@@ -452,9 +452,9 @@ func cmdInstructions(args []string) {
 		return
 	}
 
-	template := internal.GetSkillTemplate("propose")
+	instruction := internal.GetSkillTemplate(internal.ArtifactInstructionID(artifactID))
 	fmt.Printf("Change: %s\n", changeName)
-	fmt.Println(template)
+	fmt.Println(instruction)
 }
 
 func cmdArchive(args []string) {

@@ -129,12 +129,18 @@ func artifactStateToString(s ArtifactState) string {
 	}
 }
 
-func artifactSkillID(artifactID string) string {
+func ArtifactInstructionID(artifactID string) string {
 	switch artifactID {
-	case "proposal", "specs", "design", "tasks":
-		return "propose"
+	case "proposal":
+		return "artifact-proposal"
+	case "specs":
+		return "artifact-specs"
+	case "design":
+		return "artifact-design"
+	case "tasks":
+		return "artifact-tasks"
 	default:
-		return "propose"
+		return "artifact-proposal"
 	}
 }
 
@@ -183,8 +189,8 @@ func BuildArtifactInstructionsJSON(root, changeName, artifactID string) (*Artifa
 	}
 
 	changeDir := ChangePath(root, changeName)
-	skillID := artifactSkillID(artifactID)
-	template := GetSkillTemplate(skillID)
+	instruction := GetSkillTemplate(ArtifactInstructionID(artifactID))
+	template := GetSkillTemplate("propose")
 
 	var deps []DependencyInfoJSON
 	for _, reqID := range info.Requires {
@@ -217,7 +223,7 @@ func BuildArtifactInstructionsJSON(root, changeName, artifactID string) (*Artifa
 		ChangeDir:    changeDir,
 		OutputPath:   info.Filename,
 		Description:  info.Description,
-		Instruction:  template,
+		Instruction:  instruction,
 		Template:     template,
 		Dependencies: deps,
 		Unlocks:      unlocks,
