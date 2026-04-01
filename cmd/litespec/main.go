@@ -38,6 +38,8 @@ func main() {
 		cmdArchive(os.Args[2:])
 	case "new":
 		cmdNew(os.Args[2:])
+	case "update":
+		cmdUpdate(os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n", os.Args[1])
 		printUsage()
@@ -56,6 +58,7 @@ Commands:
   validate [--change <name>] [--all] [--strict]   Validate changes and specs
   instructions <artifact> [--change <name>]       Get artifact instructions
   archive <name>                                  Apply deltas and archive change
+  update [--tools <ids>]                          Regenerate skills and adapters
 
 Flags:
   --version    Print version
@@ -100,6 +103,42 @@ func cmdInit(args []string) {
 	}
 
 	fmt.Println("Project initialized.")
+}
+
+func cmdUpdate(args []string) {
+	var tools string
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--tools" && i+1 < len(args) {
+			tools = args[i+1]
+			i++
+		}
+	}
+
+	root, err := internal.FindProjectRoot()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if _, err := os.Stat(filepath.Join(root, internal.ProjectDirName)); err != nil {
+		fmt.Fprintf(os.Stderr, "error: not a litespec project. Run 'litespec init' first.\n")
+		os.Exit(1)
+	}
+
+	if err := internal.GenerateSkills(root); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("Updated .agents/skills/")
+
+	if tools != "" {
+		toolIDs := splitCSV(tools)
+		if err := internal.GenerateAdapterCommands(root, toolIDs); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Updated adapter symlinks for: %s\n", tools)
+	}
 }
 
 func cmdList(args []string) {
