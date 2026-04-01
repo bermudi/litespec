@@ -9,6 +9,8 @@ import (
 	"github.com/bermudi/litespec/internal"
 )
 
+const jsonFlag = "--json"
+
 const version = "0.1.0"
 
 func main() {
@@ -101,13 +103,15 @@ func cmdInit(args []string) {
 }
 
 func cmdList(args []string) {
-	var specsOnly, changesOnly bool
+	var specsOnly, changesOnly, asJSON bool
 	for _, arg := range args {
 		switch arg {
 		case "--specs":
 			specsOnly = true
 		case "--changes":
 			changesOnly = true
+		case jsonFlag:
+			asJSON = true
 		}
 	}
 
@@ -115,6 +119,35 @@ func cmdList(args []string) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
+	}
+
+	if asJSON {
+		type listOutput struct {
+			Specs   []string `json:"specs"`
+			Changes []string `json:"changes"`
+		}
+
+		out := listOutput{}
+		if !changesOnly {
+			names, err := internal.ListSpecs(root)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				os.Exit(1)
+			}
+			out.Specs = names
+		}
+		if !specsOnly {
+			names, err := internal.ListChanges(root)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				os.Exit(1)
+			}
+			out.Changes = names
+		}
+
+		data, _ := internal.MarshalJSON(out)
+		fmt.Println(string(data))
+		return
 	}
 
 	if !changesOnly {
@@ -150,10 +183,16 @@ func cmdList(args []string) {
 
 func cmdStatus(args []string) {
 	var changeName string
+	var asJSON bool
 	for i := 0; i < len(args); i++ {
-		if args[i] == "--change" && i+1 < len(args) {
-			changeName = args[i+1]
-			i++
+		switch args[i] {
+		case "--change":
+			if i+1 < len(args) {
+				changeName = args[i+1]
+				i++
+			}
+		case jsonFlag:
+			asJSON = true
 		}
 	}
 
@@ -161,6 +200,37 @@ func cmdStatus(args []string) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
+	}
+
+	if asJSON && changeName != "" {
+		ctx, err := internal.LoadChangeContext(root, changeName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		status := internal.BuildChangeStatusJSON(ctx)
+		data, _ := internal.MarshalJSON(status)
+		fmt.Println(string(data))
+		return
+	}
+
+	if asJSON && changeName == "" {
+		changes, err := internal.ListChanges(root)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		var statuses []internal.ChangeStatusJSON
+		for _, name := range changes {
+			ctx, err := internal.LoadChangeContext(root, name)
+			if err != nil {
+				continue
+			}
+			statuses = append(statuses, internal.BuildChangeStatusJSON(ctx))
+		}
+		data, _ := internal.MarshalJSON(statuses)
+		fmt.Println(string(data))
+		return
 	}
 
 	if changeName == "" {
@@ -258,43 +328,78 @@ func cmdValidate(args []string) {
 	}
 }
 
-var artifactToSkill = map[string]string{
-	"proposal": "propose",
-	"specs":    "propose",
-	"design":   "propose",
-	"tasks":    "propose",
-}
-
 func cmdInstructions(args []string) {
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "usage: litespec instructions <artifact> [--change <name>]\n")
+		fmt.Fprintf(os.Stderr, "usage: litespec instructions <artifact> [--change <name>] [--json]\n")
 		os.Exit(1)
 	}
 
 	artifactID := args[0]
 	var changeName string
+	var asJSON bool
 	for i := 1; i < len(args); i++ {
-		if args[i] == "--change" && i+1 < len(args) {
-			changeName = args[i+1]
-			i++
+		switch args[i] {
+		case "--change":
+			if i+1 < len(args) {
+				changeName = args[i+1]
+				i++
+			}
+		case jsonFlag:
+			asJSON = true
 		}
 	}
 
-	skillID, ok := artifactToSkill[artifactID]
-	if !ok {
-		fmt.Fprintf(os.Stderr, "unknown artifact: %s (valid: proposal, specs, design, tasks)\n", artifactID)
+	root, err := internal.FindProjectRoot()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 
-	template := internal.GetSkillTemplate(skillID)
-	if template == "" {
-		fmt.Fprintf(os.Stderr, "no template found for artifact %q\n", artifactID)
+	if changeName == "" {
+		fmt.Fprintf(os.Stderr, "error: --change <name> is required\n")
 		os.Exit(1)
 	}
 
-	if changeName != "" {
+	if artifactID == "apply" {
+		instr, err := internal.BuildApplyInstructionsJSON(root, changeName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		if asJSON {
+			data, _ := internal.MarshalJSON(instr)
+			fmt.Println(string(data))
+			return
+		}
 		fmt.Printf("Change: %s\n", changeName)
+		fmt.Printf("State: %s\n", instr.State)
+		fmt.Printf("Progress: %d/%d (%d remaining)\n", instr.Progress.Complete, instr.Progress.Total, instr.Progress.Remaining)
+		if instr.CurrentPhase < len(instr.Phases) {
+			fmt.Printf("Current Phase: %s\n", instr.Phases[instr.CurrentPhase].Name)
+		}
+		fmt.Println(instr.Instruction)
+		return
 	}
+
+	artifactInfo := internal.GetArtifact(artifactID)
+	if artifactInfo == nil {
+		fmt.Fprintf(os.Stderr, "unknown artifact: %s (valid: proposal, specs, design, tasks, apply)\n", artifactID)
+		os.Exit(1)
+	}
+
+	if asJSON {
+		instr, err := internal.BuildArtifactInstructionsJSON(root, changeName, artifactID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		data, _ := internal.MarshalJSON(instr)
+		fmt.Println(string(data))
+		return
+	}
+
+	template := internal.GetSkillTemplate("propose")
+	fmt.Printf("Change: %s\n", changeName)
 	fmt.Println(template)
 }
 

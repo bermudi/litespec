@@ -1,0 +1,317 @@
+package internal
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+type ChangeStatusJSON struct {
+	ChangeName string               `json:"changeName"`
+	SchemaName string               `json:"schemaName"`
+	IsComplete bool                 `json:"isComplete"`
+	Artifacts  []ArtifactStatusJSON `json:"artifacts"`
+}
+
+type ArtifactStatusJSON struct {
+	ID          string   `json:"id"`
+	OutputPath  string   `json:"outputPath"`
+	Status      string   `json:"status"`
+	MissingDeps []string `json:"missingDeps,omitempty"`
+}
+
+type ArtifactInstructionsJSON struct {
+	ChangeName   string               `json:"changeName"`
+	ArtifactID   string               `json:"artifactId"`
+	SchemaName   string               `json:"schemaName"`
+	ChangeDir    string               `json:"changeDir"`
+	OutputPath   string               `json:"outputPath"`
+	Description  string               `json:"description"`
+	Instruction  string               `json:"instruction"`
+	Template     string               `json:"template"`
+	Dependencies []DependencyInfoJSON `json:"dependencies"`
+	Unlocks      []string             `json:"unlocks"`
+}
+
+type DependencyInfoJSON struct {
+	ID          string `json:"id"`
+	Done        bool   `json:"done"`
+	Path        string `json:"path"`
+	Description string `json:"description"`
+}
+
+type ApplyInstructionsJSON struct {
+	ChangeName   string            `json:"changeName"`
+	ChangeDir    string            `json:"changeDir"`
+	SchemaName   string            `json:"schemaName"`
+	ContextFiles map[string]string `json:"contextFiles"`
+	Progress     ProgressJSON      `json:"progress"`
+	Phases       []PhaseJSON       `json:"phases"`
+	CurrentPhase int               `json:"currentPhase"`
+	State        string            `json:"state"`
+	Instruction  string            `json:"instruction"`
+}
+
+type ProgressJSON struct {
+	Total     int `json:"total"`
+	Complete  int `json:"complete"`
+	Remaining int `json:"remaining"`
+}
+
+type PhaseJSON struct {
+	Name     string         `json:"name"`
+	Tasks    []TaskItemJSON `json:"tasks"`
+	Complete int            `json:"complete"`
+	Total    int            `json:"total"`
+}
+
+type TaskItemJSON struct {
+	ID          string `json:"id"`
+	Description string `json:"description"`
+	Done        bool   `json:"done"`
+}
+
+type ChangeListItemJSON struct {
+	Name string `json:"name"`
+}
+
+func MarshalJSON(v interface{}) ([]byte, error) {
+	return json.MarshalIndent(v, "", "  ")
+}
+
+func artifactStateToString(s ArtifactState) string {
+	switch s {
+	case ArtifactBlocked:
+		return "blocked"
+	case ArtifactReady:
+		return "ready"
+	case ArtifactDone:
+		return "done"
+	default:
+		return "blocked"
+	}
+}
+
+func artifactSkillID(artifactID string) string {
+	switch artifactID {
+	case "proposal", "specs", "design", "tasks":
+		return "propose"
+	default:
+		return "propose"
+	}
+}
+
+func BuildChangeStatusJSON(change *Change) ChangeStatusJSON {
+	var artifacts []ArtifactStatusJSON
+	allDone := true
+
+	for _, info := range Artifacts {
+		state := change.Artifacts[info.ID]
+		if state != ArtifactDone {
+			allDone = false
+		}
+
+		var missing []string
+		for _, req := range info.Requires {
+			if change.Artifacts[req] != ArtifactDone {
+				missing = append(missing, req)
+			}
+		}
+
+		artifacts = append(artifacts, ArtifactStatusJSON{
+			ID:          info.ID,
+			OutputPath:  info.Filename,
+			Status:      artifactStateToString(state),
+			MissingDeps: missing,
+		})
+	}
+
+	return ChangeStatusJSON{
+		ChangeName: change.Name,
+		SchemaName: change.Schema,
+		IsComplete: allDone,
+		Artifacts:  artifacts,
+	}
+}
+
+func BuildArtifactInstructionsJSON(root, changeName, artifactID string) (*ArtifactInstructionsJSON, error) {
+	change, err := LoadChangeContext(root, changeName)
+	if err != nil {
+		return nil, err
+	}
+
+	info := GetArtifact(artifactID)
+	if info == nil {
+		return nil, fmt.Errorf("artifact %q not found", artifactID)
+	}
+
+	changeDir := ChangePath(root, changeName)
+	skillID := artifactSkillID(artifactID)
+	template := GetSkillTemplate(skillID)
+
+	var deps []DependencyInfoJSON
+	for _, reqID := range info.Requires {
+		reqInfo := GetArtifact(reqID)
+		if reqInfo == nil {
+			continue
+		}
+		deps = append(deps, DependencyInfoJSON{
+			ID:          reqInfo.ID,
+			Done:        change.Artifacts[reqID] == ArtifactDone,
+			Path:        filepath.Join(changeDir, reqInfo.Filename),
+			Description: reqInfo.Description,
+		})
+	}
+
+	var unlocks []string
+	for _, candidate := range Artifacts {
+		for _, req := range candidate.Requires {
+			if req == artifactID {
+				unlocks = append(unlocks, candidate.ID)
+				break
+			}
+		}
+	}
+
+	return &ArtifactInstructionsJSON{
+		ChangeName:   changeName,
+		ArtifactID:   artifactID,
+		SchemaName:   change.Schema,
+		ChangeDir:    changeDir,
+		OutputPath:   info.Filename,
+		Description:  info.Description,
+		Instruction:  template,
+		Template:     template,
+		Dependencies: deps,
+		Unlocks:      unlocks,
+	}, nil
+}
+
+func BuildApplyInstructionsJSON(root, changeName string) (*ApplyInstructionsJSON, error) {
+	change, err := LoadChangeContext(root, changeName)
+	if err != nil {
+		return nil, err
+	}
+
+	changeDir := ChangePath(root, changeName)
+	contextFiles := map[string]string{
+		"proposal": filepath.Join(changeDir, "proposal.md"),
+		"design":   filepath.Join(changeDir, "design.md"),
+		"tasks":    filepath.Join(changeDir, "tasks.md"),
+	}
+
+	tasksPath := filepath.Join(changeDir, "tasks.md")
+	state := "ready"
+	var phases []PhaseJSON
+
+	if change.Artifacts["tasks"] != ArtifactDone {
+		state = "blocked"
+	}
+
+	data, err := os.ReadFile(tasksPath)
+	if err != nil {
+		state = "blocked"
+		phases = []PhaseJSON{}
+	} else {
+		phases = parseTasksMD(string(data))
+	}
+
+	progress := computeProgress(phases)
+	currentPhase := findCurrentPhase(phases)
+
+	if state != "blocked" && progress.Remaining == 0 {
+		state = "all_done"
+	}
+
+	instruction := ""
+	if state == "ready" || state == "all_done" {
+		instruction = GetSkillTemplate("apply")
+	}
+
+	return &ApplyInstructionsJSON{
+		ChangeName:   changeName,
+		ChangeDir:    changeDir,
+		SchemaName:   change.Schema,
+		ContextFiles: contextFiles,
+		Progress:     progress,
+		Phases:       phases,
+		CurrentPhase: currentPhase,
+		State:        state,
+		Instruction:  instruction,
+	}, nil
+}
+
+func parseTasksMD(content string) []PhaseJSON {
+	var phases []PhaseJSON
+	var current *PhaseJSON
+
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "## Phase") {
+			name := strings.TrimSpace(strings.TrimPrefix(line, "##"))
+			phases = append(phases, PhaseJSON{Name: name})
+			current = &phases[len(phases)-1]
+			continue
+		}
+
+		if current == nil {
+			continue
+		}
+
+		if strings.HasPrefix(line, "- [x] ") {
+			desc := strings.TrimPrefix(line, "- [x] ")
+			current.Tasks = append(current.Tasks, TaskItemJSON{
+				ID:          fmt.Sprintf("%s-%d", current.Name, len(current.Tasks)+1),
+				Description: strings.TrimSpace(desc),
+				Done:        true,
+			})
+		} else if strings.HasPrefix(line, "- [ ] ") {
+			desc := strings.TrimPrefix(line, "- [ ] ")
+			current.Tasks = append(current.Tasks, TaskItemJSON{
+				ID:          fmt.Sprintf("%s-%d", current.Name, len(current.Tasks)+1),
+				Description: strings.TrimSpace(desc),
+				Done:        false,
+			})
+		}
+	}
+
+	for i := range phases {
+		complete := 0
+		for _, t := range phases[i].Tasks {
+			if t.Done {
+				complete++
+			}
+		}
+		phases[i].Complete = complete
+		phases[i].Total = len(phases[i].Tasks)
+	}
+
+	return phases
+}
+
+func computeProgress(phases []PhaseJSON) ProgressJSON {
+	total := 0
+	complete := 0
+	for _, p := range phases {
+		total += p.Total
+		complete += p.Complete
+	}
+	return ProgressJSON{
+		Total:     total,
+		Complete:  complete,
+		Remaining: total - complete,
+	}
+}
+
+func findCurrentPhase(phases []PhaseJSON) int {
+	for i, p := range phases {
+		for _, t := range p.Tasks {
+			if !t.Done {
+				return i
+			}
+		}
+	}
+	return 0
+}

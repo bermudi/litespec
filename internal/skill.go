@@ -10,14 +10,99 @@ import (
 )
 
 var skillTemplates = map[string]string{
-	"explore":  "Explore the codebase and discuss potential changes. Use `litespec status --json` to understand current state. No artifacts are created. Think freely about what could change and why.",
-	"grill":    "Interview the user relentlessly about a plan or design until reaching shared understanding. Resolve each branch of the decision tree. Ask one question at a time. Provide your recommended answer for each question.",
-	"propose":  "Create a change proposal with all planning artifacts. Use `litespec status --change <name> --json` to check state, then `litespec instructions <artifact> --change <name> --json` for guidance. Create proposal.md, specs/, design.md, and tasks.md in the change directory.",
-	"continue": "Create the next missing artifact for a change. Use `litespec status --change <name> --json` to see what's ready. Use `litespec instructions <artifact> --change <name> --json` for guidance. Create only the next artifact.",
-	"apply":    "Implement the next phase of tasks from a change. Read tasks.md to find the current phase (first phase with unchecked tasks). Implement each task in that phase sequentially, marking them complete with [x]. Use `litespec status --change <name> --json` to check progress.",
-	"verify":   "Review implemented code against spec requirements. Read the change's specs/ directory for requirements. Examine the relevant code files. Report gaps between spec and implementation. Do NOT run tests or lint.",
-	"adopt":    "Generate a change proposal from existing code. Given a file or directory path, read and analyze the code. Create a change directory with specs that describe what the code does. Use `litespec status --change <name> --json` and `litespec instructions` for guidance.",
-	"archive":  "Complete a change by applying delta operations. Use `litespec validate --change <name>` to verify first. Then use `litespec archive <name>` to apply deltas and move to archive.",
+	"explore": `Think deeply about the codebase and potential changes.
+
+Run ` + "`litespec list --json`" + ` to see active changes.
+
+No artifacts are created. Think freely.
+
+Investigate codebase: read files, search code, challenge assumptions.
+
+When insights crystallize, offer to proceed to grill.`,
+
+	"grill": `Interview the user relentlessly about a plan or design until reaching shared understanding.
+
+Resolve each branch of the decision tree, one question at a time.
+
+Provide your recommended answer for each question.
+
+If a question can be answered by exploring the codebase, explore it instead of asking.
+
+When the plan is fully resolved, offer to proceed to propose.`,
+
+	"propose": `Ask the user what they want to build. Derive a kebab-case change name.
+
+Run ` + "`litespec new <name>`" + ` to create the change directory.
+
+Then loop through artifacts in dependency order:
+
+1. Run ` + "`litespec status --change <name> --json`" + ` to get artifact states. Response: {changeName, schemaName, isComplete, artifacts: [{id, outputPath, status, missingDeps}]}
+2. For each "ready" artifact, run ` + "`litespec instructions <artifact-id> --change <name> --json`" + ` to get template + context. Response: {changeName, artifactId, changeDir, outputPath, description, instruction, template, dependencies: [{id, done, path}], unlocks}
+3. Read dependency files listed in dependencies, create the artifact file using the template structure.
+
+Continue until proposal, specs, design, and tasks are all created.`,
+
+	"continue": `Run ` + "`litespec list --json`" + ` to see changes. If no name given, prompt user to select.
+
+Run ` + "`litespec status --change <name> --json`" + ` to see which artifacts are ready.
+
+Run ` + "`litespec instructions <artifact-id> --change <name> --json`" + ` for the first ready artifact.
+
+Read dependency files, create exactly ONE artifact, then STOP.
+
+Report which artifact was created and what's now unlocked.`,
+
+	"apply": `Run ` + "`litespec status --change <name> --json`" + ` to verify all artifacts are done.
+
+Run ` + "`litespec instructions apply --change <name> --json`" + ` to get context. Response: {changeName, changeDir, contextFiles: {proposal: "path", ...}, progress: {total, complete, remaining}, phases: [{name, tasks: [{id, description, done}], complete, total}], currentPhase, state, instruction}
+
+If state is "blocked", tell user to create missing artifacts first.
+
+Read all contextFiles (proposal.md, design.md, specs/, tasks.md).
+
+Focus on the current phase (currentPhase index in phases array).
+
+Implement each task in that phase sequentially.
+
+After completing each task, mark it [x] in tasks.md.
+
+After completing all tasks in the phase, commit with message: "phase N: <phase name>"
+
+Stop after one phase. User can re-invoke apply for the next phase.`,
+
+	"verify": `Run ` + "`litespec instructions apply --change <name> --json`" + ` to load context files.
+
+Read all artifacts: proposal, specs, design, tasks.
+
+Search the codebase for implementation evidence.
+
+Check three dimensions: Completeness (all tasks done, all spec requirements covered), Correctness (requirement-to-implementation mapping), Coherence (design adherence).
+
+Generate a verification report with CRITICAL/WARNING/SUGGESTION issues.
+
+Produce a summary scorecard.`,
+
+	"adopt": `Given a file or directory path from the user, read and analyze the code.
+
+Run ` + "`litespec new <name>`" + ` to create a change directory.
+
+Generate specs that describe what the code does using ADDED Requirements markers.
+
+Create proposal.md explaining what was adopted and why.
+
+Create design.md documenting the existing architecture discovered.
+
+Run ` + "`litespec status --change <name> --json`" + ` to verify all artifacts.`,
+
+	"archive": `Run ` + "`litespec validate --change <name>`" + ` to verify the change.
+
+Review validation output. If errors exist, fix them before proceeding.
+
+Run ` + "`litespec archive <name>`" + ` to apply delta operations and move to archive.
+
+The CLI handles: RENAMED → REMOVED → MODIFIED → ADDED delta merge, then moves to archive/.
+
+Optionally offer to create a branch and PR for the completed change.`,
 }
 
 type skillFrontmatter struct {
