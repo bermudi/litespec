@@ -16,7 +16,7 @@ The CLI is a read-only context provider. The AI writes artifacts directly. lites
 
 - **Convention over configuration** — zero config files. All defaults, all the time.
 - **Unidirectional workflow** — `explore → grill → propose → apply → verify → archive`. No going backward.
-- **Lean skills** — 5-10 lines each. Minimal tokens, zero boilerplate.
+- **Lean skills** — minimal tokens, zero boilerplate. Enriched enough to guide, short enough to not waste context.
 - **`.agents/skills/` is canonical** — one home for all skills. Thin adapter layer for tools that need it.
 - **Git-native** — specs live in your repo. Branch per change, per-phase commits (future).
 - **CLI is read-only** — structured data out, never writes from the CLI side.
@@ -46,7 +46,7 @@ If something's wrong after `propose`, start over from `explore`/`grill`. No back
 ## Installation
 
 ```bash
-go install github.com/bermudi/litespec@latest
+go install github.com/bermudi/litespec/cmd/litespec@latest
 ```
 
 Or build from source:
@@ -56,6 +56,8 @@ git clone https://github.com/bermudi/litespec.git
 cd litespec
 go build -o litespec ./cmd/litespec
 ```
+
+Then move the binary somewhere on your PATH (e.g. `~/.local/bin`).
 
 ## Quick Start
 
@@ -92,6 +94,7 @@ Then use the skills in `.agents/skills/` with your AI agent. The skills tell the
 | `validate [--change <name>] [--all] [--strict]` | Validate structure, delta syntax, dangling deltas |
 | `instructions <artifact>` | Return enriched instructions for AI to create an artifact |
 | `archive <name>` | Apply deltas + move change to archive |
+| `update [--tools <ids>]` | Regenerate skills (+ optional tool adapters) without touching specs |
 
 All commands support `--json` for structured output.
 
