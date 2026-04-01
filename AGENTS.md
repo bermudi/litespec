@@ -27,6 +27,8 @@ The design emerged from a structured grilling session — question by question, 
 - **Changes** live in `specs/changes/<name>/` — isolated proposed modifications
 - **Delta specs** use ADDED/MODIFIED/REMOVED/RENAMED markers merged in strict order at archive time
 - **Skills** are generated into `.agents/skills/` (canonical). Claude Code gets symlinks via `--tools claude`.
+- **Scenarios** — each requirement has named scenarios (`#### Scenario: <name>`) with WHEN/THEN format. ADDED and MODIFIED requirements must have at least one scenario. Body text must contain SHALL or MUST.
+- **Artifact-specific instructions** — `litespec instructions <artifact>` returns distinct guidance per artifact (proposal: motivation/scope/non-goals; specs: delta format + capabilities; design: architecture/decisions/file changes; tasks: phased checklist). The `template` field retains the propose workflow for context.
 - **Phased tasks** — `tasks.md` organizes work into phases, applied one phase at a time
 
 ## Workflow
@@ -56,6 +58,7 @@ These came from deliberate debate. Respect the reasoning:
 - **Phase tracking derived from `tasks.md` checkboxes** — no metadata field. The first phase with unchecked tasks is the current phase.
 - **Git-native workflow** — litespec manages specs. A separate harness (future work) will handle branch creation (`change/<name>`), per-phase commits, and PR creation. For now, the skills offer prompts: "Would you like a new branch?" and "Would you like a PR?"
 - **CLI is a read-only context provider** — the AI never writes through the CLI. It writes artifact files directly. The CLI exists to give the AI structured data (status, instructions, validation).
+- **Artifact-specific instructions** — each artifact (proposal, specs, design, tasks) gets its own instruction template via `litespec instructions <artifact>`, not a single generic template. The propose skill template is kept as a `template` field for workflow context.
 
 ## Working Conventions
 
@@ -67,10 +70,21 @@ These came from deliberate debate. Respect the reasoning:
 - No `any` equivalents — explicit types everywhere
 - No comments unless absolutely necessary for non-obvious logic
 
+## Test Suite
+
+70 tests across 7 files, all passing. Coverage:
+
+- `delta_test.go` — scenario parse/serialize/merge (12 tests)
+- `delta_parse_test.go` — ParseDeltaSpec edge cases (7 tests)
+- `delta_merge_test.go` — MergeDelta ordering, errors, rename+modify (8 tests)
+- `validate_test.go` — ValidateChange with filesystem (13 tests)
+- `tasks_test.go` — parseTasksMD, findCurrentPhase, computeProgress (13 tests)
+- `archive_test.go` — full archive pipeline against temp dirs (5 tests)
+- `instructions_test.go` — artifact-specific instructions, distinctness, dependencies (12 tests)
+
 ## What's Next
 
 Things we know we want but haven't built yet:
 
 - Git-native workflow integration (branch per change, phase commits, PR creation)
-- Tests — the codebase is green but has zero test coverage
 - Skill template refinement based on real usage

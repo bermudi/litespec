@@ -92,7 +92,7 @@ Then use the skills in `.agents/skills/` with your AI agent. The skills tell the
 | `list [--specs\|--changes]` | List specs or changes |
 | `status [--change <name>]` | Show artifact states (BLOCKED / READY / DONE) |
 | `validate [--change <name>] [--all] [--strict]` | Validate structure, delta syntax, dangling deltas |
-| `instructions <artifact>` | Return enriched instructions for AI to create an artifact |
+| `instructions <artifact>` | Return artifact-specific instructions for AI to create an artifact |
 | `archive <name>` | Apply deltas + move change to archive |
 | `update [--tools <ids>]` | Regenerate skills (+ optional tool symlinks) without touching specs |
 

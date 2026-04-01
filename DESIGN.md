@@ -101,6 +101,16 @@ Applied in strict order at archive time:
 
 `validate` catches dangling deltas — MODIFIED/REMOVED operations referencing requirements that don't exist in the target spec. OpenSpec only fails on these at archive time. litespec catches them during validation.
 
+### Scenarios
+
+Each requirement has named scenarios (`#### Scenario: <name>`) with WHEN/THEN format. Scenarios describe expected behavior — the format is opaque text, not parsed structurally.
+
+Rules:
+- ADDED and MODIFIED requirements must have at least one scenario
+- ADDED and MODIFIED requirement body text must contain `SHALL` or `MUST`
+- REMOVED requirements are name-only — no body or scenarios
+- RENAMED requirements preserve content and scenarios under the new name
+
 ## Artifact Dependency Graph
 
 ```
@@ -131,7 +141,7 @@ Convention over configuration. No config file. All defaults baked in. If a need 
 | `litespec init [--tools ...]` | Scaffold `specs/` dir + generate skills (+ optional tool-specific commands) |
 | `litespec validate [--strict]` | Validate artifact structure, delta syntax, dangling deltas |
 | `litespec status [--change <name>]` | Show artifact graph state (BLOCKED/READY/DONE) |
-| `litespec instructions <artifact>` | Return enriched instructions for AI to create an artifact |
+| `litespec instructions <artifact>` | Return artifact-specific instructions for AI to create an artifact |
 | `litespec list [--specs\|--changes]` | List specs or changes |
 | `litespec archive <change>` | Apply deltas + move to archive |
 
