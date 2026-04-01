@@ -26,7 +26,7 @@ The design emerged from a structured grilling session — question by question, 
 - **Specs** live in `specs/specs/` — the source of truth for current capabilities
 - **Changes** live in `specs/changes/<name>/` — isolated proposed modifications
 - **Delta specs** use ADDED/MODIFIED/REMOVED/RENAMED markers merged in strict order at archive time
-- **Skills** are generated into `.agents/skills/` (canonical) with optional tool-specific adapters
+- **Skills** are generated into `.agents/skills/` (canonical). Claude Code gets symlinks via `--tools claude`.
 - **Phased tasks** — `tasks.md` organizes work into phases, applied one phase at a time
 
 ## Workflow
@@ -50,8 +50,8 @@ Unidirectional. No backward flow.
 These came from deliberate debate. Respect the reasoning:
 
 - **Convention over configuration** — no config files unless a concrete need arises. OpenSpec ships a stub config.yaml that nobody fills in. We skip it entirely until needed.
-- **`.agents/skills/` is canonical** — not per-tool directories. Tools that don't support the Agent Skills RFC get a thin adapter layer.
-- **Lean skills** — minimal token usage. Each skill is 5-10 lines of instructions, not pages of boilerplate.
+- **`.agents/skills/` is canonical** — one source of truth. `--tools claude` creates symlinks in `.claude/skills/` for Claude Code.
+- **Lean skills** — minimal token usage. Each skill is focused instructions, not pages of boilerplate.
 - **Dangling delta detection during `validate`** — not just at archive time. This is an improvement over OpenSpec.
 - **Phase tracking derived from `tasks.md` checkboxes** — no metadata field. The first phase with unchecked tasks is the current phase.
 - **Git-native workflow** — litespec manages specs. A separate harness (future work) will handle branch creation (`change/<name>`), per-phase commits, and PR creation. For now, the skills offer prompts: "Would you like a new branch?" and "Would you like a PR?"
@@ -71,7 +71,6 @@ These came from deliberate debate. Respect the reasoning:
 
 Things we know we want but haven't built yet:
 
-- `litespec update` — regenerate skills when templates change (OpenSpec has this)
 - Git-native workflow integration (branch per change, phase commits, PR creation)
 - Tests — the codebase is green but has zero test coverage
 - Skill template refinement based on real usage

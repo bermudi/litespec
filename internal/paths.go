@@ -59,20 +59,9 @@ var Skills = []SkillInfo{
 
 var Adapters = []ToolAdapter{
 	{
-		ID:            "claude",
-		Name:          "Claude Code",
-		SkillsDir:     ".claude/skills",
-		CommandsDir:   "",
-		FileExtension: "",
-		UsesSkillDir:  true,
-		Symlink:       true,
-	},
-	{
-		ID:            "cursor",
-		Name:          "Cursor",
-		SkillsDir:     ".cursor/skills",
-		CommandsDir:   ".cursor/commands",
-		FileExtension: ".md",
+		ID:        "claude",
+		Name:      "Claude Code",
+		SkillsDir: ".claude/skills",
 	},
 }
 

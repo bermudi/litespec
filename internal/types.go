@@ -87,11 +87,7 @@ type SkillInfo struct {
 }
 
 type ToolAdapter struct {
-	ID            string
-	Name          string
-	SkillsDir     string
-	CommandsDir   string
-	FileExtension string
-	UsesSkillDir  bool
-	Symlink       bool
+	ID        string
+	Name      string
+	SkillsDir string
 }

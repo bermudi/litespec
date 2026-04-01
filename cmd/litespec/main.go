@@ -60,6 +60,9 @@ Commands:
   archive <name>                                  Apply deltas and archive change
   update [--tools <ids>]                          Regenerate skills and adapters
 
+Tools:
+  claude    Symlink skills into .claude/skills/ for Claude Code
+
 Flags:
   --version    Print version
   --help       Print this help message

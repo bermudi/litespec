@@ -17,7 +17,7 @@ The CLI is a read-only context provider. The AI writes artifacts directly. lites
 - **Convention over configuration** — zero config files. All defaults, all the time.
 - **Unidirectional workflow** — `explore → grill → propose → apply → verify → archive`. No going backward.
 - **Lean skills** — minimal tokens, zero boilerplate. Enriched enough to guide, short enough to not waste context.
-- **`.agents/skills/` is canonical** — one home for all skills. Thin adapter layer for tools that need it.
+- **`.agents/skills/` is canonical** — one home for all skills. Symlink adapter for Claude Code (`--tools claude`).
 - **Git-native** — specs live in your repo. Branch per change, per-phase commits (future).
 - **CLI is read-only** — structured data out, never writes from the CLI side.
 - **Dangling delta detection** — catches broken deltas during `validate`, not just at archive time.
@@ -65,8 +65,8 @@ Then move the binary somewhere on your PATH (e.g. `~/.local/bin`).
 # Initialize a project
 litespec init
 
-# Optional: generate adapter commands for specific tools
-litespec init --tools claude,cursor
+# Optional: symlink skills into .claude/skills/ for Claude Code
+litespec init --tools claude
 
 # Create a new change
 litespec new add-user-auth
@@ -87,14 +87,14 @@ Then use the skills in `.agents/skills/` with your AI agent. The skills tell the
 
 | Command | Purpose |
 |---------|---------|
-| `init [--tools <ids>]` | Scaffold `specs/` dir + generate skills (+ optional tool adapters) |
+| `init [--tools <ids>]` | Scaffold `specs/` dir + generate skills (+ optional tool symlinks) |
 | `new <name>` | Create a new change directory |
 | `list [--specs\|--changes]` | List specs or changes |
 | `status [--change <name>]` | Show artifact states (BLOCKED / READY / DONE) |
 | `validate [--change <name>] [--all] [--strict]` | Validate structure, delta syntax, dangling deltas |
 | `instructions <artifact>` | Return enriched instructions for AI to create an artifact |
 | `archive <name>` | Apply deltas + move change to archive |
-| `update [--tools <ids>]` | Regenerate skills (+ optional tool adapters) without touching specs |
+| `update [--tools <ids>]` | Regenerate skills (+ optional tool symlinks) without touching specs |
 
 All commands support `--json` for structured output.
 
