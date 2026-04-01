@@ -1,9 +1,10 @@
----
-name: litespec-apply
-description: Implement the next phase of tasks from a change proposal, one phase per session. Use when the user is ready to start coding, wants to execute tasks, or says "apply".
----
+package skill
 
-Apply is execution mode. You implement tasks, one phase at a time, with discipline.
+func init() {
+	Register("apply", applyTemplate)
+}
+
+const applyTemplate = `Apply is execution mode. You implement tasks, one phase at a time, with discipline.
 
 **IMPORTANT: You are an implementer, not a designer.** Your job is to turn clear tasks into working code. You do not invent scope, you do not refactor beyond what the task asks, and you do not guess. If something is unclear — pause and ask.
 
@@ -11,9 +12,9 @@ Apply is execution mode. You implement tasks, one phase at a time, with discipli
 
 ## Setup
 
-Run `litespec status --change <name> --json` to verify all artifacts are ready.
+Run ` + "`litespec status --change <name> --json`" + ` to verify all artifacts are ready.
 
-Run `litespec instructions apply --change <name> --json` to get context. Response: {changeName, changeDir, contextFiles: {proposal: "path", ...}, progress: {total, complete, remaining}, phases: [{name, tasks: [{id, description, done}], complete, total}], currentPhase, state, instruction}
+Run ` + "`litespec instructions apply --change <name> --json`" + ` to get context. Response: {changeName, changeDir, contextFiles: {proposal: "path", ...}, progress: {total, complete, remaining}, phases: [{name, tasks: [{id, description, done}], complete, total}], currentPhase, state, instruction}
 
 If state is "blocked", stop. Tell the user to create missing artifacts first.
 
@@ -25,11 +26,11 @@ Read all contextFiles — proposal.md, design.md, specs/, tasks.md. You need ful
 
 **One phase per session. This is non-negotiable.** Litespec's strength is controlled, incremental progress.
 
-1. **Identify the current phase** — `currentPhase` points to it in the phases array
+1. **Identify the current phase** — ` + "`currentPhase`" + ` points to it in the phases array
 2. **Read the phase tasks** — understand every task before starting any of them
 3. **Implement each task sequentially** — one at a time, in order
-4. **Mark tasks done immediately** — edit `tasks.md` and set `[x]` the moment a task is complete
-5. **Commit after the phase** — message: `phase N: <phase name>`
+4. **Mark tasks done immediately** — edit ` + "`tasks.md`" + ` and set ` + "`[x]`" + ` the moment a task is complete
+5. **Commit after the phase** — message: ` + "`phase N: <phase name>`" + `
 6. **Stop** — tell the user the phase is done and they can re-invoke apply for the next one
 
 ---
@@ -39,7 +40,7 @@ Read all contextFiles — proposal.md, design.md, specs/, tasks.md. You need ful
 - **Make minimal, scoped changes** — implement exactly what the task requires, nothing more
 - **Do not refactor beyond scope** — even if you see something ugly nearby. Note it, do not fix it
 - **Do not guess on unclear tasks** — if a task is ambiguous, pause and ask before proceeding
-- **Mark tasks `[x]` immediately** — do not batch-mark at the end. Each completion gets its own edit
+- **Mark tasks ` + "`[x]`" + ` immediately** — do not batch-mark at the end. Each completion gets its own edit
 - **If a task requires artifact changes** (design, specs, proposal), note it and pause. Do not modify artifacts yourself
 - **One phase per commit** — no more, no less
 
@@ -66,4 +67,4 @@ After completing a phase, report:
 - Any issues or notes surfaced during implementation
 - That the user can re-invoke apply for the next phase
 
-Do not offer to start the next phase yourself. One phase. Stop.
+Do not offer to start the next phase yourself. One phase. Stop.`

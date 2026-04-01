@@ -1,6 +1,6 @@
 ---
 name: litespec-archive
-description: Apply delta operations and complete a change
+description: Validate and archive a completed change, applying delta operations to merge specs. Use when a change is done and the user wants to finalize it or says "archive".
 ---
 
 Run `litespec validate --change <name>` to verify the change.

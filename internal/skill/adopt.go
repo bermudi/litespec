@@ -1,9 +1,10 @@
----
-name: litespec-adopt
-description: Reverse-engineer specs from existing code. Use when the user provides a file or directory path to document, wants to spec existing code, or says "adopt".
----
+package skill
 
-Adopt reverse-engineers specs from existing code. You read code, understand what it does, and produce a change proposal that documents the discovered architecture and behavior.
+func init() {
+	Register("adopt", adoptTemplate)
+}
+
+const adoptTemplate = `Adopt reverse-engineers specs from existing code. You read code, understand what it does, and produce a change proposal that documents the discovered architecture and behavior.
 
 **IMPORTANT: You are reading code, not changing it.** You must never modify the source code you are analyzing. Your output is litespec artifacts only.
 
@@ -33,7 +34,7 @@ Do not skim. Read the actual implementation, not just signatures and comments.
 
 ## Create the Change
 
-`litespec new <name>` to create the change directory. Use a name derived from what the code does (e.g., `adopt-auth-system`, `adopt-config-parser`).
+` + "`litespec new <name>`" + ` to create the change directory. Use a name derived from what the code does (e.g., ` + "`adopt-auth-system`" + `, ` + "`adopt-config-parser`" + `).
 
 Then create artifacts in dependency order:
 
@@ -61,7 +62,7 @@ Document the existing architecture discovered:
 - External dependencies and integration points
 - Patterns and conventions used
 
-Verify with `litespec status --change <name> --json` that all artifacts are created.
+Verify with ` + "`litespec status --change <name> --json`" + ` that all artifacts are created.
 
 ---
 
@@ -81,4 +82,4 @@ Report what was adopted:
 - How many capabilities and requirements were discovered
 - Which files were analyzed
 - Any surprises or notable findings
-- Suggest next steps: verify (review the specs for accuracy), or use the specs as a baseline for future changes
+- Suggest next steps: verify (review the specs for accuracy), or use the specs as a baseline for future changes`

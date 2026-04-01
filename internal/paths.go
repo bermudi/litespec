@@ -18,42 +18,42 @@ var Skills = []SkillInfo{
 	{
 		ID:          "explore",
 		Name:        "litespec-explore",
-		Description: "Think about the codebase and potential changes without creating artifacts",
+		Description: "Enter explore mode - a thinking partner for exploring ideas, investigating problems, and clarifying requirements. Use when the user wants to think through something before or during a change.",
 	},
 	{
 		ID:          "grill",
 		Name:        "litespec-grill",
-		Description: "Relentlessly interview the user about a plan until reaching shared understanding",
+		Description: "Interview the user relentlessly about a plan or design until reaching shared understanding. Use when the user wants to stress-test a plan, get grilled on their design, or mentions \"grill me\".",
 	},
 	{
 		ID:          "propose",
 		Name:        "litespec-propose",
-		Description: "Create a change proposal with all planning artifacts (proposal, specs, design, tasks)",
+		Description: "Materialize a complete change proposal with all planning artifacts (proposal, specs, design, tasks). Use when the user wants to create a new change, start a feature, or says \"propose\".",
 	},
 	{
 		ID:          "continue",
 		Name:        "litespec-continue",
-		Description: "Create the next missing artifact for an existing change",
+		Description: "Create exactly one missing artifact for an existing change, then stop. Use when the user wants to fill in the next missing piece of a change or says \"continue\".",
 	},
 	{
 		ID:          "apply",
 		Name:        "litespec-apply",
-		Description: "Implement the next phase of tasks from a change proposal",
+		Description: "Implement the next phase of tasks from a change proposal, one phase per session. Use when the user is ready to start coding, wants to execute tasks, or says \"apply\".",
 	},
 	{
 		ID:          "verify",
 		Name:        "litespec-verify",
-		Description: "Review implemented code against spec requirements",
+		Description: "Review implemented code against spec requirements with structured QA. Use when the user wants to verify implementation, check completeness, or says \"verify\".",
 	},
 	{
 		ID:          "adopt",
 		Name:        "litespec-adopt",
-		Description: "Generate a change proposal with specs from existing code",
+		Description: "Reverse-engineer specs from existing code. Use when the user provides a file or directory path to document, wants to spec existing code, or says \"adopt\".",
 	},
 	{
 		ID:          "archive",
 		Name:        "litespec-archive",
-		Description: "Apply delta operations and complete a change",
+		Description: "Validate and archive a completed change, applying delta operations to merge specs. Use when a change is done and the user wants to finalize it or says \"archive\".",
 	},
 }
 
@@ -65,6 +65,7 @@ var Adapters = []ToolAdapter{
 		CommandsDir:   "",
 		FileExtension: "",
 		UsesSkillDir:  true,
+		Symlink:       true,
 	},
 	{
 		ID:            "cursor",

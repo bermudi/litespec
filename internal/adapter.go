@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bermudi/litespec/internal/skill"
 	"gopkg.in/yaml.v3"
 )
 
@@ -38,21 +39,34 @@ func generateSkillsDir(root string, adapter *ToolAdapter) error {
 		return fmt.Errorf("create skills directory: %w", err)
 	}
 
-	for _, skill := range Skills {
-		template := GetSkillTemplate(skill.ID)
-		if template == "" {
+	for _, si := range Skills {
+		tmpl := skill.Get(si.ID)
+		if tmpl == "" {
 			continue
 		}
 
-		skillDir := filepath.Join(skillsDir, skill.Name)
-		if err := os.MkdirAll(skillDir, 0o755); err != nil {
-			return fmt.Errorf("create skill directory %s: %w", skill.Name, err)
+		linkPath := filepath.Join(skillsDir, si.Name)
+
+		if adapter.Symlink {
+			target, err := filepath.Rel(skillsDir, filepath.Join(root, SkillsDir, si.Name))
+			if err != nil {
+				return fmt.Errorf("resolve symlink target for %s: %w", si.Name, err)
+			}
+			os.Remove(linkPath)
+			if err := os.Symlink(target, linkPath); err != nil {
+				return fmt.Errorf("symlink skill %s: %w", si.Name, err)
+			}
+			continue
 		}
 
-		content := buildSkillFile(skill, template)
-		skillFile := filepath.Join(skillDir, "SKILL.md")
+		if err := os.MkdirAll(linkPath, 0o755); err != nil {
+			return fmt.Errorf("create skill directory %s: %w", si.Name, err)
+		}
+
+		content := buildSkillFile(si, tmpl)
+		skillFile := filepath.Join(linkPath, "SKILL.md")
 		if err := os.WriteFile(skillFile, []byte(content), 0o644); err != nil {
-			return fmt.Errorf("write skill file %s: %w", skill.ID, err)
+			return fmt.Errorf("write skill file %s: %w", si.ID, err)
 		}
 	}
 	return nil
@@ -64,14 +78,14 @@ func generateCommandFiles(root string, adapter *ToolAdapter) error {
 		return fmt.Errorf("create commands directory: %w", err)
 	}
 
-	for _, skill := range Skills {
-		template := GetSkillTemplate(skill.ID)
-		if template == "" {
+	for _, si := range Skills {
+		tmpl := skill.Get(si.ID)
+		if tmpl == "" {
 			continue
 		}
 
-		content := buildSkillFile(skill, template)
-		filename := skill.Name + adapter.FileExtension
+		content := buildSkillFile(si, tmpl)
+		filename := si.Name + adapter.FileExtension
 		cmdFile := filepath.Join(commandsDir, filename)
 		if err := os.WriteFile(cmdFile, []byte(content), 0o644); err != nil {
 			return fmt.Errorf("write command file %s/%s: %w", adapter.ID, filename, err)
@@ -80,10 +94,10 @@ func generateCommandFiles(root string, adapter *ToolAdapter) error {
 	return nil
 }
 
-func buildSkillFile(skill SkillInfo, template string) string {
+func buildSkillFile(si SkillInfo, tmpl string) string {
 	fm := skillFrontmatter{
-		Name:        skill.Name,
-		Description: skill.Description,
+		Name:        si.Name,
+		Description: si.Description,
 	}
 	fmBytes, _ := yaml.Marshal(&fm)
 
@@ -91,7 +105,7 @@ func buildSkillFile(skill SkillInfo, template string) string {
 	sb.WriteString("---\n")
 	sb.Write(fmBytes)
 	sb.WriteString("---\n\n")
-	sb.WriteString(template)
+	sb.WriteString(tmpl)
 	sb.WriteString("\n")
 	return sb.String()
 }

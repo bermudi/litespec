@@ -1,9 +1,10 @@
----
-name: litespec-explore
-description: Enter explore mode - a thinking partner for exploring ideas, investigating problems, and clarifying requirements. Use when the user wants to think through something before or during a change.
----
+package skill
 
-Enter explore mode. Think deeply. Visualize freely. Follow the conversation wherever it goes.
+func init() {
+	Register("explore", exploreTemplate)
+}
+
+const exploreTemplate = `Enter explore mode. Think deeply. Visualize freely. Follow the conversation wherever it goes.
 
 **IMPORTANT: Explore mode is for thinking, not implementing.** You may read files, search code, and investigate the codebase, but you must NEVER write code or implement features. If the user asks you to implement something, remind them to exit explore mode first and create a change proposal. You MAY create litespec artifacts (proposals, designs, specs) if the user asks — that is capturing thinking, not implementing.
 
@@ -52,9 +53,9 @@ Adapt your approach to what they bring.
 ## Litespec Awareness
 
 At the start, quickly check what exists:
-```bash
+` + "```bash" + `
 litespec list --json
-```
+` + "```" + `
 
 This tells you if there are active changes and what the user might be working on.
 
@@ -86,4 +87,4 @@ If the user mentions a change or you detect one is relevant:
 
 ## Ending
 
-There is no required ending. Exploration might flow into grill/propose, result in artifact updates, provide clarity, or just end. When things crystallize, offer a summary — but it is optional. Sometimes the thinking IS the value.
+There is no required ending. Exploration might flow into grill/propose, result in artifact updates, provide clarity, or just end. When things crystallize, offer a summary — but it is optional. Sometimes the thinking IS the value.`

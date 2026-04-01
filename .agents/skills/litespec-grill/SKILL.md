@@ -1,6 +1,6 @@
 ---
 name: litespec-grill
-description: Relentlessly interview the user about a plan until reaching shared understanding
+description: Interview the user relentlessly about a plan or design until reaching shared understanding. Use when the user wants to stress-test a plan, get grilled on their design, or mentions "grill me".
 ---
 
 Interview the user relentlessly about a plan or design until reaching shared understanding.

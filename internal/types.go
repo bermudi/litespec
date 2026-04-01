@@ -93,4 +93,5 @@ type ToolAdapter struct {
 	CommandsDir   string
 	FileExtension string
 	UsesSkillDir  bool
+	Symlink       bool
 }
