@@ -62,8 +62,9 @@ var Adapters = []ToolAdapter{
 		ID:            "claude",
 		Name:          "Claude Code",
 		SkillsDir:     ".claude/skills",
-		CommandsDir:   ".claude/commands/litespec",
-		FileExtension: ".md",
+		CommandsDir:   "",
+		FileExtension: "",
+		UsesSkillDir:  true,
 	},
 	{
 		ID:            "cursor",

@@ -92,4 +92,5 @@ type ToolAdapter struct {
 	SkillsDir     string
 	CommandsDir   string
 	FileExtension string
+	UsesSkillDir  bool
 }
