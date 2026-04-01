@@ -275,7 +275,7 @@ func cmdStatus(args []string) {
 
 func cmdValidate(args []string) {
 	var changeName string
-	var all, strict bool
+	var all, strict, asJSON bool
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--change":
@@ -287,6 +287,8 @@ func cmdValidate(args []string) {
 			all = true
 		case "--strict":
 			strict = true
+		case jsonFlag:
+			asJSON = true
 		}
 	}
 
@@ -307,6 +309,16 @@ func cmdValidate(args []string) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
+	}
+
+	if asJSON {
+		out := internal.BuildValidationResultJSON(result)
+		data, _ := internal.MarshalJSON(out)
+		fmt.Println(string(data))
+		if !result.Valid || (strict && len(result.Warnings) > 0) {
+			os.Exit(1)
+		}
+		return
 	}
 
 	failed := !result.Valid
