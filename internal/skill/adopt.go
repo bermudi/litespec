@@ -46,6 +46,8 @@ Each capability discovered gets its own spec. Each requirement should be specifi
 - Describe *what the code does*, not *how it does it*
 - Include observable behavior, inputs, outputs, and side effects
 - Note error conditions and how they are handled
+- Structure each requirement with ` + "`### Requirement:`" + ` heading, body text containing SHALL or MUST, and at least one ` + "`#### Scenario:`" + ` block describing expected behavior
+- Use WHEN/THEN format for scenarios: - **WHEN** <condition> / - **THEN** <expected outcome>
 
 ### Proposal
 

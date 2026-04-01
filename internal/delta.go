@@ -16,7 +16,9 @@ func ParseMainSpec(content string) (*Spec, error) {
 		if current == nil {
 			return
 		}
-		current.Content = strings.TrimSpace(strings.Join(body, "\n"))
+		preamble, scenarios := parseScenariosFromBody(body)
+		current.Content = strings.TrimSpace(preamble)
+		current.Scenarios = scenarios
 		spec.Requirements = append(spec.Requirements, *current)
 		current = nil
 		body = nil
@@ -63,7 +65,9 @@ func ParseDeltaSpec(content string) (*DeltaSpec, error) {
 		if current == nil {
 			return
 		}
-		current.Content = strings.TrimSpace(strings.Join(body, "\n"))
+		preamble, scenarios := parseScenariosFromBody(body)
+		current.Content = strings.TrimSpace(preamble)
+		current.Scenarios = scenarios
 		delta.Requirements = append(delta.Requirements, *current)
 		current = nil
 		body = nil
@@ -170,6 +174,7 @@ func MergeDelta(main *Spec, deltas []*DeltaSpec) (*Spec, error) {
 		for i := range result.Requirements {
 			if result.Requirements[i].Name == r.Name {
 				result.Requirements[i].Content = r.Content
+				result.Requirements[i].Scenarios = r.Scenarios
 				found = true
 				break
 			}
@@ -181,8 +186,9 @@ func MergeDelta(main *Spec, deltas []*DeltaSpec) (*Spec, error) {
 
 	for _, r := range added {
 		result.Requirements = append(result.Requirements, SpecRequirement{
-			Name:    r.Name,
-			Content: r.Content,
+			Name:      r.Name,
+			Content:   r.Content,
+			Scenarios: r.Scenarios,
 		})
 	}
 
@@ -202,9 +208,54 @@ func SerializeSpec(spec *Spec) string {
 			b.WriteString(req.Content)
 			b.WriteString("\n")
 		}
+		for _, sc := range req.Scenarios {
+			b.WriteString("\n#### Scenario: ")
+			b.WriteString(sc.Name)
+			b.WriteString("\n")
+			if sc.Content != "" {
+				b.WriteString("\n")
+				b.WriteString(sc.Content)
+				b.WriteString("\n")
+			}
+		}
 	}
 
 	return b.String()
+}
+
+func parseScenariosFromBody(body []string) (string, []Scenario) {
+	var scenarios []Scenario
+	var preamble []string
+	var currentScenario *Scenario
+	var scenarioBody []string
+
+	flushScenario := func() {
+		if currentScenario == nil {
+			return
+		}
+		currentScenario.Content = strings.TrimSpace(strings.Join(scenarioBody, "\n"))
+		scenarios = append(scenarios, *currentScenario)
+		currentScenario = nil
+		scenarioBody = nil
+	}
+
+	for _, line := range body {
+		if isScenarioHeading(line) {
+			flushScenario()
+			name := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "#### Scenario:"))
+			currentScenario = &Scenario{Name: name}
+			scenarioBody = nil
+			continue
+		}
+		if currentScenario != nil {
+			scenarioBody = append(scenarioBody, line)
+		} else {
+			preamble = append(preamble, line)
+		}
+	}
+	flushScenario()
+
+	return strings.Join(preamble, "\n"), scenarios
 }
 
 func isH1(line string) bool {
@@ -213,6 +264,11 @@ func isH1(line string) bool {
 
 func isReqHeading(line string) bool {
 	return strings.HasPrefix(line, "### Requirement:")
+}
+
+func isScenarioHeading(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	return strings.HasPrefix(trimmed, "#### Scenario:")
 }
 
 func splitArrow(s string) []string {

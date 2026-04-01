@@ -533,7 +533,11 @@ func cmdArchive(args []string) {
 
 		var mainSpec *internal.Spec
 		if readErr != nil {
-			mainSpec = &internal.Spec{Capability: deltas[0].Capability}
+			cap := deltas[0].Capability
+			if cap == "" {
+				cap = capability
+			}
+			mainSpec = &internal.Spec{Capability: cap}
 		} else {
 			mainSpec, err = internal.ParseMainSpec(string(mainData))
 			if err != nil {

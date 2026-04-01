@@ -45,11 +45,17 @@ type ArtifactInfo struct {
 	Requires    []string
 }
 
+type Scenario struct {
+	Name    string
+	Content string
+}
+
 type DeltaRequirement struct {
 	Operation DeltaOperation
 	Name      string
 	OldName   string
 	Content   string
+	Scenarios []Scenario
 }
 
 type DeltaSpec struct {
@@ -70,8 +76,9 @@ type ValidationResult struct {
 }
 
 type SpecRequirement struct {
-	Name    string
-	Content string
+	Name      string
+	Content   string
+	Scenarios []Scenario
 }
 
 type Spec struct {

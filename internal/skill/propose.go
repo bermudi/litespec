@@ -62,6 +62,38 @@ Each artifact comes with ` + "`instruction`" + `, ` + "`template`" + `, and ` + 
 
 ---
 
+## Spec Format
+
+Write delta specs in this exact structure:
+
+    # <capability>                    (optional heading)
+    ## ADDED Requirements
+    ### Requirement: <name>
+    <body text — must contain SHALL or MUST>
+
+    #### Scenario: <short name>
+    - **WHEN** <condition>
+    - **THEN** <expected outcome>
+
+    ## MODIFIED Requirements
+    ### Requirement: <name>
+    <full replacement including scenarios>
+
+    ## REMOVED Requirements
+    ### Requirement: <name>            (name only, no body or scenarios)
+
+    ## RENAMED Requirements
+    ### Requirement: <old> → <new>     (preserves body and scenarios)
+
+Rules:
+
+- Every ADDED and MODIFIED requirement must include at least one ` + "`#### Scenario:`" + ` block
+- Scenario text describes expected behavior — WHEN/THEN is the recommended format
+- REMOVED requirements are name-only
+- RENAMED requirements change the heading only; content and scenarios carry over
+
+---
+
 ## Behavioral Guardrails
 
 - **Verify every file after writing.** Confirm the artifact landed at ` + "`outputPath`" + `. If it did not, write it again before moving on.

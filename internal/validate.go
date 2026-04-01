@@ -89,6 +89,25 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 					continue
 				}
 
+				for _, req := range delta.Requirements {
+					if req.Operation == DeltaAdded || req.Operation == DeltaModified {
+						if !strings.Contains(req.Content, "SHALL") && !strings.Contains(req.Content, "MUST") {
+							result.Errors = append(result.Errors, ValidationIssue{
+								Severity: SeverityError,
+								Message:  fmt.Sprintf("%s requirement %q must contain SHALL or MUST", req.Operation, req.Name),
+								File:     specPath,
+							})
+						}
+						if len(req.Scenarios) == 0 {
+							result.Errors = append(result.Errors, ValidationIssue{
+								Severity: SeverityError,
+								Message:  fmt.Sprintf("%s requirement %q must include at least one scenario", req.Operation, req.Name),
+								File:     specPath,
+							})
+						}
+					}
+				}
+
 				hasModOrRemove := false
 				for _, req := range delta.Requirements {
 					if req.Operation == DeltaModified || req.Operation == DeltaRemoved {
@@ -129,8 +148,8 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 				for _, req := range delta.Requirements {
 					if req.Operation == DeltaModified || req.Operation == DeltaRemoved {
 						if !existingNames[req.Name] {
-							result.Warnings = append(result.Warnings, ValidationIssue{
-								Severity: SeverityWarning,
+							result.Errors = append(result.Errors, ValidationIssue{
+								Severity: SeverityError,
 								Message:  fmt.Sprintf("%s requirement %q not found in main spec", req.Operation, req.Name),
 								File:     specPath,
 							})
@@ -209,6 +228,16 @@ func ValidateSpecs(root string) (*ValidationResult, error) {
 				Message:  fmt.Sprintf("capability %q has no requirements", entry.Name()),
 				File:     specPath,
 			})
+		}
+
+		for _, req := range spec.Requirements {
+			if len(req.Scenarios) == 0 {
+				result.Warnings = append(result.Warnings, ValidationIssue{
+					Severity: SeverityWarning,
+					Message:  fmt.Sprintf("requirement %q in capability %q has no scenarios", req.Name, entry.Name()),
+					File:     specPath,
+				})
+			}
 		}
 	}
 
