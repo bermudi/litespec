@@ -441,3 +441,335 @@ The system MUST enforce limits.
 		t.Fatal("MUST should be accepted as a keyword")
 	}
 }
+
+func TestValidateChangeRENAMEDDanglingOldName(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "auth", `# auth
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+- **WHEN** valid creds
+`)
+	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
+	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
+	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## RENAMED Requirements
+
+### Requirement: Ghost → Phantom
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected invalid (RENAMED dangling OldName)")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if e.Message == `RENAMED requirement "Ghost" not found in main spec` {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected RENAMED dangling OldName error")
+	}
+}
+
+func TestValidateChangeRENAMEDTargetCollision(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "auth", `# auth
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+- **WHEN** valid creds
+
+### Requirement: Logout
+The system SHALL invalidate.
+
+#### Scenario: Valid
+- **WHEN** logged out
+`)
+	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
+	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
+	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## RENAMED Requirements
+
+### Requirement: Login → Logout
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected invalid (RENAMED target collision)")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if e.Message == `RENAMED requirement new name "Logout" already exists in main spec` {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected RENAMED target collision error")
+	}
+}
+
+func TestValidateChangeADDEDDuplicateExisting(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "auth", `# auth
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+- **WHEN** valid creds
+`)
+	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
+	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
+	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## ADDED Requirements
+
+### Requirement: Login
+The system SHALL authenticate differently.
+
+#### Scenario: S1
+- **WHEN** triggered
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected invalid (ADDED duplicate of existing)")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if e.Message == `ADDED requirement "Login" already exists in main spec` {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected ADDED duplicate error")
+	}
+}
+
+func TestValidateChangeREMOVEDWithBodyContent(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "auth", `# auth
+
+### Requirement: Legacy
+The system SHALL do legacy thing.
+
+#### Scenario: Old
+- **WHEN** old thing
+`)
+	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
+	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
+	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## REMOVED Requirements
+
+### Requirement: Legacy
+This should not be here.
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected invalid (REMOVED with body content)")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if e.Message == `REMOVED requirement "Legacy" must not have body content` {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected REMOVED body content error")
+	}
+}
+
+func TestValidateChangeREMOVEDWithScenarios(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "auth", `# auth
+
+### Requirement: Legacy
+The system SHALL do legacy thing.
+
+#### Scenario: Old
+- **WHEN** old thing
+`)
+	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
+	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
+	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## REMOVED Requirements
+
+### Requirement: Legacy
+
+#### Scenario: Cleanup reason
+- **WHEN** removing old feature
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected invalid (REMOVED with scenarios)")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if e.Message == `REMOVED requirement "Legacy" must not have scenarios` {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected REMOVED scenarios error")
+	}
+}
+
+func TestValidateChangeRENAMEDWithBodyContent(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "auth", `# auth
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+- **WHEN** valid creds
+`)
+	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
+	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
+	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## RENAMED Requirements
+
+### Requirement: Login → Authenticate
+This should not be here.
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected invalid (RENAMED with body content)")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if e.Message == `RENAMED requirement "Authenticate" must not have body content` {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected RENAMED body content error")
+	}
+}
+
+func TestValidateChangeRENAMEDWithScenarios(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "auth", `# auth
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+- **WHEN** valid creds
+`)
+	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
+	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
+	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## RENAMED Requirements
+
+### Requirement: Login → Authenticate
+
+#### Scenario: Reason
+- **WHEN** renaming for clarity
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected invalid (RENAMED with scenarios)")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if e.Message == `RENAMED requirement "Authenticate" must not have scenarios` {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected RENAMED scenarios error")
+	}
+}
+
+func TestValidateChangeRENAMEDNoOpRenameWarning(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "auth", `# auth
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+- **WHEN** valid creds
+`)
+	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
+	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
+	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## RENAMED Requirements
+
+### Requirement: Login → Login
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if !result.Valid {
+		for _, e := range result.Errors {
+			t.Errorf("Unexpected error: %s: %s", e.File, e.Message)
+		}
+		t.Fatal("no-op rename should be valid (warning only)")
+	}
+	found := false
+	for _, w := range result.Warnings {
+		if w.Message == `RENAMED requirement "Login" has same old and new name` {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected no-op rename warning")
+	}
+}
+
+func TestValidateChangeADDEDNewCapabilityNoMainSpec(t *testing.T) {
+	root := setupTestProject(t)
+	makeValidChange(t, root, "change", `## ADDED Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: S1
+- **WHEN** triggered
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if !result.Valid {
+		for _, e := range result.Errors {
+			t.Errorf("Unexpected error: %s: %s", e.File, e.Message)
+		}
+		t.Fatal("ADDED on new capability (no main spec) should be valid")
+	}
+}

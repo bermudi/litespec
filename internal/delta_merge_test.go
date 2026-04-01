@@ -203,6 +203,254 @@ func TestMergeDeltaNoRequirements(t *testing.T) {
 	}
 }
 
+func TestMergeDeltaDuplicateAddedRejected(t *testing.T) {
+	main := &Spec{
+		Capability: "auth",
+		Requirements: []SpecRequirement{
+			{Name: "Login", Content: "SHALL authenticate"},
+		},
+	}
+	delta := &DeltaSpec{
+		Requirements: []DeltaRequirement{
+			{Operation: DeltaAdded, Name: "Login", Content: "duplicate"},
+		},
+	}
+
+	_, err := MergeDelta(main, []*DeltaSpec{delta})
+	if err == nil {
+		t.Fatal("expected error for ADDED duplicate of existing requirement")
+	}
+	if !contains(t, err.Error(), "already exists in spec") {
+		t.Errorf("error = %q, want mention of already exists", err.Error())
+	}
+}
+
+func TestMergeDeltaRenamedTargetCollisionRejected(t *testing.T) {
+	main := &Spec{
+		Capability: "auth",
+		Requirements: []SpecRequirement{
+			{Name: "Login", Content: "original"},
+			{Name: "Logout", Content: "original"},
+		},
+	}
+	delta := &DeltaSpec{
+		Requirements: []DeltaRequirement{
+			{Operation: DeltaRenamed, OldName: "Login", Name: "Logout"},
+		},
+	}
+
+	_, err := MergeDelta(main, []*DeltaSpec{delta})
+	if err == nil {
+		t.Fatal("expected error for RENAMED target collision")
+	}
+	if !contains(t, err.Error(), "already exists in spec") {
+		t.Errorf("error = %q, want mention of already exists", err.Error())
+	}
+}
+
+func TestMergeDeltaCrossDeltaDuplicateModifiedRejected(t *testing.T) {
+	main := &Spec{
+		Capability: "auth",
+		Requirements: []SpecRequirement{
+			{Name: "Login", Content: "original"},
+		},
+	}
+	d1 := &DeltaSpec{
+		Requirements: []DeltaRequirement{
+			{Operation: DeltaModified, Name: "Login", Content: "first edit"},
+		},
+	}
+	d2 := &DeltaSpec{
+		Requirements: []DeltaRequirement{
+			{Operation: DeltaModified, Name: "Login", Content: "second edit"},
+		},
+	}
+
+	_, err := MergeDelta(main, []*DeltaSpec{d1, d2})
+	if err == nil {
+		t.Fatal("expected error for cross-delta MODIFIED conflict")
+	}
+	if !contains(t, err.Error(), "multiple deltas modify") {
+		t.Errorf("error = %q, want mention of multiple deltas modify", err.Error())
+	}
+}
+
+func TestMergeDeltaCrossDeltaDuplicateRemovedRejected(t *testing.T) {
+	main := &Spec{
+		Capability: "auth",
+		Requirements: []SpecRequirement{
+			{Name: "Login", Content: "original"},
+		},
+	}
+	d1 := &DeltaSpec{
+		Requirements: []DeltaRequirement{
+			{Operation: DeltaRemoved, Name: "Login"},
+		},
+	}
+	d2 := &DeltaSpec{
+		Requirements: []DeltaRequirement{
+			{Operation: DeltaRemoved, Name: "Login"},
+		},
+	}
+
+	_, err := MergeDelta(main, []*DeltaSpec{d1, d2})
+	if err == nil {
+		t.Fatal("expected error for cross-delta REMOVED conflict")
+	}
+	if !contains(t, err.Error(), "multiple deltas remove") {
+		t.Errorf("error = %q, want mention of multiple deltas remove", err.Error())
+	}
+}
+
+func TestMergeDeltaCrossDeltaDuplicateRenamedRejected(t *testing.T) {
+	main := &Spec{
+		Capability: "auth",
+		Requirements: []SpecRequirement{
+			{Name: "Login", Content: "original"},
+		},
+	}
+	d1 := &DeltaSpec{
+		Requirements: []DeltaRequirement{
+			{Operation: DeltaRenamed, OldName: "Login", Name: "Auth"},
+		},
+	}
+	d2 := &DeltaSpec{
+		Requirements: []DeltaRequirement{
+			{Operation: DeltaRenamed, OldName: "Login", Name: "SignIn"},
+		},
+	}
+
+	_, err := MergeDelta(main, []*DeltaSpec{d1, d2})
+	if err == nil {
+		t.Fatal("expected error for cross-delta RENAMED conflict")
+	}
+	if !contains(t, err.Error(), "multiple renames target") {
+		t.Errorf("error = %q, want mention of multiple renames target", err.Error())
+	}
+}
+
+func TestMergeDeltaCrossDeltaRemovedAndModifiedConflictRejected(t *testing.T) {
+	main := &Spec{
+		Capability: "auth",
+		Requirements: []SpecRequirement{
+			{Name: "Login", Content: "original"},
+		},
+	}
+	d1 := &DeltaSpec{
+		Requirements: []DeltaRequirement{
+			{Operation: DeltaRemoved, Name: "Login"},
+		},
+	}
+	d2 := &DeltaSpec{
+		Requirements: []DeltaRequirement{
+			{Operation: DeltaModified, Name: "Login", Content: "edited"},
+		},
+	}
+
+	_, err := MergeDelta(main, []*DeltaSpec{d1, d2})
+	if err == nil {
+		t.Fatal("expected error for REMOVED + MODIFIED conflict")
+	}
+	if !contains(t, err.Error(), "conflicting operations") {
+		t.Errorf("error = %q, want mention of conflicting operations", err.Error())
+	}
+}
+
+func TestMergeDeltaCrossDeltaDuplicateAddedRejected(t *testing.T) {
+	main := &Spec{
+		Capability:   "auth",
+		Requirements: []SpecRequirement{},
+	}
+	d1 := &DeltaSpec{
+		Requirements: []DeltaRequirement{
+			{Operation: DeltaAdded, Name: "Login", Content: "first"},
+		},
+	}
+	d2 := &DeltaSpec{
+		Requirements: []DeltaRequirement{
+			{Operation: DeltaAdded, Name: "Login", Content: "second"},
+		},
+	}
+
+	_, err := MergeDelta(main, []*DeltaSpec{d1, d2})
+	if err == nil {
+		t.Fatal("expected error for cross-delta ADDED duplicate")
+	}
+	if !contains(t, err.Error(), "multiple deltas add") {
+		t.Errorf("error = %q, want mention of multiple deltas add", err.Error())
+	}
+}
+
+func TestMergeDeltaNoOpRenameSkipped(t *testing.T) {
+	main := &Spec{
+		Capability: "auth",
+		Requirements: []SpecRequirement{
+			{Name: "Login", Content: "original"},
+		},
+	}
+	delta := &DeltaSpec{
+		Requirements: []DeltaRequirement{
+			{Operation: DeltaRenamed, OldName: "Login", Name: "Login"},
+		},
+	}
+
+	result, err := MergeDelta(main, []*DeltaSpec{delta})
+	if err != nil {
+		t.Fatalf("MergeDelta: %v", err)
+	}
+	if len(result.Requirements) != 1 {
+		t.Fatalf("Requirements count = %d, want 1", len(result.Requirements))
+	}
+	if result.Requirements[0].Name != "Login" {
+		t.Errorf("Name = %q, want %q", result.Requirements[0].Name, "Login")
+	}
+}
+
+func TestMergeDeltaDeepCopyIsolation(t *testing.T) {
+	main := &Spec{
+		Capability: "auth",
+		Requirements: []SpecRequirement{
+			{Name: "Login", Content: "original", Scenarios: []Scenario{
+				{Name: "Basic", Content: "when basic"},
+			}},
+		},
+	}
+	delta := &DeltaSpec{
+		Requirements: []DeltaRequirement{
+			{Operation: DeltaAdded, Name: "Logout", Content: "new"},
+		},
+	}
+
+	result, err := MergeDelta(main, []*DeltaSpec{delta})
+	if err != nil {
+		t.Fatalf("MergeDelta: %v", err)
+	}
+
+	result.Requirements[0].Content = "mutated"
+	result.Requirements[0].Scenarios[0].Content = "mutated"
+
+	if main.Requirements[0].Content != "original" {
+		t.Error("mutating merged spec changed original spec content")
+	}
+	if main.Requirements[0].Scenarios[0].Content != "when basic" {
+		t.Error("mutating merged spec changed original spec scenario")
+	}
+}
+
+func contains(t *testing.T, s, substr string) bool {
+	t.Helper()
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsSubstr(s, substr))
+}
+
+func containsSubstr(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
 func TestMergeDeltaRemoveThenAddSameName(t *testing.T) {
 	main := &Spec{
 		Capability: "auth",

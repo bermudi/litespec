@@ -106,53 +106,127 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 							})
 						}
 					}
+					if req.Operation == DeltaRemoved {
+						if req.Content != "" {
+							result.Errors = append(result.Errors, ValidationIssue{
+								Severity: SeverityError,
+								Message:  fmt.Sprintf("REMOVED requirement %q must not have body content", req.Name),
+								File:     specPath,
+							})
+						}
+						if len(req.Scenarios) > 0 {
+							result.Errors = append(result.Errors, ValidationIssue{
+								Severity: SeverityError,
+								Message:  fmt.Sprintf("REMOVED requirement %q must not have scenarios", req.Name),
+								File:     specPath,
+							})
+						}
+					}
+					if req.Operation == DeltaRenamed {
+						if req.Content != "" {
+							result.Errors = append(result.Errors, ValidationIssue{
+								Severity: SeverityError,
+								Message:  fmt.Sprintf("RENAMED requirement %q must not have body content", req.Name),
+								File:     specPath,
+							})
+						}
+						if len(req.Scenarios) > 0 {
+							result.Errors = append(result.Errors, ValidationIssue{
+								Severity: SeverityError,
+								Message:  fmt.Sprintf("RENAMED requirement %q must not have scenarios", req.Name),
+								File:     specPath,
+							})
+						}
+						if req.OldName == req.Name {
+							result.Warnings = append(result.Warnings, ValidationIssue{
+								Severity: SeverityWarning,
+								Message:  fmt.Sprintf("RENAMED requirement %q has same old and new name", req.Name),
+								File:     specPath,
+							})
+						}
+					}
 				}
 
-				hasModOrRemove := false
+				needsMainSpec := false
 				for _, req := range delta.Requirements {
-					if req.Operation == DeltaModified || req.Operation == DeltaRemoved {
-						hasModOrRemove = true
+					if req.Operation == DeltaModified || req.Operation == DeltaRemoved || req.Operation == DeltaRenamed || req.Operation == DeltaAdded {
+						needsMainSpec = true
 						break
 					}
 				}
-				if !hasModOrRemove {
-					continue
-				}
 
-				mainSpecPath := filepath.Join(SpecsPath(root), entry.Name(), "spec.md")
-				mainData, readErr := os.ReadFile(mainSpecPath)
-				if readErr != nil {
-					result.Errors = append(result.Errors, ValidationIssue{
-						Severity: SeverityError,
-						Message:  fmt.Sprintf("main spec for capability %q does not exist", entry.Name()),
-						File:     specPath,
-					})
-					continue
-				}
-
-				mainSpec, parseErr := ParseMainSpec(string(mainData))
-				if parseErr != nil {
-					result.Errors = append(result.Errors, ValidationIssue{
-						Severity: SeverityError,
-						Message:  fmt.Sprintf("invalid main spec for capability %q: %s", entry.Name(), parseErr),
-						File:     mainSpecPath,
-					})
-					continue
-				}
-
-				existingNames := make(map[string]bool)
-				for _, r := range mainSpec.Requirements {
-					existingNames[r.Name] = true
-				}
-
-				for _, req := range delta.Requirements {
-					if req.Operation == DeltaModified || req.Operation == DeltaRemoved {
-						if !existingNames[req.Name] {
+				var existingNames map[string]bool
+				if needsMainSpec {
+					mainSpecPath := filepath.Join(SpecsPath(root), entry.Name(), "spec.md")
+					mainData, readErr := os.ReadFile(mainSpecPath)
+					if readErr != nil {
+						hasModOrRenameOrRemove := false
+						for _, req := range delta.Requirements {
+							if req.Operation == DeltaModified || req.Operation == DeltaRemoved || req.Operation == DeltaRenamed {
+								hasModOrRenameOrRemove = true
+								break
+							}
+						}
+						if hasModOrRenameOrRemove {
 							result.Errors = append(result.Errors, ValidationIssue{
 								Severity: SeverityError,
-								Message:  fmt.Sprintf("%s requirement %q not found in main spec", req.Operation, req.Name),
+								Message:  fmt.Sprintf("main spec for capability %q does not exist", entry.Name()),
 								File:     specPath,
 							})
+							continue
+						}
+					} else {
+						mainSpec, parseErr := ParseMainSpec(string(mainData))
+						if parseErr != nil {
+							result.Errors = append(result.Errors, ValidationIssue{
+								Severity: SeverityError,
+								Message:  fmt.Sprintf("invalid main spec for capability %q: %s", entry.Name(), parseErr),
+								File:     mainSpecPath,
+							})
+							continue
+						}
+
+						existingNames = make(map[string]bool)
+						for _, r := range mainSpec.Requirements {
+							existingNames[r.Name] = true
+						}
+					}
+				}
+
+				if existingNames != nil {
+					for _, req := range delta.Requirements {
+						switch req.Operation {
+						case DeltaModified, DeltaRemoved:
+							if !existingNames[req.Name] {
+								result.Errors = append(result.Errors, ValidationIssue{
+									Severity: SeverityError,
+									Message:  fmt.Sprintf("%s requirement %q not found in main spec", req.Operation, req.Name),
+									File:     specPath,
+								})
+							}
+						case DeltaRenamed:
+							if !existingNames[req.OldName] {
+								result.Errors = append(result.Errors, ValidationIssue{
+									Severity: SeverityError,
+									Message:  fmt.Sprintf("RENAMED requirement %q not found in main spec", req.OldName),
+									File:     specPath,
+								})
+							}
+							if existingNames[req.Name] && req.Name != req.OldName {
+								result.Errors = append(result.Errors, ValidationIssue{
+									Severity: SeverityError,
+									Message:  fmt.Sprintf("RENAMED requirement new name %q already exists in main spec", req.Name),
+									File:     specPath,
+								})
+							}
+						case DeltaAdded:
+							if existingNames[req.Name] {
+								result.Errors = append(result.Errors, ValidationIssue{
+									Severity: SeverityError,
+									Message:  fmt.Sprintf("ADDED requirement %q already exists in main spec", req.Name),
+									File:     specPath,
+								})
+							}
 						}
 					}
 				}

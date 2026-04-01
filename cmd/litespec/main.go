@@ -486,82 +486,19 @@ func cmdArchive(args []string) {
 		fmt.Printf("WARN   %s: %s\n", issue.File, issue.Message)
 	}
 
-	changeSpecsDir := internal.ChangeSpecsPath(root, name)
-	entries, err := os.ReadDir(changeSpecsDir)
+	writes, err := internal.PrepareArchiveWrites(root, name)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error reading change specs: %v\n", err)
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
+	if err := internal.WritePendingSpecs(writes); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
 
-		capability := entry.Name()
-		capDir := filepath.Join(changeSpecsDir, capability)
-		files, readErr := os.ReadDir(capDir)
-		if readErr != nil {
-			continue
-		}
-
-		var deltas []*internal.DeltaSpec
-		for _, f := range files {
-			if filepath.Ext(f.Name()) != ".md" {
-				continue
-			}
-			data, readErr := os.ReadFile(filepath.Join(capDir, f.Name()))
-			if readErr != nil {
-				fmt.Fprintf(os.Stderr, "error reading delta spec %s: %v\n", f.Name(), readErr)
-				os.Exit(1)
-			}
-			delta, parseErr := internal.ParseDeltaSpec(string(data))
-			if parseErr != nil {
-				fmt.Fprintf(os.Stderr, "error parsing delta spec %s: %v\n", f.Name(), parseErr)
-				os.Exit(1)
-			}
-			deltas = append(deltas, delta)
-		}
-
-		if len(deltas) == 0 {
-			continue
-		}
-
-		mainSpecDir := filepath.Join(internal.SpecsPath(root), capability)
-		mainSpecPath := filepath.Join(mainSpecDir, "spec.md")
-		mainData, readErr := os.ReadFile(mainSpecPath)
-
-		var mainSpec *internal.Spec
-		if readErr != nil {
-			cap := deltas[0].Capability
-			if cap == "" {
-				cap = capability
-			}
-			mainSpec = &internal.Spec{Capability: cap}
-		} else {
-			mainSpec, err = internal.ParseMainSpec(string(mainData))
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error parsing main spec for %s: %v\n", capability, err)
-				os.Exit(1)
-			}
-		}
-
-		merged, err := internal.MergeDelta(mainSpec, deltas)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error merging delta for %s: %v\n", capability, err)
-			os.Exit(1)
-		}
-
-		if err := os.MkdirAll(mainSpecDir, 0o755); err != nil {
-			fmt.Fprintf(os.Stderr, "error creating spec directory: %v\n", err)
-			os.Exit(1)
-		}
-		if err := os.WriteFile(mainSpecPath, []byte(internal.SerializeSpec(merged)), 0o644); err != nil {
-			fmt.Fprintf(os.Stderr, "error writing spec: %v\n", err)
-			os.Exit(1)
-		}
-
-		fmt.Printf("Updated spec: %s\n", capability)
+	for _, w := range writes {
+		fmt.Printf("Updated spec: %s\n", w.Capability)
 	}
 
 	if err := internal.ArchiveChange(root, name); err != nil {

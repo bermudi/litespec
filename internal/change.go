@@ -84,6 +84,99 @@ func ListSpecs(root string) ([]string, error) {
 	return names, nil
 }
 
+type PendingWrite struct {
+	Capability string
+	Path       string
+	Dir        string
+	Content    string
+}
+
+func PrepareArchiveWrites(root, name string) ([]PendingWrite, error) {
+	changeSpecsDir := ChangeSpecsPath(root, name)
+	entries, err := os.ReadDir(changeSpecsDir)
+	if err != nil {
+		return nil, fmt.Errorf("read change specs: %w", err)
+	}
+
+	var writes []PendingWrite
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		capability := entry.Name()
+		capDir := filepath.Join(changeSpecsDir, capability)
+		files, readErr := os.ReadDir(capDir)
+		if readErr != nil {
+			continue
+		}
+
+		var deltas []*DeltaSpec
+		for _, f := range files {
+			if filepath.Ext(f.Name()) != ".md" {
+				continue
+			}
+			data, readErr := os.ReadFile(filepath.Join(capDir, f.Name()))
+			if readErr != nil {
+				return nil, fmt.Errorf("reading delta spec %s: %w", f.Name(), readErr)
+			}
+			delta, parseErr := ParseDeltaSpec(string(data))
+			if parseErr != nil {
+				return nil, fmt.Errorf("parsing delta spec %s: %w", f.Name(), parseErr)
+			}
+			deltas = append(deltas, delta)
+		}
+
+		if len(deltas) == 0 {
+			continue
+		}
+
+		mainSpecDir := filepath.Join(SpecsPath(root), capability)
+		mainSpecPath := filepath.Join(mainSpecDir, "spec.md")
+		mainData, readErr := os.ReadFile(mainSpecPath)
+
+		var mainSpec *Spec
+		if readErr != nil {
+			cap := deltas[0].Capability
+			if cap == "" {
+				cap = capability
+			}
+			mainSpec = &Spec{Capability: cap}
+		} else {
+			mainSpec, err = ParseMainSpec(string(mainData))
+			if err != nil {
+				return nil, fmt.Errorf("parsing main spec for %s: %w", capability, err)
+			}
+		}
+
+		merged, err := MergeDelta(mainSpec, deltas)
+		if err != nil {
+			return nil, fmt.Errorf("merging delta for %s: %w", capability, err)
+		}
+
+		writes = append(writes, PendingWrite{
+			Capability: capability,
+			Path:       mainSpecPath,
+			Dir:        mainSpecDir,
+			Content:    SerializeSpec(merged),
+		})
+	}
+
+	return writes, nil
+}
+
+func WritePendingSpecs(writes []PendingWrite) error {
+	for _, w := range writes {
+		if err := os.MkdirAll(w.Dir, 0o755); err != nil {
+			return fmt.Errorf("creating spec directory %s: %w", w.Dir, err)
+		}
+		if err := os.WriteFile(w.Path, []byte(w.Content), 0o644); err != nil {
+			return fmt.Errorf("writing spec %s: %w", w.Path, err)
+		}
+	}
+	return nil
+}
+
 func ArchiveChange(root, name string) error {
 	changeDir := ChangePath(root, name)
 	if _, err := os.Stat(changeDir); err != nil {

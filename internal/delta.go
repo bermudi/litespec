@@ -123,7 +123,13 @@ func MergeDelta(main *Spec, deltas []*DeltaSpec) (*Spec, error) {
 		Capability:   main.Capability,
 		Requirements: make([]SpecRequirement, len(main.Requirements)),
 	}
-	copy(result.Requirements, main.Requirements)
+	for i, req := range main.Requirements {
+		result.Requirements[i] = SpecRequirement{
+			Name:      req.Name,
+			Content:   req.Content,
+			Scenarios: append([]Scenario(nil), req.Scenarios...),
+		}
+	}
 
 	var renamed, removed, modified, added []DeltaRequirement
 	for _, d := range deltas {
@@ -141,10 +147,74 @@ func MergeDelta(main *Spec, deltas []*DeltaSpec) (*Spec, error) {
 		}
 	}
 
+	renamedOldNames := make(map[string]int)
 	for _, r := range renamed {
+		renamedOldNames[r.OldName]++
+	}
+	for name, count := range renamedOldNames {
+		if count > 1 {
+			return nil, fmt.Errorf("RENAMED: multiple renames target requirement %q", name)
+		}
+	}
+
+	modifiedNames := make(map[string]int)
+	for _, r := range modified {
+		modifiedNames[r.Name]++
+	}
+	for name, count := range modifiedNames {
+		if count > 1 {
+			return nil, fmt.Errorf("MODIFIED: multiple deltas modify requirement %q", name)
+		}
+	}
+
+	removedNames := make(map[string]int)
+	for _, r := range removed {
+		removedNames[r.Name]++
+	}
+	for name, count := range removedNames {
+		if count > 1 {
+			return nil, fmt.Errorf("REMOVED: multiple deltas remove requirement %q", name)
+		}
+	}
+
+	addedNames := make(map[string]int)
+	for _, r := range added {
+		addedNames[r.Name]++
+	}
+	for name, count := range addedNames {
+		if count > 1 {
+			return nil, fmt.Errorf("ADDED: multiple deltas add requirement %q", name)
+		}
+	}
+
+	allTargets := make(map[string][]string)
+	for _, r := range removed {
+		allTargets[r.Name] = append(allTargets[r.Name], "REMOVED")
+	}
+	for _, r := range modified {
+		allTargets[r.Name] = append(allTargets[r.Name], "MODIFIED")
+	}
+	for _, r := range renamed {
+		allTargets[r.OldName] = append(allTargets[r.OldName], "RENAMED")
+	}
+	for name, ops := range allTargets {
+		if len(ops) > 1 {
+			return nil, fmt.Errorf("conflicting operations on requirement %q: %s", name, strings.Join(ops, " + "))
+		}
+	}
+
+	for _, r := range renamed {
+		if r.OldName == r.Name {
+			continue
+		}
 		found := false
 		for i := range result.Requirements {
 			if result.Requirements[i].Name == r.OldName {
+				for _, existing := range result.Requirements {
+					if existing.Name == r.Name {
+						return nil, fmt.Errorf("RENAMED: new name %q already exists in spec", r.Name)
+					}
+				}
 				result.Requirements[i].Name = r.Name
 				found = true
 				break
@@ -174,7 +244,7 @@ func MergeDelta(main *Spec, deltas []*DeltaSpec) (*Spec, error) {
 		for i := range result.Requirements {
 			if result.Requirements[i].Name == r.Name {
 				result.Requirements[i].Content = r.Content
-				result.Requirements[i].Scenarios = r.Scenarios
+				result.Requirements[i].Scenarios = append([]Scenario(nil), r.Scenarios...)
 				found = true
 				break
 			}
@@ -185,10 +255,15 @@ func MergeDelta(main *Spec, deltas []*DeltaSpec) (*Spec, error) {
 	}
 
 	for _, r := range added {
+		for _, existing := range result.Requirements {
+			if existing.Name == r.Name {
+				return nil, fmt.Errorf("ADDED: requirement %q already exists in spec", r.Name)
+			}
+		}
 		result.Requirements = append(result.Requirements, SpecRequirement{
 			Name:      r.Name,
 			Content:   r.Content,
-			Scenarios: r.Scenarios,
+			Scenarios: append([]Scenario(nil), r.Scenarios...),
 		})
 	}
 
