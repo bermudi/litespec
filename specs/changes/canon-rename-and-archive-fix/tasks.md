@@ -11,11 +11,11 @@
 
 ## Phase 2: Fix archive to strip specs subtree
 
-- [ ] In `internal/change.go`: add `os.RemoveAll(ChangeSpecsPath(root, name))` in `ArchiveChange` before `os.Rename`
-- [ ] In `internal/archive_test.go`: add test asserting archived directory does NOT contain `specs/` subtree
-- [ ] Update `AGENTS.md` line 26: `specs/specs/` → `specs/canon/`
-- [ ] Update or remove `BUGS.md` entry 1 (this change fixes the described bug)
-- [ ] Run `go test ./...` — all tests pass
+- [x] In `internal/change.go`: add `os.RemoveAll(ChangeSpecsPath(root, name))` in `ArchiveChange` before `os.Rename`
+- [x] In `internal/archive_test.go`: add test asserting archived directory does NOT contain `specs/` subtree
+- [x] Update `AGENTS.md` line 26: `specs/specs/` → `specs/canon/`
+- [x] Update or remove `BUGS.md` entry 1 (this change fixes the described bug)
+- [x] Run `go test ./...` — all tests pass
 
 ## Phase 3: Physical directory rename
 

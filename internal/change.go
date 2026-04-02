@@ -190,6 +190,8 @@ func ArchiveChange(root, name string) error {
 		return fmt.Errorf("change %q does not exist", name)
 	}
 
+	os.RemoveAll(ChangeSpecsPath(root, name))
+
 	archivedName := time.Now().Format("2006-01-02") + "-" + name
 	dest := filepath.Join(ArchivePath(root), archivedName)
 

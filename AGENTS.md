@@ -23,7 +23,7 @@ The design emerged from a structured grilling session — question by question, 
 
 ## Core Concepts
 
-- **Specs** live in `specs/specs/` — the source of truth for current capabilities
+- **Specs** live in `specs/canon/` — the source of truth for current capabilities
 - **Changes** live in `specs/changes/<name>/` — isolated proposed modifications
 - **Delta specs** use ADDED/MODIFIED/REMOVED/RENAMED markers merged in strict order at archive time
 - **Skills** are generated into `.agents/skills/` (canonical). Claude Code gets symlinks via `--tools claude`.

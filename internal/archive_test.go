@@ -82,6 +82,45 @@ The system SHALL limit API requests.
 	}
 }
 
+func TestArchiveStripsSpecsSubtree(t *testing.T) {
+	root := setupTestProject(t)
+	writeChangeFile(t, root, "strip-test", "proposal.md", "# Proposal")
+	writeChangeFile(t, root, "strip-test", "design.md", "# Design")
+	writeChangeFile(t, root, "strip-test", "tasks.md", "## Phase 1\n- [x] Done")
+
+	writeDeltaSpecFile(t, root, "strip-test", "auth", "spec.md", `## ADDED Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+- **WHEN** valid creds
+`)
+
+	runArchivePipeline(t, root, "strip-test")
+
+	archiveEntries, _ := os.ReadDir(ArchivePath(root))
+	var archivedName string
+	for _, e := range archiveEntries {
+		if strings.HasSuffix(e.Name(), "-strip-test") {
+			archivedName = e.Name()
+		}
+	}
+	if archivedName == "" {
+		t.Fatal("archived directory not found")
+	}
+
+	specsSubtree := filepath.Join(ArchivePath(root), archivedName, "specs")
+	if _, err := os.Stat(specsSubtree); !os.IsNotExist(err) {
+		t.Errorf("archived directory MUST NOT contain specs/ subtree, but %s exists", specsSubtree)
+	}
+
+	proposalPath := filepath.Join(ArchivePath(root), archivedName, "proposal.md")
+	if _, err := os.Stat(proposalPath); os.IsNotExist(err) {
+		t.Error("archived directory should still contain proposal.md")
+	}
+}
+
 func TestArchiveModifyExistingCapability(t *testing.T) {
 	root := setupTestProject(t)
 
