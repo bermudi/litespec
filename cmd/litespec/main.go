@@ -172,14 +172,13 @@ func cmdList(args []string) {
 	}
 	checkUnknownFlags(args, map[string]bool{"--specs": true, "--changes": true, "--sort": true, "--json": true})
 
-	var specsOnly, changesOnly, asJSON bool
+	var specsOnly, asJSON bool
 	var sortBy string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--specs":
 			specsOnly = true
 		case "--changes":
-			changesOnly = true
 		case jsonFlag:
 			asJSON = true
 		case "--sort":
@@ -213,7 +212,7 @@ func cmdList(args []string) {
 		}
 
 		out := listOutput{}
-		if !changesOnly {
+		if specsOnly {
 			specs, listErr := internal.ListSpecs(root)
 			if listErr != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", listErr)
@@ -228,8 +227,7 @@ func cmdList(args []string) {
 					RequirementCount: s.RequirementCount,
 				})
 			}
-		}
-		if !specsOnly {
+		} else {
 			changes, listErr := internal.ListChanges(root)
 			if listErr != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", listErr)
@@ -252,7 +250,7 @@ func cmdList(args []string) {
 		return
 	}
 
-	if !changesOnly {
+	if specsOnly {
 		specs, listErr := internal.ListSpecs(root)
 		if listErr != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", listErr)
@@ -264,30 +262,33 @@ func cmdList(args []string) {
 		fmt.Println("Specs:")
 		if len(specs) == 0 {
 			fmt.Println("  (none)")
+		} else {
+			fmt.Println()
+			maxName := maxNameWidthSpecs(specs)
+			nameHeaderWidth := max(maxName, 4)
+			fmt.Printf("  %-*s  %s\n", nameHeaderWidth, "Name", "Requirements")
+			for _, s := range specs {
+				fmt.Printf("  %-*s  %d\n", nameHeaderWidth, s.Name, s.RequirementCount)
+			}
 		}
-		maxName := maxNameWidthSpecs(specs)
-		for _, s := range specs {
-			fmt.Printf("  %-*s  requirements %d\n", maxName, s.Name, s.RequirementCount)
-		}
+		return
 	}
 
-	if !specsOnly {
-		changes, listErr := internal.ListChanges(root)
-		if listErr != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", listErr)
-			os.Exit(1)
-		}
-		sortChanges(changes, sortBy)
-		fmt.Println("Changes:")
-		if len(changes) == 0 {
-			fmt.Println("  (none)")
-		}
-		maxName := maxNameWidthChanges(changes)
-		for _, c := range changes {
-			status := changeStatusText(c)
-			relTime := internal.FormatRelativeTime(c.LastModified)
-			fmt.Printf("  %-*s  %-16s %s\n", maxName, c.Name, status, relTime)
-		}
+	changes, listErr := internal.ListChanges(root)
+	if listErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", listErr)
+		os.Exit(1)
+	}
+	sortChanges(changes, sortBy)
+	fmt.Println("Changes:")
+	if len(changes) == 0 {
+		fmt.Println("  (none)")
+	}
+	maxName := maxNameWidthChanges(changes)
+	for _, c := range changes {
+		status := changeStatusText(c)
+		relTime := internal.FormatRelativeTime(c.LastModified)
+		fmt.Printf("  %-*s  %-16s %s\n", maxName, c.Name, status, relTime)
 	}
 }
 
@@ -782,11 +783,11 @@ Examples:
 func printListHelp() {
 	fmt.Print(`Usage: litespec list [--specs|--changes] [--sort recent|name] [--json]
 
-List specs and changes in the project.
+List active changes in the project (default) or specs with --specs.
 
 Flags:
-  --specs           List specs only
-  --changes         List changes only
+  --specs           List specs instead of changes
+  --changes         List changes (default)
   --sort <field>    Sort changes by 'recent' (default) or 'name'
   --json            Output as JSON
 

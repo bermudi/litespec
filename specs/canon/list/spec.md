@@ -4,7 +4,7 @@
 
 ### Requirement: Enriched Change Listing
 
-The `litespec list` command SHALL display each active change with three columns of metadata: task progress, status, and relative last-modified time. Task progress SHALL be derived from the change's `tasks.md` using the existing `TaskCompletion()` function. When all tasks are complete, the status column SHALL display `✓ Complete`. When tasks exist but are incomplete, it SHALL display `<completed>/<total> tasks`. When no `tasks.md` exists or there are zero tasks, it SHALL display `No tasks`. The last-modified time SHALL be determined by recursively walking all files in the change directory and finding the most recent modification time, falling back to the directory's own mtime if no files are found. The relative time format SHALL be: `just now` (< 1 min), `Xm ago` (minutes), `Xh ago` (hours), `Xd ago` (days, up to 30), or the locale date if older than 30 days.
+The `litespec list` command SHALL, by default, display each active change with three columns of metadata: task progress, status, and relative last-modified time. Task progress SHALL be derived from the change's `tasks.md` using the existing `TaskCompletion()` function. When all tasks are complete, the status column SHALL display `✓ Complete`. When tasks exist but are incomplete, it SHALL display `<completed>/<total> tasks`. When no `tasks.md` exists or there are zero tasks, it SHALL display `No tasks`. The last-modified time SHALL be determined by recursively walking all files in the change directory and finding the most recent modification time, falling back to the directory's own mtime if no files are found. The relative time format SHALL be: `just now` (< 1 min), `Xm ago` (minutes), `Xh ago` (hours), `Xd ago` (days, up to 30), or the locale date if older than 30 days.
 
 #### Scenario: Change with completed tasks
 
@@ -26,6 +26,16 @@ The `litespec list` command SHALL display each active change with three columns 
 - **WHEN** `litespec list` is run with changes of varying name lengths
 - **THEN** columns are left-aligned with names padded to the widest name width
 
+#### Scenario: Default shows changes only
+
+- **WHEN** `litespec list` is run without flags
+- **THEN** only changes are listed, not specs
+
+#### Scenario: --changes is explicit default
+
+- **WHEN** `litespec list --changes` is run
+- **THEN** the output is identical to running `litespec list` without flags
+
 ### Requirement: Enriched Spec Listing
 
 The `litespec list --specs` command SHALL display each canonical spec with its name and requirement count. The requirement count SHALL be derived by parsing each `specs/canon/<name>/spec.md` with `ParseMainSpec()` and counting `len(spec.Requirements)`. If parsing fails, the count SHALL be 0. Specs SHALL always be sorted alphabetically by name. The output format SHALL be column-aligned with names padded to the widest name width.
@@ -33,7 +43,7 @@ The `litespec list --specs` command SHALL display each canonical spec with its n
 #### Scenario: Spec with requirements
 
 - **WHEN** `litespec list --specs` is run and a spec has 5 requirements
-- **THEN** the output shows `requirements 5` next to the spec name
+- **THEN** the output shows a table with `Name` and `Requirements` column headers, and the spec row shows `5` in the Requirements column
 
 #### Scenario: Spec with parse failure
 
