@@ -414,30 +414,9 @@ func cmdInstructions(args []string) {
 		os.Exit(1)
 	}
 
-	if artifactID == "apply" {
-		instr, err := internal.BuildApplyInstructionsJSON(root, changeName)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
-		}
-		if asJSON {
-			data, _ := internal.MarshalJSON(instr)
-			fmt.Println(string(data))
-			return
-		}
-		fmt.Printf("Change: %s\n", changeName)
-		fmt.Printf("State: %s\n", instr.State)
-		fmt.Printf("Progress: %d/%d (%d remaining)\n", instr.Progress.Complete, instr.Progress.Total, instr.Progress.Remaining)
-		if instr.CurrentPhase < len(instr.Phases) {
-			fmt.Printf("Current Phase: %s\n", instr.Phases[instr.CurrentPhase].Name)
-		}
-		fmt.Println(instr.Instruction)
-		return
-	}
-
 	artifactInfo := internal.GetArtifact(artifactID)
 	if artifactInfo == nil {
-		fmt.Fprintf(os.Stderr, "unknown artifact: %s (valid: proposal, specs, design, tasks, apply)\n", artifactID)
+		fmt.Fprintf(os.Stderr, "unknown artifact: %s (valid: proposal, specs, design, tasks)\n", artifactID)
 		os.Exit(1)
 	}
 

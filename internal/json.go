@@ -3,7 +3,6 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 )
@@ -40,18 +39,6 @@ type DependencyInfoJSON struct {
 	Done        bool   `json:"done"`
 	Path        string `json:"path"`
 	Description string `json:"description"`
-}
-
-type ApplyInstructionsJSON struct {
-	ChangeName   string            `json:"changeName"`
-	ChangeDir    string            `json:"changeDir"`
-	SchemaName   string            `json:"schemaName"`
-	ContextFiles map[string]string `json:"contextFiles"`
-	Progress     ProgressJSON      `json:"progress"`
-	Phases       []PhaseJSON       `json:"phases"`
-	CurrentPhase int               `json:"currentPhase"`
-	State        string            `json:"state"`
-	Instruction  string            `json:"instruction"`
 }
 
 type ProgressJSON struct {
@@ -227,60 +214,6 @@ func BuildArtifactInstructionsJSON(root, changeName, artifactID string) (*Artifa
 		Template:     template,
 		Dependencies: deps,
 		Unlocks:      unlocks,
-	}, nil
-}
-
-func BuildApplyInstructionsJSON(root, changeName string) (*ApplyInstructionsJSON, error) {
-	change, err := LoadChangeContext(root, changeName)
-	if err != nil {
-		return nil, err
-	}
-
-	changeDir := ChangePath(root, changeName)
-	contextFiles := map[string]string{
-		"proposal": filepath.Join(changeDir, "proposal.md"),
-		"design":   filepath.Join(changeDir, "design.md"),
-		"tasks":    filepath.Join(changeDir, "tasks.md"),
-	}
-
-	tasksPath := filepath.Join(changeDir, "tasks.md")
-	state := "ready"
-	var phases []PhaseJSON
-
-	if change.Artifacts["tasks"] != ArtifactDone {
-		state = "blocked"
-	}
-
-	data, err := os.ReadFile(tasksPath)
-	if err != nil {
-		state = "blocked"
-		phases = []PhaseJSON{}
-	} else {
-		phases = parseTasksMD(string(data))
-	}
-
-	progress := computeProgress(phases)
-	currentPhase := findCurrentPhase(phases)
-
-	if state != "blocked" && progress.Remaining == 0 {
-		state = "all_done"
-	}
-
-	instruction := ""
-	if state == "ready" || state == "all_done" {
-		instruction = GetSkillTemplate("apply")
-	}
-
-	return &ApplyInstructionsJSON{
-		ChangeName:   changeName,
-		ChangeDir:    changeDir,
-		SchemaName:   change.Schema,
-		ContextFiles: contextFiles,
-		Progress:     progress,
-		Phases:       phases,
-		CurrentPhase: currentPhase,
-		State:        state,
-		Instruction:  instruction,
 	}, nil
 }
 
