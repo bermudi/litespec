@@ -478,3 +478,26 @@ func TestMergeDeltaRemoveThenAddSameName(t *testing.T) {
 		t.Errorf("Content = %q, want new content after remove+add", result.Requirements[0].Content)
 	}
 }
+
+func TestMergeDeltaPreservesPurpose(t *testing.T) {
+	main := &Spec{
+		Capability:   "auth",
+		Purpose:      "Handles user authentication.",
+		Requirements: []SpecRequirement{},
+	}
+	delta := &DeltaSpec{
+		Requirements: []DeltaRequirement{
+			{Operation: DeltaAdded, Name: "Login", Content: "The system SHALL authenticate.", Scenarios: []Scenario{
+				{Name: "Happy path", Content: "- **WHEN** valid creds"},
+			}},
+		},
+	}
+
+	result, err := MergeDelta(main, []*DeltaSpec{delta})
+	if err != nil {
+		t.Fatalf("MergeDelta: %v", err)
+	}
+	if result.Purpose != "Handles user authentication." {
+		t.Errorf("Purpose = %q, want %q", result.Purpose, "Handles user authentication.")
+	}
+}

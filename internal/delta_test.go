@@ -554,3 +554,66 @@ The system SHALL authenticate users.
 		t.Fatalf("Requirements count: got %d, want %d", len(spec2.Requirements), len(spec.Requirements))
 	}
 }
+
+func TestParseMainSpecEmptyRequirementsSection(t *testing.T) {
+	input := `# auth
+
+## Requirements
+`
+
+	spec, err := ParseMainSpec(input)
+	if err != nil {
+		t.Fatalf("ParseMainSpec: %v", err)
+	}
+	if spec.Capability != "auth" {
+		t.Errorf("Capability = %q, want %q", spec.Capability, "auth")
+	}
+	if len(spec.Requirements) != 0 {
+		t.Errorf("Requirements count = %d, want 0", len(spec.Requirements))
+	}
+}
+
+func TestParseMainSpecPurposeAfterRequirements(t *testing.T) {
+	input := `# auth
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+## Purpose
+
+This should not be accepted.
+`
+
+	_, err := ParseMainSpec(input)
+	if err == nil {
+		t.Fatal("expected error for ## Purpose appearing after ## Requirements")
+	}
+	if !containsSubstr(err.Error(), "unexpected H2 section") {
+		t.Errorf("error = %q, want mention of unexpected H2 section", err.Error())
+	}
+}
+
+func TestParseMainSpecDuplicateRequirementsHeaders(t *testing.T) {
+	input := `# auth
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+## Requirements
+
+### Requirement: Logout
+The system SHALL log out.
+`
+
+	_, err := ParseMainSpec(input)
+	if err == nil {
+		t.Fatal("expected error for duplicate ## Requirements header")
+	}
+	if !containsSubstr(err.Error(), "unexpected H2 section") {
+		t.Errorf("error = %q, want mention of unexpected H2 section", err.Error())
+	}
+}

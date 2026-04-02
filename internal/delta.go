@@ -50,7 +50,7 @@ func ParseMainSpec(content string) (*Spec, error) {
 			heading := strings.TrimSpace(trimmed[2:])
 
 			if state == stateRequirements {
-				continue
+				return nil, fmt.Errorf("unexpected H2 section %q inside ## Requirements", trimmed)
 			}
 
 			if heading == "Purpose" {
