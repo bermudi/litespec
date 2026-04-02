@@ -63,24 +63,11 @@ These came from deliberate debate. Respect the reasoning:
 ## Working Conventions
 
 - Use `stdlib` and established Go patterns
-- No external dependencies unless strongly justified (yaml.v3 is the only one so far)
 - Run `go build`, `go test`, `go vet` after changes
 - Follow standard Go project layout: `cmd/`, `internal/`
 - Write tests that verify behavior and system state
 - No `any` equivalents — explicit types everywhere
 - No comments unless absolutely necessary for non-obvious logic
-
-## Test Suite
-
-77 tests across 7 files, all passing. Coverage:
-
-- `delta_test.go` — scenario parse/serialize/merge (12 tests)
-- `delta_parse_test.go` — ParseDeltaSpec edge cases (7 tests)
-- `delta_merge_test.go` — MergeDelta ordering, errors, rename+modify (8 tests)
-- `validate_test.go` — ValidateChange with filesystem (13 tests)
-- `tasks_test.go` — parseTasksMD, findCurrentPhase, computeProgress, TaskCompletion (20 tests)
-- `archive_test.go` — full archive pipeline against temp dirs (5 tests)
-- `instructions_test.go` — artifact-specific instructions, distinctness, dependencies (12 tests)
 
 ## What's Next
 
