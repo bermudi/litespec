@@ -17,6 +17,6 @@
 
 ## Phase 3: Deployment
 
-- [ ] Create `.github/workflows/docs.yml` for GitHub Pages auto-deploy
-- [ ] Trim `README.md` to brief summary with link to docs site
-- [ ] Verify full build and local preview work correctly
+- [x] Create `.github/workflows/docs.yml` for GitHub Pages auto-deploy
+- [x] Trim `README.md` to brief summary with link to docs site
+- [x] Verify full build and local preview work correctly
