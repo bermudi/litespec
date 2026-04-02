@@ -751,6 +751,72 @@ The system SHALL authenticate.
 	}
 }
 
+func TestValidateSpecValid(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "auth", `# auth
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+- **WHEN** valid creds
+`)
+
+	result, err := ValidateSpec(root, "auth")
+	if err != nil {
+		t.Fatalf("ValidateSpec: %v", err)
+	}
+	if !result.Valid {
+		for _, e := range result.Errors {
+			t.Errorf("Unexpected error: %s: %s", e.File, e.Message)
+		}
+		t.Fatal("expected valid spec")
+	}
+}
+
+func TestValidateSpecNotFound(t *testing.T) {
+	root := setupTestProject(t)
+	_, err := ValidateSpec(root, "nonexistent")
+	if err == nil {
+		t.Fatal("expected error for nonexistent spec")
+	}
+}
+
+func TestValidateSpecInvalidContent(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "auth", `not a valid spec`)
+
+	result, err := ValidateSpec(root, "auth")
+	if err != nil {
+		t.Fatalf("ValidateSpec: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected invalid for unparseable spec")
+	}
+}
+
+func TestValidateSpecNoRequirements(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "auth", `# auth`)
+
+	result, err := ValidateSpec(root, "auth")
+	if err != nil {
+		t.Fatalf("ValidateSpec: %v", err)
+	}
+	if !result.Valid {
+		t.Fatal("spec with no requirements should be valid")
+	}
+	found := false
+	for _, w := range result.Warnings {
+		if w.Message == `capability "auth" has no requirements` {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected warning for no requirements")
+	}
+}
+
 func TestValidateChangeADDEDNewCapabilityNoMainSpec(t *testing.T) {
 	root := setupTestProject(t)
 	makeValidChange(t, root, "change", `## ADDED Requirements

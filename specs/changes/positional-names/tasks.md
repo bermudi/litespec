@@ -16,8 +16,8 @@
 
 ## Phase 3: Tests
 
-- [ ] Add tests for `ValidateSpec()`
-- [ ] Add tests for `BuildArtifactInstructionsStandaloneJSON()`
-- [ ] Add CLI-level tests for validate argument parsing (positional, bulk flags, type detection, ambiguity, mutual exclusivity)
-- [ ] Add CLI-level tests for status positional name
-- [ ] Add CLI-level tests for instructions without `--change`
+- [x] Add tests for `ValidateSpec()`
+- [x] Add tests for `BuildArtifactInstructionsStandaloneJSON()`
+- [x] Add CLI-level tests for validate argument parsing (positional, bulk flags, type detection, ambiguity, mutual exclusivity)
+- [x] Add CLI-level tests for status positional name
+- [x] Add CLI-level tests for instructions without `--change`
