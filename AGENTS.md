@@ -45,7 +45,7 @@ Unidirectional. No backward flow.
 - **propose** is the commit point. If something is wrong after proposing, start over from explore/grill.
 - **apply** works on one phase at a time. Each phase = one agent session = one commit. Re-invoke for the next phase.
 - **adopt** is a separate path — reverse-engineers specs from existing code given a file/directory path.
-- **verify** is pure AI review of code vs specs. No test/lint running.
+- **verify** is context-aware AI review: artifact review when no tasks are checked (evaluates planning artifacts), implementation review when some tasks are checked (code vs specs), pre-archive review when all tasks are checked (both artifacts and code). No test/lint running.
 
 ## Key Design Decisions
 

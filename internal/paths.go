@@ -44,7 +44,7 @@ var Skills = []SkillInfo{
 	{
 		ID:          "verify",
 		Name:        "litespec-verify",
-		Description: "Review implemented code against spec requirements with structured QA. Use when the user wants to verify implementation, check completeness, or says \"verify\".",
+		Description: "Context-aware review that adapts to change lifecycle: artifact review (pre-implementation), implementation review (during implementation), and pre-archive review (post-implementation). Use when the user wants to verify artifacts or implementation, check completeness, or says \"verify\".",
 	},
 	{
 		ID:          "adopt",

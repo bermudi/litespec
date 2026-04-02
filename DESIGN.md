@@ -63,7 +63,7 @@ No backward flow. If something is wrong after propose, start over from explore/g
 | `propose` | Materializes | Creates change dir + proposal + specs + design + tasks (all at once). This is the commit point. |
 | `continue` | Incremental | Creates next missing artifact one at a time. For when propose only partially completes or artifacts need re-creation. |
 | `apply` | Phase-based | Implements tasks per phase in `tasks.md`. One phase per invocation. AI focuses on one area without doing the whole implementation at once. |
-| `verify` | AI review | Reads implemented code, compares against spec requirements. Pure AI review — no test/lint running. |
+| `verify` | AI review | Context-aware review that adapts to change lifecycle: artifact review (0 tasks checked — evaluates planning artifacts for quality, consistency, readiness), implementation review (some tasks checked — compares code against specs), pre-archive review (all tasks checked — reviews both artifacts and code comprehensively before archiving). Pure AI review — no test/lint running. |
 | `adopt` | Reverse-engineer | Takes a file/directory path. Generates a change proposal with specs from existing code. For code that has no spec yet. |
 | `archive` | Merge + move | Validates task completion (blocks if unchecked), applies delta operations (RENAMED→REMOVED→MODIFIED→ADDED) into `specs/canon/`, strips the change's `specs/` subtree, then moves the remaining planning artifacts to `archive/`. Bypass with `--allow-incomplete`. |
 
