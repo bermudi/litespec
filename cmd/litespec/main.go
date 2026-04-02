@@ -79,6 +79,12 @@ Flags:
 }
 
 func cmdInit(args []string) {
+	if hasHelpFlag(args) {
+		printInitHelp()
+		return
+	}
+	checkUnknownFlags(args, map[string]bool{"--tools": true})
+
 	var tools string
 	for i := 0; i < len(args); i++ {
 		if args[i] == "--tools" && i+1 < len(args) {
@@ -118,6 +124,12 @@ func cmdInit(args []string) {
 }
 
 func cmdUpdate(args []string) {
+	if hasHelpFlag(args) {
+		printUpdateHelp()
+		return
+	}
+	checkUnknownFlags(args, map[string]bool{"--tools": true})
+
 	var tools string
 	for i := 0; i < len(args); i++ {
 		if args[i] == "--tools" && i+1 < len(args) {
@@ -154,6 +166,12 @@ func cmdUpdate(args []string) {
 }
 
 func cmdList(args []string) {
+	if hasHelpFlag(args) {
+		printListHelp()
+		return
+	}
+	checkUnknownFlags(args, map[string]bool{"--specs": true, "--changes": true, "--sort": true, "--json": true})
+
 	var specsOnly, changesOnly, asJSON bool
 	var sortBy string
 	for i := 0; i < len(args); i++ {
@@ -165,10 +183,12 @@ func cmdList(args []string) {
 		case jsonFlag:
 			asJSON = true
 		case "--sort":
-			if i+1 < len(args) {
-				sortBy = args[i+1]
-				i++
+			if i+1 >= len(args) {
+				fmt.Fprintf(os.Stderr, "error: --sort requires a value (recent or name)\n")
+				os.Exit(1)
 			}
+			sortBy = args[i+1]
+			i++
 		}
 	}
 
@@ -272,6 +292,12 @@ func cmdList(args []string) {
 }
 
 func cmdStatus(args []string) {
+	if hasHelpFlag(args) {
+		printStatusHelp()
+		return
+	}
+	checkUnknownFlags(args, map[string]bool{"--json": true})
+
 	var name string
 	var asJSON bool
 	for _, arg := range args {
@@ -359,6 +385,12 @@ func cmdStatus(args []string) {
 }
 
 func cmdValidate(args []string) {
+	if hasHelpFlag(args) {
+		printValidateHelp()
+		return
+	}
+	checkUnknownFlags(args, map[string]bool{"--all": true, "--changes": true, "--specs": true, "--strict": true, "--json": true, "--type": true})
+
 	var positional string
 	var flagAll, flagChanges, flagSpecs, strict, asJSON bool
 	var typeFilter string
@@ -376,10 +408,12 @@ func cmdValidate(args []string) {
 		case jsonFlag:
 			asJSON = true
 		case "--type":
-			if i+1 < len(args) {
-				typeFilter = args[i+1]
-				i++
+			if i+1 >= len(args) {
+				fmt.Fprintf(os.Stderr, "error: --type requires a value (change or spec)\n")
+				os.Exit(1)
 			}
+			typeFilter = args[i+1]
+			i++
 		default:
 			if !strings.HasPrefix(args[i], "-") && positional == "" {
 				positional = args[i]
@@ -526,6 +560,12 @@ func cmdValidate(args []string) {
 }
 
 func cmdInstructions(args []string) {
+	if hasHelpFlag(args) {
+		printInstructionsHelp()
+		return
+	}
+	checkUnknownFlags(args, map[string]bool{"--json": true})
+
 	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "usage: litespec instructions <artifact> [--json]\n")
 		os.Exit(1)
@@ -561,6 +601,12 @@ func cmdInstructions(args []string) {
 }
 
 func cmdArchive(args []string) {
+	if hasHelpFlag(args) {
+		printArchiveHelp()
+		return
+	}
+	checkUnknownFlags(args, map[string]bool{"--allow-incomplete": true})
+
 	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "usage: litespec archive <change-name> [--allow-incomplete]\n")
 		os.Exit(1)
@@ -576,6 +622,10 @@ func cmdArchive(args []string) {
 		filtered = append(filtered, a)
 	}
 	name := filtered[0]
+	if len(filtered) > 1 {
+		fmt.Fprintf(os.Stderr, "error: unexpected arguments. Usage: litespec archive <name> [--allow-incomplete]\n")
+		os.Exit(1)
+	}
 
 	root, err := internal.FindProjectRoot()
 	if err != nil {
@@ -635,6 +685,16 @@ func cmdArchive(args []string) {
 }
 
 func cmdNew(args []string) {
+	if hasHelpFlag(args) {
+		printNewHelp()
+		return
+	}
+	checkUnknownFlags(args, map[string]bool{})
+	if len(args) > 1 {
+		fmt.Fprintf(os.Stderr, "error: unexpected arguments. Usage: litespec new <name>\n")
+		os.Exit(1)
+	}
+
 	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "usage: litespec new <change-name>\n")
 		os.Exit(1)
@@ -653,6 +713,164 @@ func cmdNew(args []string) {
 	}
 
 	fmt.Println(internal.ChangePath(root, name))
+}
+
+func hasHelpFlag(args []string) bool {
+	for _, arg := range args {
+		if arg == "--help" || arg == "-h" {
+			return true
+		}
+	}
+	return false
+}
+
+func checkUnknownFlags(args []string, validFlags map[string]bool) {
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--") && !validFlags[arg] {
+			fmt.Fprintf(os.Stderr, "error: unknown flag %s\n", arg)
+			os.Exit(1)
+		}
+	}
+}
+
+func printInitHelp() {
+	fmt.Print(`Usage: litespec init [--tools <ids>]
+
+Initialize a new litespec project in the current directory.
+
+Creates:
+  specs/canon/      Canonical spec directory
+  specs/changes/    Change proposals directory
+  .agents/skills/   Generated skill files
+
+Flags:
+  --tools <ids>     Comma-separated tool IDs (e.g., claude)
+
+Examples:
+  litespec init
+  litespec init --tools claude
+`)
+}
+
+func printUpdateHelp() {
+	fmt.Print(`Usage: litespec update [--tools <ids>]
+
+Regenerate skills and adapter commands from current specs.
+
+Flags:
+  --tools <ids>     Comma-separated tool IDs (e.g., claude)
+
+Examples:
+  litespec update
+  litespec update --tools claude
+`)
+}
+
+func printNewHelp() {
+	fmt.Print(`Usage: litespec new <name>
+
+Create a new change directory under specs/changes/.
+
+Arguments:
+  <name>            Change name (e.g., add-auth)
+
+Examples:
+  litespec new add-auth
+`)
+}
+
+func printListHelp() {
+	fmt.Print(`Usage: litespec list [--specs|--changes] [--sort recent|name] [--json]
+
+List specs and changes in the project.
+
+Flags:
+  --specs           List specs only
+  --changes         List changes only
+  --sort <field>    Sort changes by 'recent' (default) or 'name'
+  --json            Output as JSON
+
+Examples:
+  litespec list
+  litespec list --changes --sort name
+  litespec list --specs --json
+`)
+}
+
+func printStatusHelp() {
+	fmt.Print(`Usage: litespec status [<name>] [--json]
+
+Show artifact states for a change or all changes.
+
+Arguments:
+  <name>            Change name (omit to show all changes)
+
+Flags:
+  --json            Output as JSON
+
+Examples:
+  litespec status
+  litespec status my-change
+  litespec status --json
+`)
+}
+
+func printValidateHelp() {
+	fmt.Print(`Usage: litespec validate [<name>] [--all|--changes|--specs] [--type T] [--strict] [--json]
+
+Validate changes and specs.
+
+Arguments:
+  <name>            Validate a specific change or spec by name
+
+Flags:
+  --all             Validate all changes and specs
+  --changes         Validate all changes only
+  --specs           Validate all specs only
+  --type <T>        Disambiguate name: change|spec
+  --strict          Treat warnings as errors
+  --json            Output as JSON
+
+Examples:
+  litespec validate
+  litespec validate my-change
+  litespec validate --all --strict
+  litespec validate shared --type spec
+`)
+}
+
+func printInstructionsHelp() {
+	fmt.Print(`Usage: litespec instructions <artifact> [--json]
+
+Get artifact-specific instructions for writing proposals, specs, designs, or tasks.
+
+Arguments:
+  <artifact>        One of: proposal, specs, design, tasks
+
+Flags:
+  --json            Output as JSON
+
+Examples:
+  litespec instructions proposal
+  litespec instructions design --json
+`)
+}
+
+func printArchiveHelp() {
+	fmt.Print(`Usage: litespec archive <name> [--allow-incomplete]
+
+Apply deltas and archive a completed change.
+
+Arguments:
+  <name>            Change name to archive
+
+Flags:
+  --allow-incomplete    Archive even with incomplete tasks
+
+Examples:
+  litespec archive my-change
+  litespec archive my-change --allow-incomplete
+`)
 }
 
 func splitCSV(s string) []string {

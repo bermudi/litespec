@@ -389,3 +389,216 @@ func TestMaxNameWidthEmpty(t *testing.T) {
 		t.Error("expected 0 for nil slice")
 	}
 }
+
+func TestCLIHelpFlag(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "--help")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "Commands:") {
+		t.Error("expected Commands section in help output")
+	}
+}
+
+func TestCLIHelpShortFlag(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "-h")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "Commands:") {
+		t.Error("expected Commands section in help output")
+	}
+}
+
+func TestCLIInitHelp(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "init", "--help")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "Usage: litespec init") {
+		t.Error("expected init usage in help output")
+	}
+}
+
+func TestCLIInitHelpShort(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "init", "-h")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "Usage: litespec init") {
+		t.Error("expected init usage in help output")
+	}
+}
+
+func TestCLIUpdateHelp(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "update", "--help")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "Usage: litespec update") {
+		t.Error("expected update usage in help output")
+	}
+}
+
+func TestCLINewHelp(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "new", "--help")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "Usage: litespec new") {
+		t.Error("expected new usage in help output")
+	}
+}
+
+func TestCLIListHelp(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "list", "--help")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "Usage: litespec list") {
+		t.Error("expected list usage in help output")
+	}
+}
+
+func TestCLIStatusHelp(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "status", "--help")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "Usage: litespec status") {
+		t.Error("expected status usage in help output")
+	}
+}
+
+func TestCLIValidateHelp(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "validate", "--help")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "Usage: litespec validate") {
+		t.Error("expected validate usage in help output")
+	}
+}
+
+func TestCLIInstructionsHelp(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "instructions", "--help")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "Usage: litespec instructions") {
+		t.Error("expected instructions usage in help output")
+	}
+}
+
+func TestCLIArchiveHelp(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "archive", "--help")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "Usage: litespec archive") {
+		t.Error("expected archive usage in help output")
+	}
+}
+
+func TestCLINewExtraArgs(t *testing.T) {
+	bin, root := setupCLITest(t)
+	_, code := runCLI(t, bin, root, "new", "foo", "bar")
+	if code != 1 {
+		t.Fatalf("expected exit 1 for extra args, got %d", code)
+	}
+}
+
+func TestCLIArchiveExtraArgs(t *testing.T) {
+	bin, root := setupCLITest(t)
+	_, code := runCLI(t, bin, root, "archive", "foo", "bar")
+	if code != 1 {
+		t.Fatalf("expected exit 1 for extra args, got %d", code)
+	}
+}
+
+func TestCLIInitUnknownFlag(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+	_, code := runCLI(t, bin, root, "init", "--bogus")
+	if code != 1 {
+		t.Fatalf("expected exit 1 for unknown flag, got %d", code)
+	}
+}
+
+func TestCLIListUnknownFlag(t *testing.T) {
+	bin, root := setupCLITest(t)
+	_, code := runCLI(t, bin, root, "list", "--bogus")
+	if code != 1 {
+		t.Fatalf("expected exit 1 for unknown flag, got %d", code)
+	}
+}
+
+func TestCLIStatusUnknownFlag(t *testing.T) {
+	bin, root := setupCLITest(t)
+	_, code := runCLI(t, bin, root, "status", "--bogus")
+	if code != 1 {
+		t.Fatalf("expected exit 1 for unknown flag, got %d", code)
+	}
+}
+
+func TestCLIValidateUnknownFlag(t *testing.T) {
+	bin, root := setupCLITest(t)
+	_, code := runCLI(t, bin, root, "validate", "--bogus")
+	if code != 1 {
+		t.Fatalf("expected exit 1 for unknown flag, got %d", code)
+	}
+}
+
+func TestCLIInstructionsUnknownFlag(t *testing.T) {
+	bin, root := setupCLITest(t)
+	_, code := runCLI(t, bin, root, "instructions", "proposal", "--bogus")
+	if code != 1 {
+		t.Fatalf("expected exit 1 for unknown flag, got %d", code)
+	}
+}
+
+func TestCLIArchiveUnknownFlag(t *testing.T) {
+	bin, root := setupCLITest(t)
+	_, code := runCLI(t, bin, root, "archive", "foo", "--bogus")
+	if code != 1 {
+		t.Fatalf("expected exit 1 for unknown flag, got %d", code)
+	}
+}
+
+func TestCLIListSortMissingValue(t *testing.T) {
+	bin, root := setupCLITest(t)
+	_, code := runCLI(t, bin, root, "list", "--sort")
+	if code != 1 {
+		t.Fatalf("expected exit 1 for --sort without value, got %d", code)
+	}
+}
+
+func TestCLIValidateTypeMissingValue(t *testing.T) {
+	bin, root := setupCLITest(t)
+	_, code := runCLI(t, bin, root, "validate", "foo", "--type")
+	if code != 1 {
+		t.Fatalf("expected exit 1 for --type without value, got %d", code)
+	}
+}
