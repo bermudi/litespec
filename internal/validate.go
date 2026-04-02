@@ -379,8 +379,8 @@ func ValidateAll(root string, strict bool) (*ValidationResult, error) {
 		return nil, err
 	}
 
-	for _, name := range changes {
-		changeResult, err := ValidateChange(root, name)
+	for _, ci := range changes {
+		changeResult, err := ValidateChange(root, ci.Name)
 		if err != nil {
 			return nil, err
 		}

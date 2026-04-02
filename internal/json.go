@@ -48,7 +48,16 @@ type TaskItemJSON struct {
 }
 
 type ChangeListItemJSON struct {
-	Name string `json:"name"`
+	Name           string `json:"name"`
+	CompletedTasks int    `json:"completedTasks"`
+	TotalTasks     int    `json:"totalTasks"`
+	LastModified   string `json:"lastModified"`
+	Status         string `json:"status"`
+}
+
+type SpecListItemJSON struct {
+	Name             string `json:"name"`
+	RequirementCount int    `json:"requirementCount"`
 }
 
 type ValidationResultJSON struct {
@@ -84,6 +93,16 @@ func BuildValidationResultJSON(r *ValidationResult) ValidationResultJSON {
 		Warnings: warnings,
 		Summary:  ValidationSummaryJSON{Total: len(errors) + len(warnings), Invalid: len(errors)},
 	}
+}
+
+func ChangeListStatus(completed, total int) string {
+	if total == 0 {
+		return "no-tasks"
+	}
+	if completed == total {
+		return "complete"
+	}
+	return "in-progress"
 }
 
 func MarshalJSON(v interface{}) ([]byte, error) {

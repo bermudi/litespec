@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/bermudi/litespec/internal"
 )
@@ -152,15 +154,29 @@ func cmdUpdate(args []string) {
 
 func cmdList(args []string) {
 	var specsOnly, changesOnly, asJSON bool
-	for _, arg := range args {
-		switch arg {
+	var sortBy string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
 		case "--specs":
 			specsOnly = true
 		case "--changes":
 			changesOnly = true
 		case jsonFlag:
 			asJSON = true
+		case "--sort":
+			if i+1 < len(args) {
+				sortBy = args[i+1]
+				i++
+			}
 		}
+	}
+
+	if sortBy == "" {
+		sortBy = "recent"
+	}
+	if sortBy != "recent" && sortBy != "name" {
+		fmt.Fprintf(os.Stderr, "error: --sort must be 'recent' or 'name', got %q\n", sortBy)
+		os.Exit(1)
 	}
 
 	root, err := internal.FindProjectRoot()
@@ -171,26 +187,40 @@ func cmdList(args []string) {
 
 	if asJSON {
 		type listOutput struct {
-			Specs   []string `json:"specs"`
-			Changes []string `json:"changes"`
+			Changes []internal.ChangeListItemJSON `json:"changes,omitempty"`
+			Specs   []internal.SpecListItemJSON   `json:"specs,omitempty"`
 		}
 
 		out := listOutput{}
 		if !changesOnly {
-			names, err := internal.ListSpecs(root)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			specs, listErr := internal.ListSpecs(root)
+			if listErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", listErr)
 				os.Exit(1)
 			}
-			out.Specs = names
+			for _, s := range specs {
+				out.Specs = append(out.Specs, internal.SpecListItemJSON{
+					Name:             s.Name,
+					RequirementCount: s.RequirementCount,
+				})
+			}
 		}
 		if !specsOnly {
-			names, err := internal.ListChanges(root)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			changes, listErr := internal.ListChanges(root)
+			if listErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", listErr)
 				os.Exit(1)
 			}
-			out.Changes = names
+			sortChanges(changes, sortBy)
+			for _, c := range changes {
+				out.Changes = append(out.Changes, internal.ChangeListItemJSON{
+					Name:           c.Name,
+					CompletedTasks: c.CompletedTasks,
+					TotalTasks:     c.TotalTasks,
+					LastModified:   c.LastModified.Format(time.RFC3339),
+					Status:         internal.ChangeListStatus(c.CompletedTasks, c.TotalTasks),
+				})
+			}
 		}
 
 		data, _ := internal.MarshalJSON(out)
@@ -199,32 +229,40 @@ func cmdList(args []string) {
 	}
 
 	if !changesOnly {
-		specNames, err := internal.ListSpecs(root)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		specs, listErr := internal.ListSpecs(root)
+		if listErr != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", listErr)
 			os.Exit(1)
 		}
+		sort.Slice(specs, func(i, j int) bool {
+			return specs[i].Name < specs[j].Name
+		})
 		fmt.Println("Specs:")
-		if len(specNames) == 0 {
+		if len(specs) == 0 {
 			fmt.Println("  (none)")
 		}
-		for _, name := range specNames {
-			fmt.Printf("  %s\n", name)
+		maxName := maxNameWidthSpecs(specs)
+		for _, s := range specs {
+			fmt.Printf("  %-*s  requirements %d\n", maxName, s.Name, s.RequirementCount)
 		}
 	}
 
 	if !specsOnly {
-		changeNames, err := internal.ListChanges(root)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		changes, listErr := internal.ListChanges(root)
+		if listErr != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", listErr)
 			os.Exit(1)
 		}
+		sortChanges(changes, sortBy)
 		fmt.Println("Changes:")
-		if len(changeNames) == 0 {
+		if len(changes) == 0 {
 			fmt.Println("  (none)")
 		}
-		for _, name := range changeNames {
-			fmt.Printf("  %s\n", name)
+		maxName := maxNameWidthChanges(changes)
+		for _, c := range changes {
+			status := changeStatusText(c)
+			relTime := internal.FormatRelativeTime(c.LastModified)
+			fmt.Printf("  %-*s  %-16s %s\n", maxName, c.Name, status, relTime)
 		}
 	}
 }
@@ -288,7 +326,7 @@ func cmdStatus(args []string) {
 	if asJSON {
 		var statuses []internal.ChangeStatusJSON
 		for _, n := range changes {
-			ctx, err := internal.LoadChangeContext(root, n)
+			ctx, err := internal.LoadChangeContext(root, n.Name)
 			if err != nil {
 				continue
 			}
@@ -304,12 +342,12 @@ func cmdStatus(args []string) {
 		return
 	}
 	for _, n := range changes {
-		ctx, err := internal.LoadChangeContext(root, n)
+		ctx, err := internal.LoadChangeContext(root, n.Name)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error loading change %q: %v\n", n, err)
+			fmt.Fprintf(os.Stderr, "error loading change %q: %v\n", n.Name, err)
 			continue
 		}
-		fmt.Printf("%s\n", n)
+		fmt.Printf("%s\n", n.Name)
 		for _, art := range internal.Artifacts {
 			fmt.Printf("  %-12s %s\n", art.ID+":", ctx.Artifacts[art.ID])
 		}
@@ -376,10 +414,18 @@ func cmdValidate(args []string) {
 	var result *internal.ValidationResult
 
 	if positional != "" {
-		changes, _ := internal.ListChanges(root)
-		specs, _ := internal.ListSpecs(root)
-		isChange := contains(changes, positional)
-		isSpec := contains(specs, positional)
+		changeList, _ := internal.ListChanges(root)
+		specList, _ := internal.ListSpecs(root)
+		changeNames := make([]string, len(changeList))
+		for i, c := range changeList {
+			changeNames[i] = c.Name
+		}
+		specNames := make([]string, len(specList))
+		for i, s := range specList {
+			specNames[i] = s.Name
+		}
+		isChange := contains(changeNames, positional)
+		isSpec := contains(specNames, positional)
 
 		if typeFilter == "change" {
 			isSpec = false
@@ -424,8 +470,8 @@ func cmdValidate(args []string) {
 				fmt.Fprintf(os.Stderr, "error: %v\n", listErr)
 				os.Exit(1)
 			}
-			for _, name := range changes {
-				changeResult, changeErr := internal.ValidateChange(root, name)
+			for _, ci := range changes {
+				changeResult, changeErr := internal.ValidateChange(root, ci.Name)
 				if changeErr != nil {
 					fmt.Fprintf(os.Stderr, "error: %v\n", changeErr)
 					os.Exit(1)
@@ -620,4 +666,47 @@ func contains(slice []string, val string) bool {
 		}
 	}
 	return false
+}
+
+func sortChanges(changes []internal.ChangeInfo, sortBy string) {
+	switch sortBy {
+	case "name":
+		sort.Slice(changes, func(i, j int) bool {
+			return changes[i].Name < changes[j].Name
+		})
+	default:
+		sort.Slice(changes, func(i, j int) bool {
+			return changes[i].LastModified.After(changes[j].LastModified)
+		})
+	}
+}
+
+func changeStatusText(c internal.ChangeInfo) string {
+	if c.TotalTasks == 0 {
+		return "No tasks"
+	}
+	if c.CompletedTasks == c.TotalTasks {
+		return "✓ Complete"
+	}
+	return fmt.Sprintf("%d/%d tasks", c.CompletedTasks, c.TotalTasks)
+}
+
+func maxNameWidthChanges(changes []internal.ChangeInfo) int {
+	max := 0
+	for _, c := range changes {
+		if len(c.Name) > max {
+			max = len(c.Name)
+		}
+	}
+	return max
+}
+
+func maxNameWidthSpecs(specs []internal.SpecInfo) int {
+	max := 0
+	for _, s := range specs {
+		if len(s.Name) > max {
+			max = len(s.Name)
+		}
+	}
+	return max
 }

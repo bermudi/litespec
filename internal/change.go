@@ -11,6 +11,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type ChangeInfo struct {
+	Name           string
+	CompletedTasks int
+	TotalTasks     int
+	LastModified   time.Time
+}
+
+type SpecInfo struct {
+	Name             string
+	RequirementCount int
+}
+
 var (
 	checkboxUncheckedRe = regexp.MustCompile(`^\s*- \[ \]`)
 	checkboxAnyRe       = regexp.MustCompile(`(?i)^\s*- \[[ xX]\]`)
@@ -58,37 +70,67 @@ func CreateChange(root, name string) error {
 	return nil
 }
 
-func ListChanges(root string) ([]string, error) {
+func ListChanges(root string) ([]ChangeInfo, error) {
 	changesDir := ChangesPath(root)
 	entries, err := os.ReadDir(changesDir)
 	if err != nil {
 		return nil, fmt.Errorf("read changes directory: %w", err)
 	}
 
-	var names []string
+	var result []ChangeInfo
 	for _, entry := range entries {
 		if !entry.IsDir() || entry.Name() == ArchiveDirName {
 			continue
 		}
-		names = append(names, entry.Name())
+		name := entry.Name()
+		changeDir := ChangePath(root, name)
+
+		var completed, total int
+		tasksData, tasksErr := os.ReadFile(filepath.Join(changeDir, "tasks.md"))
+		if tasksErr == nil {
+			completed, total = TaskCompletion(string(tasksData))
+		}
+
+		lastMod, _ := GetLastModified(changeDir)
+
+		result = append(result, ChangeInfo{
+			Name:           name,
+			CompletedTasks: completed,
+			TotalTasks:     total,
+			LastModified:   lastMod,
+		})
 	}
-	return names, nil
+	return result, nil
 }
 
-func ListSpecs(root string) ([]string, error) {
+func ListSpecs(root string) ([]SpecInfo, error) {
 	specsDir := CanonPath(root)
 	entries, err := os.ReadDir(specsDir)
 	if err != nil {
 		return nil, fmt.Errorf("read specs directory: %w", err)
 	}
 
-	var names []string
+	var result []SpecInfo
 	for _, entry := range entries {
-		if entry.IsDir() {
-			names = append(names, entry.Name())
+		if !entry.IsDir() {
+			continue
 		}
+		name := entry.Name()
+		specPath := filepath.Join(specsDir, name, "spec.md")
+		var reqCount int
+		data, readErr := os.ReadFile(specPath)
+		if readErr == nil {
+			spec, parseErr := ParseMainSpec(string(data))
+			if parseErr == nil {
+				reqCount = len(spec.Requirements)
+			}
+		}
+		result = append(result, SpecInfo{
+			Name:             name,
+			RequirementCount: reqCount,
+		})
 	}
-	return names, nil
+	return result, nil
 }
 
 type PendingWrite struct {
@@ -223,6 +265,46 @@ func ReadChangeMeta(root, name string) (*ChangeMeta, error) {
 }
 
 // TaskCompletion returns (completed, total) counts for checkbox items in tasks.md content.
+func GetLastModified(dir string) (time.Time, error) {
+	var maxTime time.Time
+	info, err := os.Stat(dir)
+	if err != nil {
+		return maxTime, fmt.Errorf("stat directory %s: %w", dir, err)
+	}
+	maxTime = info.ModTime()
+
+	err = filepath.Walk(dir, func(path string, fi os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if !fi.IsDir() && fi.ModTime().After(maxTime) {
+			maxTime = fi.ModTime()
+		}
+		return nil
+	})
+	if err != nil {
+		return maxTime, fmt.Errorf("walk directory %s: %w", dir, err)
+	}
+	return maxTime, nil
+}
+
+func FormatRelativeTime(t time.Time) string {
+	d := time.Since(t)
+	if d < time.Minute {
+		return "just now"
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	}
+	if d < 24*time.Hour {
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	}
+	if d < 30*24*time.Hour {
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	}
+	return t.Format("2006-01-02")
+}
+
 func TaskCompletion(content string) (completed, total int) {
 	for _, line := range strings.Split(content, "\n") {
 		if checkboxAnyRe.MatchString(line) {
