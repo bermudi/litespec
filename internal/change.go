@@ -4,9 +4,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
+)
+
+var (
+	checkboxUncheckedRe = regexp.MustCompile(`^\s*- \[ \]`)
+	checkboxAnyRe       = regexp.MustCompile(`(?i)^\s*- \[[ xX]\]`)
 )
 
 func InitProject(root string) error {
@@ -211,4 +218,17 @@ func ReadChangeMeta(root, name string) (*ChangeMeta, error) {
 	}
 
 	return &meta, nil
+}
+
+// TaskCompletion returns (completed, total) counts for checkbox items in tasks.md content.
+func TaskCompletion(content string) (completed, total int) {
+	for _, line := range strings.Split(content, "\n") {
+		if checkboxAnyRe.MatchString(line) {
+			total++
+			if !checkboxUncheckedRe.MatchString(line) {
+				completed++
+			}
+		}
+	}
+	return
 }

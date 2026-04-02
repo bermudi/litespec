@@ -459,11 +459,21 @@ func cmdInstructions(args []string) {
 
 func cmdArchive(args []string) {
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "usage: litespec archive <change-name>\n")
+		fmt.Fprintf(os.Stderr, "usage: litespec archive <change-name> [--allow-incomplete]\n")
 		os.Exit(1)
 	}
 
-	name := args[0]
+	allowIncomplete := false
+	filtered := args[:0]
+	for _, a := range args {
+		if a == "--allow-incomplete" {
+			allowIncomplete = true
+			continue
+		}
+		filtered = append(filtered, a)
+	}
+	name := filtered[0]
+
 	root, err := internal.FindProjectRoot()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -484,6 +494,18 @@ func cmdArchive(args []string) {
 	}
 	for _, issue := range result.Warnings {
 		fmt.Printf("WARN   %s: %s\n", issue.File, issue.Message)
+	}
+
+	if !allowIncomplete {
+		tasksPath := filepath.Join(internal.ChangePath(root, name), "tasks.md")
+		tasksData, tasksErr := os.ReadFile(tasksPath)
+		if tasksErr == nil {
+			completed, total := internal.TaskCompletion(string(tasksData))
+			if completed < total {
+				fmt.Fprintf(os.Stderr, "ERROR  %d/%d tasks completed. Finish tasks or use --allow-incomplete.\n", completed, total)
+				os.Exit(1)
+			}
+		}
 	}
 
 	writes, err := internal.PrepareArchiveWrites(root, name)

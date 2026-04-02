@@ -218,3 +218,77 @@ func TestComputeProgressAllDone(t *testing.T) {
 		t.Errorf("Remaining = %d, want 0", p.Remaining)
 	}
 }
+
+func TestTaskCompletionAllChecked(t *testing.T) {
+	content := `## Phase 1: Stuff
+- [x] Do thing
+- [x] Do other thing
+`
+	completed, total := TaskCompletion(content)
+	if completed != 2 || total != 2 {
+		t.Fatalf("got %d/%d, want 2/2", completed, total)
+	}
+}
+
+func TestTaskCompletionSomeUnchecked(t *testing.T) {
+	content := `## Phase 1: Stuff
+- [x] Done
+- [ ] Not done
+- [x] Also done
+`
+	completed, total := TaskCompletion(content)
+	if completed != 2 || total != 3 {
+		t.Fatalf("got %d/%d, want 2/3", completed, total)
+	}
+}
+
+func TestTaskCompletionNoneChecked(t *testing.T) {
+	content := `## Phase 1: Stuff
+- [ ] First
+- [ ] Second
+`
+	completed, total := TaskCompletion(content)
+	if completed != 0 || total != 2 {
+		t.Fatalf("got %d/%d, want 0/2", completed, total)
+	}
+}
+
+func TestTaskCompletionNoCheckboxes(t *testing.T) {
+	content := `## Phase 1: Stuff
+Just some prose, no checkboxes.
+`
+	completed, total := TaskCompletion(content)
+	if completed != 0 || total != 0 {
+		t.Fatalf("got %d/%d, want 0/0", completed, total)
+	}
+}
+
+func TestTaskCompletionMixedCaseX(t *testing.T) {
+	content := `## Phase 1
+- [x] lower x
+- [X] upper X
+`
+	completed, total := TaskCompletion(content)
+	if completed != 2 || total != 2 {
+		t.Fatalf("got %d/%d, want 2/2", completed, total)
+	}
+}
+
+func TestTaskCompletionNestedCheckboxes(t *testing.T) {
+	content := `## Phase 1
+  - [ ] Nested unchecked
+    - [ ] Deep nested
+- [x] Top level
+`
+	completed, total := TaskCompletion(content)
+	if completed != 1 || total != 3 {
+		t.Fatalf("got %d/%d, want 1/3", completed, total)
+	}
+}
+
+func TestTaskCompletionEmptyString(t *testing.T) {
+	completed, total := TaskCompletion("")
+	if completed != 0 || total != 0 {
+		t.Fatalf("got %d/%d, want 0/0", completed, total)
+	}
+}

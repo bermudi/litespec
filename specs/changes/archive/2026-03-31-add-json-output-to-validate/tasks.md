@@ -1,10 +1,10 @@
 ## Phase 1: Types
-- [ ] Add ValidationResultJSON type to internal/json.go
-- [ ] Add BuildValidationResultJSON builder function
+- [x] Add ValidationResultJSON type to internal/json.go
+- [x] Add BuildValidationResultJSON builder function
 
 ## Phase 2: CLI Wiring
-- [ ] Add --json flag parsing to cmdValidate
-- [ ] Output JSON when flag is present
+- [x] Add --json flag parsing to cmdValidate
+- [x] Output JSON when flag is present
 
 ## Phase 3: Verification
 - [x] Build and vet
