@@ -6,14 +6,14 @@
 
 ## Phase 2: Content
 
-- [ ] Create `docs/index.md` — landing page with pitch and key ideas
-- [ ] Create `docs/concepts.md` — philosophy: what specs are, why they work, progressive rigor
-- [ ] Create `docs/getting-started.md` — installation, init
-- [ ] Create `docs/tutorial.md` — worked "first change" walkthrough from init to archive with real output
-- [ ] Create `docs/workflow.md` — the full workflow with named patterns (Quick Feature, Exploratory, Adopt)
-- [ ] Create `docs/cli-reference.md` — every command and flag documented
-- [ ] Create `docs/delta-specs.md` — delta format with before/after merge example
-- [ ] Create `docs/project-structure.md` — directory layout explained
+- [x] Create `docs/index.md` — landing page with pitch and key ideas
+- [x] Create `docs/concepts.md` — philosophy: what specs are, why they work, progressive rigor
+- [x] Create `docs/getting-started.md` — installation, init
+- [x] Create `docs/tutorial.md` — worked "first change" walkthrough from init to archive with real output
+- [x] Create `docs/workflow.md` — the full workflow with named patterns (Quick Feature, Exploratory, Adopt)
+- [x] Create `docs/cli-reference.md` — every command and flag documented
+- [x] Create `docs/delta-specs.md` — delta format with before/after merge example
+- [x] Create `docs/project-structure.md` — directory layout explained
 
 ## Phase 3: Deployment
 
