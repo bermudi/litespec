@@ -157,6 +157,8 @@ func TestListSpecsEnriched(t *testing.T) {
 	root := setupTestProject(t)
 	writeMainSpecFile(t, root, "auth", `# auth
 
+## Requirements
+
 ### Requirement: Login
 The system SHALL authenticate.
 

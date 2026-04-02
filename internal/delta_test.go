@@ -7,6 +7,8 @@ import (
 func TestParseMainSpecWithScenarios(t *testing.T) {
 	input := `# auth
 
+## Requirements
+
 ### Requirement: Login
 The system SHALL authenticate users.
 
@@ -102,6 +104,8 @@ The system SHALL limit API requests per user.
 func TestParseRequirementWithNoScenarios(t *testing.T) {
 	input := `# test
 
+## Requirements
+
 ### Requirement: Simple
 The system SHALL do something.
 `
@@ -124,6 +128,8 @@ The system SHALL do something.
 
 func TestParseMultipleScenariosUnderOneRequirement(t *testing.T) {
 	input := `# cap
+
+## Requirements
 
 ### Requirement: Multi
 The system SHALL support multiple scenarios.
@@ -163,6 +169,8 @@ The system SHALL support multiple scenarios.
 func TestSerializeRoundTrip(t *testing.T) {
 	original := `# auth
 
+## Requirements
+
 ### Requirement: Login
 The system SHALL authenticate users.
 
@@ -184,6 +192,9 @@ The system SHALL invalidate sessions.
 	}
 
 	serialized := SerializeSpec(spec)
+	if !containsSubstr(serialized, "## Requirements") {
+		t.Errorf("serialized output missing ## Requirements header:\n%s", serialized)
+	}
 	spec2, err := ParseMainSpec(serialized)
 	if err != nil {
 		t.Fatalf("ParseMainSpec(round-trip): %v", err)
@@ -438,5 +449,108 @@ func TestDeltaSpecCapabilityFallbackInMerge(t *testing.T) {
 	}
 	if len(result.Requirements) != 1 {
 		t.Fatalf("Requirements count = %d, want 1", len(result.Requirements))
+	}
+}
+
+func TestParseMainSpecMissingRequirementsWrapper(t *testing.T) {
+	input := `# auth
+
+### Requirement: Login
+The system SHALL authenticate users.
+`
+
+	_, err := ParseMainSpec(input)
+	if err == nil {
+		t.Fatal("expected error for spec without ## Requirements wrapper")
+	}
+	if !containsSubstr(err.Error(), "before ## Requirements") {
+		t.Errorf("error = %q, want mention of Requirements section", err.Error())
+	}
+}
+
+func TestParseMainSpecWithPurpose(t *testing.T) {
+	input := `# auth
+
+## Purpose
+
+This capability handles user authentication and session management.
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate users.
+
+#### Scenario: Valid
+- **WHEN** valid creds
+`
+
+	spec, err := ParseMainSpec(input)
+	if err != nil {
+		t.Fatalf("ParseMainSpec: %v", err)
+	}
+	if spec.Purpose != "This capability handles user authentication and session management." {
+		t.Errorf("Purpose = %q, want purpose text", spec.Purpose)
+	}
+	if len(spec.Requirements) != 1 {
+		t.Fatalf("Requirements count = %d, want 1", len(spec.Requirements))
+	}
+}
+
+func TestParseMainSpecUnsupportedH2BeforeRequirements(t *testing.T) {
+	input := `# auth
+
+## Background
+
+Some background info.
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+`
+
+	_, err := ParseMainSpec(input)
+	if err == nil {
+		t.Fatal("expected error for unsupported H2 before ## Requirements")
+	}
+	if !containsSubstr(err.Error(), "unexpected H2 section") {
+		t.Errorf("error = %q, want mention of unexpected H2 section", err.Error())
+	}
+}
+
+func TestRoundTripPreservesPurpose(t *testing.T) {
+	input := `# auth
+
+## Purpose
+
+Auth purpose text.
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate users.
+`
+
+	spec, err := ParseMainSpec(input)
+	if err != nil {
+		t.Fatalf("ParseMainSpec: %v", err)
+	}
+	if spec.Purpose != "Auth purpose text." {
+		t.Fatalf("Purpose = %q, want %q", spec.Purpose, "Auth purpose text.")
+	}
+
+	serialized := SerializeSpec(spec)
+	spec2, err := ParseMainSpec(serialized)
+	if err != nil {
+		t.Fatalf("ParseMainSpec(round-trip): %v", err)
+	}
+	if spec2.Purpose != spec.Purpose {
+		t.Errorf("Purpose: got %q, want %q", spec2.Purpose, spec.Purpose)
+	}
+	if spec2.Capability != spec.Capability {
+		t.Errorf("Capability: got %q, want %q", spec2.Capability, spec.Capability)
+	}
+	if len(spec2.Requirements) != len(spec.Requirements) {
+		t.Fatalf("Requirements count: got %d, want %d", len(spec2.Requirements), len(spec.Requirements))
 	}
 }

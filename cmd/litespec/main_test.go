@@ -93,6 +93,8 @@ func createSpec(t *testing.T, root, name string) {
 	}
 	os.WriteFile(filepath.Join(specDir, "spec.md"), []byte(`# `+name+`
 
+## Requirements
+
 ### Requirement: R1
 The system SHALL work.
 

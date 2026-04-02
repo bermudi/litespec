@@ -9,6 +9,15 @@ func ParseMainSpec(content string) (*Spec, error) {
 	spec := &Spec{}
 	lines := strings.Split(content, "\n")
 
+	type sectionState int
+	const (
+		statePreamble sectionState = iota
+		statePurpose
+		stateRequirements
+	)
+
+	state := statePreamble
+	var purposeLines []string
 	var current *SpecRequirement
 	var body []string
 
@@ -25,15 +34,60 @@ func ParseMainSpec(content string) (*Spec, error) {
 	}
 
 	for _, line := range lines {
-		if isH1(line) && spec.Capability == "" {
+		trimmed := strings.TrimSpace(line)
+
+		if isH1(trimmed) && spec.Capability == "" {
 			flush()
-			spec.Capability = strings.TrimSpace(line[1:])
-		} else if isReqHeading(line) {
+			spec.Capability = strings.TrimSpace(trimmed[1:])
+			continue
+		}
+
+		if spec.Capability == "" {
+			continue
+		}
+
+		if isH2(trimmed) {
+			heading := strings.TrimSpace(trimmed[2:])
+
+			if state == stateRequirements {
+				continue
+			}
+
+			if heading == "Purpose" {
+				if state != statePreamble {
+					return nil, fmt.Errorf("## Purpose must appear before ## Requirements")
+				}
+				state = statePurpose
+				purposeLines = nil
+				continue
+			}
+
+			if heading == "Requirements" {
+				flush()
+				state = stateRequirements
+				continue
+			}
+
+			return nil, fmt.Errorf("unexpected H2 section %q before ## Requirements; only ## Purpose is permitted", trimmed)
+		}
+
+		if state == statePurpose {
+			purposeLines = append(purposeLines, line)
+			continue
+		}
+
+		if isReqHeading(trimmed) {
+			if state != stateRequirements {
+				return nil, fmt.Errorf("requirement heading %q appears before ## Requirements section", trimmed)
+			}
 			flush()
-			name := strings.TrimSpace(strings.TrimPrefix(line, "### Requirement:"))
+			name := strings.TrimSpace(strings.TrimPrefix(trimmed, "### Requirement:"))
 			current = &SpecRequirement{Name: name}
 			body = nil
-		} else if current != nil {
+			continue
+		}
+
+		if current != nil {
 			body = append(body, line)
 		}
 	}
@@ -41,6 +95,14 @@ func ParseMainSpec(content string) (*Spec, error) {
 
 	if spec.Capability == "" {
 		return nil, fmt.Errorf("missing capability heading (# <name>)")
+	}
+
+	if state != stateRequirements {
+		return nil, fmt.Errorf("missing ## Requirements section")
+	}
+
+	if purposeLines != nil {
+		spec.Purpose = strings.TrimSpace(strings.Join(purposeLines, "\n"))
 	}
 
 	return spec, nil
@@ -121,6 +183,7 @@ func ParseDeltaSpec(content string) (*DeltaSpec, error) {
 func MergeDelta(main *Spec, deltas []*DeltaSpec) (*Spec, error) {
 	result := &Spec{
 		Capability:   main.Capability,
+		Purpose:      main.Purpose,
 		Requirements: make([]SpecRequirement, len(main.Requirements)),
 	}
 	for i, req := range main.Requirements {
@@ -274,6 +337,14 @@ func SerializeSpec(spec *Spec) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# %s\n", spec.Capability)
 
+	if spec.Purpose != "" {
+		b.WriteString("\n## Purpose\n\n")
+		b.WriteString(spec.Purpose)
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n## Requirements\n")
+
 	for _, req := range spec.Requirements {
 		b.WriteString("\n### Requirement: ")
 		b.WriteString(req.Name)
@@ -335,6 +406,10 @@ func parseScenariosFromBody(body []string) (string, []Scenario) {
 
 func isH1(line string) bool {
 	return strings.HasPrefix(line, "# ") && !strings.HasPrefix(line, "## ")
+}
+
+func isH2(line string) bool {
+	return strings.HasPrefix(line, "## ") && !strings.HasPrefix(line, "### ")
 }
 
 func isReqHeading(line string) bool {

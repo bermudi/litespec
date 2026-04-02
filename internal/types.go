@@ -83,6 +83,7 @@ type SpecRequirement struct {
 
 type Spec struct {
 	Capability   string
+	Purpose      string
 	Requirements []SpecRequirement
 }
 

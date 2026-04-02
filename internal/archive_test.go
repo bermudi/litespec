@@ -126,6 +126,8 @@ func TestArchiveModifyExistingCapability(t *testing.T) {
 
 	writeMainSpecFile(t, root, "auth", `# auth
 
+## Requirements
+
 ### Requirement: Login
 The system SHALL authenticate.
 
@@ -175,6 +177,8 @@ func TestArchiveRenameThenModify(t *testing.T) {
 	root := setupTestProject(t)
 
 	writeMainSpecFile(t, root, "auth", `# auth
+
+## Requirements
 
 ### Requirement: Login
 The system SHALL authenticate.
@@ -286,6 +290,8 @@ func TestArchiveRENAMEDDanglingRejected(t *testing.T) {
 	root := setupTestProject(t)
 	writeMainSpecFile(t, root, "auth", `# auth
 
+## Requirements
+
 ### Requirement: Login
 The system SHALL authenticate.
 
@@ -322,6 +328,8 @@ The system SHALL authenticate.
 func TestArchiveCrossDeltaConflictRejected(t *testing.T) {
 	root := setupTestProject(t)
 	writeMainSpecFile(t, root, "auth", `# auth
+
+## Requirements
 
 ### Requirement: Login
 The system SHALL authenticate.
@@ -399,6 +407,8 @@ func TestArchiveADDEDDuplicateRejected(t *testing.T) {
 	root := setupTestProject(t)
 	writeMainSpecFile(t, root, "auth", `# auth
 
+## Requirements
+
 ### Requirement: Login
 The system SHALL authenticate.
 
@@ -441,6 +451,8 @@ func TestArchiveMultiCapabilityAtomicity(t *testing.T) {
 
 	writeMainSpecFile(t, root, "auth", `# auth
 
+## Requirements
+
 ### Requirement: Login
 The system SHALL authenticate.
 
@@ -449,6 +461,8 @@ The system SHALL authenticate.
 `)
 
 	writeMainSpecFile(t, root, "api", `# api
+
+## Requirements
 
 ### Requirement: Rate Limit
 The system SHALL limit requests.
@@ -525,6 +539,8 @@ func TestArchiveMultiCapabilityHappyPath(t *testing.T) {
 	root := setupTestProject(t)
 
 	writeMainSpecFile(t, root, "auth", `# auth
+
+## Requirements
 
 ### Requirement: Login
 The system SHALL authenticate.
@@ -639,7 +655,7 @@ func TestWritePendingSpecsCreatesDirectories(t *testing.T) {
 			Capability: "brand-new",
 			Path:       filepath.Join(CanonPath(root), "brand-new", "spec.md"),
 			Dir:        filepath.Join(CanonPath(root), "brand-new"),
-			Content:    "# brand-new\n\n### Requirement: Core\nThe system SHALL work.\n",
+			Content:    "# brand-new\n\n## Requirements\n\n### Requirement: Core\nThe system SHALL work.\n",
 		},
 	}
 

@@ -174,6 +174,8 @@ func TestValidateChangeMODIFIEDWithoutSHALL(t *testing.T) {
 	root := setupTestProject(t)
 	writeMainSpecFile(t, root, "cap", `# cap
 
+## Requirements
+
 ### Requirement: R1
 The system SHALL work.
 
@@ -230,6 +232,8 @@ The system SHALL work.
 func TestValidateChangeMODIFIEDWithoutScenarios(t *testing.T) {
 	root := setupTestProject(t)
 	writeMainSpecFile(t, root, "cap", `# cap
+
+## Requirements
 
 ### Requirement: R1
 The system SHALL work.
@@ -288,6 +292,8 @@ func TestValidateChangeDanglingDeltaNonexistentRequirement(t *testing.T) {
 	root := setupTestProject(t)
 	writeMainSpecFile(t, root, "auth", `# auth
 
+## Requirements
+
 ### Requirement: Login
 The system SHALL authenticate.
 
@@ -327,6 +333,8 @@ The system SHALL do something.
 func TestValidateChangeDanglingDeltaRemovedNonexistent(t *testing.T) {
 	root := setupTestProject(t)
 	writeMainSpecFile(t, root, "auth", `# auth
+
+## Requirements
 
 ### Requirement: Login
 The system SHALL authenticate.
@@ -393,6 +401,8 @@ func TestValidateChangeREMOVEDNeedsNoSHALLOrScenarios(t *testing.T) {
 	root := setupTestProject(t)
 	writeMainSpecFile(t, root, "auth", `# auth
 
+## Requirements
+
 ### Requirement: Legacy
 The system SHALL do legacy thing.
 
@@ -446,6 +456,8 @@ func TestValidateChangeRENAMEDDanglingOldName(t *testing.T) {
 	root := setupTestProject(t)
 	writeMainSpecFile(t, root, "auth", `# auth
 
+## Requirements
+
 ### Requirement: Login
 The system SHALL authenticate.
 
@@ -481,6 +493,8 @@ The system SHALL authenticate.
 func TestValidateChangeRENAMEDTargetCollision(t *testing.T) {
 	root := setupTestProject(t)
 	writeMainSpecFile(t, root, "auth", `# auth
+
+## Requirements
 
 ### Requirement: Login
 The system SHALL authenticate.
@@ -524,6 +538,8 @@ func TestValidateChangeADDEDDuplicateExisting(t *testing.T) {
 	root := setupTestProject(t)
 	writeMainSpecFile(t, root, "auth", `# auth
 
+## Requirements
+
 ### Requirement: Login
 The system SHALL authenticate.
 
@@ -564,6 +580,8 @@ func TestValidateChangeREMOVEDWithBodyContent(t *testing.T) {
 	root := setupTestProject(t)
 	writeMainSpecFile(t, root, "auth", `# auth
 
+## Requirements
+
 ### Requirement: Legacy
 The system SHALL do legacy thing.
 
@@ -600,6 +618,8 @@ This should not be here.
 func TestValidateChangeREMOVEDWithScenarios(t *testing.T) {
 	root := setupTestProject(t)
 	writeMainSpecFile(t, root, "auth", `# auth
+
+## Requirements
 
 ### Requirement: Legacy
 The system SHALL do legacy thing.
@@ -640,6 +660,8 @@ func TestValidateChangeRENAMEDWithBodyContent(t *testing.T) {
 	root := setupTestProject(t)
 	writeMainSpecFile(t, root, "auth", `# auth
 
+## Requirements
+
 ### Requirement: Login
 The system SHALL authenticate.
 
@@ -676,6 +698,8 @@ This should not be here.
 func TestValidateChangeRENAMEDWithScenarios(t *testing.T) {
 	root := setupTestProject(t)
 	writeMainSpecFile(t, root, "auth", `# auth
+
+## Requirements
 
 ### Requirement: Login
 The system SHALL authenticate.
@@ -716,6 +740,8 @@ func TestValidateChangeRENAMEDNoOpRenameWarning(t *testing.T) {
 	root := setupTestProject(t)
 	writeMainSpecFile(t, root, "auth", `# auth
 
+## Requirements
+
 ### Requirement: Login
 The system SHALL authenticate.
 
@@ -754,6 +780,8 @@ The system SHALL authenticate.
 func TestValidateSpecValid(t *testing.T) {
 	root := setupTestProject(t)
 	writeMainSpecFile(t, root, "auth", `# auth
+
+## Requirements
 
 ### Requirement: Login
 The system SHALL authenticate.
@@ -797,7 +825,10 @@ func TestValidateSpecInvalidContent(t *testing.T) {
 
 func TestValidateSpecNoRequirements(t *testing.T) {
 	root := setupTestProject(t)
-	writeMainSpecFile(t, root, "auth", `# auth`)
+	writeMainSpecFile(t, root, "auth", `# auth
+
+## Requirements
+`)
 
 	result, err := ValidateSpec(root, "auth")
 	if err != nil {
