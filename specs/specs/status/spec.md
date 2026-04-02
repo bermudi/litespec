@@ -1,7 +1,5 @@
 # status
 
-## ADDED Requirements
-
 ### Requirement: Positional Name for Status
 
 The `litespec status` command MUST accept an optional positional `<name>` argument instead of `--change <name>`. When provided, it shows artifact state for that specific change. When omitted, it shows all changes. The `--change` flag SHALL be removed.
