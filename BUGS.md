@@ -1,5 +1,5 @@
 - ~~`litespec archive` creates specs/changes/archive/<change-name>/specs instead of just creating specs/specs/ ( the archived directory also keeps its specs/ subtree. )~~ (fixed by canon-rename-and-archive-fix)
-- copy `openspec list` output format
+- ~~copy `openspec list` output format~~ (fixed by enriched-list-output)
 - copy `openspec show` functionality
 - ~~add --help flag to all commands~~ (fixed by help-flags-and-sharp-edges)
 - do we need litespec.yaml? openspec doesn't create one per change
