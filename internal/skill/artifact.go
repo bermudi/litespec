@@ -106,10 +106,10 @@ Structure:
 - [ ] <task description>
 
 Rules:
-- Organize into phases — each phase is a coherent unit of work that can be committed independently
-- Phase 1 should be the foundation: data model changes, new types, infrastructure
-- Later phases build on earlier ones
+- Each phase is a coherent edit context — group tasks that share the same files, types, and mental model
+- Tasks that touch the same structs, files, or abstractions belong in the same phase, even if they differ in complexity
+- The goal is to minimize context switching: an agent loads a working set once, does everything that needs it, then moves on
+- Avoid over-decomposition: fewer, denser phases are better than many thin ones, as long as each phase has a clear boundary
+- Each phase must be independently committable — it should leave the codebase in a valid state
 - Each task should be a single, verifiable unit of work
-- Tasks should reference specific spec requirements where applicable
-- Order matters: tasks within a phase are done sequentially, phases are sequential
-- Aim for 3-7 tasks per phase, 2-5 phases for a typical change`
+- Tasks should reference specific spec requirements where applicable`
