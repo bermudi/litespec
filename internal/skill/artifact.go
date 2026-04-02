@@ -55,6 +55,8 @@ For each affected capability, create a spec.md file under specs/<capability>/ wi
     ## RENAMED Requirements
     ### Requirement: <old> → <new>
 
+Note: Delta specs use operation headers (## ADDED/MODIFIED/REMOVED/RENAMED Requirements). The canonical specs in specs/canon/ use ## Requirements and optionally ## Purpose. Deltas are merged into canonical specs at archive time.
+
 Rules:
 - Every ADDED and MODIFIED requirement must include at least one #### Scenario: block
 - REMOVED requirements are name-only — no body or scenarios

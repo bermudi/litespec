@@ -108,6 +108,29 @@ Applied in strict order at archive time:
 
 `validate` catches dangling deltas — MODIFIED/REMOVED operations referencing requirements that don't exist in the target spec. OpenSpec only fails on these at archive time. litespec catches them during validation.
 
+### Canonical Spec Format
+
+Canonical specs (`specs/canon/<capability>/spec.md`) use this structure:
+
+```markdown
+# <capability>
+
+## Purpose               ← optional
+
+## Requirements          ← required
+
+### Requirement: <name>
+<body text — must contain SHALL or MUST>
+
+#### Scenario: <short name>
+- **WHEN** <condition>
+- **THEN** <expected outcome>
+```
+
+- `## Purpose` is optional prose before requirements. If present, `SerializeSpec` emits it.
+- `## Requirements` is required — all `### Requirement:` blocks must appear inside it.
+- No other H2 sections are permitted between H1 and `## Requirements`.
+
 ### Scenarios
 
 Each requirement has named scenarios (`#### Scenario: <name>`) with WHEN/THEN format. Scenarios describe expected behavior — the format is opaque text, not parsed structurally.
