@@ -1,6 +1,6 @@
 # verify
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Context-Aware Review Mode
 

@@ -1,6 +1,6 @@
 # spec-format
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Requirements Section Wrapper
 

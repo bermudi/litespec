@@ -22,8 +22,8 @@
 
 ## Phase 4: Migrate Existing Canon Specs
 
-- [ ] Add `## Requirements` wrapper to `specs/canon/validate/spec.md`
-- [ ] Add `## Requirements` wrapper to `specs/canon/archive/spec.md`
-- [ ] Add `## Requirements` wrapper to `specs/canon/status/spec.md`
-- [ ] Add `## Requirements` wrapper to `specs/canon/instructions/spec.md`
-- [ ] Run `go build ./...` and `go test ./...` to verify everything passes
+- [x] Add `## Requirements` wrapper to `specs/canon/validate/spec.md`
+- [x] Add `## Requirements` wrapper to `specs/canon/archive/spec.md`
+- [x] Add `## Requirements` wrapper to `specs/canon/status/spec.md`
+- [x] Add `## Requirements` wrapper to `specs/canon/instructions/spec.md`
+- [x] Run `go build ./...` and `go test ./...` to verify everything passes

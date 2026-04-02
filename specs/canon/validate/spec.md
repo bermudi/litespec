@@ -1,5 +1,7 @@
 # validate
 
+## Requirements
+
 ### Requirement: JSON Output for Validate
 
 The `litespec validate` command MUST support a `--json` flag that returns structured JSON output containing a `valid` boolean, `errors` array, and `warnings` array. Each issue MUST include `severity`, `message`, and `file` fields. This applies to all validate modes: positional name, bulk flags, and default (no arguments).

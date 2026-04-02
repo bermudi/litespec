@@ -1,5 +1,7 @@
 # archive
 
+## Requirements
+
 ### Requirement: Delta Merge into Canon
 
 The `litespec archive <change>` command MUST merge all delta operations (RENAMED, REMOVED, MODIFIED, ADDED) from the change's specs into the canonical spec files at `specs/canon/<capability>/spec.md`. The merge order SHALL be RENAMED first, then REMOVED, then MODIFIED, then ADDED. If the capability does not yet exist in canon, a new directory and spec file MUST be created.

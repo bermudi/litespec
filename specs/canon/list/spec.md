@@ -1,6 +1,6 @@
 # list
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Enriched Change Listing
 
