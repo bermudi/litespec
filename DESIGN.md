@@ -139,8 +139,8 @@ Convention over configuration. No config file. All defaults baked in. If a need 
 | Command | Purpose |
 |---------|---------|
 | `litespec init [--tools ...]` | Scaffold `specs/` dir + generate skills (+ optional tool-specific commands) |
-| `litespec validate [--strict]` | Validate artifact structure, delta syntax, dangling deltas |
-| `litespec status [--change <name>]` | Show artifact graph state (BLOCKED/READY/DONE) |
+| `litespec validate [<name>] [--all\|--changes\|--specs] [--type change\|spec] [--strict]` | Validate artifact structure, delta syntax, dangling deltas |
+| `litespec status [<name>]` | Show artifact graph state (BLOCKED/READY/DONE) |
 | `litespec instructions <artifact>` | Return artifact-specific instructions for AI to create an artifact |
 | `litespec list [--specs\|--changes]` | List specs or changes |
 | `litespec archive <change> [--allow-incomplete]` | Apply deltas + move to archive |

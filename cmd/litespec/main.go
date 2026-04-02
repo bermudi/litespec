@@ -51,14 +51,14 @@ func printUsage() {
 	fmt.Print(`Usage: litespec <command> [options]
 
 Commands:
-  init [--tools <ids>]                            Initialize project structure
-  new <name>                                      Create a new change
-  list [--specs|--changes]                        List specs or changes
-  status [--change <name>]                        Show artifact states
-  validate [--change <name>] [--all] [--strict]   Validate changes and specs
-  instructions <artifact> [--change <name>]       Get artifact instructions
-  archive <name>                                  Apply deltas and archive change
-  update [--tools <ids>]                          Regenerate skills and adapters
+  init [--tools <ids>]                                        Initialize project structure
+  new <name>                                                  Create a new change
+  list [--specs|--changes]                                    List specs or changes
+  status [<name>]                                             Show artifact states
+  validate [<name>] [--all|--changes|--specs] [--type T]      Validate changes and specs
+  instructions <artifact>                                     Get artifact instructions
+  archive <name>                                              Apply deltas and archive change
+  update [--tools <ids>]                                      Regenerate skills and adapters
 
 Tools:
   claude    Symlink skills into .claude/skills/ for Claude Code
@@ -66,6 +66,12 @@ Tools:
 Flags:
   --version    Print version
   --help       Print this help message
+  --json       Output structured JSON (status, validate, list, instructions)
+  --strict     Treat warnings as errors (validate)
+  --all        Validate all changes and specs
+  --changes    Validate all changes only
+  --specs      Validate all specs only
+  --type       Disambiguate name type: change|spec (validate)
 `)
 }
 
@@ -224,17 +230,16 @@ func cmdList(args []string) {
 }
 
 func cmdStatus(args []string) {
-	var changeName string
+	var name string
 	var asJSON bool
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--change":
-			if i+1 < len(args) {
-				changeName = args[i+1]
-				i++
-			}
+	for _, arg := range args {
+		switch arg {
 		case jsonFlag:
 			asJSON = true
+		default:
+			if !strings.HasPrefix(arg, "-") && name == "" {
+				name = arg
+			}
 		}
 	}
 
@@ -244,27 +249,46 @@ func cmdStatus(args []string) {
 		os.Exit(1)
 	}
 
-	if asJSON && changeName != "" {
-		ctx, err := internal.LoadChangeContext(root, changeName)
+	if name != "" {
+		if !internal.ChangeExists(root, name) {
+			fmt.Fprintf(os.Stderr, "error: change %q not found\n", name)
+			os.Exit(1)
+		}
+
+		ctx, err := internal.LoadChangeContext(root, name)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
-		status := internal.BuildChangeStatusJSON(ctx)
-		data, _ := internal.MarshalJSON(status)
-		fmt.Println(string(data))
+
+		if asJSON {
+			status := internal.BuildChangeStatusJSON(ctx)
+			data, _ := internal.MarshalJSON(status)
+			fmt.Println(string(data))
+			return
+		}
+
+		fmt.Printf("Change: %s\n", name)
+		if !ctx.Created.IsZero() {
+			fmt.Printf("Created: %s\n", ctx.Created.Format("2006-01-02 15:04:05"))
+		}
+		fmt.Println()
+		for _, art := range internal.Artifacts {
+			fmt.Printf("  %-12s %-10s %s\n", art.ID, ctx.Artifacts[art.ID], art.Description)
+		}
 		return
 	}
 
-	if asJSON && changeName == "" {
-		changes, err := internal.ListChanges(root)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
-		}
+	changes, err := internal.ListChanges(root)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if asJSON {
 		var statuses []internal.ChangeStatusJSON
-		for _, name := range changes {
-			ctx, err := internal.LoadChangeContext(root, name)
+		for _, n := range changes {
+			ctx, err := internal.LoadChangeContext(root, n)
 			if err != nil {
 				continue
 			}
@@ -275,63 +299,72 @@ func cmdStatus(args []string) {
 		return
 	}
 
-	if changeName == "" {
-		changes, err := internal.ListChanges(root)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
-		}
-		if len(changes) == 0 {
-			fmt.Println("No active changes.")
-			return
-		}
-		for _, name := range changes {
-			ctx, err := internal.LoadChangeContext(root, name)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error loading change %q: %v\n", name, err)
-				continue
-			}
-			fmt.Printf("%s\n", name)
-			for _, art := range internal.Artifacts {
-				fmt.Printf("  %-12s %s\n", art.ID+":", ctx.Artifacts[art.ID])
-			}
-		}
+	if len(changes) == 0 {
+		fmt.Println("No active changes.")
 		return
 	}
-
-	ctx, err := internal.LoadChangeContext(root, changeName)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("Change: %s\n", changeName)
-	if !ctx.Created.IsZero() {
-		fmt.Printf("Created: %s\n", ctx.Created.Format("2006-01-02 15:04:05"))
-	}
-	fmt.Println()
-	for _, art := range internal.Artifacts {
-		fmt.Printf("  %-12s %-10s %s\n", art.ID, ctx.Artifacts[art.ID], art.Description)
+	for _, n := range changes {
+		ctx, err := internal.LoadChangeContext(root, n)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error loading change %q: %v\n", n, err)
+			continue
+		}
+		fmt.Printf("%s\n", n)
+		for _, art := range internal.Artifacts {
+			fmt.Printf("  %-12s %s\n", art.ID+":", ctx.Artifacts[art.ID])
+		}
 	}
 }
 
 func cmdValidate(args []string) {
-	var changeName string
-	var all, strict, asJSON bool
+	var positional string
+	var flagAll, flagChanges, flagSpecs, strict, asJSON bool
+	var typeFilter string
+
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
-		case "--change":
-			if i+1 < len(args) {
-				changeName = args[i+1]
-				i++
-			}
 		case "--all":
-			all = true
+			flagAll = true
+		case "--changes":
+			flagChanges = true
+		case "--specs":
+			flagSpecs = true
 		case "--strict":
 			strict = true
 		case jsonFlag:
 			asJSON = true
+		case "--type":
+			if i+1 < len(args) {
+				typeFilter = args[i+1]
+				i++
+			}
+		default:
+			if !strings.HasPrefix(args[i], "-") && positional == "" {
+				positional = args[i]
+			}
 		}
+	}
+
+	hasBulk := flagAll || flagChanges || flagSpecs
+
+	if positional != "" && hasBulk {
+		fmt.Fprintf(os.Stderr, "error: positional name and bulk flags (--all, --changes, --specs) are mutually exclusive\n")
+		os.Exit(1)
+	}
+
+	if typeFilter != "" && positional == "" {
+		fmt.Fprintf(os.Stderr, "error: --type requires a positional name\n")
+		os.Exit(1)
+	}
+
+	if typeFilter != "" && hasBulk {
+		fmt.Fprintf(os.Stderr, "error: --type cannot be used with bulk flags\n")
+		os.Exit(1)
+	}
+
+	if typeFilter != "" && typeFilter != "change" && typeFilter != "spec" {
+		fmt.Fprintf(os.Stderr, "error: --type must be 'change' or 'spec', got %q\n", typeFilter)
+		os.Exit(1)
 	}
 
 	root, err := internal.FindProjectRoot()
@@ -342,10 +375,70 @@ func cmdValidate(args []string) {
 
 	var result *internal.ValidationResult
 
-	if all || changeName == "" {
-		result, err = internal.ValidateAll(root, strict)
+	if positional != "" {
+		changes, _ := internal.ListChanges(root)
+		specs, _ := internal.ListSpecs(root)
+		isChange := contains(changes, positional)
+		isSpec := contains(specs, positional)
+
+		if typeFilter == "change" {
+			isSpec = false
+		} else if typeFilter == "spec" {
+			isChange = false
+		}
+
+		if isChange && isSpec {
+			fmt.Fprintf(os.Stderr, "error: %q is ambiguous — exists as both a change and a spec. Use --type change or --type spec\n", positional)
+			os.Exit(1)
+		}
+
+		if !isChange && !isSpec {
+			fmt.Fprintf(os.Stderr, "error: %q not found as a change or spec\n", positional)
+			os.Exit(1)
+		}
+
+		if isChange {
+			result, err = internal.ValidateChange(root, positional)
+		} else {
+			result, err = internal.ValidateSpec(root, positional)
+		}
 	} else {
-		result, err = internal.ValidateChange(root, changeName)
+		validateSpecs := flagSpecs || flagAll || (!flagChanges && !flagSpecs)
+		validateChanges := flagChanges || flagAll || (!flagChanges && !flagSpecs)
+
+		result = &internal.ValidationResult{Valid: true}
+
+		if validateSpecs {
+			specResult, specErr := internal.ValidateSpecs(root)
+			if specErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", specErr)
+				os.Exit(1)
+			}
+			result.Errors = append(result.Errors, specResult.Errors...)
+			result.Warnings = append(result.Warnings, specResult.Warnings...)
+		}
+
+		if validateChanges {
+			changes, listErr := internal.ListChanges(root)
+			if listErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", listErr)
+				os.Exit(1)
+			}
+			for _, name := range changes {
+				changeResult, changeErr := internal.ValidateChange(root, name)
+				if changeErr != nil {
+					fmt.Fprintf(os.Stderr, "error: %v\n", changeErr)
+					os.Exit(1)
+				}
+				result.Errors = append(result.Errors, changeResult.Errors...)
+				result.Warnings = append(result.Warnings, changeResult.Warnings...)
+			}
+		}
+
+		result.Valid = len(result.Errors) == 0
+		if strict && len(result.Warnings) > 0 {
+			result.Valid = false
+		}
 	}
 
 	if err != nil {
@@ -384,34 +477,16 @@ func cmdValidate(args []string) {
 
 func cmdInstructions(args []string) {
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "usage: litespec instructions <artifact> [--change <name>] [--json]\n")
+		fmt.Fprintf(os.Stderr, "usage: litespec instructions <artifact> [--json]\n")
 		os.Exit(1)
 	}
 
 	artifactID := args[0]
-	var changeName string
 	var asJSON bool
-	for i := 1; i < len(args); i++ {
-		switch args[i] {
-		case "--change":
-			if i+1 < len(args) {
-				changeName = args[i+1]
-				i++
-			}
-		case jsonFlag:
+	for _, arg := range args[1:] {
+		if arg == jsonFlag {
 			asJSON = true
 		}
-	}
-
-	root, err := internal.FindProjectRoot()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
-
-	if changeName == "" {
-		fmt.Fprintf(os.Stderr, "error: --change <name> is required\n")
-		os.Exit(1)
 	}
 
 	artifactInfo := internal.GetArtifact(artifactID)
@@ -421,7 +496,7 @@ func cmdInstructions(args []string) {
 	}
 
 	if asJSON {
-		instr, err := internal.BuildArtifactInstructionsJSON(root, changeName, artifactID)
+		instr, err := internal.BuildArtifactInstructionsStandaloneJSON(artifactID)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
@@ -432,7 +507,6 @@ func cmdInstructions(args []string) {
 	}
 
 	instruction := internal.GetSkillTemplate(internal.ArtifactInstructionID(artifactID))
-	fmt.Printf("Change: %s\n", changeName)
 	fmt.Println(instruction)
 }
 
@@ -537,4 +611,13 @@ func splitCSV(s string) []string {
 		parts[i] = strings.TrimSpace(parts[i])
 	}
 	return parts
+}
+
+func contains(slice []string, val string) bool {
+	for _, s := range slice {
+		if s == val {
+			return true
+		}
+	}
+	return false
 }

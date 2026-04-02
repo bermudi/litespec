@@ -8,11 +8,11 @@
 
 ## Phase 2: CLI — Argument Parsing Rewrite and Docs
 
-- [ ] Rewrite `cmdValidate()` — accept positional `<name>`, add `--changes`/`--specs`/`--all` (combinable), add `--type change|spec`, remove `--change`
-- [ ] Rewrite `cmdStatus()` — accept positional `<name>`, remove `--change`
-- [ ] Rewrite `cmdInstructions()` — remove `--change` requirement, return static artifact guidance
-- [ ] Update `printUsage()` to reflect new command surfaces
-- [ ] Update `DESIGN.md` CLI commands table
+- [x] Rewrite `cmdValidate()` — accept positional `<name>`, add `--changes`/`--specs`/`--all` (combinable), add `--type change|spec`, remove `--change`
+- [x] Rewrite `cmdStatus()` — accept positional `<name>`, remove `--change`
+- [x] Rewrite `cmdInstructions()` — remove `--change` requirement, return static artifact guidance
+- [x] Update `printUsage()` to reflect new command surfaces
+- [x] Update `DESIGN.md` CLI commands table
 
 ## Phase 3: Tests
 
