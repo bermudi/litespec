@@ -84,6 +84,16 @@ If the user mentions a change or you detect one is relevant:
 
 ---
 
+## Steering Toward Grill
+
+If questions surface that would benefit from rigorous examination — tradeoffs that matter, decisions with lasting consequences, assumptions that could fail — say:
+
+> "This feels like it could use a grill session. Want me to switch to litespec-grill mode to stress-test it?"
+
+Do not force this. Not every question needs grilling. But when a design decision, architecture choice, or plan would benefit from structured interrogation, offer it.
+
+---
+
 ## Ending
 
 There is no required ending. Exploration might flow into grill/propose, result in artifact updates, provide clarity, or just end. When things crystallize, offer a summary — but it is optional. Sometimes the thinking IS the value.
