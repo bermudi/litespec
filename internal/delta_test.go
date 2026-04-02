@@ -617,3 +617,66 @@ The system SHALL log out.
 		t.Errorf("error = %q, want mention of unexpected H2 section", err.Error())
 	}
 }
+
+func TestParseMainSpecEmptyPurpose(t *testing.T) {
+	input := `# auth
+
+## Purpose
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+`
+
+	spec, err := ParseMainSpec(input)
+	if err != nil {
+		t.Fatalf("ParseMainSpec: %v", err)
+	}
+	if spec.Purpose != "" {
+		t.Errorf("Purpose = %q, want empty string", spec.Purpose)
+	}
+}
+
+func TestParseMainSpecMultilinePurpose(t *testing.T) {
+	input := `# auth
+
+## Purpose
+
+Line one of purpose.
+Line two of purpose.
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+`
+
+	spec, err := ParseMainSpec(input)
+	if err != nil {
+		t.Fatalf("ParseMainSpec: %v", err)
+	}
+	want := "Line one of purpose.\nLine two of purpose."
+	if spec.Purpose != want {
+		t.Errorf("Purpose = %q, want %q", spec.Purpose, want)
+	}
+}
+
+func TestSerializeSpecEmptyRequirements(t *testing.T) {
+	spec := &Spec{
+		Capability:   "empty",
+		Requirements: []SpecRequirement{},
+	}
+
+	out := SerializeSpec(spec)
+	spec2, err := ParseMainSpec(out)
+	if err != nil {
+		t.Fatalf("ParseMainSpec(serialized empty): %v", err)
+	}
+	if spec2.Capability != "empty" {
+		t.Errorf("Capability = %q, want %q", spec2.Capability, "empty")
+	}
+	if len(spec2.Requirements) != 0 {
+		t.Errorf("Requirements count = %d, want 0", len(spec2.Requirements))
+	}
+}
