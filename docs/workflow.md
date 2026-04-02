@@ -252,9 +252,9 @@ The `docs-site` change in this repo followed the Exploratory pattern:
 1. **explore:** Investigated MkDocs alternatives, sketched directory structure, debated manual vs auto-generated docs
 2. **grill:** Stress-tested the choice of MkDocs Material, questioned the scope (why not add search now?), verified that docs-as-source-of-truth made sense
 3. **propose:** Created a complete proposal with specs, design, and tasks
-4. **apply:** Currently in progress — implementing Phase 1 (Infrastructure: pyproject.toml, mkdocs.yml)
-5. **verify:** Will run artifact review before Phase 1, implementation review during phases, pre-archive review before finalizing
-6. **archive:** Will merge delta specs and move to archive when complete
+4. **apply:** Implemented in three phases — infrastructure (pyproject.toml, mkdocs.yml), content (8 doc pages), deployment (GitHub Actions)
+5. **verify:** Ran artifact review, implementation review, and pre-archive review
+6. **archive:** Merged delta specs into `specs/canon/docs-site/spec.md` and moved to archive
 
 This change had significant uncertainty (which docs engine? what scope? deployment strategy?), so it benefited from the full exploratory workflow. A simpler change like `shell-completions` could have used Quick Feature.
 
@@ -262,6 +262,6 @@ This change had significant uncertainty (which docs engine? what scope? deployme
 
 ## Next Steps
 
-- See `tutorial.md` for a worked walkthrough of a complete change from init to archive
-- See `concepts.md` for the philosophy behind spec-driven development
-- See `cli-reference.md` for command details
+- [Tutorial](tutorial.md) — worked walkthrough of a complete change from init to archive
+- [Concepts](concepts.md) — philosophy behind spec-driven development
+- [CLI Reference](cli-reference.md) — command details

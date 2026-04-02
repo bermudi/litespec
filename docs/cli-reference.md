@@ -646,6 +646,6 @@ project/
 
 ## See Also
 
-- [DESIGN.md](../DESIGN.md) — Architecture and design decisions
-- [AGENTS.md](../AGENTS.md) — Project conventions and workflow
-- [README.md](../README.md) — Quick start guide
+- [Concepts](concepts.md) — Philosophy and core ideas behind litespec
+- [Getting Started](getting-started.md) — Installation and first steps
+- [Tutorial](tutorial.md) — Worked walkthrough of a complete change

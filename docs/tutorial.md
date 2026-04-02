@@ -136,7 +136,7 @@ The rate limiter MUST track incoming requests per IP address and enforce a maxim
 - **THEN** the request count for that IP resets
 
 ### Requirement: Configurable Limit
-The rate limit MUST be configurable via to `RATE_LIMIT_PER_MINUTE` environment variable. The default value SHALL be 100 if not specified.
+The rate limit MUST be configurable via `RATE_LIMIT_PER_MINUTE` environment variable. The default value SHALL be 100 if not specified.
 
 #### Scenario: Default limit
 - **WHEN** no `RATE_LIMIT_PER_MINUTE` environment variable is set

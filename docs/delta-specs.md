@@ -55,8 +55,7 @@ Changes requirement names while preserving content and scenarios. Useful for cla
 ```markdown
 ## RENAMED Requirements
 
-### Requirement: <old-name>
-### Requirement: <new-name>
+### Requirement: <old-name> → <new-name>
 ```
 
 ## Merge Order

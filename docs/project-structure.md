@@ -252,7 +252,7 @@ Active work is isolated:
 ### Progressive Rigor
 
 The structure supports different workflows:
-- **Quick Feature:** explore → grill → propose → apply → archive
+- **Quick Feature:** propose → apply → archive
 - **Exploratory:** explore → grill (no artifacts if it doesn't pan out)
 - **Adopt:** reverse-engineer specs from existing code
 
