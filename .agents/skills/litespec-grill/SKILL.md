@@ -5,6 +5,8 @@ description: Interview the user relentlessly about a plan or design until reachi
 
 Interview the user relentlessly about a plan or design until reaching shared understanding.
 
+Think hard about the implications of each question before asking and use your expertise to guide.
+
 Resolve each branch of the decision tree, one question at a time.
 
 Provide your recommended answer for each question.
