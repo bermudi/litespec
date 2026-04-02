@@ -2,3 +2,4 @@
 - copy `openspec list` output format
 - copy `openspec show` functionality
 - add --help flag to all commands
+- do we need litespec.yaml? openspec doesn't create one per change
