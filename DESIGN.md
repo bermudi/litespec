@@ -174,6 +174,8 @@ Convention over configuration. No config file. All defaults baked in. If a need 
 | `litespec instructions <artifact>` | Return artifact-specific instructions for AI to create an artifact |
 | `litespec list [--specs\|--changes]` | List specs or changes |
 | `litespec archive <change> [--allow-incomplete]` | Apply deltas + move to archive |
+| `litespec completion <shell>` | Print shell completion script (bash, zsh, fish) |
+| `litespec __complete <words...>` | Hidden backend for dynamic shell completions |
 
 ## Archive Behavior
 

@@ -42,6 +42,10 @@ func main() {
 		cmdNew(os.Args[2:])
 	case "update":
 		cmdUpdate(os.Args[2:])
+	case "completion":
+		cmdCompletion(os.Args[2:])
+	case "__complete":
+		cmdComplete()
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n", os.Args[1])
 		printUsage()
@@ -61,6 +65,7 @@ Commands:
   instructions <artifact>                                     Get artifact instructions
   archive <name>                                              Apply deltas and archive change
   update [--tools <ids>]                                      Regenerate skills and adapters
+  completion <shell>                                          Generate shell completion script (bash, zsh, fish)
 
 Tools:
   claude    Symlink skills into .claude/skills/ for Claude Code
@@ -723,6 +728,33 @@ func hasHelpFlag(args []string) bool {
 		}
 	}
 	return false
+}
+
+func cmdCompletion(args []string) {
+	if len(args) == 0 {
+		fmt.Fprintf(os.Stderr, "usage: litespec completion <shell>\n")
+		fmt.Fprintf(os.Stderr, "Supported shells: bash, zsh, fish\n")
+		os.Exit(1)
+	}
+
+	shell := args[0]
+	script, err := internal.CompletionScript(shell)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Print(script)
+}
+
+func cmdComplete() {
+	root, _ := internal.FindProjectRoot()
+
+	words := os.Args[2:]
+	completions := internal.Complete(root, words)
+	for _, c := range completions {
+		fmt.Printf("%s\t%s\n", c.Candidate, c.Description)
+	}
 }
 
 func checkUnknownFlags(args []string, validFlags map[string]bool) {

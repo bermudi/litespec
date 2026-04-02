@@ -1,6 +1,6 @@
 ## Motivation
 
-litespec is a CLI tool with 8 commands and a growing flag surface. Users currently have to remember every command, flag, and valid value (change names, artifact IDs, tool IDs) from memory or `--help`. Shell completions are table stakes for any CLI that expects regular use — they reduce cognitive load, prevent typos, and make the tool discoverable.
+litespec is a CLI tool with 9 commands and a growing flag surface. Users currently have to remember every command, flag, and valid value (change names, artifact IDs, tool IDs) from memory or `--help`. Shell completions are table stakes for any CLI that expects regular use — they reduce cognitive load, prevent typos, and make the tool discoverable.
 
 ## Scope
 
@@ -15,7 +15,7 @@ Add dynamic shell completion support for bash, zsh, and fish:
 Completable positions:
 - `$1`: all public commands (init, new, list, status, validate, instructions, archive, update, completion)
 - `init --tools`, `update --tools`: tool IDs from the `Adapters` var at runtime
-- `status --change`, `validate --change`, `instructions --change`: change names from filesystem
+- `status <name>`, `validate <name>`, `instructions` positional: change names from filesystem
 - `instructions <artifact>`: artifact IDs (proposal, specs, design, tasks, apply)
 - `archive <name>`: change names from filesystem
 - `completion <shell>`: static list (bash, zsh, fish)

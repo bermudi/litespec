@@ -44,7 +44,7 @@ Completion is UX sugar. If `FindProjectRoot()` fails or `ListChanges()` errors, 
 - `Complete(root string, words []string) []Completion` — parses word position, dispatches to per-command resolvers
 - `CompletionScript(shell string) (string, error)` — returns embedded script for the requested shell
 - Internal helpers: `completeCommands()`, `completeChangeNames(root)`, `completeSpecNames(root)`, `completeArtifactIDs()`, `completeToolIDs()`, `completeShells()`
-- Per-command parsers that understand flag positions (e.g., after `--change`, after `--tools`)
+- Per-command parsers that understand positional and flag positions (e.g., after `--tools`, positional name after `status`/`validate`/`archive`)
 
 ### `internal/completion/scripts/litespec.bash` (new)
 - `_litespec()` function using `complete -F`

@@ -27,7 +27,7 @@ The CLI SHALL provide a hidden `__complete` command that receives the command-li
 - **THEN** the command prints all public command names (init, new, list, status, validate, instructions, archive, update, completion) with their descriptions, one per line, excluding `__complete`
 
 #### Scenario: Complete change names
-- **WHEN** the user invokes `litespec __complete litespec status --change ` (cursor after `--change `)
+- **WHEN** the user invokes `litespec __complete litespec status ` (cursor after the positional argument slot for `status`)
 - **THEN** the command prints the names of active changes from `specs/changes/`, one per line
 
 #### Scenario: Error during filesystem access
@@ -40,7 +40,7 @@ The `__complete` command SHALL resolve candidates dynamically from runtime state
 - Change names from `ListChanges()` (filesystem)
 - Spec names from `ListSpecs()` (filesystem)
 - Tool IDs from the `Adapters` var
-- Artifact IDs from the `Artifacts` var (proposal, specs, design, tasks, apply)
+- Artifact IDs from the `Artifacts` var (proposal, specs, design, tasks)
 
 Static completions (command names, flag names, shell names) SHALL be hardcoded in the completion resolver.
 
@@ -50,7 +50,11 @@ Static completions (command names, flag names, shell names) SHALL be hardcoded i
 
 #### Scenario: Complete artifact IDs
 - **WHEN** the user invokes `litespec __complete litespec instructions ` (cursor after `instructions `)
-- **THEN** the command prints each ID from the `Artifacts` var plus `apply` with its description
+- **THEN** the command prints each ID from the `Artifacts` var with its description
+
+#### Scenario: Complete flags for a command
+- **WHEN** the user invokes `litespec __complete litespec validate --`
+- **THEN** the command prints all flags valid for `validate` (--all, --changes, --specs, --strict, --json, --type) with their descriptions
 
 ### Requirement: Bash Completion Script
 
@@ -61,7 +65,7 @@ The completion script for bash SHALL register a `_litespec()` completion functio
 - **THEN** bash offers `validate` as a completion
 
 #### Scenario: Bash tab-completes change names
-- **WHEN** the user types `litespec status --change <tab>` in a project with changes `foo` and `bar`
+- **WHEN** the user types `litespec status <tab>` in a project with changes `foo` and `bar`
 - **THEN** bash offers `foo` and `bar` as completions
 
 ### Requirement: Zsh Completion Script
