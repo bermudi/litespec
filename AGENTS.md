@@ -72,13 +72,13 @@ These came from deliberate debate. Respect the reasoning:
 
 ## Test Suite
 
-70 tests across 7 files, all passing. Coverage:
+77 tests across 7 files, all passing. Coverage:
 
 - `delta_test.go` — scenario parse/serialize/merge (12 tests)
 - `delta_parse_test.go` — ParseDeltaSpec edge cases (7 tests)
 - `delta_merge_test.go` — MergeDelta ordering, errors, rename+modify (8 tests)
 - `validate_test.go` — ValidateChange with filesystem (13 tests)
-- `tasks_test.go` — parseTasksMD, findCurrentPhase, computeProgress (13 tests)
+- `tasks_test.go` — parseTasksMD, findCurrentPhase, computeProgress, TaskCompletion (20 tests)
 - `archive_test.go` — full archive pipeline against temp dirs (5 tests)
 - `instructions_test.go` — artifact-specific instructions, distinctness, dependencies (12 tests)
 

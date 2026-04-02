@@ -58,7 +58,7 @@ No backward flow. If something is wrong after propose, start over from explore/g
 | `apply` | Phase-based | Implements tasks per phase in `tasks.md`. One phase per invocation. AI focuses on one area without doing the whole implementation at once. |
 | `verify` | AI review | Reads implemented code, compares against spec requirements. Pure AI review — no test/lint running. |
 | `adopt` | Reverse-engineer | Takes a file/directory path. Generates a change proposal with specs from existing code. For code that has no spec yet. |
-| `archive` | Merge + move | Applies delta operations (RENAMED→REMOVED→MODIFIED→ADDED), moves change to `archive/`. |
+| `archive` | Merge + move | Validates task completion (blocks if unchecked), applies delta operations (RENAMED→REMOVED→MODIFIED→ADDED), moves change to `archive/`. Bypass with `--allow-incomplete`. |
 
 ## Tasks (Phased)
 
@@ -143,7 +143,7 @@ Convention over configuration. No config file. All defaults baked in. If a need 
 | `litespec status [--change <name>]` | Show artifact graph state (BLOCKED/READY/DONE) |
 | `litespec instructions <artifact>` | Return artifact-specific instructions for AI to create an artifact |
 | `litespec list [--specs\|--changes]` | List specs or changes |
-| `litespec archive <change>` | Apply deltas + move to archive |
+| `litespec archive <change> [--allow-incomplete]` | Apply deltas + move to archive |
 
 ## Change Metadata
 
