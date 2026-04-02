@@ -249,3 +249,34 @@ func writeFile(t *testing.T, path, content string) {
 		t.Fatalf("write %s: %v", path, err)
 	}
 }
+
+func TestFormatRelativeTimeBoundaries(t *testing.T) {
+	tests := []struct {
+		name string
+		dt   time.Duration
+		want string
+	}{
+		{"exactly 1 minute", 1 * time.Minute, "1m ago"},
+		{"just under 1 hour", 59*time.Minute + 59*time.Second, "59m ago"},
+		{"exactly 1 hour", 1 * time.Hour, "1h ago"},
+		{"just under 24 hours", 23*time.Hour + 59*time.Minute + 59*time.Second, "23h ago"},
+		{"exactly 24 hours", 24 * time.Hour, "1d ago"},
+		{"just under 30 days", 30*24*time.Hour - time.Second, "29d ago"},
+		{"just over 30 days", 30*24*time.Hour + time.Second, time.Now().Add(-30*24*time.Hour - time.Second).Format("2006-01-02")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FormatRelativeTime(time.Now().Add(-tt.dt))
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetLastModifiedNonexistentDir(t *testing.T) {
+	_, err := GetLastModified("/nonexistent/path/that/does/not/exist")
+	if err == nil {
+		t.Error("expected error for nonexistent directory")
+	}
+}

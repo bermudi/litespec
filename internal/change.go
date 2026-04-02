@@ -91,7 +91,13 @@ func ListChanges(root string) ([]ChangeInfo, error) {
 			completed, total = TaskCompletion(string(tasksData))
 		}
 
-		lastMod, _ := GetLastModified(changeDir)
+		lastMod, modErr := GetLastModified(changeDir)
+		if modErr != nil {
+			lastMod = time.Time{}
+			if fi, fiErr := entry.Info(); fiErr == nil {
+				lastMod = fi.ModTime()
+			}
+		}
 
 		result = append(result, ChangeInfo{
 			Name:           name,
@@ -264,7 +270,6 @@ func ReadChangeMeta(root, name string) (*ChangeMeta, error) {
 	return &meta, nil
 }
 
-// TaskCompletion returns (completed, total) counts for checkbox items in tasks.md content.
 func GetLastModified(dir string) (time.Time, error) {
 	var maxTime time.Time
 	info, err := os.Stat(dir)
@@ -299,12 +304,13 @@ func FormatRelativeTime(t time.Time) string {
 	if d < 24*time.Hour {
 		return fmt.Sprintf("%dh ago", int(d.Hours()))
 	}
-	if d < 30*24*time.Hour {
+	if d <= 30*24*time.Hour {
 		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
 	}
 	return t.Format("2006-01-02")
 }
 
+// TaskCompletion returns (completed, total) counts for checkbox items in tasks.md content.
 func TaskCompletion(content string) (completed, total int) {
 	for _, line := range strings.Split(content, "\n") {
 		if checkboxAnyRe.MatchString(line) {

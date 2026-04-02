@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/bermudi/litespec/internal"
 )
 
 func buildBinary(t *testing.T) string {
@@ -292,5 +295,97 @@ func TestCLIInstructionsUnknownArtifact(t *testing.T) {
 	}
 	if !strings.Contains(out, "valid:") {
 		t.Errorf("expected valid artifact list in error, got: %s", out)
+	}
+}
+
+func TestChangeStatusText(t *testing.T) {
+	tests := []struct {
+		completed int
+		total     int
+		want      string
+	}{
+		{0, 0, "No tasks"},
+		{5, 5, "✓ Complete"},
+		{3, 5, "3/5 tasks"},
+		{0, 3, "0/3 tasks"},
+	}
+	for _, tt := range tests {
+		c := internal.ChangeInfo{CompletedTasks: tt.completed, TotalTasks: tt.total}
+		got := changeStatusText(c)
+		if got != tt.want {
+			t.Errorf("changeStatusText(%d/%d) = %q, want %q", tt.completed, tt.total, got, tt.want)
+		}
+	}
+}
+
+func TestSortChangesByRecent(t *testing.T) {
+	now := time.Now()
+	changes := []internal.ChangeInfo{
+		{Name: "alpha", LastModified: now.Add(-2 * time.Hour)},
+		{Name: "beta", LastModified: now},
+		{Name: "gamma", LastModified: now.Add(-1 * time.Hour)},
+	}
+	sortChanges(changes, "recent")
+	if changes[0].Name != "beta" {
+		t.Errorf("first = %q, want %q", changes[0].Name, "beta")
+	}
+	if changes[1].Name != "gamma" {
+		t.Errorf("second = %q, want %q", changes[1].Name, "gamma")
+	}
+	if changes[2].Name != "alpha" {
+		t.Errorf("third = %q, want %q", changes[2].Name, "alpha")
+	}
+}
+
+func TestSortChangesByName(t *testing.T) {
+	now := time.Now()
+	changes := []internal.ChangeInfo{
+		{Name: "charlie", LastModified: now},
+		{Name: "alpha", LastModified: now.Add(-1 * time.Hour)},
+		{Name: "bravo", LastModified: now.Add(-2 * time.Hour)},
+	}
+	sortChanges(changes, "name")
+	if changes[0].Name != "alpha" {
+		t.Errorf("first = %q, want %q", changes[0].Name, "alpha")
+	}
+	if changes[1].Name != "bravo" {
+		t.Errorf("second = %q, want %q", changes[1].Name, "bravo")
+	}
+	if changes[2].Name != "charlie" {
+		t.Errorf("third = %q, want %q", changes[2].Name, "charlie")
+	}
+}
+
+func TestMaxNameWidthChanges(t *testing.T) {
+	changes := []internal.ChangeInfo{
+		{Name: "short"},
+		{Name: "a-very-long-change-name"},
+		{Name: "medium-name"},
+	}
+	got := maxNameWidthChanges(changes)
+	want := len("a-very-long-change-name")
+	if got != want {
+		t.Errorf("maxNameWidthChanges = %d, want %d", got, want)
+	}
+}
+
+func TestMaxNameWidthSpecs(t *testing.T) {
+	specs := []internal.SpecInfo{
+		{Name: "ab"},
+		{Name: "a"},
+		{Name: "abc"},
+	}
+	got := maxNameWidthSpecs(specs)
+	if got != 3 {
+		t.Errorf("maxNameWidthSpecs = %d, want 3", got)
+	}
+}
+
+func TestMaxNameWidthEmpty(t *testing.T) {
+	if maxNameWidthChanges(nil) != 0 {
+		t.Error("expected 0 for nil slice")
+	}
+	if maxNameWidthSpecs(nil) != 0 {
+		t.Error("expected 0 for nil slice")
 	}
 }

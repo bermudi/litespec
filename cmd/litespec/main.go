@@ -55,7 +55,7 @@ func printUsage() {
 Commands:
   init [--tools <ids>]                                        Initialize project structure
   new <name>                                                  Create a new change
-  list [--specs|--changes]                                    List specs or changes
+  list [--specs|--changes] [--sort recent|name]                   List specs or changes
   status [<name>]                                             Show artifact states
   validate [<name>] [--all|--changes|--specs] [--type T]      Validate changes and specs
   instructions <artifact>                                     Get artifact instructions
@@ -74,6 +74,7 @@ Flags:
   --changes    Validate all changes only
   --specs      Validate all specs only
   --type       Disambiguate name type: change|spec (validate)
+  --sort       Sort changes by recent or name (list, default: recent)
 `)
 }
 
@@ -198,6 +199,9 @@ func cmdList(args []string) {
 				fmt.Fprintf(os.Stderr, "error: %v\n", listErr)
 				os.Exit(1)
 			}
+			sort.Slice(specs, func(i, j int) bool {
+				return specs[i].Name < specs[j].Name
+			})
 			for _, s := range specs {
 				out.Specs = append(out.Specs, internal.SpecListItemJSON{
 					Name:             s.Name,
