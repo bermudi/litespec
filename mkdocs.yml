@@ -1,0 +1,60 @@
+site_name: litespec
+site_description: A lean, AI-native spec-driven development CLI
+site_url: https://bermudi.github.io/litespec/
+repo_url: https://github.com/bermudi/litespec
+repo_name: litespec
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - toc.follow
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: light blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: light blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  language: en
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - tables
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Concepts: concepts.md
+  - Getting Started:
+    - Installation: getting-started.md
+    - Tutorial: tutorial.md
+  - Workflow: workflow.md
+  - CLI Reference: cli-reference.md
+  - Delta Specs: delta-specs.md
+  - Project Structure: project-structure.md

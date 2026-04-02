@@ -1,8 +1,8 @@
 ## Phase 1: Infrastructure
 
-- [ ] Create `pyproject.toml` with mkdocs and mkdocs-material dependencies
-- [ ] Create `mkdocs.yml` with site config, Material theme, and nav structure
-- [ ] Verify `uv run mkdocs build` produces a working site
+- [x] Create `pyproject.toml` with mkdocs and mkdocs-material dependencies
+- [x] Create `mkdocs.yml` with site config, Material theme, and nav structure
+- [x] Verify `uv run mkdocs build` produces a working site
 
 ## Phase 2: Content
 
