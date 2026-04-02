@@ -19,5 +19,5 @@
 
 ## Phase 3: Physical directory rename
 
-- [ ] Rename physical directory: `mv specs/specs specs/canon`
-- [ ] Run full `go test ./...` and `go vet ./...`
+- [x] Rename physical directory: `mv specs/specs specs/canon`
+- [x] Run full `go test ./...` and `go vet ./...`
