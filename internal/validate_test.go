@@ -10,7 +10,7 @@ func setupTestProject(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	dirs := []string{
-		SpecsPath(root),
+		CanonPath(root),
 		ChangesPath(root),
 		ArchivePath(root),
 	}
@@ -46,7 +46,7 @@ func writeDeltaSpecFile(t *testing.T, root, changeName, capability, filename, co
 
 func writeMainSpecFile(t *testing.T, root, capability, content string) {
 	t.Helper()
-	dir := filepath.Join(SpecsPath(root), capability)
+	dir := filepath.Join(CanonPath(root), capability)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}

@@ -18,7 +18,7 @@ var (
 
 func InitProject(root string) error {
 	dirs := []string{
-		SpecsPath(root),
+		CanonPath(root),
 		ChangesPath(root),
 		ArchivePath(root),
 	}
@@ -76,7 +76,7 @@ func ListChanges(root string) ([]string, error) {
 }
 
 func ListSpecs(root string) ([]string, error) {
-	specsDir := SpecsPath(root)
+	specsDir := CanonPath(root)
 	entries, err := os.ReadDir(specsDir)
 	if err != nil {
 		return nil, fmt.Errorf("read specs directory: %w", err)
@@ -138,7 +138,7 @@ func PrepareArchiveWrites(root, name string) ([]PendingWrite, error) {
 			continue
 		}
 
-		mainSpecDir := filepath.Join(SpecsPath(root), capability)
+		mainSpecDir := filepath.Join(CanonPath(root), capability)
 		mainSpecPath := filepath.Join(mainSpecDir, "spec.md")
 		mainData, readErr := os.ReadFile(mainSpecPath)
 

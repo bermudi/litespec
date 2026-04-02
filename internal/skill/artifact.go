@@ -60,7 +60,7 @@ Rules:
 - REMOVED requirements are name-only — no body or scenarios
 - RENAMED requirements change the heading only; content and scenarios carry over under the new name
 - Body text for ADDED and MODIFIED requirements must contain SHALL or MUST
-- Read existing main specs in specs/specs/ to understand what already exists before writing deltas
+- Read existing main specs in specs/canon/ to understand what already exists before writing deltas
 - Only include sections that have requirements — omit empty sections`
 
 const artifactDesign = `Create the design artifact at the specified output path.

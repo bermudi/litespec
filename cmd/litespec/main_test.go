@@ -23,7 +23,7 @@ func setupCLITest(t *testing.T) (string, string) {
 	t.Helper()
 	bin := buildBinary(t)
 	root := t.TempDir()
-	specsDir := filepath.Join(root, "specs", "specs")
+	specsDir := filepath.Join(root, "specs", "canon")
 	changesDir := filepath.Join(root, "specs", "changes")
 	if err := os.MkdirAll(specsDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -84,7 +84,7 @@ The system SHALL work.
 
 func createSpec(t *testing.T, root, name string) {
 	t.Helper()
-	specDir := filepath.Join(root, "specs", "specs", name)
+	specDir := filepath.Join(root, "specs", "canon", name)
 	if err := os.MkdirAll(specDir, 0o755); err != nil {
 		t.Fatal(err)
 	}

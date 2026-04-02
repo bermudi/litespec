@@ -13,7 +13,9 @@ AI-native spec-driven development tool. A leaner, opinionated reimagining of [Op
 ```
 project/
 ├── specs/
-│   ├── specs/                    # source of truth (current capabilities)
+│   ├── canon/                    # source of truth (accepted capabilities)
+│   │   └── <capability>/
+│   │       └── spec.md
 │   └── changes/                  # active changes
 │       ├── <name>/
 │       │   ├── .litespec.yaml    # metadata (schema + timestamp)
@@ -24,6 +26,11 @@ project/
 │       │       └── <capability>/
 │       │           └── spec.md
 │       └── archive/              # completed changes (YYYY-MM-DD-<name>/)
+│           └── <date>-<name>/
+│               ├── .litespec.yaml
+│               ├── proposal.md
+│               ├── design.md
+│               └── tasks.md      # planning artifacts only — no specs/ subtree
 └── .agents/skills/               # generated skills (canonical)
     ├── litespec-explore/
     ├── litespec-grill/
@@ -58,7 +65,7 @@ No backward flow. If something is wrong after propose, start over from explore/g
 | `apply` | Phase-based | Implements tasks per phase in `tasks.md`. One phase per invocation. AI focuses on one area without doing the whole implementation at once. |
 | `verify` | AI review | Reads implemented code, compares against spec requirements. Pure AI review — no test/lint running. |
 | `adopt` | Reverse-engineer | Takes a file/directory path. Generates a change proposal with specs from existing code. For code that has no spec yet. |
-| `archive` | Merge + move | Validates task completion (blocks if unchecked), applies delta operations (RENAMED→REMOVED→MODIFIED→ADDED), moves change to `archive/`. Bypass with `--allow-incomplete`. |
+| `archive` | Merge + move | Validates task completion (blocks if unchecked), applies delta operations (RENAMED→REMOVED→MODIFIED→ADDED) into `specs/canon/`, strips the change's `specs/` subtree, then moves the remaining planning artifacts to `archive/`. Bypass with `--allow-incomplete`. |
 
 ## Tasks (Phased)
 
@@ -144,6 +151,18 @@ Convention over configuration. No config file. All defaults baked in. If a need 
 | `litespec instructions <artifact>` | Return artifact-specific instructions for AI to create an artifact |
 | `litespec list [--specs\|--changes]` | List specs or changes |
 | `litespec archive <change> [--allow-incomplete]` | Apply deltas + move to archive |
+
+## Archive Behavior
+
+`litespec archive <change>` performs these steps in order:
+
+1. **Validate** — run `ValidateChange` (artifacts exist, delta syntax valid, no dangling deltas)
+2. **Check tasks** — all checkboxes must be checked, unless `--allow-incomplete`
+3. **Merge deltas** — apply RENAMED→REMOVED→MODIFIED→ADDED into `specs/canon/<capability>/spec.md`
+4. **Strip specs/ subtree** — remove the change's `specs/` directory before archiving
+5. **Move** — relocate the change directory to `specs/changes/archive/<YYYY-MM-DD>-<name>/`
+
+The archived directory MUST contain only planning artifacts (`.litespec.yaml`, `proposal.md`, `design.md`, `tasks.md`). The `specs/` subtree MUST NOT be present — its contents have already been merged into the canonical `specs/canon/` source of truth.
 
 ## Change Metadata
 

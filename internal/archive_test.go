@@ -45,7 +45,7 @@ The system SHALL limit API requests.
 
 	runArchivePipeline(t, root, "add-rate-limit")
 
-	mainSpecPath := filepath.Join(SpecsPath(root), "rate-limit", "spec.md")
+	mainSpecPath := filepath.Join(CanonPath(root), "rate-limit", "spec.md")
 	data, err := os.ReadFile(mainSpecPath)
 	if err != nil {
 		t.Fatalf("read main spec: %v", err)
@@ -109,7 +109,7 @@ The system SHALL authenticate via OAuth.
 
 	runArchivePipeline(t, root, "mod-auth")
 
-	data, err := os.ReadFile(filepath.Join(SpecsPath(root), "auth", "spec.md"))
+	data, err := os.ReadFile(filepath.Join(CanonPath(root), "auth", "spec.md"))
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -163,7 +163,7 @@ The system SHALL authenticate via SSO.
 
 	runArchivePipeline(t, root, "rename-mod")
 
-	data, err := os.ReadFile(filepath.Join(SpecsPath(root), "auth", "spec.md"))
+	data, err := os.ReadFile(filepath.Join(CanonPath(root), "auth", "spec.md"))
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -230,7 +230,7 @@ The system SHALL provide the feature.
 
 	runArchivePipeline(t, root, "add-cap")
 
-	data, err := os.ReadFile(filepath.Join(SpecsPath(root), "my-feature", "spec.md"))
+	data, err := os.ReadFile(filepath.Join(CanonPath(root), "my-feature", "spec.md"))
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -270,7 +270,7 @@ The system SHALL authenticate.
 		t.Fatal("validation should reject RENAMED dangling delta")
 	}
 
-	mainData, _ := os.ReadFile(filepath.Join(SpecsPath(root), "auth", "spec.md"))
+	mainData, _ := os.ReadFile(filepath.Join(CanonPath(root), "auth", "spec.md"))
 	mainSpec, _ := ParseMainSpec(string(mainData))
 	if len(mainSpec.Requirements) != 1 || mainSpec.Requirements[0].Name != "Login" {
 		t.Fatal("main spec should be unchanged after rejected archive")
@@ -338,7 +338,7 @@ The system SHALL authenticate via SAML.
 		}
 	}
 
-	mainData, _ := os.ReadFile(filepath.Join(SpecsPath(root), "auth", "spec.md"))
+	mainData, _ := os.ReadFile(filepath.Join(CanonPath(root), "auth", "spec.md"))
 	mainSpec, _ := ParseMainSpec(string(mainData))
 
 	_, mergeErr := MergeDelta(mainSpec, deltas)
@@ -349,7 +349,7 @@ The system SHALL authenticate via SAML.
 		t.Errorf("error = %q, want mention of multiple deltas modify", mergeErr.Error())
 	}
 
-	mainData2, _ := os.ReadFile(filepath.Join(SpecsPath(root), "auth", "spec.md"))
+	mainData2, _ := os.ReadFile(filepath.Join(CanonPath(root), "auth", "spec.md"))
 	mainSpec2, _ := ParseMainSpec(string(mainData2))
 	if mainSpec2.Requirements[0].Content != "The system SHALL authenticate." {
 		t.Fatal("main spec should be unchanged after rejected merge")
@@ -387,7 +387,7 @@ The system SHALL authenticate differently.
 		t.Fatal("validation should reject ADDED duplicate of existing requirement")
 	}
 
-	mainData, _ := os.ReadFile(filepath.Join(SpecsPath(root), "auth", "spec.md"))
+	mainData, _ := os.ReadFile(filepath.Join(CanonPath(root), "auth", "spec.md"))
 	mainSpec, _ := ParseMainSpec(string(mainData))
 	if len(mainSpec.Requirements) != 1 || mainSpec.Requirements[0].Content != "The system SHALL authenticate." {
 		t.Fatal("main spec should be unchanged after rejected archive")
@@ -465,13 +465,13 @@ The system SHALL limit to 200.
 		t.Errorf("error = %q, want mention of multiple deltas modify", prepareErr.Error())
 	}
 
-	authData, _ := os.ReadFile(filepath.Join(SpecsPath(root), "auth", "spec.md"))
+	authData, _ := os.ReadFile(filepath.Join(CanonPath(root), "auth", "spec.md"))
 	authSpec, _ := ParseMainSpec(string(authData))
 	if len(authSpec.Requirements) != 1 || authSpec.Requirements[0].Content != "The system SHALL authenticate." {
 		t.Fatal("auth spec should be unchanged — no writes should have occurred")
 	}
 
-	apiData, _ := os.ReadFile(filepath.Join(SpecsPath(root), "api", "spec.md"))
+	apiData, _ := os.ReadFile(filepath.Join(CanonPath(root), "api", "spec.md"))
 	apiSpec, _ := ParseMainSpec(string(apiData))
 	if len(apiSpec.Requirements) != 1 || apiSpec.Requirements[0].Content != "The system SHALL limit requests." {
 		t.Fatal("api spec should be unchanged — no writes should have occurred")
@@ -520,7 +520,7 @@ The system SHALL throttle requests.
 
 	runArchivePipeline(t, root, "multi-ok")
 
-	authData, err := os.ReadFile(filepath.Join(SpecsPath(root), "auth", "spec.md"))
+	authData, err := os.ReadFile(filepath.Join(CanonPath(root), "auth", "spec.md"))
 	if err != nil {
 		t.Fatalf("read auth spec: %v", err)
 	}
@@ -535,7 +535,7 @@ The system SHALL throttle requests.
 		t.Errorf("auth content = %q, want SSO updated", authSpec.Requirements[0].Content)
 	}
 
-	rlData, err := os.ReadFile(filepath.Join(SpecsPath(root), "rate-limit", "spec.md"))
+	rlData, err := os.ReadFile(filepath.Join(CanonPath(root), "rate-limit", "spec.md"))
 	if err != nil {
 		t.Fatalf("read rate-limit spec: %v", err)
 	}
@@ -598,8 +598,8 @@ func TestWritePendingSpecsCreatesDirectories(t *testing.T) {
 	writes := []PendingWrite{
 		{
 			Capability: "brand-new",
-			Path:       filepath.Join(SpecsPath(root), "brand-new", "spec.md"),
-			Dir:        filepath.Join(SpecsPath(root), "brand-new"),
+			Path:       filepath.Join(CanonPath(root), "brand-new", "spec.md"),
+			Dir:        filepath.Join(CanonPath(root), "brand-new"),
 			Content:    "# brand-new\n\n### Requirement: Core\nThe system SHALL work.\n",
 		},
 	}
@@ -608,7 +608,7 @@ func TestWritePendingSpecsCreatesDirectories(t *testing.T) {
 		t.Fatalf("WritePendingSpecs: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(SpecsPath(root), "brand-new", "spec.md"))
+	data, err := os.ReadFile(filepath.Join(CanonPath(root), "brand-new", "spec.md"))
 	if err != nil {
 		t.Fatalf("read written spec: %v", err)
 	}

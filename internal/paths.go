@@ -6,12 +6,13 @@ import (
 )
 
 const (
-	SpecsDirName   = "specs"
-	ChangesDirName = "changes"
-	ArchiveDirName = "archive"
-	MetaFileName   = ".litespec.yaml"
-	ProjectDirName = "specs"
-	SkillsDir      = ".agents/skills"
+	CanonDirName       = "canon"
+	ChangeSpecsDirName = "specs"
+	ChangesDirName     = "changes"
+	ArchiveDirName     = "archive"
+	MetaFileName       = ".litespec.yaml"
+	ProjectDirName     = "specs"
+	SkillsDir          = ".agents/skills"
 )
 
 var Skills = []SkillInfo{
@@ -83,8 +84,8 @@ func FindProjectRoot() (string, error) {
 	}
 }
 
-func SpecsPath(root string) string {
-	return filepath.Join(root, ProjectDirName, SpecsDirName)
+func CanonPath(root string) string {
+	return filepath.Join(root, ProjectDirName, CanonDirName)
 }
 
 func ChangesPath(root string) string {
@@ -100,5 +101,5 @@ func ChangePath(root, name string) string {
 }
 
 func ChangeSpecsPath(root, name string) string {
-	return filepath.Join(ChangePath(root, name), SpecsDirName)
+	return filepath.Join(ChangePath(root, name), ChangeSpecsDirName)
 }

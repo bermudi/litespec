@@ -157,7 +157,7 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 
 				var existingNames map[string]bool
 				if needsMainSpec {
-					mainSpecPath := filepath.Join(SpecsPath(root), entry.Name(), "spec.md")
+					mainSpecPath := filepath.Join(CanonPath(root), entry.Name(), "spec.md")
 					mainData, readErr := os.ReadFile(mainSpecPath)
 					if readErr != nil {
 						hasModOrRenameOrRemove := false
@@ -261,7 +261,7 @@ func hasPhaseHeading(content string) bool {
 
 func ValidateSpec(root, name string) (*ValidationResult, error) {
 	result := &ValidationResult{Valid: true}
-	specPath := filepath.Join(SpecsPath(root), name, "spec.md")
+	specPath := filepath.Join(CanonPath(root), name, "spec.md")
 
 	data, err := os.ReadFile(specPath)
 	if err != nil {
@@ -306,7 +306,7 @@ func ValidateSpec(root, name string) (*ValidationResult, error) {
 
 func ValidateSpecs(root string) (*ValidationResult, error) {
 	result := &ValidationResult{Valid: true}
-	specsDir := SpecsPath(root)
+	specsDir := CanonPath(root)
 
 	entries, err := os.ReadDir(specsDir)
 	if err != nil {

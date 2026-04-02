@@ -1,0 +1,4 @@
+- `litespec archive` creates specs/changes/archive/<change-name>/specs instead of just creating specs/specs/ ( the archived directory also keeps its specs/ subtree. )
+- copy `openspec list` output format
+- copy `openspec show` functionality
+- add --help flag to all commands
