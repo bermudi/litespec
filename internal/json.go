@@ -3,7 +3,6 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strings"
 )
 
@@ -21,24 +20,12 @@ type ArtifactStatusJSON struct {
 	MissingDeps []string `json:"missingDeps,omitempty"`
 }
 
-type ArtifactInstructionsJSON struct {
-	ChangeName   string               `json:"changeName"`
-	ArtifactID   string               `json:"artifactId"`
-	SchemaName   string               `json:"schemaName"`
-	ChangeDir    string               `json:"changeDir"`
-	OutputPath   string               `json:"outputPath"`
-	Description  string               `json:"description"`
-	Instruction  string               `json:"instruction"`
-	Template     string               `json:"template"`
-	Dependencies []DependencyInfoJSON `json:"dependencies"`
-	Unlocks      []string             `json:"unlocks"`
-}
-
-type DependencyInfoJSON struct {
-	ID          string `json:"id"`
-	Done        bool   `json:"done"`
-	Path        string `json:"path"`
+type ArtifactInstructionsStandaloneJSON struct {
+	ArtifactID  string `json:"artifactId"`
 	Description string `json:"description"`
+	Instruction string `json:"instruction"`
+	Template    string `json:"template"`
+	OutputPath  string `json:"outputPath"`
 }
 
 type ProgressJSON struct {
@@ -131,6 +118,24 @@ func ArtifactInstructionID(artifactID string) string {
 	}
 }
 
+func BuildArtifactInstructionsStandaloneJSON(artifactID string) (*ArtifactInstructionsStandaloneJSON, error) {
+	info := GetArtifact(artifactID)
+	if info == nil {
+		return nil, fmt.Errorf("artifact %q not found", artifactID)
+	}
+
+	instruction := GetSkillTemplate(ArtifactInstructionID(artifactID))
+	template := GetSkillTemplate("propose")
+
+	return &ArtifactInstructionsStandaloneJSON{
+		ArtifactID:  artifactID,
+		Description: info.Description,
+		Instruction: instruction,
+		Template:    template,
+		OutputPath:  info.Filename,
+	}, nil
+}
+
 func BuildChangeStatusJSON(change *Change) ChangeStatusJSON {
 	var artifacts []ArtifactStatusJSON
 	allDone := true
@@ -162,59 +167,6 @@ func BuildChangeStatusJSON(change *Change) ChangeStatusJSON {
 		IsComplete: allDone,
 		Artifacts:  artifacts,
 	}
-}
-
-func BuildArtifactInstructionsJSON(root, changeName, artifactID string) (*ArtifactInstructionsJSON, error) {
-	change, err := LoadChangeContext(root, changeName)
-	if err != nil {
-		return nil, err
-	}
-
-	info := GetArtifact(artifactID)
-	if info == nil {
-		return nil, fmt.Errorf("artifact %q not found", artifactID)
-	}
-
-	changeDir := ChangePath(root, changeName)
-	instruction := GetSkillTemplate(ArtifactInstructionID(artifactID))
-	template := GetSkillTemplate("propose")
-
-	var deps []DependencyInfoJSON
-	for _, reqID := range info.Requires {
-		reqInfo := GetArtifact(reqID)
-		if reqInfo == nil {
-			continue
-		}
-		deps = append(deps, DependencyInfoJSON{
-			ID:          reqInfo.ID,
-			Done:        change.Artifacts[reqID] == ArtifactDone,
-			Path:        filepath.Join(changeDir, reqInfo.Filename),
-			Description: reqInfo.Description,
-		})
-	}
-
-	var unlocks []string
-	for _, candidate := range Artifacts {
-		for _, req := range candidate.Requires {
-			if req == artifactID {
-				unlocks = append(unlocks, candidate.ID)
-				break
-			}
-		}
-	}
-
-	return &ArtifactInstructionsJSON{
-		ChangeName:   changeName,
-		ArtifactID:   artifactID,
-		SchemaName:   change.Schema,
-		ChangeDir:    changeDir,
-		OutputPath:   info.Filename,
-		Description:  info.Description,
-		Instruction:  instruction,
-		Template:     template,
-		Dependencies: deps,
-		Unlocks:      unlocks,
-	}, nil
 }
 
 func parseTasksMD(content string) []PhaseJSON {

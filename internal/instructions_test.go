@@ -1,62 +1,11 @@
 package internal
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/bermudi/litespec/internal/skill"
 )
-
-func setupChangeWithDeps(t *testing.T, name string, artifacts map[string]string) string {
-	t.Helper()
-	root := t.TempDir()
-	specsDir := filepath.Join(root, "specs", "specs")
-	changesDir := filepath.Join(root, "specs", "changes")
-	if err := os.MkdirAll(specsDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(changesDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	changeDir := filepath.Join(changesDir, name)
-	if err := os.MkdirAll(changeDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	metaPath := filepath.Join(changeDir, ".litespec.yaml")
-	if err := os.WriteFile(metaPath, []byte("schema: spec-driven\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	for id, content := range artifacts {
-		switch id {
-		case "proposal":
-			if err := os.WriteFile(filepath.Join(changeDir, "proposal.md"), []byte(content), 0o644); err != nil {
-				t.Fatal(err)
-			}
-		case "specs":
-			specSubdir := filepath.Join(changeDir, "specs", "test-cap")
-			if err := os.MkdirAll(specSubdir, 0o755); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(filepath.Join(specSubdir, "spec.md"), []byte(content), 0o644); err != nil {
-				t.Fatal(err)
-			}
-		case "design":
-			if err := os.WriteFile(filepath.Join(changeDir, "design.md"), []byte(content), 0o644); err != nil {
-				t.Fatal(err)
-			}
-		case "tasks":
-			if err := os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte(content), 0o644); err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
-
-	return root
-}
 
 func TestArtifactInstructionID(t *testing.T) {
 	tests := []struct {
@@ -114,12 +63,10 @@ func TestArtifactInstructionID_AllTemplatesDistinct(t *testing.T) {
 	}
 }
 
-func TestBuildArtifactInstructionsJSON_InstructionDiffersFromTemplate(t *testing.T) {
-	root := setupChangeWithDeps(t, "test-change", nil)
-
-	instr, err := BuildArtifactInstructionsJSON(root, "test-change", "proposal")
+func TestBuildArtifactInstructionsStandaloneJSON_InstructionDiffersFromTemplate(t *testing.T) {
+	instr, err := BuildArtifactInstructionsStandaloneJSON("proposal")
 	if err != nil {
-		t.Fatalf("BuildArtifactInstructionsJSON: %v", err)
+		t.Fatalf("BuildArtifactInstructionsStandaloneJSON: %v", err)
 	}
 
 	if instr.Instruction == "" {
@@ -133,14 +80,12 @@ func TestBuildArtifactInstructionsJSON_InstructionDiffersFromTemplate(t *testing
 	}
 }
 
-func TestBuildArtifactInstructionsJSON_InstructionPerArtifact(t *testing.T) {
-	root := setupChangeWithDeps(t, "test-change", nil)
-
+func TestBuildArtifactInstructionsStandaloneJSON_InstructionPerArtifact(t *testing.T) {
 	instructions := map[string]string{}
 	for _, id := range []string{"proposal", "specs", "design", "tasks"} {
-		instr, err := BuildArtifactInstructionsJSON(root, "test-change", id)
+		instr, err := BuildArtifactInstructionsStandaloneJSON(id)
 		if err != nil {
-			t.Fatalf("BuildArtifactInstructionsJSON(%q): %v", id, err)
+			t.Fatalf("BuildArtifactInstructionsStandaloneJSON(%q): %v", id, err)
 		}
 		instructions[id] = instr.Instruction
 	}
@@ -166,13 +111,11 @@ func TestBuildArtifactInstructionsJSON_InstructionPerArtifact(t *testing.T) {
 	}
 }
 
-func TestBuildArtifactInstructionsJSON_TemplateIsAlwaysPropose(t *testing.T) {
-	root := setupChangeWithDeps(t, "test-change", nil)
-
+func TestBuildArtifactInstructionsStandaloneJSON_TemplateIsAlwaysPropose(t *testing.T) {
 	for _, id := range []string{"proposal", "specs", "design", "tasks"} {
-		instr, err := BuildArtifactInstructionsJSON(root, "test-change", id)
+		instr, err := BuildArtifactInstructionsStandaloneJSON(id)
 		if err != nil {
-			t.Fatalf("BuildArtifactInstructionsJSON(%q): %v", id, err)
+			t.Fatalf("BuildArtifactInstructionsStandaloneJSON(%q): %v", id, err)
 		}
 		if instr.Template != skill.Get("propose") {
 			t.Errorf("artifact %q: Template does not match propose skill", id)
@@ -180,9 +123,7 @@ func TestBuildArtifactInstructionsJSON_TemplateIsAlwaysPropose(t *testing.T) {
 	}
 }
 
-func TestBuildArtifactInstructionsJSON_InstructionContainsArtifactMarkers(t *testing.T) {
-	root := setupChangeWithDeps(t, "test-change", nil)
-
+func TestBuildArtifactInstructionsStandaloneJSON_InstructionContainsArtifactMarkers(t *testing.T) {
 	expectedMarkers := map[string]string{
 		"proposal": "Motivation",
 		"specs":    "ADDED Requirements",
@@ -191,9 +132,9 @@ func TestBuildArtifactInstructionsJSON_InstructionContainsArtifactMarkers(t *tes
 	}
 
 	for id, marker := range expectedMarkers {
-		instr, err := BuildArtifactInstructionsJSON(root, "test-change", id)
+		instr, err := BuildArtifactInstructionsStandaloneJSON(id)
 		if err != nil {
-			t.Fatalf("BuildArtifactInstructionsJSON(%q): %v", id, err)
+			t.Fatalf("BuildArtifactInstructionsStandaloneJSON(%q): %v", id, err)
 		}
 		if !strings.Contains(instr.Instruction, marker) {
 			t.Errorf("artifact %q instruction missing marker %q", id, marker)
@@ -201,50 +142,25 @@ func TestBuildArtifactInstructionsJSON_InstructionContainsArtifactMarkers(t *tes
 	}
 }
 
-func TestBuildArtifactInstructionsJSON_Dependencies(t *testing.T) {
-	root := setupChangeWithDeps(t, "test-change", map[string]string{
-		"proposal": "# Test Proposal",
-	})
-
-	instr, err := BuildArtifactInstructionsJSON(root, "test-change", "design")
+func TestBuildArtifactInstructionsStandaloneJSON_Fields(t *testing.T) {
+	instr, err := BuildArtifactInstructionsStandaloneJSON("design")
 	if err != nil {
-		t.Fatalf("BuildArtifactInstructionsJSON: %v", err)
+		t.Fatalf("BuildArtifactInstructionsStandaloneJSON: %v", err)
 	}
 
-	if len(instr.Dependencies) != 1 {
-		t.Fatalf("expected 1 dependency, got %d", len(instr.Dependencies))
+	if instr.ArtifactID != "design" {
+		t.Errorf("ArtifactID = %q, want %q", instr.ArtifactID, "design")
 	}
-	if instr.Dependencies[0].ID != "proposal" {
-		t.Errorf("dependency ID = %q, want %q", instr.Dependencies[0].ID, "proposal")
+	if instr.OutputPath != "design.md" {
+		t.Errorf("OutputPath = %q, want %q", instr.OutputPath, "design.md")
 	}
-	if !instr.Dependencies[0].Done {
-		t.Error("proposal dependency should be done")
+	if instr.Description == "" {
+		t.Error("Description is empty")
 	}
 }
 
-func TestBuildArtifactInstructionsJSON_Unlocks(t *testing.T) {
-	root := setupChangeWithDeps(t, "test-change", nil)
-
-	instr, err := BuildArtifactInstructionsJSON(root, "test-change", "proposal")
-	if err != nil {
-		t.Fatalf("BuildArtifactInstructionsJSON: %v", err)
-	}
-
-	expectedUnlocks := map[string]bool{"specs": false, "design": false, "tasks": false}
-	for _, u := range instr.Unlocks {
-		expectedUnlocks[u] = true
-	}
-	for u, found := range expectedUnlocks {
-		if !found {
-			t.Errorf("proposal should unlock %q", u)
-		}
-	}
-}
-
-func TestBuildArtifactInstructionsJSON_UnknownArtifact(t *testing.T) {
-	root := setupChangeWithDeps(t, "test-change", nil)
-
-	_, err := BuildArtifactInstructionsJSON(root, "test-change", "nonexistent")
+func TestBuildArtifactInstructionsStandaloneJSON_UnknownArtifact(t *testing.T) {
+	_, err := BuildArtifactInstructionsStandaloneJSON("nonexistent")
 	if err == nil {
 		t.Error("expected error for unknown artifact")
 	}

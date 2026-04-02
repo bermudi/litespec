@@ -2,9 +2,9 @@
 
 ## Phase 1: Internal — Validation and Instructions Logic
 
-- [ ] Add `ValidateSpec(root, name string) (*ValidationResult, error)` in `internal/validate.go` — singular counterpart to existing `ValidateSpecs`
-- [ ] Add `BuildArtifactInstructionsStandaloneJSON(artifactID string)` in `internal/json.go` — returns `artifactId`, `description`, `instruction`, `template`, `outputPath` without change context
-- [ ] Remove `BuildArtifactInstructionsJSON` and `ArtifactInstructionsJSON` from `internal/json.go` — replaced by standalone version
+- [x] Add `ValidateSpec(root, name string) (*ValidationResult, error)` in `internal/validate.go` — singular counterpart to existing `ValidateSpecs`
+- [x] Add `BuildArtifactInstructionsStandaloneJSON(artifactID string)` in `internal/json.go` — returns `artifactId`, `description`, `instruction`, `template`, `outputPath` without change context
+- [x] Remove `BuildArtifactInstructionsJSON` and `ArtifactInstructionsJSON` from `internal/json.go` — replaced by standalone version
 
 ## Phase 2: CLI — Argument Parsing Rewrite and Docs
 

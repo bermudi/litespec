@@ -259,6 +259,51 @@ func hasPhaseHeading(content string) bool {
 	return false
 }
 
+func ValidateSpec(root, name string) (*ValidationResult, error) {
+	result := &ValidationResult{Valid: true}
+	specPath := filepath.Join(SpecsPath(root), name, "spec.md")
+
+	data, err := os.ReadFile(specPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("spec %q not found", name)
+		}
+		return nil, fmt.Errorf("read spec %q: %w", name, err)
+	}
+
+	spec, parseErr := ParseMainSpec(string(data))
+	if parseErr != nil {
+		result.Errors = append(result.Errors, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("invalid spec: %s", parseErr),
+			File:     specPath,
+		})
+		result.Valid = false
+		return result, nil
+	}
+
+	if len(spec.Requirements) == 0 {
+		result.Warnings = append(result.Warnings, ValidationIssue{
+			Severity: SeverityWarning,
+			Message:  fmt.Sprintf("capability %q has no requirements", name),
+			File:     specPath,
+		})
+	}
+
+	for _, req := range spec.Requirements {
+		if len(req.Scenarios) == 0 {
+			result.Warnings = append(result.Warnings, ValidationIssue{
+				Severity: SeverityWarning,
+				Message:  fmt.Sprintf("requirement %q in capability %q has no scenarios", req.Name, name),
+				File:     specPath,
+			})
+		}
+	}
+
+	result.Valid = len(result.Errors) == 0
+	return result, nil
+}
+
 func ValidateSpecs(root string) (*ValidationResult, error) {
 	result := &ValidationResult{Valid: true}
 	specsDir := SpecsPath(root)
