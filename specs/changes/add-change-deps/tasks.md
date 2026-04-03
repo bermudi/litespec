@@ -28,5 +28,5 @@
 - [x] Update tests: view renders dashboard, graph section appears only when deps exist
 
 ## Phase 5: Documentation
-- [ ] Update `DESIGN.md`: add Change Dependencies section, add view to CLI table, update Change Metadata section
-- [ ] Update `AGENTS.md`: add view command, mention dependsOn in core concepts
+- [x] Update `DESIGN.md`: add Change Dependencies section, add view to CLI table, update Change Metadata section
+- [x] Update `AGENTS.md`: add view command, mention dependsOn in core concepts

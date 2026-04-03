@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -198,68 +199,105 @@ func cmdView(args []string) {
 		os.Exit(1)
 	}
 
-	totalSpecs := len(specs)
+	var draft, active, completed []internal.ChangeInfo
+	for _, c := range changes {
+		if c.TotalTasks == 0 {
+			draft = append(draft, c)
+		} else if c.CompletedTasks == c.TotalTasks {
+			completed = append(completed, c)
+		} else {
+			active = append(active, c)
+		}
+	}
+
+	sort.Slice(active, func(i, j int) bool {
+		pctI := float64(active[i].CompletedTasks) / float64(active[i].TotalTasks)
+		pctJ := float64(active[j].CompletedTasks) / float64(active[j].TotalTasks)
+		if pctI != pctJ {
+			return pctI < pctJ
+		}
+		return active[i].Name < active[j].Name
+	})
+
 	totalReqs := 0
 	for _, s := range specs {
 		totalReqs += s.RequirementCount
 	}
 
-	activeChanges := len(changes)
-	draftChanges := 0
 	totalCompletedTasks := 0
 	totalTasks := 0
-
-	for _, c := range changes {
-		if c.TotalTasks == 0 {
-			draftChanges++
-		}
+	for _, c := range active {
 		totalCompletedTasks += c.CompletedTasks
 		totalTasks += c.TotalTasks
 	}
 
-	taskCompletion := 0
-	if totalTasks > 0 {
-		taskCompletion = int(float64(totalCompletedTasks) / float64(totalTasks) * 100)
-	}
-
-	fmt.Println("Summary")
-	fmt.Println("-------")
-	fmt.Printf("  Specs: %d\n", totalSpecs)
-	fmt.Printf("  Requirements: %d\n", totalReqs)
-	fmt.Printf("  Active Changes: %d\n", activeChanges)
-	fmt.Printf("  Draft Changes: %d\n", draftChanges)
-	if totalTasks > 0 {
-		fmt.Printf("  Task Completion: %d%%\n", taskCompletion)
-	} else {
-		fmt.Printf("  Task Completion: N/A\n")
-	}
 	fmt.Println()
+	fmt.Println("Litespec Dashboard")
+	fmt.Println()
+	sep := strings.Repeat("═", 60)
+	fmt.Println(sep)
 
-	fmt.Println("Active Changes")
-	fmt.Println("--------------")
-	if len(changes) == 0 {
-		fmt.Println("  (none)")
-	} else {
-		for _, c := range changes {
-			status := changeStatusText(c)
-			relTime := internal.FormatRelativeTime(c.LastModified)
-			fmt.Printf("  %-20s %-16s %s\n", c.Name, status, relTime)
+	fmt.Println("Summary:")
+	fmt.Printf("  ● Specifications: %d specs, %d requirements\n", len(specs), totalReqs)
+	if len(draft) > 0 {
+		fmt.Printf("  ● Draft Changes: %d\n", len(draft))
+	}
+	fmt.Printf("  ● Active Changes: %d in progress\n", len(active))
+	fmt.Printf("  ● Completed Changes: %d\n", len(completed))
+	if totalTasks > 0 {
+		pct := int(math.Round(float64(totalCompletedTasks) / float64(totalTasks) * 100))
+		fmt.Printf("  ● Task Progress: %d/%d (%d%% complete)\n", totalCompletedTasks, totalTasks, pct)
+	}
+
+	if len(active) > 0 {
+		fmt.Println()
+		fmt.Println("Active Changes")
+		fmt.Println(strings.Repeat("─", 60))
+		for _, c := range active {
+			bar := createProgressBar(c.CompletedTasks, c.TotalTasks, 20)
+			pct := int(math.Round(float64(c.CompletedTasks) / float64(c.TotalTasks) * 100))
+			fmt.Printf("  ◉ %-30s %s %d%%\n", c.Name, bar, pct)
 		}
 	}
-	fmt.Println()
 
-	fmt.Println("Specifications")
-	fmt.Println("-------------")
-	if len(specs) == 0 {
-		fmt.Println("  (none)")
-	} else {
+	if len(draft) > 0 {
+		fmt.Println()
+		fmt.Println("Draft Changes")
+		fmt.Println(strings.Repeat("─", 60))
+		for _, c := range draft {
+			fmt.Printf("  ○ %s\n", c.Name)
+		}
+	}
+
+	if len(completed) > 0 {
+		fmt.Println()
+		fmt.Println("Completed Changes")
+		fmt.Println(strings.Repeat("─", 60))
+		for _, c := range completed {
+			fmt.Printf("  ✓ %s\n", c.Name)
+		}
+	}
+
+	if len(specs) > 0 {
+		fmt.Println()
+		fmt.Println("Specifications")
+		fmt.Println(strings.Repeat("─", 60))
+		sort.Slice(specs, func(i, j int) bool {
+			return specs[i].RequirementCount > specs[j].RequirementCount
+		})
 		for _, s := range specs {
-			fmt.Printf("  %-20s %d requirements\n", s.Name, s.RequirementCount)
+			label := "requirement"
+			if s.RequirementCount != 1 {
+				label = "requirements"
+			}
+			fmt.Printf("  ▪ %-30s %d %s\n", s.Name, s.RequirementCount, label)
 		}
 	}
 
 	depMap, err := internal.LoadDepMap(root)
 	if err != nil {
+		fmt.Println()
+		fmt.Println(sep)
 		return
 	}
 
@@ -274,9 +312,23 @@ func cmdView(args []string) {
 	if hasDeps {
 		fmt.Println()
 		fmt.Println("Dependency Graph")
-		fmt.Println("-----------------")
+		fmt.Println(strings.Repeat("─", 60))
 		renderDependencyGraph(depMap, changes)
 	}
+
+	fmt.Println()
+	fmt.Println(sep)
+	fmt.Printf("\nUse litespec list --changes or litespec list --specs for detailed views\n")
+}
+
+func createProgressBar(completed, total, width int) string {
+	if total == 0 {
+		return strings.Repeat("─", width)
+	}
+	pct := float64(completed) / float64(total)
+	filled := int(math.Round(pct * float64(width)))
+	empty := width - filled
+	return "[" + strings.Repeat("█", filled) + strings.Repeat("░", empty) + "]"
 }
 
 func renderDependencyGraph(depMap map[string][]string, changes []internal.ChangeInfo) {

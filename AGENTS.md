@@ -26,10 +26,12 @@ The design emerged from a structured grilling session — question by question, 
 - **Specs** live in `specs/canon/` — the source of truth for current capabilities
 - **Changes** live in `specs/changes/<name>/` — isolated proposed modifications
 - **Delta specs** use ADDED/MODIFIED/REMOVED/RENAMED markers merged in strict order at archive time
+- **Change dependencies** — optional `dependsOn` field in `.litespec.yaml` for prerequisite relationships between changes. Enables cycle/overlap detection, topological sorting, archive guards, and dependency graph visualization.
 - **Skills** are generated into `.agents/skills/` (canonical). Claude Code gets symlinks via `--tools claude`.
 - **Scenarios** — each requirement has named scenarios (`#### Scenario: <name>`) with WHEN/THEN format. ADDED and MODIFIED requirements must have at least one scenario. Body text must contain SHALL or MUST.
 - **Artifact-specific instructions** — `litespec instructions <artifact>` returns distinct guidance per artifact (proposal: motivation/scope/non-goals; specs: delta format + capabilities; design: architecture/decisions/file changes; tasks: phased checklist). The `template` field retains the propose workflow for context.
 - **Phased tasks** — `tasks.md` organizes work into phases, applied one phase at a time
+- **`view` command** — displays a dashboard with progress bars `[████░░░]`, change categories (draft/active/completed), specs sorted by requirement count, and an optional dependency graph section when any change has `dependsOn`
 
 ## Workflow
 

@@ -783,7 +783,7 @@ func TestCLIViewDashboard(t *testing.T) {
 		t.Fatalf("exit %d: %s", code, out)
 	}
 
-	if !strings.Contains(out, "Summary") {
+	if !strings.Contains(out, "Summary:") {
 		t.Error("expected Summary section")
 	}
 	if !strings.Contains(out, "Active Changes") {
@@ -792,20 +792,17 @@ func TestCLIViewDashboard(t *testing.T) {
 	if !strings.Contains(out, "Specifications") {
 		t.Error("expected Specifications section")
 	}
-	if !strings.Contains(out, "Specs: 2") {
-		t.Error("expected 2 specs")
+	if !strings.Contains(out, "Specifications: 2 specs, 2 requirements") {
+		t.Error("expected '2 specs, 2 requirements' in summary")
 	}
-	if !strings.Contains(out, "Requirements: 2") {
-		t.Error("expected 2 requirements")
-	}
-	if !strings.Contains(out, "Active Changes: 2") {
-		t.Error("expected 2 active changes")
+	if !strings.Contains(out, "Active Changes: 1 in progress") {
+		t.Error("expected 1 active change")
 	}
 	if !strings.Contains(out, "Draft Changes: 1") {
 		t.Error("expected 1 draft change")
 	}
-	if !strings.Contains(out, "Task Completion: 50%") {
-		t.Error("expected 50% task completion")
+	if !strings.Contains(out, "Task Progress: 1/2 (50% complete)") {
+		t.Error("expected 50% task progress")
 	}
 	if !strings.Contains(out, "auth") {
 		t.Error("expected auth spec")
@@ -818,6 +815,12 @@ func TestCLIViewDashboard(t *testing.T) {
 	}
 	if !strings.Contains(out, "draft-change") {
 		t.Error("expected draft-change change")
+	}
+	if !strings.Contains(out, "█████") {
+		t.Error("expected progress bar characters")
+	}
+	if !strings.Contains(out, "50%") {
+		t.Error("expected 50% in progress bar")
 	}
 }
 
@@ -843,14 +846,14 @@ func TestCLIViewNoSpecs(t *testing.T) {
 		t.Fatalf("exit %d: %s", code, out)
 	}
 
-	if !strings.Contains(out, "Summary") {
+	if !strings.Contains(out, "Summary:") {
 		t.Error("expected Summary section")
 	}
-	if !strings.Contains(out, "Specs: 0") {
-		t.Error("expected 0 specs")
+	if !strings.Contains(out, "Specifications: 0 specs, 0 requirements") {
+		t.Error("expected 0 specs in summary")
 	}
-	if !strings.Contains(out, "Requirements: 0") {
-		t.Error("expected 0 requirements")
+	if !strings.Contains(out, "Active Changes: 0 in progress") {
+		t.Error("expected 0 active changes")
 	}
 }
 
@@ -889,9 +892,11 @@ func TestCLIViewWithDependencyGraph(t *testing.T) {
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "parent-change" || strings.HasSuffix(trimmed, "parent-change") {
-			parentIdx = i
+			if !strings.Contains(line, "Active Changes") && !strings.Contains(line, "Draft Changes") {
+				parentIdx = i
+			}
 		}
-		if strings.Contains(line, "child-change") && !strings.Contains(line, "Active Changes") {
+		if strings.Contains(line, "child-change") && !strings.Contains(line, "Active Changes") && !strings.Contains(line, "Draft Changes") {
 			childIdx = i
 		}
 	}

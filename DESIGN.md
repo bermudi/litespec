@@ -169,11 +169,12 @@ Convention over configuration. No config file. All defaults baked in. If a need 
 | Command | Purpose |
 |---------|---------|
 | `litespec init [--tools ...]` | Scaffold `specs/` dir + generate skills (+ optional tool-specific commands) |
-| `litespec validate [<name>] [--all\|--changes\|--specs] [--type change\|spec] [--strict]` | Validate artifact structure, delta syntax, dangling deltas |
+| `litespec validate [<name>] [--all\|--changes\|--specs] [--type change\|spec] [--strict]` | Validate artifact structure, delta syntax, dangling deltas, dependency cycles/overlaps |
 | `litespec status [<name>]` | Show artifact graph state (BLOCKED/READY/DONE) |
 | `litespec instructions <artifact>` | Return artifact-specific instructions for AI to create an artifact |
-| `litespec list [--specs\|--changes]` | List specs or changes |
-| `litespec archive <change> [--allow-incomplete]` | Apply deltas + move to archive |
+| `litespec list [--specs\|--changes] [--sort name\|recent\|deps]` | List specs or changes (deps sort uses topological order) |
+| `litespec view` | Display dashboard overview with progress bars, specs, changes, and dependency graph |
+| `litespec archive <change> [--allow-incomplete]` | Apply deltas + move to archive (warns if other changes depend on this one) |
 | `litespec completion <shell>` | Print shell completion script (bash, zsh, fish) |
 | `litespec __complete <words...>` | Hidden backend for dynamic shell completions |
 
@@ -196,6 +197,20 @@ Each change directory contains `.litespec.yaml`:
 ```yaml
 schema: spec-driven
 created: "2026-03-31T10:30:00Z"
+dependsOn:          # optional — list of change names this change depends on
+  - parent-change
 ```
 
-Minimal. No phase tracking — derived from `tasks.md`.
+Minimal. No phase tracking — derived from `tasks.md`. The `dependsOn` field is optional and establishes prerequisite relationships between changes.
+
+## Change Dependencies
+
+Changes can declare optional `dependsOn` relationships in `.litespec.yaml`. This enables:
+
+- **Cycle detection** — `validate --changes` and `validate --all` detect circular dependencies
+- **Overlap detection** — validates that changes sharing a dependency don't modify the same capability requirements
+- **Topological sorting** — `list --changes --sort deps` orders changes by dependency (level-by-level BFS, alphabetical within each level); falls back to alphabetical on cycles
+- **Archive guard** — `archive` warns when other active changes depend on the change being archived; errors unless `--allow-incomplete`
+- **Dependency graph** — `view` renders a tree-style DAG with box-drawing characters when any active change has `dependsOn`
+
+Resolution ignores archived changes — dependencies reference active changes only.
