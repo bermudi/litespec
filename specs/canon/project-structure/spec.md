@@ -1,6 +1,6 @@
 # project-structure
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Per-Command File Organization
 
