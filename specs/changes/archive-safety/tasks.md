@@ -18,7 +18,7 @@
 
 ## Phase 4: Testing
 
-- [ ] Test atomic write success path (happy path still works)
-- [ ] Test rollback when parse fails after merge
-- [ ] Test rollback when write fails (simulate permission error)
-- [ ] Test deterministic ordering with files named out of order
+- [x] Test atomic write success path (happy path still works)
+- [x] Test rollback when parse fails after merge
+- [x] Test rollback when write fails (simulate permission error)
+- [x] Test deterministic ordering with files named out of order
