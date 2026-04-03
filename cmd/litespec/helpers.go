@@ -178,6 +178,19 @@ Examples:
 `)
 }
 
+func printUpgradeHelp() {
+	fmt.Print(`Usage: litespec upgrade
+
+Check for the latest version and upgrade via go install.
+
+Only available for binaries installed via 'go install'.
+
+Examples:
+  litespec upgrade
+  litespec upgrade --help
+`)
+}
+
 func splitCSV(s string) []string {
 	parts := strings.Split(s, ",")
 	for i := range parts {

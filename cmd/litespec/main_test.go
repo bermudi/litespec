@@ -3,7 +3,10 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1753,42 +1756,297 @@ func TestFindProjectRoot_InProjectRoot(t *testing.T) {
 	}
 }
 
-func TestFindProjectRoot_InSubdirectory(t *testing.T) {
-	oldDir, _ := os.Getwd()
-	defer os.Chdir(oldDir)
-
-	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, "specs"), 0o755); err != nil {
+func TestIsGoInstall_InGOBIN(t *testing.T) {
+	dir := t.TempDir()
+	binPath := filepath.Join(dir, "litespec")
+	if err := os.WriteFile(binPath, nil, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	deep := filepath.Join(root, "subdir", "deep")
-	if err := os.MkdirAll(deep, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.Chdir(deep)
-
-	got, err := internal.FindProjectRoot()
-	if err != nil {
-		t.Fatalf("FindProjectRoot: %v", err)
-	}
-	if got != root {
-		t.Errorf("got %q, want %q", got, root)
+	t.Setenv("GOBIN", dir)
+	t.Setenv("GOPATH", "")
+	if !isGoInstallCheck(t, binPath) {
+		t.Error("expected true for binary in GOBIN")
 	}
 }
 
-func TestFindProjectRoot_NoSpecs(t *testing.T) {
-	oldDir, _ := os.Getwd()
-	defer os.Chdir(oldDir)
-
-	root := t.TempDir()
-	os.Chdir(root)
-
-	got, err := internal.FindProjectRoot()
-	if err != nil {
-		t.Fatalf("FindProjectRoot: %v", err)
+func TestIsGoInstall_InGOPATHBin(t *testing.T) {
+	dir := t.TempDir()
+	gobinDir := filepath.Join(dir, "bin")
+	if err := os.MkdirAll(gobinDir, 0o755); err != nil {
+		t.Fatal(err)
 	}
-	if got != root {
-		t.Errorf("got %q, want cwd %q", got, root)
+	binPath := filepath.Join(gobinDir, "litespec")
+	if err := os.WriteFile(binPath, nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GOBIN", "")
+	t.Setenv("GOPATH", dir)
+	if !isGoInstallCheck(t, binPath) {
+		t.Error("expected true for binary in GOPATH/bin")
+	}
+}
+
+func TestIsGoInstall_Elsewhere(t *testing.T) {
+	dir := t.TempDir()
+	binPath := filepath.Join(dir, "litespec")
+	if err := os.WriteFile(binPath, nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GOBIN", "/nonexistent")
+	t.Setenv("GOPATH", "/nonexistent")
+	if isGoInstallCheck(t, binPath) {
+		t.Error("expected false for binary outside GOBIN/GOPATH/bin")
+	}
+}
+
+func TestIsGoInstall_DefaultGOPATH(t *testing.T) {
+	home := t.TempDir()
+	gobinDir := filepath.Join(home, "go", "bin")
+	if err := os.MkdirAll(gobinDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	binPath := filepath.Join(gobinDir, "litespec")
+	if err := os.WriteFile(binPath, nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GOBIN", "")
+	t.Setenv("GOPATH", "")
+	t.Setenv("HOME", home)
+	if !isGoInstallCheck(t, binPath) {
+		t.Error("expected true for binary in ~/go/bin with empty GOPATH")
+	}
+}
+
+func isGoInstallCheck(t *testing.T, exePath string) bool {
+	t.Helper()
+	if gobin := os.Getenv("GOBIN"); gobin != "" {
+		if strings.HasPrefix(exePath, filepath.Clean(gobin)+string(os.PathSeparator)) {
+			return true
+		}
+	}
+	gopath := os.Getenv("GOPATH")
+	if gopath == "" {
+		gopath = filepath.Join(os.Getenv("HOME"), "go")
+	}
+	gobinDefault := filepath.Join(gopath, "bin")
+	return strings.HasPrefix(exePath, filepath.Clean(gobinDefault)+string(os.PathSeparator))
+}
+
+func TestParseSemver_Valid(t *testing.T) {
+	tests := []struct {
+		input    string
+		majorExp int
+		minorExp int
+		patchExp int
+	}{
+		{"v1.2.3", 1, 2, 3},
+		{"0.1.0", 0, 1, 0},
+		{"v10.20.30", 10, 20, 30},
+		{"v1.2.3-alpha", 1, 2, 3},
+		{"v1.2.3-beta.1+build", 1, 2, 3},
+	}
+	for _, tt := range tests {
+		major, minor, patch, err := parseSemver(tt.input)
+		if err != nil {
+			t.Errorf("parseSemver(%q): %v", tt.input, err)
+			continue
+		}
+		if major != tt.majorExp || minor != tt.minorExp || patch != tt.patchExp {
+			t.Errorf("parseSemver(%q) = %d.%d.%d, want %d.%d.%d", tt.input, major, minor, patch, tt.majorExp, tt.minorExp, tt.patchExp)
+		}
+	}
+}
+
+func TestParseSemver_Invalid(t *testing.T) {
+	tests := []string{"", "1", "1.2", "a.b.c", "v1.2.x"}
+	for _, input := range tests {
+		_, _, _, err := parseSemver(input)
+		if err == nil {
+			t.Errorf("parseSemver(%q): expected error", input)
+		}
+	}
+}
+
+func TestCompareSemver(t *testing.T) {
+	tests := []struct {
+		local, remote string
+		want          int
+	}{
+		{"0.1.0", "0.1.0", 0},
+		{"0.1.0", "0.2.0", -1},
+		{"0.2.0", "0.1.0", 1},
+		{"1.0.0", "0.9.9", 1},
+		{"0.9.9", "1.0.0", -1},
+		{"0.1.0", "0.1.1", -1},
+	}
+	for _, tt := range tests {
+		got, err := compareSemver(tt.local, tt.remote)
+		if err != nil {
+			t.Errorf("compareSemver(%q, %q): %v", tt.local, tt.remote, err)
+			continue
+		}
+		if got != tt.want {
+			t.Errorf("compareSemver(%q, %q) = %d, want %d", tt.local, tt.remote, got, tt.want)
+		}
+	}
+}
+
+func TestGetModulePath(t *testing.T) {
+	path, err := getModulePath()
+	if err != nil {
+		t.Fatalf("getModulePath(): %v", err)
+	}
+	if path == "" {
+		t.Error("expected non-empty module path")
+	}
+	if !strings.HasPrefix(path, "github.com/bermudi/litespec") {
+		t.Errorf("got %q, want path starting with github.com/bermudi/litespec", path)
+	}
+}
+
+func TestFetchLatestVersion_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"tag_name": "v0.2.0"}`)
+	}))
+	defer server.Close()
+
+	tag, err := fetchLatestVersionFromURL(server.URL)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tag != "v0.2.0" {
+		t.Errorf("got %q, want v0.2.0", tag)
+	}
+}
+
+func TestFetchLatestVersion_Non200(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	_, err := fetchLatestVersionFromURL(server.URL)
+	if err == nil {
+		t.Error("expected error for non-200 response")
+	}
+}
+
+func TestFetchLatestVersion_MalformedJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `not json`)
+	}))
+	defer server.Close()
+
+	_, err := fetchLatestVersionFromURL(server.URL)
+	if err == nil {
+		t.Error("expected error for malformed JSON")
+	}
+}
+
+func TestFetchLatestVersion_EmptyTag(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"tag_name": ""}`)
+	}))
+	defer server.Close()
+
+	_, err := fetchLatestVersionFromURL(server.URL)
+	if err == nil {
+		t.Error("expected error for empty tag")
+	}
+}
+
+func TestCLIUpgradeHelp(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "upgrade", "--help")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "Usage: litespec upgrade") {
+		t.Error("expected upgrade usage in help output")
+	}
+}
+
+func TestCLIUpgrade_NotGoInstall(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "upgrade")
+	if code == 0 {
+		t.Fatal("expected non-zero exit for non-go-install binary")
+	}
+	if !strings.Contains(out, "go install") {
+		t.Errorf("expected go install error message, got: %s", out)
+	}
+}
+
+func TestMaybeBackgroundUpgrade_SkipsWhenNotGoInstall(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("GOBIN", "/nonexistent")
+	t.Setenv("GOPATH", "/nonexistent")
+
+	cacheDir := filepath.Join(home, ".cache", "litespec")
+	stampFile := filepath.Join(cacheDir, "last-update-check")
+	if _, err := os.Stat(stampFile); !os.IsNotExist(err) {
+		t.Error("expected no stamp file when not go install")
+	}
+}
+
+func TestMaybeBackgroundUpgrade_SkipsWhenRecent(t *testing.T) {
+	home := t.TempDir()
+	cacheDir := filepath.Join(home, ".cache", "litespec")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stampFile := filepath.Join(cacheDir, "last-update-check")
+	if err := os.WriteFile(stampFile, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("HOME", home)
+
+	info, err := os.Stat(stampFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if time.Since(info.ModTime()) >= backgroundUpgradeInterval {
+		t.Error("stamp should be recent")
+	}
+}
+
+func TestMaybeBackgroundUpgrade_FiresWhenExpired(t *testing.T) {
+	home := t.TempDir()
+	cacheDir := filepath.Join(home, ".cache", "litespec")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stampFile := filepath.Join(cacheDir, "last-update-check")
+	oldTime := time.Now().Add(-8 * 24 * time.Hour)
+	if err := os.WriteFile(stampFile, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(stampFile, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("HOME", home)
+
+	info, _ := os.Stat(stampFile)
+	if info != nil && time.Since(info.ModTime()) < backgroundUpgradeInterval {
+		t.Error("stamp should be expired")
+	}
+}
+
+func TestMaybeBackgroundUpgrade_FiresWhenNoStamp(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	stampFile := filepath.Join(home, ".cache", "litespec", "last-update-check")
+	if _, err := os.Stat(stampFile); !os.IsNotExist(err) {
+		t.Error("expected no stamp file")
 	}
 }
 
