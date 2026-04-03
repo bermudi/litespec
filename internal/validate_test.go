@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func setupTestProject(t *testing.T) string {
@@ -868,5 +870,297 @@ The system SHALL authenticate.
 			t.Errorf("Unexpected error: %s: %s", e.File, e.Message)
 		}
 		t.Fatal("ADDED on new capability (no main spec) should be valid")
+	}
+}
+
+func writeChangeMeta(t *testing.T, root, changeName string, meta ChangeMeta) {
+	t.Helper()
+	metaPath := filepath.Join(ChangePath(root, changeName), MetaFileName)
+	data, err := yaml.Marshal(&meta)
+	if err != nil {
+		t.Fatalf("marshal meta: %v", err)
+	}
+	if err := os.WriteFile(metaPath, data, 0o644); err != nil {
+		t.Fatalf("write meta: %v", err)
+	}
+}
+
+func TestValidateChangeMissingDep(t *testing.T) {
+	root := setupTestProject(t)
+	makeValidChange(t, root, "change-a", `## ADDED Requirements
+
+### Requirement: R1
+The system SHALL work.
+
+#### Scenario: S1
+- **WHEN** triggered
+`)
+	writeChangeMeta(t, root, "change-a", ChangeMeta{
+		Schema:    "spec-driven",
+		DependsOn: []string{"nonexistent"},
+	})
+
+	result, err := ValidateChange(root, "change-a")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected invalid for missing dependency")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if e.Message == `dependency "nonexistent" not found` {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected missing dependency error")
+	}
+}
+
+func TestValidateChangeValidDepActive(t *testing.T) {
+	root := setupTestProject(t)
+	CreateChange(root, "add-auth")
+	makeValidChange(t, root, "change-b", `## ADDED Requirements
+
+### Requirement: R1
+The system SHALL work.
+
+#### Scenario: S1
+- **WHEN** triggered
+`)
+	writeChangeMeta(t, root, "change-b", ChangeMeta{
+		Schema:    "spec-driven",
+		DependsOn: []string{"add-auth"},
+	})
+
+	result, err := ValidateChange(root, "change-b")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if !result.Valid {
+		for _, e := range result.Errors {
+			t.Errorf("Unexpected error: %s: %s", e.File, e.Message)
+		}
+		t.Fatal("expected valid with active dep")
+	}
+}
+
+func TestValidateChangeValidDepArchived(t *testing.T) {
+	root := setupTestProject(t)
+	os.MkdirAll(filepath.Join(ArchivePath(root), "2026-04-01-add-auth"), 0o755)
+	makeValidChange(t, root, "change-b", `## ADDED Requirements
+
+### Requirement: R1
+The system SHALL work.
+
+#### Scenario: S1
+- **WHEN** triggered
+`)
+	writeChangeMeta(t, root, "change-b", ChangeMeta{
+		Schema:    "spec-driven",
+		DependsOn: []string{"add-auth"},
+	})
+
+	result, err := ValidateChange(root, "change-b")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if !result.Valid {
+		for _, e := range result.Errors {
+			t.Errorf("Unexpected error: %s: %s", e.File, e.Message)
+		}
+		t.Fatal("expected valid with archived dep")
+	}
+}
+
+func TestValidateAllCycleDetected(t *testing.T) {
+	root := setupTestProject(t)
+	makeValidChange(t, root, "change-a", `## ADDED Requirements
+
+### Requirement: R1
+The system SHALL work.
+
+#### Scenario: S1
+- **WHEN** triggered
+`)
+	makeValidChange(t, root, "change-b", `## ADDED Requirements
+
+### Requirement: R1
+The system SHALL work.
+
+#### Scenario: S1
+- **WHEN** triggered
+`)
+	writeChangeMeta(t, root, "change-a", ChangeMeta{
+		Schema:    "spec-driven",
+		DependsOn: []string{"change-b"},
+	})
+	writeChangeMeta(t, root, "change-b", ChangeMeta{
+		Schema:    "spec-driven",
+		DependsOn: []string{"change-a"},
+	})
+
+	result, err := ValidateAll(root, false)
+	if err != nil {
+		t.Fatalf("ValidateAll: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected invalid for dependency cycle")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if e.Severity == SeverityError && len(e.Message) > 0 && e.Message[:len("dependency cycle detected")] == "dependency cycle detected" {
+			found = true
+		}
+	}
+	if !found {
+		var msgs []string
+		for _, e := range result.Errors {
+			msgs = append(msgs, e.Message)
+		}
+		t.Errorf("expected cycle error, got: %v", msgs)
+	}
+}
+
+func TestValidateAllOverlapWarning(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "cap", `# cap
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+- **WHEN** valid creds
+`)
+	makeValidChange(t, root, "change-a", `## MODIFIED Requirements
+
+### Requirement: Login
+The system SHALL authenticate via SSO.
+
+#### Scenario: SSO
+- **WHEN** SSO token valid
+`)
+	makeValidChange(t, root, "change-b", `## MODIFIED Requirements
+
+### Requirement: Login
+The system SHALL authenticate via OAuth.
+
+#### Scenario: OAuth
+- **WHEN** OAuth token valid
+`)
+
+	result, err := ValidateAll(root, false)
+	if err != nil {
+		t.Fatalf("ValidateAll: %v", err)
+	}
+
+	if !result.Valid {
+		for _, e := range result.Errors {
+			t.Errorf("Unexpected error: %s: %s", e.File, e.Message)
+		}
+		t.Fatal("overlaps should produce warnings, not errors")
+	}
+
+	found := false
+	for _, w := range result.Warnings {
+		if w.Severity == SeverityWarning && w.Message[:len("changes")] == "changes" {
+			found = true
+		}
+	}
+	if !found {
+		var msgs []string
+		for _, w := range result.Warnings {
+			msgs = append(msgs, w.Message)
+		}
+		t.Errorf("expected overlap warning, got: %v", msgs)
+	}
+}
+
+func TestValidateAllOverlapSuppressedByDepEdge(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "cap", `# cap
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+- **WHEN** valid creds
+`)
+	makeValidChange(t, root, "change-a", `## MODIFIED Requirements
+
+### Requirement: Login
+The system SHALL authenticate via SSO.
+
+#### Scenario: SSO
+- **WHEN** SSO token valid
+`)
+	makeValidChange(t, root, "change-b", `## MODIFIED Requirements
+
+### Requirement: Login
+The system SHALL authenticate via OAuth.
+
+#### Scenario: OAuth
+- **WHEN** OAuth token valid
+`)
+	writeChangeMeta(t, root, "change-b", ChangeMeta{
+		Schema:    "spec-driven",
+		DependsOn: []string{"change-a"},
+	})
+
+	result, err := ValidateAll(root, false)
+	if err != nil {
+		t.Fatalf("ValidateAll: %v", err)
+	}
+	if !result.Valid {
+		for _, e := range result.Errors {
+			t.Errorf("Unexpected error: %s: %s", e.File, e.Message)
+		}
+		t.Fatal("expected valid")
+	}
+	for _, w := range result.Warnings {
+		if w.Severity == SeverityWarning && w.Message[:len("changes")] == "changes" {
+			t.Errorf("overlap warning should be suppressed by dep edge, got: %s", w.Message)
+		}
+	}
+}
+
+func TestValidateAllNoOverlapDifferentCapabilities(t *testing.T) {
+	root := setupTestProject(t)
+	makeValidChange(t, root, "change-a", `## ADDED Requirements
+
+### Requirement: R1
+The system SHALL do A.
+
+#### Scenario: S1
+- **WHEN** triggered
+`)
+	makeValidChange(t, root, "change-b", `## ADDED Requirements
+
+### Requirement: R1
+The system SHALL do B.
+
+#### Scenario: S1
+- **WHEN** triggered
+`)
+
+	result, err := ValidateAll(root, false)
+	if err != nil {
+		t.Fatalf("ValidateAll: %v", err)
+	}
+	if !result.Valid {
+		for _, e := range result.Errors {
+			t.Errorf("Unexpected error: %s: %s", e.File, e.Message)
+		}
+		t.Fatal("expected valid")
+	}
+	for _, w := range result.Warnings {
+		if w.Severity == SeverityWarning && w.Message[:len("changes")] == "changes" {
+			t.Errorf("should not warn about overlap on different capabilities, got: %s", w.Message)
+		}
 	}
 }

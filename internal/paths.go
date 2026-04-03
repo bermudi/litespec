@@ -3,6 +3,7 @@ package internal
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 )
 
 const (
@@ -102,4 +103,14 @@ func ChangePath(root, name string) string {
 
 func ChangeSpecsPath(root, name string) string {
 	return filepath.Join(ChangePath(root, name), ChangeSpecsDirName)
+}
+
+var ArchivedNameRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}-(.+)$`)
+
+func ParseArchivedName(name string) string {
+	m := ArchivedNameRe.FindStringSubmatch(name)
+	if len(m) == 2 {
+		return m[1]
+	}
+	return name
 }

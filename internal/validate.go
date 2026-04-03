@@ -246,6 +246,19 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 		}
 	}
 
+	meta, metaErr := ReadChangeMeta(root, name)
+	if metaErr == nil && len(meta.DependsOn) > 0 {
+		for _, dep := range meta.DependsOn {
+			_, found := ResolveDep(root, dep)
+			if !found {
+				result.Errors = append(result.Errors, ValidationIssue{
+					Severity: SeverityError,
+					Message:  fmt.Sprintf("dependency %q not found", dep),
+				})
+			}
+		}
+	}
+
 	result.Valid = len(result.Errors) == 0
 	return result, nil
 }
@@ -387,6 +400,23 @@ func ValidateAll(root string, strict bool) (*ValidationResult, error) {
 		result.Errors = append(result.Errors, changeResult.Errors...)
 		result.Warnings = append(result.Warnings, changeResult.Warnings...)
 	}
+
+	depMap, err := LoadDepMap(root)
+	if err != nil {
+		return nil, fmt.Errorf("load dependency map: %w", err)
+	}
+
+	cycles := DetectCycles(depMap)
+	for _, cycle := range cycles {
+		path := strings.Join(cycle, " -> ")
+		result.Errors = append(result.Errors, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("dependency cycle detected: %s", path),
+		})
+	}
+
+	overlaps := DetectOverlaps(root, changes, depMap)
+	result.Warnings = append(result.Warnings, overlaps...)
 
 	result.Valid = len(result.Errors) == 0
 	if strict && len(result.Warnings) > 0 {

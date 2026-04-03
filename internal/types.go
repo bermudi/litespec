@@ -27,8 +27,9 @@ const (
 )
 
 type ChangeMeta struct {
-	Schema  string    `yaml:"schema"`
-	Created time.Time `yaml:"created"`
+	Schema    string    `yaml:"schema"`
+	Created   time.Time `yaml:"created"`
+	DependsOn []string  `yaml:"dependsOn,omitempty"`
 }
 
 type Change struct {
