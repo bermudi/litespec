@@ -14,7 +14,7 @@ The archive flow gains a write-verify-commit pattern: prepare writes → write t
 
 - `internal/change.go`: 
   - In `PrepareArchiveWrites`: sort delta file entries by name before processing.
-  - Add `AtomicArchiveWrites` function that writes to temp files, verifies parse, then renames to final location.
+  - Add `WritePendingSpecsAtomic` function that writes to temp files, verifies parse, then renames to final location.
   - Add rollback logic that restores original content on failure.
   - Add post-archive verification in `ArchiveChange` or a new wrapper.
 - `cmd/litespec/main.go`: Update `cmdArchive` to use the new atomic write flow.
