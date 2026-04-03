@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+
+	"github.com/bermudi/litespec/internal/skill"
 )
 
 func ValidateChange(root, name string) (*ValidationResult, error) {
@@ -91,7 +94,7 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 
 				for _, req := range delta.Requirements {
 					if req.Operation == DeltaAdded || req.Operation == DeltaModified {
-						if !strings.Contains(req.Content, "SHALL") && !strings.Contains(req.Content, "MUST") {
+						if !containsKeyword(req.Content) {
 							result.Errors = append(result.Errors, ValidationIssue{
 								Severity: SeverityError,
 								Message:  fmt.Sprintf("%s requirement %q must contain SHALL or MUST", req.Operation, req.Name),
@@ -104,6 +107,15 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 								Message:  fmt.Sprintf("%s requirement %q must include at least one scenario", req.Operation, req.Name),
 								File:     specPath,
 							})
+						}
+						for _, sc := range req.Scenarios {
+							if !strings.Contains(sc.Content, "WHEN") || !strings.Contains(sc.Content, "THEN") {
+								result.Errors = append(result.Errors, ValidationIssue{
+									Severity: SeverityError,
+									Message:  fmt.Sprintf("scenario %q in requirement %q must contain WHEN and THEN", sc.Name, req.Name),
+									File:     specPath,
+								})
+							}
 						}
 					}
 					if req.Operation == DeltaRemoved {
@@ -144,6 +156,52 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 								File:     specPath,
 							})
 						}
+					}
+				}
+
+				seenReqNames := make(map[string]bool)
+				for _, req := range delta.Requirements {
+					if seenReqNames[req.Name] {
+						result.Errors = append(result.Errors, ValidationIssue{
+							Severity: SeverityError,
+							Message:  fmt.Sprintf("duplicate requirement name %q", req.Name),
+							File:     specPath,
+						})
+					}
+					seenReqNames[req.Name] = true
+
+					seenScenarioNames := make(map[string]bool)
+					for _, sc := range req.Scenarios {
+						if seenScenarioNames[sc.Name] {
+							result.Errors = append(result.Errors, ValidationIssue{
+								Severity: SeverityError,
+								Message:  fmt.Sprintf("duplicate scenario name %q in requirement %q", sc.Name, req.Name),
+								File:     specPath,
+							})
+						}
+						seenScenarioNames[sc.Name] = true
+					}
+				}
+
+				nameOps := make(map[string][]DeltaOperation)
+				for _, req := range delta.Requirements {
+					switch req.Operation {
+					case DeltaRenamed:
+						nameOps[req.OldName] = append(nameOps[req.OldName], DeltaRenamed)
+						if req.OldName != req.Name {
+							nameOps[req.Name] = append(nameOps[req.Name], DeltaAdded)
+						}
+					default:
+						nameOps[req.Name] = append(nameOps[req.Name], req.Operation)
+					}
+				}
+				for name, ops := range nameOps {
+					if len(ops) > 1 {
+						result.Errors = append(result.Errors, ValidationIssue{
+							Severity: SeverityError,
+							Message:  fmt.Sprintf("conflicting operations on requirement %q", name),
+							File:     specPath,
+						})
 					}
 				}
 
@@ -248,12 +306,14 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 
 	meta, metaErr := ReadChangeMeta(root, name)
 	if metaErr == nil && len(meta.DependsOn) > 0 {
+		metaPath := filepath.Join(changeDir, MetaFileName)
 		for _, dep := range meta.DependsOn {
 			_, found := ResolveDep(root, dep)
 			if !found {
 				result.Errors = append(result.Errors, ValidationIssue{
 					Severity: SeverityError,
 					Message:  fmt.Sprintf("dependency %q not found", dep),
+					File:     metaPath,
 				})
 			}
 		}
@@ -270,6 +330,18 @@ func hasPhaseHeading(content string) bool {
 		}
 	}
 	return false
+}
+
+var keywordRe = regexp.MustCompile(`\b(SHALL|MUST)\b`)
+
+func stripCodeBlocks(content string) string {
+	noFenced := regexp.MustCompile("(?s)```.*?```").ReplaceAllString(content, "")
+	noInline := regexp.MustCompile("`[^`]*`").ReplaceAllString(noFenced, "")
+	return noInline
+}
+
+func containsKeyword(content string) bool {
+	return keywordRe.MatchString(stripCodeBlocks(content))
 }
 
 func ValidateSpec(root, name string) (*ValidationResult, error) {
@@ -417,6 +489,18 @@ func ValidateAll(root string, strict bool) (*ValidationResult, error) {
 
 	overlaps := DetectOverlaps(root, changes, depMap)
 	result.Warnings = append(result.Warnings, overlaps...)
+
+	skillIDs := make([]string, len(Skills))
+	for i, s := range Skills {
+		skillIDs[i] = s.ID
+	}
+	missingTemplates := skill.ValidateSkillTemplates(skillIDs)
+	for _, id := range missingTemplates {
+		result.Warnings = append(result.Warnings, ValidationIssue{
+			Severity: SeverityWarning,
+			Message:  fmt.Sprintf("skill %q has no registered template", id),
+		})
+	}
 
 	result.Valid = len(result.Errors) == 0
 	if strict && len(result.Warnings) > 0 {

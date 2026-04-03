@@ -211,11 +211,19 @@ func DetectOverlaps(root string, changes []ChangeInfo, depMap map[string][]strin
 					continue
 				}
 				for _, req := range delta.Requirements {
-					if req.Operation == DeltaModified || req.Operation == DeltaRenamed {
+					if req.Operation == DeltaModified {
 						targets = append(targets, changeTarget{
 							name:        ci.Name,
 							capability:  entry.Name(),
 							requirement: req.Name,
+							operation:   req.Operation,
+						})
+					}
+					if req.Operation == DeltaRenamed {
+						targets = append(targets, changeTarget{
+							name:        ci.Name,
+							capability:  entry.Name(),
+							requirement: req.OldName,
 							operation:   req.Operation,
 						})
 					}

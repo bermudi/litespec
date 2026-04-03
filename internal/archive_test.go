@@ -15,8 +15,8 @@ func runArchivePipeline(t *testing.T, root, changeName string) {
 		t.Fatalf("PrepareArchiveWrites: %v", err)
 	}
 
-	if err := WritePendingSpecs(writes); err != nil {
-		t.Fatalf("WritePendingSpecs: %v", err)
+	if err := WritePendingSpecsAtomic(writes); err != nil {
+		t.Fatalf("WritePendingSpecsAtomic: %v", err)
 	}
 
 	if err := ArchiveChange(root, changeName); err != nil {
@@ -348,6 +348,7 @@ The system SHALL authenticate via OAuth.
 
 #### Scenario: OAuth
 - **WHEN** OAuth token valid
+- **THEN** authenticated via OAuth
 `)
 	writeDeltaSpecFile(t, root, "conflict", "auth", "part2.md", `## MODIFIED Requirements
 
@@ -356,6 +357,7 @@ The system SHALL authenticate via SAML.
 
 #### Scenario: SAML
 - **WHEN** SAML assertion valid
+- **THEN** authenticated via SAML
 `)
 
 	result, err := ValidateChange(root, "conflict")
@@ -482,6 +484,7 @@ The system SHALL authenticate via OAuth.
 
 #### Scenario: OAuth
 - **WHEN** OAuth token valid
+- **THEN** authenticated via OAuth
 `)
 
 	writeDeltaSpecFile(t, root, "multi", "api", "part1.md", `## MODIFIED Requirements
@@ -491,6 +494,7 @@ The system SHALL limit to 100.
 
 #### Scenario: Over 100
 - **WHEN** 101 requests
+- **THEN** reject with 429
 `)
 
 	writeDeltaSpecFile(t, root, "multi", "api", "part2.md", `## MODIFIED Requirements
@@ -500,6 +504,7 @@ The system SHALL limit to 200.
 
 #### Scenario: Over 200
 - **WHEN** 201 requests
+- **THEN** reject with 429
 `)
 
 	result, err := ValidateChange(root, "multi")
@@ -676,5 +681,188 @@ func TestWritePendingSpecsCreatesDirectories(t *testing.T) {
 	}
 	if len(spec.Requirements) != 1 || spec.Requirements[0].Name != "Core" {
 		t.Errorf("requirements unexpected: %+v", spec.Requirements)
+	}
+}
+
+func TestAtomicWriteSuccess(t *testing.T) {
+	root := setupTestProject(t)
+
+	originalContent := "# auth\n\n## Requirements\n\n### Requirement: Login\nThe system SHALL authenticate.\n"
+	writeMainSpecFile(t, root, "auth", originalContent)
+
+	newContent := "# auth\n\n## Requirements\n\n### Requirement: Login\nThe system SHALL authenticate via SSO.\n"
+	writes := []PendingWrite{
+		{
+			Capability: "auth",
+			Path:       filepath.Join(CanonPath(root), "auth", "spec.md"),
+			Dir:        filepath.Join(CanonPath(root), "auth"),
+			Content:    newContent,
+			Backup:     []byte(originalContent),
+		},
+	}
+
+	if err := WritePendingSpecsAtomic(writes); err != nil {
+		t.Fatalf("WritePendingSpecsAtomic: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(CanonPath(root), "auth", "spec.md"))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	spec, err := ParseMainSpec(string(data))
+	if err != nil {
+		t.Fatalf("ParseMainSpec: %v", err)
+	}
+	if spec.Requirements[0].Content != "The system SHALL authenticate via SSO." {
+		t.Errorf("content = %q, want SSO", spec.Requirements[0].Content)
+	}
+
+	if _, err := os.Stat(filepath.Join(CanonPath(root), "auth", "spec.md.tmp")); !os.IsNotExist(err) {
+		t.Error("temp file should be cleaned up")
+	}
+}
+
+func TestAtomicWriteRollbackOnParseFailure(t *testing.T) {
+	root := setupTestProject(t)
+
+	originalContent := "# auth\n\n## Requirements\n\n### Requirement: Login\nThe system SHALL authenticate.\n"
+	writeMainSpecFile(t, root, "auth", originalContent)
+
+	writes := []PendingWrite{
+		{
+			Capability: "auth",
+			Path:       filepath.Join(CanonPath(root), "auth", "spec.md"),
+			Dir:        filepath.Join(CanonPath(root), "auth"),
+			Content:    "INVALID CONTENT WITHOUT PROPER SPEC FORMAT",
+			Backup:     []byte(originalContent),
+		},
+	}
+
+	err := WritePendingSpecsAtomic(writes)
+	if err == nil {
+		t.Fatal("expected error for unparseable content")
+	}
+
+	data, readErr := os.ReadFile(filepath.Join(CanonPath(root), "auth", "spec.md"))
+	if readErr != nil {
+		t.Fatalf("read: %v", readErr)
+	}
+	if string(data) != originalContent {
+		t.Errorf("content should be unchanged after rollback, got %q", string(data))
+	}
+
+	if _, statErr := os.Stat(filepath.Join(CanonPath(root), "auth", "spec.md.tmp")); !os.IsNotExist(statErr) {
+		t.Error("temp file should be cleaned up after rollback")
+	}
+}
+
+func TestAtomicWriteRollbackOnWriteFailure(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("skipping: test requires non-root user")
+	}
+
+	root := setupTestProject(t)
+
+	authOriginal := "# auth\n\n## Requirements\n\n### Requirement: Login\nThe system SHALL authenticate.\n"
+	writeMainSpecFile(t, root, "auth", authOriginal)
+
+	readOnlyDir := filepath.Join(CanonPath(root), "readonly")
+	if err := os.MkdirAll(readOnlyDir, 0o555); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	defer os.Chmod(readOnlyDir, 0o755)
+
+	writes := []PendingWrite{
+		{
+			Capability: "auth",
+			Path:       filepath.Join(CanonPath(root), "auth", "spec.md"),
+			Dir:        filepath.Join(CanonPath(root), "auth"),
+			Content:    "# auth\n\n## Requirements\n\n### Requirement: Login\nUpdated.\n",
+			Backup:     []byte(authOriginal),
+		},
+		{
+			Capability: "readonly",
+			Path:       filepath.Join(readOnlyDir, "spec.md"),
+			Dir:        readOnlyDir,
+			Content:    "# readonly\n\n## Requirements\n\n### Requirement: R\nContent.\n",
+			Backup:     nil,
+		},
+	}
+
+	err := WritePendingSpecsAtomic(writes)
+	if err == nil {
+		t.Fatal("expected error for write to read-only directory")
+	}
+
+	data, readErr := os.ReadFile(filepath.Join(CanonPath(root), "auth", "spec.md"))
+	if readErr != nil {
+		t.Fatalf("read auth: %v", readErr)
+	}
+	if string(data) != authOriginal {
+		t.Error("auth spec should be unchanged after rollback")
+	}
+
+	if _, statErr := os.Stat(filepath.Join(CanonPath(root), "auth", "spec.md.tmp")); !os.IsNotExist(statErr) {
+		t.Error("auth tmp file should be cleaned up")
+	}
+}
+
+func TestDeterministicDeltaOrdering(t *testing.T) {
+	root := setupTestProject(t)
+
+	writeMainSpecFile(t, root, "auth", `# auth
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+`)
+
+	writeChangeFile(t, root, "ordering-test", "proposal.md", "# Proposal")
+	writeChangeFile(t, root, "ordering-test", "design.md", "# Design")
+	writeChangeFile(t, root, "ordering-test", "tasks.md", "## Phase 1\n- [x] Done")
+
+	writeDeltaSpecFile(t, root, "ordering-test", "auth", "zzz-last.md", `## ADDED Requirements
+
+### Requirement: Z-Last
+The system SHALL do Z last.
+
+#### Scenario: Z
+- **WHEN** Z happens
+`)
+
+	writeDeltaSpecFile(t, root, "ordering-test", "auth", "aaa-first.md", `## ADDED Requirements
+
+### Requirement: A-First
+The system SHALL do A first.
+
+#### Scenario: A
+- **WHEN** A happens
+`)
+
+	writes, err := PrepareArchiveWrites(root, "ordering-test")
+	if err != nil {
+		t.Fatalf("PrepareArchiveWrites: %v", err)
+	}
+	if len(writes) != 1 {
+		t.Fatalf("writes = %d, want 1", len(writes))
+	}
+
+	spec, parseErr := ParseMainSpec(writes[0].Content)
+	if parseErr != nil {
+		t.Fatalf("ParseMainSpec: %v", parseErr)
+	}
+
+	if len(spec.Requirements) != 3 {
+		t.Fatalf("requirements count = %d, want 3", len(spec.Requirements))
+	}
+	if spec.Requirements[0].Name != "Login" {
+		t.Errorf("first requirement = %q, want %q", spec.Requirements[0].Name, "Login")
+	}
+	if spec.Requirements[1].Name != "A-First" {
+		t.Errorf("second requirement = %q, want %q (from aaa-first.md)", spec.Requirements[1].Name, "A-First")
+	}
+	if spec.Requirements[2].Name != "Z-Last" {
+		t.Errorf("third requirement = %q, want %q (from zzz-last.md)", spec.Requirements[2].Name, "Z-Last")
 	}
 }

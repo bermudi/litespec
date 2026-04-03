@@ -20,12 +20,19 @@ func ParseMainSpec(content string) (*Spec, error) {
 	var purposeLines []string
 	var current *SpecRequirement
 	var body []string
+	var flushErr error
 
 	flush := func() {
 		if current == nil {
 			return
 		}
-		preamble, scenarios := parseScenariosFromBody(body)
+		preamble, scenarios, err := parseScenariosFromBody(body, current.Name)
+		if err != nil {
+			flushErr = err
+			current = nil
+			body = nil
+			return
+		}
 		current.Content = strings.TrimSpace(preamble)
 		current.Scenarios = scenarios
 		spec.Requirements = append(spec.Requirements, *current)
@@ -38,6 +45,9 @@ func ParseMainSpec(content string) (*Spec, error) {
 
 		if isH1(trimmed) && spec.Capability == "" {
 			flush()
+			if flushErr != nil {
+				return nil, flushErr
+			}
 			spec.Capability = strings.TrimSpace(trimmed[1:])
 			continue
 		}
@@ -64,6 +74,9 @@ func ParseMainSpec(content string) (*Spec, error) {
 
 			if heading == "Requirements" {
 				flush()
+				if flushErr != nil {
+					return nil, flushErr
+				}
 				state = stateRequirements
 				continue
 			}
@@ -81,7 +94,13 @@ func ParseMainSpec(content string) (*Spec, error) {
 				return nil, fmt.Errorf("requirement heading %q appears before ## Requirements section", trimmed)
 			}
 			flush()
+			if flushErr != nil {
+				return nil, flushErr
+			}
 			name := strings.TrimSpace(strings.TrimPrefix(trimmed, "### Requirement:"))
+			if strings.TrimSpace(name) == "" {
+				return nil, fmt.Errorf("empty requirement name")
+			}
 			current = &SpecRequirement{Name: name}
 			body = nil
 			continue
@@ -92,6 +111,9 @@ func ParseMainSpec(content string) (*Spec, error) {
 		}
 	}
 	flush()
+	if flushErr != nil {
+		return nil, flushErr
+	}
 
 	if spec.Capability == "" {
 		return nil, fmt.Errorf("missing capability heading (# <name>)")
@@ -122,12 +144,19 @@ func ParseDeltaSpec(content string) (*DeltaSpec, error) {
 	var currentOp DeltaOperation
 	var current *DeltaRequirement
 	var body []string
+	var flushErr error
 
 	flush := func() {
 		if current == nil {
 			return
 		}
-		preamble, scenarios := parseScenariosFromBody(body)
+		preamble, scenarios, err := parseScenariosFromBody(body, current.Name)
+		if err != nil {
+			flushErr = err
+			current = nil
+			body = nil
+			return
+		}
 		current.Content = strings.TrimSpace(preamble)
 		current.Scenarios = scenarios
 		delta.Requirements = append(delta.Requirements, *current)
@@ -140,19 +169,31 @@ func ParseDeltaSpec(content string) (*DeltaSpec, error) {
 
 		if isH1(trimmed) && delta.Capability == "" {
 			flush()
+			if flushErr != nil {
+				return nil, flushErr
+			}
 			delta.Capability = strings.TrimSpace(trimmed[1:])
 			continue
 		}
 
 		if op, ok := opSections[trimmed]; ok {
 			flush()
+			if flushErr != nil {
+				return nil, flushErr
+			}
 			currentOp = op
 			continue
 		}
 
 		if isReqHeading(trimmed) {
 			flush()
+			if flushErr != nil {
+				return nil, flushErr
+			}
 			namePart := strings.TrimSpace(strings.TrimPrefix(trimmed, "### Requirement:"))
+			if strings.TrimSpace(namePart) == "" {
+				return nil, fmt.Errorf("empty requirement name")
+			}
 			req := DeltaRequirement{Operation: currentOp}
 
 			if currentOp == DeltaRenamed {
@@ -162,6 +203,9 @@ func ParseDeltaSpec(content string) (*DeltaSpec, error) {
 				}
 				req.OldName = strings.TrimSpace(parts[0])
 				req.Name = strings.TrimSpace(parts[1])
+				if req.OldName == "" || req.Name == "" {
+					return nil, fmt.Errorf("empty requirement name")
+				}
 			} else {
 				req.Name = namePart
 			}
@@ -176,6 +220,9 @@ func ParseDeltaSpec(content string) (*DeltaSpec, error) {
 		}
 	}
 	flush()
+	if flushErr != nil {
+		return nil, flushErr
+	}
 
 	return delta, nil
 }
@@ -369,7 +416,7 @@ func SerializeSpec(spec *Spec) string {
 	return b.String()
 }
 
-func parseScenariosFromBody(body []string) (string, []Scenario) {
+func parseScenariosFromBody(body []string, reqName string) (string, []Scenario, error) {
 	var scenarios []Scenario
 	var preamble []string
 	var currentScenario *Scenario
@@ -389,6 +436,9 @@ func parseScenariosFromBody(body []string) (string, []Scenario) {
 		if isScenarioHeading(line) {
 			flushScenario()
 			name := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "#### Scenario:"))
+			if strings.TrimSpace(name) == "" {
+				return "", nil, fmt.Errorf("empty scenario name in requirement %q", reqName)
+			}
 			currentScenario = &Scenario{Name: name}
 			scenarioBody = nil
 			continue
@@ -401,7 +451,7 @@ func parseScenariosFromBody(body []string) (string, []Scenario) {
 	}
 	flushScenario()
 
-	return strings.Join(preamble, "\n"), scenarios
+	return strings.Join(preamble, "\n"), scenarios, nil
 }
 
 func isH1(line string) bool {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/bermudi/litespec/internal/skill"
 )
@@ -12,7 +13,7 @@ func GenerateAdapterCommands(root string, toolIDs []string) error {
 	for _, toolID := range toolIDs {
 		adapter := GetAdapter(toolID)
 		if adapter == nil {
-			return fmt.Errorf("unknown tool: %s (supported: claude)", toolID)
+			return fmt.Errorf("unknown tool: %s (supported: %s)", toolID, strings.Join(ValidToolIDs(), ", "))
 		}
 
 		skillsDir := filepath.Join(root, adapter.SkillsDir)
@@ -23,7 +24,7 @@ func GenerateAdapterCommands(root string, toolIDs []string) error {
 		for _, si := range Skills {
 			tmpl := skill.Get(si.ID)
 			if tmpl == "" {
-				continue
+				return fmt.Errorf("skill %s: template not registered for adapter %s", si.ID, toolID)
 			}
 
 			linkPath := filepath.Join(skillsDir, si.Name)

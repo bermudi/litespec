@@ -86,6 +86,7 @@ The system SHALL work.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** expected result
 `), 0o644)
 }
 
@@ -104,6 +105,7 @@ The system SHALL work.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** expected result
 `), 0o644)
 }
 
@@ -629,6 +631,7 @@ The system SHALL work.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** expected result
 `), 0o644)
 
 	childDir := filepath.Join(root, "specs", "changes", "child")
@@ -648,6 +651,7 @@ The system SHALL work.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** expected result
 `), 0o644)
 
 	out, code := runCLI(t, bin, root, "archive", "parent")
@@ -679,6 +683,7 @@ The system SHALL work.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** expected result
 `), 0o644)
 
 	childDir := filepath.Join(root, "specs", "changes", "child")
@@ -698,6 +703,7 @@ The system SHALL work.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** expected result
 `), 0o644)
 
 	out, code := runCLI(t, bin, root, "archive", "parent", "--allow-incomplete")
@@ -1033,5 +1039,341 @@ func TestCLIListSortDepsWithCycle(t *testing.T) {
 	}
 	if changes[1].(map[string]interface{})["name"] != "change-b" {
 		t.Errorf("expected alphabetical order, second = %v", changes[1].(map[string]interface{})["name"])
+	}
+}
+
+func TestValidateChangeName(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"empty", "", true},
+		{"path separator slash", "foo/bar", true},
+		{"path separator backslash", "foo\\bar", true},
+		{"traversal double dot", "..", true},
+		{"traversal embedded", "foo..bar", true},
+		{"leading whitespace", " foo", true},
+		{"trailing whitespace", "foo ", true},
+		{"reserved canon", "canon", true},
+		{"reserved changes", "changes", true},
+		{"reserved archive", "archive", true},
+		{"too long", strings.Repeat("a", 101), true},
+		{"valid simple", "add-auth", false},
+		{"valid with numbers", "fix-123-issue", false},
+		{"valid at limit", strings.Repeat("a", 100), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateChangeName(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateChangeName(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestCLINewInvalidName(t *testing.T) {
+	bin, root := setupCLITest(t)
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"empty", ""},
+		{"path separator", "foo/bar"},
+		{"traversal", ".."},
+		{"reserved", "canon"},
+		{"whitespace padded", " foo "},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args := []string{"new"}
+			if tt.input != "" {
+				args = append(args, tt.input)
+			}
+			_, code := runCLI(t, bin, root, args...)
+			if code != 1 {
+				t.Errorf("expected exit 1 for name %q, got %d", tt.input, code)
+			}
+		})
+	}
+}
+
+func TestCLIInitUnknownTool(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+	_, code := runCLI(t, bin, root, "init", "--tools", "unknown-tool")
+	if code != 1 {
+		t.Fatalf("expected exit 1 for unknown tool, got %d", code)
+	}
+}
+
+func TestCLIInitKnownTool(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "init", "--tools", "claude")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "adapter commands") {
+		t.Errorf("expected adapter commands output, got: %s", out)
+	}
+}
+
+func TestCLIUpdateUnknownTool(t *testing.T) {
+	bin, root := setupCLITest(t)
+	_, code := runCLI(t, bin, root, "update", "--tools", "bogus")
+	if code != 1 {
+		t.Fatalf("expected exit 1 for unknown tool, got %d", code)
+	}
+}
+
+func setupDirectTest(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	dirs := []string{
+		filepath.Join(root, "specs", "canon"),
+		filepath.Join(root, "specs", "changes"),
+		filepath.Join(root, "specs", "changes", "archive"),
+	}
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Chdir(root)
+	return root
+}
+
+func TestCmdNewDirect_HappyPath(t *testing.T) {
+	root := setupDirectTest(t)
+	err := cmdNew([]string{"my-change"})
+	if err != nil {
+		t.Fatalf("cmdNew: %v", err)
+	}
+	changeDir := filepath.Join(root, "specs", "changes", "my-change")
+	if _, statErr := os.Stat(changeDir); os.IsNotExist(statErr) {
+		t.Error("expected change directory to exist")
+	}
+	meta, metaErr := os.ReadFile(filepath.Join(changeDir, ".litespec.yaml"))
+	if metaErr != nil {
+		t.Fatalf("reading metadata: %v", metaErr)
+	}
+	if !strings.Contains(string(meta), "spec-driven") {
+		t.Errorf("expected spec-driven schema in metadata, got: %s", string(meta))
+	}
+}
+
+func TestCmdNewDirect_MissingName(t *testing.T) {
+	setupDirectTest(t)
+	err := cmdNew([]string{})
+	if err == nil {
+		t.Fatal("expected error for missing name")
+	}
+}
+
+func TestCmdNewDirect_InvalidName(t *testing.T) {
+	setupDirectTest(t)
+	err := cmdNew([]string{"foo/bar"})
+	if err == nil {
+		t.Fatal("expected error for invalid name")
+	}
+}
+
+func TestCmdStatusDirect_NonexistentChange(t *testing.T) {
+	setupDirectTest(t)
+	err := cmdStatus([]string{"nonexistent"})
+	if err == nil {
+		t.Fatal("expected error for nonexistent change")
+	}
+}
+
+func TestCmdStatusDirect_AllChangesEmpty(t *testing.T) {
+	setupDirectTest(t)
+	err := cmdStatus([]string{})
+	if err != nil {
+		t.Fatalf("cmdStatus (all): %v", err)
+	}
+}
+
+func TestCmdStatusDirect_SpecificChange(t *testing.T) {
+	root := setupDirectTest(t)
+	createChange(t, root, "test-change")
+	err := cmdStatus([]string{"test-change"})
+	if err != nil {
+		t.Fatalf("cmdStatus: %v", err)
+	}
+}
+
+func TestCmdListDirect_EmptyChanges(t *testing.T) {
+	setupDirectTest(t)
+	err := cmdList([]string{})
+	if err != nil {
+		t.Fatalf("cmdList: %v", err)
+	}
+}
+
+func TestCmdListDirect_Specs(t *testing.T) {
+	root := setupDirectTest(t)
+	createSpec(t, root, "auth")
+	err := cmdList([]string{"--specs"})
+	if err != nil {
+		t.Fatalf("cmdList --specs: %v", err)
+	}
+}
+
+func TestCmdListDirect_InvalidSort(t *testing.T) {
+	setupDirectTest(t)
+	err := cmdList([]string{"--sort", "invalid"})
+	if err == nil {
+		t.Fatal("expected error for invalid sort value")
+	}
+}
+
+func TestCmdValidateDirect_InvalidType(t *testing.T) {
+	setupDirectTest(t)
+	err := cmdValidate([]string{"foo", "--type", "invalid"})
+	if err == nil {
+		t.Fatal("expected error for invalid --type value")
+	}
+}
+
+func TestCmdValidateDirect_NameWithBulk(t *testing.T) {
+	setupDirectTest(t)
+	err := cmdValidate([]string{"foo", "--all"})
+	if err == nil {
+		t.Fatal("expected error for name + bulk flag")
+	}
+}
+
+func TestCmdValidateDirect_TypeWithoutName(t *testing.T) {
+	setupDirectTest(t)
+	err := cmdValidate([]string{"--type", "change"})
+	if err == nil {
+		t.Fatal("expected error for --type without name")
+	}
+}
+
+func TestCmdInstructionsDirect_NoArgs(t *testing.T) {
+	setupDirectTest(t)
+	err := cmdInstructions([]string{})
+	if err == nil {
+		t.Fatal("expected error for no args")
+	}
+}
+
+func TestCmdInstructionsDirect_UnknownArtifact(t *testing.T) {
+	setupDirectTest(t)
+	err := cmdInstructions([]string{"bogus"})
+	if err == nil {
+		t.Fatal("expected error for unknown artifact")
+	}
+}
+
+func TestCmdArchiveDirect_NoArgs(t *testing.T) {
+	setupDirectTest(t)
+	err := cmdArchive([]string{})
+	if err == nil {
+		t.Fatal("expected error for no args")
+	}
+}
+
+func TestCmdInitDirect_UnknownFlag(t *testing.T) {
+	err := cmdInit([]string{"--bogus"})
+	if err == nil {
+		t.Fatal("expected error for unknown flag")
+	}
+}
+
+func TestCmdCompletionDirect_NoArgs(t *testing.T) {
+	err := cmdCompletion([]string{})
+	if err == nil {
+		t.Fatal("expected error for no args")
+	}
+}
+
+func TestCmdCompletionDirect_InvalidShell(t *testing.T) {
+	err := cmdCompletion([]string{"powershell"})
+	if err == nil {
+		t.Fatal("expected error for invalid shell")
+	}
+}
+
+func TestCLIStatusJSONWarningOnError(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	goodDir := filepath.Join(root, "specs", "changes", "good-change")
+	if err := os.MkdirAll(goodDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(goodDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
+
+	badDir := filepath.Join(root, "specs", "changes", "bad-change")
+	if err := os.MkdirAll(badDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(badDir, ".litespec.yaml"), []byte("key: [unclosed\n"), 0o644)
+
+	out, code := runCLI(t, bin, root, "status", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	warnings, ok := result["warnings"].([]interface{})
+	if !ok || len(warnings) == 0 {
+		t.Errorf("expected warnings in output, got: %v", result["warnings"])
+	}
+}
+
+func TestCmdViewDirect_HappyPath(t *testing.T) {
+	root := setupDirectTest(t)
+	createSpec(t, root, "auth")
+	createChangeWithArtifacts(t, root, "add-auth")
+	if err := cmdView([]string{}); err != nil {
+		t.Fatalf("cmdView: %v", err)
+	}
+}
+
+func TestCmdViewDirect_NoProjectRoot(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	err := cmdView([]string{})
+	if err == nil {
+		t.Fatal("expected error when no project root")
+	}
+}
+
+func TestCmdUpdateDirect_HappyPath(t *testing.T) {
+	root := setupDirectTest(t)
+	if err := internal.InitProject(root); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdUpdate([]string{}); err != nil {
+		t.Fatalf("cmdUpdate: %v", err)
+	}
+}
+
+func TestCmdUpdateDirect_WithTools(t *testing.T) {
+	root := setupDirectTest(t)
+	if err := internal.InitProject(root); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdUpdate([]string{"--tools", "claude"}); err != nil {
+		t.Fatalf("cmdUpdate --tools claude: %v", err)
+	}
+}
+
+func TestCmdUpdateDirect_UnknownTool(t *testing.T) {
+	root := setupDirectTest(t)
+	if err := internal.InitProject(root); err != nil {
+		t.Fatal(err)
+	}
+	err := cmdUpdate([]string{"--tools", "bogus"})
+	if err == nil {
+		t.Fatal("expected error for unknown tool")
 	}
 }

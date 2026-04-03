@@ -680,3 +680,153 @@ func TestSerializeSpecEmptyRequirements(t *testing.T) {
 		t.Errorf("Requirements count = %d, want 0", len(spec2.Requirements))
 	}
 }
+
+func TestParseMainSpecEmptyRequirementName(t *testing.T) {
+	input := `# auth
+
+## Requirements
+
+### Requirement:
+The system SHALL do something.
+`
+	_, err := ParseMainSpec(input)
+	if err == nil {
+		t.Fatal("expected error for empty requirement name")
+	}
+	if !containsSubstr(err.Error(), "empty requirement name") {
+		t.Errorf("error = %q, want empty requirement name", err.Error())
+	}
+}
+
+func TestParseMainSpecWhitespaceRequirementName(t *testing.T) {
+	input := `# auth
+
+## Requirements
+
+### Requirement:   
+The system SHALL do something.
+`
+	_, err := ParseMainSpec(input)
+	if err == nil {
+		t.Fatal("expected error for whitespace-only requirement name")
+	}
+	if !containsSubstr(err.Error(), "empty requirement name") {
+		t.Errorf("error = %q, want empty requirement name", err.Error())
+	}
+}
+
+func TestParseMainSpecEmptyScenarioName(t *testing.T) {
+	input := `# auth
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario:
+- **WHEN** triggered
+`
+	_, err := ParseMainSpec(input)
+	if err == nil {
+		t.Fatal("expected error for empty scenario name")
+	}
+	if !containsSubstr(err.Error(), "empty scenario name") {
+		t.Errorf("error = %q, want empty scenario name", err.Error())
+	}
+}
+
+func TestParseMainSpecWhitespaceScenarioName(t *testing.T) {
+	input := `# auth
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario:   
+- **WHEN** triggered
+`
+	_, err := ParseMainSpec(input)
+	if err == nil {
+		t.Fatal("expected error for whitespace-only scenario name")
+	}
+	if !containsSubstr(err.Error(), "empty scenario name") {
+		t.Errorf("error = %q, want empty scenario name", err.Error())
+	}
+}
+
+func TestParseDeltaSpecEmptyRequirementName(t *testing.T) {
+	input := `## ADDED Requirements
+
+### Requirement:
+The system SHALL work.
+`
+	_, err := ParseDeltaSpec(input)
+	if err == nil {
+		t.Fatal("expected error for empty requirement name in delta")
+	}
+	if !containsSubstr(err.Error(), "empty requirement name") {
+		t.Errorf("error = %q, want empty requirement name", err.Error())
+	}
+}
+
+func TestParseDeltaSpecWhitespaceRequirementName(t *testing.T) {
+	input := `## ADDED Requirements
+
+### Requirement:   
+The system SHALL work.
+`
+	_, err := ParseDeltaSpec(input)
+	if err == nil {
+		t.Fatal("expected error for whitespace requirement name in delta")
+	}
+	if !containsSubstr(err.Error(), "empty requirement name") {
+		t.Errorf("error = %q, want empty requirement name", err.Error())
+	}
+}
+
+func TestParseDeltaSpecRenamedEmptyOldName(t *testing.T) {
+	input := `## RENAMED Requirements
+
+### Requirement: → NewName
+`
+	_, err := ParseDeltaSpec(input)
+	if err == nil {
+		t.Fatal("expected error for RENAMED with empty old name")
+	}
+	if !containsSubstr(err.Error(), "empty requirement name") {
+		t.Errorf("error = %q, want empty requirement name", err.Error())
+	}
+}
+
+func TestParseDeltaSpecRenamedEmptyNewName(t *testing.T) {
+	input := `## RENAMED Requirements
+
+### Requirement: OldName →   
+`
+	_, err := ParseDeltaSpec(input)
+	if err == nil {
+		t.Fatal("expected error for RENAMED with empty new name")
+	}
+	if !containsSubstr(err.Error(), "empty requirement name") {
+		t.Errorf("error = %q, want empty requirement name", err.Error())
+	}
+}
+
+func TestParseDeltaSpecEmptyScenarioName(t *testing.T) {
+	input := `## ADDED Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario:
+- **WHEN** triggered
+`
+	_, err := ParseDeltaSpec(input)
+	if err == nil {
+		t.Fatal("expected error for empty scenario name in delta")
+	}
+	if !containsSubstr(err.Error(), "empty scenario name") {
+		t.Errorf("error = %q, want empty scenario name", err.Error())
+	}
+}

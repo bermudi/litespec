@@ -13,3 +13,13 @@ func Get(id string) string {
 func All() map[string]string {
 	return templates
 }
+
+func ValidateSkillTemplates(skillIDs []string) []string {
+	missing := make([]string, 0)
+	for _, id := range skillIDs {
+		if templates[id] == "" {
+			missing = append(missing, id)
+		}
+	}
+	return missing
+}

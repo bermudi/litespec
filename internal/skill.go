@@ -28,7 +28,7 @@ func GenerateSkills(root string) error {
 	for _, s := range Skills {
 		template := skill.Get(s.ID)
 		if template == "" {
-			continue
+			return fmt.Errorf("skill %s: template not registered", s.ID)
 		}
 
 		skillDir := filepath.Join(skillsDir, s.Name)

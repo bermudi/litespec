@@ -3,6 +3,7 @@ package internal
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -73,7 +74,9 @@ func TestValidateChangeValid(t *testing.T) {
 The system SHALL authenticate.
 
 #### Scenario: Valid
-- **WHEN** valid creds
+	- **WHEN** valid creds
+- **THEN** result
+- **THEN** authenticated
 `)
 
 	result, err := ValidateChange(root, "test-change")
@@ -99,6 +102,7 @@ The system SHALL work.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** result
 `)
 
 	result, err := ValidateChange(root, "bad")
@@ -152,6 +156,7 @@ Some content without keywords.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** result
 `)
 
 	result, err := ValidateChange(root, "change")
@@ -183,6 +188,7 @@ The system SHALL work.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** result
 `)
 	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
 	writeChangeFile(t, root, "change", "design.md", "# Design")
@@ -194,6 +200,7 @@ Updated content without keywords.
 
 #### Scenario: S2
 - **WHEN** something
+- **THEN** expected result
 `)
 
 	result, err := ValidateChange(root, "change")
@@ -242,6 +249,7 @@ The system SHALL work.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** result
 `)
 	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
 	writeChangeFile(t, root, "change", "design.md", "# Design")
@@ -270,6 +278,7 @@ The system SHALL authenticate via SSO.
 
 #### Scenario: SSO
 - **WHEN** SSO token valid
+- **THEN** expected result
 `)
 
 	result, err := ValidateChange(root, "change")
@@ -300,7 +309,8 @@ func TestValidateChangeDanglingDeltaNonexistentRequirement(t *testing.T) {
 The system SHALL authenticate.
 
 #### Scenario: Valid
-- **WHEN** valid creds
+	- **WHEN** valid creds
+- **THEN** result
 `)
 	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
 	writeChangeFile(t, root, "change", "design.md", "# Design")
@@ -312,6 +322,7 @@ The system SHALL do something.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** result
 `)
 
 	result, err := ValidateChange(root, "change")
@@ -342,7 +353,8 @@ func TestValidateChangeDanglingDeltaRemovedNonexistent(t *testing.T) {
 The system SHALL authenticate.
 
 #### Scenario: Valid
-- **WHEN** valid creds
+	- **WHEN** valid creds
+- **THEN** result
 `)
 	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
 	writeChangeFile(t, root, "change", "design.md", "# Design")
@@ -370,6 +382,7 @@ The system SHALL work.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** result
 `)
 	writeChangeFile(t, root, "change", "tasks.md", "- [ ] Task without phase heading")
 
@@ -410,6 +423,7 @@ The system SHALL do legacy thing.
 
 #### Scenario: Old
 - **WHEN** old thing
+- **THEN** expected result
 `)
 	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
 	writeChangeFile(t, root, "change", "design.md", "# Design")
@@ -440,6 +454,7 @@ The system MUST enforce limits.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** result
 `)
 
 	result, err := ValidateChange(root, "change")
@@ -464,7 +479,8 @@ func TestValidateChangeRENAMEDDanglingOldName(t *testing.T) {
 The system SHALL authenticate.
 
 #### Scenario: Valid
-- **WHEN** valid creds
+	- **WHEN** valid creds
+- **THEN** result
 `)
 	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
 	writeChangeFile(t, root, "change", "design.md", "# Design")
@@ -502,13 +518,15 @@ func TestValidateChangeRENAMEDTargetCollision(t *testing.T) {
 The system SHALL authenticate.
 
 #### Scenario: Valid
-- **WHEN** valid creds
+	- **WHEN** valid creds
+- **THEN** result
 
 ### Requirement: Logout
 The system SHALL invalidate.
 
 #### Scenario: Valid
 - **WHEN** logged out
+- **THEN** expected result
 `)
 	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
 	writeChangeFile(t, root, "change", "design.md", "# Design")
@@ -546,7 +564,8 @@ func TestValidateChangeADDEDDuplicateExisting(t *testing.T) {
 The system SHALL authenticate.
 
 #### Scenario: Valid
-- **WHEN** valid creds
+	- **WHEN** valid creds
+- **THEN** result
 `)
 	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
 	writeChangeFile(t, root, "change", "design.md", "# Design")
@@ -558,6 +577,7 @@ The system SHALL authenticate differently.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** result
 `)
 
 	result, err := ValidateChange(root, "change")
@@ -589,6 +609,7 @@ The system SHALL do legacy thing.
 
 #### Scenario: Old
 - **WHEN** old thing
+- **THEN** expected result
 `)
 	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
 	writeChangeFile(t, root, "change", "design.md", "# Design")
@@ -628,6 +649,7 @@ The system SHALL do legacy thing.
 
 #### Scenario: Old
 - **WHEN** old thing
+- **THEN** expected result
 `)
 	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
 	writeChangeFile(t, root, "change", "design.md", "# Design")
@@ -638,6 +660,7 @@ The system SHALL do legacy thing.
 
 #### Scenario: Cleanup reason
 - **WHEN** removing old feature
+- **THEN** expected result
 `)
 
 	result, err := ValidateChange(root, "change")
@@ -668,7 +691,8 @@ func TestValidateChangeRENAMEDWithBodyContent(t *testing.T) {
 The system SHALL authenticate.
 
 #### Scenario: Valid
-- **WHEN** valid creds
+	- **WHEN** valid creds
+- **THEN** result
 `)
 	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
 	writeChangeFile(t, root, "change", "design.md", "# Design")
@@ -707,7 +731,8 @@ func TestValidateChangeRENAMEDWithScenarios(t *testing.T) {
 The system SHALL authenticate.
 
 #### Scenario: Valid
-- **WHEN** valid creds
+	- **WHEN** valid creds
+- **THEN** result
 `)
 	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
 	writeChangeFile(t, root, "change", "design.md", "# Design")
@@ -718,6 +743,7 @@ The system SHALL authenticate.
 
 #### Scenario: Reason
 - **WHEN** renaming for clarity
+- **THEN** expected result
 `)
 
 	result, err := ValidateChange(root, "change")
@@ -748,7 +774,8 @@ func TestValidateChangeRENAMEDNoOpRenameWarning(t *testing.T) {
 The system SHALL authenticate.
 
 #### Scenario: Valid
-- **WHEN** valid creds
+	- **WHEN** valid creds
+- **THEN** result
 `)
 	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
 	writeChangeFile(t, root, "change", "design.md", "# Design")
@@ -789,7 +816,8 @@ func TestValidateSpecValid(t *testing.T) {
 The system SHALL authenticate.
 
 #### Scenario: Valid
-- **WHEN** valid creds
+	- **WHEN** valid creds
+- **THEN** result
 `)
 
 	result, err := ValidateSpec(root, "auth")
@@ -859,6 +887,7 @@ The system SHALL authenticate.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** result
 `)
 
 	result, err := ValidateChange(root, "change")
@@ -894,6 +923,7 @@ The system SHALL work.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** result
 `)
 	writeChangeMeta(t, root, "change-a", ChangeMeta{
 		Schema:    "spec-driven",
@@ -928,6 +958,7 @@ The system SHALL work.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** result
 `)
 	writeChangeMeta(t, root, "change-b", ChangeMeta{
 		Schema:    "spec-driven",
@@ -956,6 +987,7 @@ The system SHALL work.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** result
 `)
 	writeChangeMeta(t, root, "change-b", ChangeMeta{
 		Schema:    "spec-driven",
@@ -983,6 +1015,7 @@ The system SHALL work.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** result
 `)
 	makeValidChange(t, root, "change-b", `## ADDED Requirements
 
@@ -991,6 +1024,7 @@ The system SHALL work.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** result
 `)
 	writeChangeMeta(t, root, "change-a", ChangeMeta{
 		Schema:    "spec-driven",
@@ -1033,7 +1067,8 @@ func TestValidateAllOverlapWarning(t *testing.T) {
 The system SHALL authenticate.
 
 #### Scenario: Valid
-- **WHEN** valid creds
+	- **WHEN** valid creds
+- **THEN** result
 `)
 	makeValidChange(t, root, "change-a", `## MODIFIED Requirements
 
@@ -1042,6 +1077,7 @@ The system SHALL authenticate via SSO.
 
 #### Scenario: SSO
 - **WHEN** SSO token valid
+- **THEN** expected result
 `)
 	makeValidChange(t, root, "change-b", `## MODIFIED Requirements
 
@@ -1050,6 +1086,7 @@ The system SHALL authenticate via OAuth.
 
 #### Scenario: OAuth
 - **WHEN** OAuth token valid
+- **THEN** expected result
 `)
 
 	result, err := ValidateAll(root, false)
@@ -1089,7 +1126,8 @@ func TestValidateAllOverlapSuppressedByDepEdge(t *testing.T) {
 The system SHALL authenticate.
 
 #### Scenario: Valid
-- **WHEN** valid creds
+	- **WHEN** valid creds
+- **THEN** result
 `)
 	makeValidChange(t, root, "change-a", `## MODIFIED Requirements
 
@@ -1098,6 +1136,7 @@ The system SHALL authenticate via SSO.
 
 #### Scenario: SSO
 - **WHEN** SSO token valid
+- **THEN** authenticated
 `)
 	makeValidChange(t, root, "change-b", `## MODIFIED Requirements
 
@@ -1106,6 +1145,7 @@ The system SHALL authenticate via OAuth.
 
 #### Scenario: OAuth
 - **WHEN** OAuth token valid
+- **THEN** authenticated
 `)
 	writeChangeMeta(t, root, "change-b", ChangeMeta{
 		Schema:    "spec-driven",
@@ -1138,6 +1178,7 @@ The system SHALL do A.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** result
 `)
 	makeValidChange(t, root, "change-b", `## ADDED Requirements
 
@@ -1146,6 +1187,7 @@ The system SHALL do B.
 
 #### Scenario: S1
 - **WHEN** triggered
+- **THEN** result
 `)
 
 	result, err := ValidateAll(root, false)
@@ -1161,6 +1203,473 @@ The system SHALL do B.
 	for _, w := range result.Warnings {
 		if w.Severity == SeverityWarning && w.Message[:len("changes")] == "changes" {
 			t.Errorf("should not warn about overlap on different capabilities, got: %s", w.Message)
+		}
+	}
+}
+
+func TestValidateChangeDuplicateRequirementNames(t *testing.T) {
+	root := setupTestProject(t)
+	makeValidChange(t, root, "change", `## ADDED Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: S1
+- **WHEN** triggered
+- **THEN** expected result
+
+### Requirement: Login
+The system SHALL authenticate again.
+
+#### Scenario: S2
+- **WHEN** triggered
+- **THEN** result
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected invalid for duplicate requirement names")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if e.Message == `duplicate requirement name "Login"` {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected duplicate requirement name error")
+	}
+}
+
+func TestValidateChangeDuplicateScenarioNames(t *testing.T) {
+	root := setupTestProject(t)
+	makeValidChange(t, root, "change", `## ADDED Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: happy path
+- **WHEN** first trigger
+- **THEN** expected result
+
+#### Scenario: happy path
+- **WHEN** second trigger
+- **THEN** expected result
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected invalid for duplicate scenario names")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if e.Message == `duplicate scenario name "happy path" in requirement "Login"` {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected duplicate scenario name error")
+	}
+}
+
+func TestValidateChangeSHALLInsideFencedCodeBlock(t *testing.T) {
+	root := setupTestProject(t)
+	makeValidChange(t, root, "change", `## ADDED Requirements
+
+### Requirement: R1
+Some content.
+`+"```"+`
+The system SHALL do something.
+`+"```"+`
+
+#### Scenario: S1
+- **WHEN** triggered
+- **THEN** result
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected invalid (SHALL inside fenced code block)")
+	}
+}
+
+func TestValidateChangeSHALLInsideInlineCode(t *testing.T) {
+	root := setupTestProject(t)
+	makeValidChange(t, root, "change", `## ADDED Requirements
+
+### Requirement: R1
+Use `+"`"+"The system SHALL do X"+"`"+` pattern.
+
+#### Scenario: S1
+- **WHEN** triggered
+- **THEN** result
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected invalid (SHALL inside inline code)")
+	}
+}
+
+func TestValidateChangeSHALLAsWholeWordAccepted(t *testing.T) {
+	root := setupTestProject(t)
+	makeValidChange(t, root, "change", `## ADDED Requirements
+
+### Requirement: R1
+The system SHALL do X.
+
+#### Scenario: S1
+- **WHEN** triggered
+- **THEN** result
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if !result.Valid {
+		for _, e := range result.Errors {
+			t.Errorf("Unexpected error: %s: %s", e.File, e.Message)
+		}
+		t.Fatal("expected valid (SHALL as whole word)")
+	}
+}
+
+func TestValidateChangeSHALLAsSubstringRejected(t *testing.T) {
+	root := setupTestProject(t)
+	makeValidChange(t, root, "change", `## ADDED Requirements
+
+### Requirement: R1
+MARSHALL plan implementation.
+
+#### Scenario: S1
+- **WHEN** triggered
+- **THEN** result
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected invalid (SHALL as substring)")
+	}
+}
+
+func TestValidateChangeScenarioWithoutWHENTHEN(t *testing.T) {
+	root := setupTestProject(t)
+	makeValidChange(t, root, "change", `## ADDED Requirements
+
+### Requirement: R1
+The system SHALL work.
+
+#### Scenario: S1
+Some description without markers.
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected invalid (scenario without WHEN/THEN)")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if e.Message == `scenario "S1" in requirement "R1" must contain WHEN and THEN` {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected scenario WHEN/THEN error")
+	}
+}
+
+func TestValidateChangeScenarioWithValidWHENTHEN(t *testing.T) {
+	root := setupTestProject(t)
+	makeValidChange(t, root, "change", `## ADDED Requirements
+
+### Requirement: R1
+The system SHALL work.
+
+#### Scenario: S1
+- **WHEN** something happens
+- **THEN** the result follows
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if !result.Valid {
+		for _, e := range result.Errors {
+			t.Errorf("Unexpected error: %s: %s", e.File, e.Message)
+		}
+		t.Fatal("expected valid with WHEN/THEN in scenario")
+	}
+}
+
+func TestValidateChangeCrossOpModifiedAndRemoved(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "auth", `# auth
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+	- **WHEN** valid creds
+- **THEN** result
+`)
+	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
+	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
+	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## MODIFIED Requirements
+
+### Requirement: Login
+The system SHALL authenticate via SSO.
+
+#### Scenario: SSO
+- **WHEN** valid
+- **THEN** expected result
+
+## REMOVED Requirements
+
+### Requirement: Login
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	found := false
+	for _, e := range result.Errors {
+		if e.Message == `conflicting operations on requirement "Login"` {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected cross-operation conflict on Login")
+	}
+}
+
+func TestValidateChangeCrossOpRenamedOldNameConflictsModified(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "auth", `# auth
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+	- **WHEN** valid creds
+- **THEN** result
+`)
+	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
+	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
+	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## RENAMED Requirements
+
+### Requirement: Login → Auth
+
+## MODIFIED Requirements
+
+### Requirement: Login
+The system SHALL authenticate via SSO.
+
+#### Scenario: SSO
+- **WHEN** valid
+- **THEN** expected result
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	found := false
+	for _, e := range result.Errors {
+		if e.Message == `conflicting operations on requirement "Login"` {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected cross-operation conflict on Login (RENAMED old + MODIFIED)")
+	}
+}
+
+func TestValidateChangeCrossOpRenamedNewNameConflictsAdded(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "auth", `# auth
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+	- **WHEN** valid creds
+- **THEN** result
+`)
+	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
+	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
+	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## RENAMED Requirements
+
+### Requirement: Login → Auth
+
+## ADDED Requirements
+
+### Requirement: Auth
+The system SHALL do auth.
+
+#### Scenario: S1
+- **WHEN** triggered
+- **THEN** result
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	found := false
+	for _, e := range result.Errors {
+		if e.Message == `conflicting operations on requirement "Auth"` {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected cross-operation conflict on Auth (RENAMED new + ADDED)")
+	}
+}
+
+func TestValidateChangeDependencyErrorHasFile(t *testing.T) {
+	root := setupTestProject(t)
+	makeValidChange(t, root, "change-a", `## ADDED Requirements
+
+### Requirement: R1
+The system SHALL work.
+
+#### Scenario: S1
+- **WHEN** triggered
+- **THEN** result
+`)
+	writeChangeMeta(t, root, "change-a", ChangeMeta{
+		Schema:    "spec-driven",
+		DependsOn: []string{"nonexistent"},
+	})
+
+	result, err := ValidateChange(root, "change-a")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	found := false
+	metaPath := filepath.Join(ChangePath(root, "change-a"), MetaFileName)
+	for _, e := range result.Errors {
+		if e.Message == `dependency "nonexistent" not found` && e.File == metaPath {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected dependency error with file path %q", metaPath)
+	}
+}
+
+func TestValidateAllOverlapRenamedOldName(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "cap", `# cap
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+	- **WHEN** valid creds
+- **THEN** result
+`)
+	makeValidChange(t, root, "change-a", `## RENAMED Requirements
+
+### Requirement: Login → Auth
+`)
+	makeValidChange(t, root, "change-b", `## MODIFIED Requirements
+
+### Requirement: Login
+The system SHALL authenticate via SSO.
+
+#### Scenario: SSO
+- **WHEN** SSO token valid
+- **THEN** authenticated
+`)
+
+	result, err := ValidateAll(root, false)
+	if err != nil {
+		t.Fatalf("ValidateAll: %v", err)
+	}
+
+	found := false
+	for _, w := range result.Warnings {
+		if w.Severity == SeverityWarning && strings.Contains(w.Message, `changes`) && strings.Contains(w.Message, `Login`) {
+			found = true
+		}
+	}
+	if !found {
+		var msgs []string
+		for _, w := range result.Warnings {
+			msgs = append(msgs, w.Message)
+		}
+		t.Errorf("expected overlap warning on Login, got: %v", msgs)
+	}
+}
+
+func TestValidateAllOverlapRenamedNoFalsePositiveNewName(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "cap", `# cap
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+	- **WHEN** valid creds
+- **THEN** result
+`)
+	makeValidChange(t, root, "change-a", `## RENAMED Requirements
+
+### Requirement: Login → Auth
+`)
+	makeValidChange(t, root, "change-b", `## MODIFIED Requirements
+
+### Requirement: Auth
+The system SHALL authenticate via SSO.
+
+#### Scenario: SSO
+- **WHEN** SSO token valid
+- **THEN** authenticated
+`)
+
+	result, err := ValidateAll(root, false)
+	if err != nil {
+		t.Fatalf("ValidateAll: %v", err)
+	}
+
+	for _, w := range result.Warnings {
+		if w.Severity == SeverityWarning && strings.Contains(w.Message, "changes") {
+			t.Errorf("should not warn about overlap on new name, got: %s", w.Message)
 		}
 	}
 }

@@ -105,6 +105,14 @@ func ChangeSpecsPath(root, name string) string {
 	return filepath.Join(ChangePath(root, name), ChangeSpecsDirName)
 }
 
+func ValidToolIDs() []string {
+	ids := make([]string, len(Adapters))
+	for i, a := range Adapters {
+		ids[i] = a.ID
+	}
+	return ids
+}
+
 var ArchivedNameRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}-(.+)$`)
 
 func ParseArchivedName(name string) string {

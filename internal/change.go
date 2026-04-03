@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -144,6 +145,7 @@ type PendingWrite struct {
 	Path       string
 	Dir        string
 	Content    string
+	Backup     []byte
 }
 
 func PrepareArchiveWrites(root, name string) ([]PendingWrite, error) {
@@ -165,6 +167,10 @@ func PrepareArchiveWrites(root, name string) ([]PendingWrite, error) {
 		if readErr != nil {
 			continue
 		}
+
+		sort.Slice(files, func(i, j int) bool {
+			return files[i].Name() < files[j].Name()
+		})
 
 		var deltas []*DeltaSpec
 		for _, f := range files {
@@ -209,11 +215,17 @@ func PrepareArchiveWrites(root, name string) ([]PendingWrite, error) {
 			return nil, fmt.Errorf("merging delta for %s: %w", capability, err)
 		}
 
+		var backup []byte
+		if readErr == nil {
+			backup = mainData
+		}
+
 		writes = append(writes, PendingWrite{
 			Capability: capability,
 			Path:       mainSpecPath,
 			Dir:        mainSpecDir,
 			Content:    SerializeSpec(merged),
+			Backup:     backup,
 		})
 	}
 
@@ -230,6 +242,62 @@ func WritePendingSpecs(writes []PendingWrite) error {
 		}
 	}
 	return nil
+}
+
+func WritePendingSpecsAtomic(writes []PendingWrite) error {
+	tmpPaths := make([]string, len(writes))
+	written := 0
+
+	for i, w := range writes {
+		if err := os.MkdirAll(w.Dir, 0o755); err != nil {
+			cleanupTmps(tmpPaths[:written])
+			return fmt.Errorf("creating spec directory %s: %w", w.Dir, err)
+		}
+		tmpPath := w.Path + ".tmp"
+		if err := os.WriteFile(tmpPath, []byte(w.Content), 0o644); err != nil {
+			cleanupTmps(tmpPaths[:written])
+			return fmt.Errorf("writing temp spec %s: %w", tmpPath, err)
+		}
+		tmpPaths[i] = tmpPath
+		written++
+
+		data, err := os.ReadFile(tmpPath)
+		if err != nil {
+			cleanupTmps(tmpPaths[:written])
+			return fmt.Errorf("reading temp spec for verification %s: %w", tmpPath, err)
+		}
+		if _, err := ParseMainSpec(string(data)); err != nil {
+			cleanupTmps(tmpPaths[:written])
+			return fmt.Errorf("parse verification failed for %s: %w", w.Capability, err)
+		}
+	}
+
+	for i, w := range writes {
+		if err := os.Rename(tmpPaths[i], w.Path); err != nil {
+			cleanupTmps(tmpPaths[i:])
+			restoreBackups(writes, i)
+			return fmt.Errorf("renaming temp to final %s: %w", w.Path, err)
+		}
+	}
+
+	return nil
+}
+
+func cleanupTmps(paths []string) {
+	for _, p := range paths {
+		os.Remove(p)
+	}
+}
+
+func restoreBackups(writes []PendingWrite, count int) {
+	for i := 0; i < count; i++ {
+		w := writes[i]
+		if w.Backup != nil {
+			os.WriteFile(w.Path, w.Backup, 0o644)
+		} else {
+			os.Remove(w.Path)
+		}
+	}
 }
 
 func ArchiveChange(root, name string) error {
