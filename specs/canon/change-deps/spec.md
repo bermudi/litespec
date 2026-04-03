@@ -1,5 +1,7 @@
 # change-deps
-## ADDED Requirements
+
+## Requirements
+
 ### Requirement: Dependency Metadata Field
 
 The `ChangeMeta` struct SHALL support an optional `dependsOn` field containing a list of change names. When absent, the change has no dependencies. The field SHALL be read from and written to `.litespec.yaml` alongside existing `schema` and `created` fields.

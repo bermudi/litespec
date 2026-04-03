@@ -1,5 +1,7 @@
 # view
-## ADDED Requirements
+
+## Requirements
+
 ### Requirement: Dashboard Display
 
 The dashboard SHALL display a formatted dashboard with a title header, box-drawing separators (`══` for outer border, `──` for section underlines), and distinct sections for summary, active changes, draft changes, completed changes, specifications, and optionally a dependency graph.
