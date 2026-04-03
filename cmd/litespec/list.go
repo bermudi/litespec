@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"time"
 
@@ -45,6 +47,10 @@ func cmdList(args []string) error {
 	root, err := internal.FindProjectRoot()
 	if err != nil {
 		return err
+	}
+
+	if _, err := os.Stat(filepath.Join(root, internal.ProjectDirName)); err != nil {
+		return fmt.Errorf("not a litespec project. Run 'litespec init' first")
 	}
 
 	if asJSON {
