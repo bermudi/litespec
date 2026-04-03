@@ -1727,6 +1727,13 @@ func TestCmdInitDirect_HelpFlag(t *testing.T) {
 	}
 }
 
+func TestMarshalJSONErrorPropagation(t *testing.T) {
+	_, err := internal.MarshalJSON(map[string]chan int{"ch": make(chan int)})
+	if err == nil {
+		t.Fatal("expected error for unmarshallable value")
+	}
+}
+
 func TestFindProjectRoot_InProjectRoot(t *testing.T) {
 	oldDir, _ := os.Getwd()
 	defer os.Chdir(oldDir)
