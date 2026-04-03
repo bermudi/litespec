@@ -1,7 +1,7 @@
 ## Phase 1: Deterministic Delta Ordering
 
-- [ ] Sort delta file entries by filename in `PrepareArchiveWrites` after `os.ReadDir`
-- [ ] Add test that multiple delta files merge in lexicographic order regardless of `os.ReadDir` order
+- [x] Sort delta file entries by filename in `PrepareArchiveWrites` after `os.ReadDir`
+- [x] Add test that multiple delta files merge in lexicographic order regardless of `os.ReadDir` order
 
 ## Phase 2: Atomic Write Flow
 
