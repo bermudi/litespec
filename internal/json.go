@@ -48,11 +48,12 @@ type TaskItemJSON struct {
 }
 
 type ChangeListItemJSON struct {
-	Name           string `json:"name"`
-	CompletedTasks int    `json:"completedTasks"`
-	TotalTasks     int    `json:"totalTasks"`
-	LastModified   string `json:"lastModified"`
-	Status         string `json:"status"`
+	Name           string   `json:"name"`
+	CompletedTasks int      `json:"completedTasks"`
+	TotalTasks     int      `json:"totalTasks"`
+	LastModified   string   `json:"lastModified"`
+	Status         string   `json:"status"`
+	DependsOn      []string `json:"dependsOn,omitempty"`
 }
 
 type SpecListItemJSON struct {

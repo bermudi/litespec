@@ -28,10 +28,14 @@ func setupCLITest(t *testing.T) (string, string) {
 	root := t.TempDir()
 	specsDir := filepath.Join(root, "specs", "canon")
 	changesDir := filepath.Join(root, "specs", "changes")
+	archiveDir := filepath.Join(root, "specs", "changes", "archive")
 	if err := os.MkdirAll(specsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(changesDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	return bin, root
@@ -327,7 +331,7 @@ func TestSortChangesByRecent(t *testing.T) {
 		{Name: "beta", LastModified: now},
 		{Name: "gamma", LastModified: now.Add(-1 * time.Hour)},
 	}
-	sortChanges(changes, "recent")
+	sortChanges(changes, "recent", "")
 	if changes[0].Name != "beta" {
 		t.Errorf("first = %q, want %q", changes[0].Name, "beta")
 	}
@@ -346,7 +350,7 @@ func TestSortChangesByName(t *testing.T) {
 		{Name: "alpha", LastModified: now.Add(-1 * time.Hour)},
 		{Name: "bravo", LastModified: now.Add(-2 * time.Hour)},
 	}
-	sortChanges(changes, "name")
+	sortChanges(changes, "name", "")
 	if changes[0].Name != "alpha" {
 		t.Errorf("first = %q, want %q", changes[0].Name, "alpha")
 	}
@@ -602,5 +606,317 @@ func TestCLIValidateTypeMissingValue(t *testing.T) {
 	_, code := runCLI(t, bin, root, "validate", "foo", "--type")
 	if code != 1 {
 		t.Fatalf("expected exit 1 for --type without value, got %d", code)
+	}
+}
+
+func TestCLIArchiveBlocksOnActiveDependent(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	changeDir := filepath.Join(root, "specs", "changes", "parent")
+	if err := os.MkdirAll(changeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
+	os.WriteFile(filepath.Join(changeDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
+	os.WriteFile(filepath.Join(changeDir, "design.md"), []byte("# Design\nTest."), 0o644)
+	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1: Test\n- [x] Task one"), 0o644)
+	specsDir := filepath.Join(changeDir, "specs", "cap")
+	os.MkdirAll(specsDir, 0o755)
+	os.WriteFile(filepath.Join(specsDir, "spec.md"), []byte(`## ADDED Requirements
+
+### Requirement: R1
+The system SHALL work.
+
+#### Scenario: S1
+- **WHEN** triggered
+`), 0o644)
+
+	childDir := filepath.Join(root, "specs", "changes", "child")
+	if err := os.MkdirAll(childDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(childDir, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - parent\n"), 0o644)
+	os.WriteFile(filepath.Join(childDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
+	os.WriteFile(filepath.Join(childDir, "design.md"), []byte("# Design\nTest."), 0o644)
+	os.WriteFile(filepath.Join(childDir, "tasks.md"), []byte("## Phase 1: Test\n- [ ] Task one"), 0o644)
+	childSpecsDir := filepath.Join(childDir, "specs", "cap2")
+	os.MkdirAll(childSpecsDir, 0o755)
+	os.WriteFile(filepath.Join(childSpecsDir, "spec.md"), []byte(`## ADDED Requirements
+
+### Requirement: R1
+The system SHALL work.
+
+#### Scenario: S1
+- **WHEN** triggered
+`), 0o644)
+
+	out, code := runCLI(t, bin, root, "archive", "parent")
+	if code != 1 {
+		t.Fatalf("expected exit 1 for active dependent, got %d: %s", code, out)
+	}
+	if !strings.Contains(out, "active changes depend on") {
+		t.Errorf("expected dependent warning, got: %s", out)
+	}
+}
+
+func TestCLIArchiveAllowsIncompleteWithDependents(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	changeDir := filepath.Join(root, "specs", "changes", "parent")
+	if err := os.MkdirAll(changeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
+	os.WriteFile(filepath.Join(changeDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
+	os.WriteFile(filepath.Join(changeDir, "design.md"), []byte("# Design\nTest."), 0o644)
+	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1: Test\n- [x] Task one"), 0o644)
+	specsDir := filepath.Join(changeDir, "specs", "cap")
+	os.MkdirAll(specsDir, 0o755)
+	os.WriteFile(filepath.Join(specsDir, "spec.md"), []byte(`## ADDED Requirements
+
+### Requirement: R1
+The system SHALL work.
+
+#### Scenario: S1
+- **WHEN** triggered
+`), 0o644)
+
+	childDir := filepath.Join(root, "specs", "changes", "child")
+	if err := os.MkdirAll(childDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(childDir, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - parent\n"), 0o644)
+	os.WriteFile(filepath.Join(childDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
+	os.WriteFile(filepath.Join(childDir, "design.md"), []byte("# Design\nTest."), 0o644)
+	os.WriteFile(filepath.Join(childDir, "tasks.md"), []byte("## Phase 1: Test\n- [ ] Task one"), 0o644)
+	childSpecsDir := filepath.Join(childDir, "specs", "cap2")
+	os.MkdirAll(childSpecsDir, 0o755)
+	os.WriteFile(filepath.Join(childSpecsDir, "spec.md"), []byte(`## ADDED Requirements
+
+### Requirement: R1
+The system SHALL work.
+
+#### Scenario: S1
+- **WHEN** triggered
+`), 0o644)
+
+	out, code := runCLI(t, bin, root, "archive", "parent", "--allow-incomplete")
+	if code != 0 {
+		t.Fatalf("expected success with --allow-incomplete, got %d: %s", code, out)
+	}
+	if !strings.Contains(out, "archived successfully") {
+		t.Errorf("expected archive success, got: %s", out)
+	}
+}
+
+func TestCLIListSortDeps(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	parentDir := filepath.Join(root, "specs", "changes", "add-auth")
+	if err := os.MkdirAll(parentDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(parentDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
+
+	childDir := filepath.Join(root, "specs", "changes", "add-rate-limiting")
+	if err := os.MkdirAll(childDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(childDir, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - add-auth\n"), 0o644)
+
+	out, code := runCLI(t, bin, root, "list", "--sort", "deps", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	changes := result["changes"].([]interface{})
+	if len(changes) != 2 {
+		t.Fatalf("expected 2 changes, got %d", len(changes))
+	}
+	first := changes[0].(map[string]interface{})
+	second := changes[1].(map[string]interface{})
+	if first["name"] != "add-auth" {
+		t.Errorf("first should be add-auth (dep), got %v", first["name"])
+	}
+	if second["name"] != "add-rate-limiting" {
+		t.Errorf("second should be add-rate-limiting (dependent), got %v", second["name"])
+	}
+	deps, _ := second["dependsOn"].([]interface{})
+	if len(deps) != 1 || deps[0] != "add-auth" {
+		t.Errorf("expected dependsOn [add-auth], got %v", deps)
+	}
+}
+
+func TestCLIViewHelp(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "view", "--help")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "Usage: litespec view") {
+		t.Error("expected view usage in help output")
+	}
+}
+
+func TestCLIViewDashboard(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	createSpec(t, root, "auth")
+	createSpec(t, root, "database")
+
+	createChangeWithArtifacts(t, root, "add-auth")
+	changeDir := filepath.Join(root, "specs", "changes", "add-auth")
+	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1: Test\n- [x] Task one\n- [ ] Task two"), 0o644)
+
+	createChange(t, root, "draft-change")
+
+	out, code := runCLI(t, bin, root, "view")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	if !strings.Contains(out, "Summary") {
+		t.Error("expected Summary section")
+	}
+	if !strings.Contains(out, "Active Changes") {
+		t.Error("expected Active Changes section")
+	}
+	if !strings.Contains(out, "Specifications") {
+		t.Error("expected Specifications section")
+	}
+	if !strings.Contains(out, "Specs: 2") {
+		t.Error("expected 2 specs")
+	}
+	if !strings.Contains(out, "Requirements: 2") {
+		t.Error("expected 2 requirements")
+	}
+	if !strings.Contains(out, "Active Changes: 2") {
+		t.Error("expected 2 active changes")
+	}
+	if !strings.Contains(out, "Draft Changes: 1") {
+		t.Error("expected 1 draft change")
+	}
+	if !strings.Contains(out, "Task Completion: 50%") {
+		t.Error("expected 50% task completion")
+	}
+	if !strings.Contains(out, "auth") {
+		t.Error("expected auth spec")
+	}
+	if !strings.Contains(out, "database") {
+		t.Error("expected database spec")
+	}
+	if !strings.Contains(out, "add-auth") {
+		t.Error("expected add-auth change")
+	}
+	if !strings.Contains(out, "draft-change") {
+		t.Error("expected draft-change change")
+	}
+}
+
+func TestCLIViewNoSpecs(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+
+	specsDir := filepath.Join(root, "specs", "canon")
+	if err := os.MkdirAll(specsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	changesDir := filepath.Join(root, "specs", "changes")
+	if err := os.MkdirAll(changesDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	archiveDir := filepath.Join(root, "specs", "changes", "archive")
+	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	out, code := runCLI(t, bin, root, "view")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	if !strings.Contains(out, "Summary") {
+		t.Error("expected Summary section")
+	}
+	if !strings.Contains(out, "Specs: 0") {
+		t.Error("expected 0 specs")
+	}
+	if !strings.Contains(out, "Requirements: 0") {
+		t.Error("expected 0 requirements")
+	}
+}
+
+func TestCLIViewWithDependencyGraph(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	parentDir := filepath.Join(root, "specs", "changes", "parent-change")
+	if err := os.MkdirAll(parentDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(parentDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
+
+	childDir := filepath.Join(root, "specs", "changes", "child-change")
+	if err := os.MkdirAll(childDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(childDir, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - parent-change\n"), 0o644)
+
+	unrelatedDir := filepath.Join(root, "specs", "changes", "unrelated-change")
+	if err := os.MkdirAll(unrelatedDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(unrelatedDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
+
+	out, code := runCLI(t, bin, root, "view")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	if !strings.Contains(out, "Dependency Graph") {
+		t.Error("expected Dependency Graph section when dependencies exist")
+	}
+	if !strings.Contains(out, "parent-change") {
+		t.Error("expected parent-change in graph")
+	}
+	if !strings.Contains(out, "child-change") {
+		t.Error("expected child-change in graph")
+	}
+	if !strings.Contains(out, "└──") {
+		t.Error("expected box-drawing characters in graph")
+	}
+	if !strings.Contains(out, "Unrelated:") {
+		t.Error("expected Unrelated section for changes with no deps and no dependents")
+	}
+	if !strings.Contains(out, "unrelated-change") {
+		t.Error("expected unrelated-change in unrelated list")
+	}
+}
+
+func TestCLIViewNoDependencyGraphWhenNoDeps(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	createChange(t, root, "change-a")
+	createChange(t, root, "change-b")
+
+	out, code := runCLI(t, bin, root, "view")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	if strings.Contains(out, "Dependency Graph") {
+		t.Error("expected no Dependency Graph section when no dependencies exist")
+	}
+}
+
+func TestCLIViewUnknownFlag(t *testing.T) {
+	bin, root := setupCLITest(t)
+	_, code := runCLI(t, bin, root, "view", "--bogus")
+	if code != 1 {
+		t.Fatalf("expected exit 1 for unknown flag, got %d", code)
 	}
 }

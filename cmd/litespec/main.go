@@ -46,6 +46,8 @@ func main() {
 		cmdCompletion(os.Args[2:])
 	case "__complete":
 		cmdComplete()
+	case "view":
+		cmdView(os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n", os.Args[1])
 		printUsage()
@@ -59,11 +61,12 @@ func printUsage() {
 Commands:
   init [--tools <ids>]                                        Initialize project structure
   new <name>                                                  Create a new change
-  list [--specs|--changes] [--sort recent|name]                   List specs or changes
+  list [--specs|--changes] [--sort recent|name|deps]                   List specs or changes
   status [<name>]                                             Show artifact states
   validate [<name>] [--all|--changes|--specs] [--type T]      Validate changes and specs
   instructions <artifact>                                     Get artifact instructions
   archive <name>                                              Apply deltas and archive change
+  view                                                        Dashboard overview with dependency graph
   update [--tools <ids>]                                      Regenerate skills and adapters
   completion <shell>                                          Generate shell completion script (bash, zsh, fish)
 
@@ -71,15 +74,15 @@ Tools:
   claude    Symlink skills into .claude/skills/ for Claude Code
 
 Flags:
-  --version    Print version
-  --help       Print this help message
-  --json       Output structured JSON (status, validate, list, instructions)
-  --strict     Treat warnings as errors (validate)
-  --all        Validate all changes and specs
-  --changes    Validate all changes only
-  --specs      Validate all specs only
-  --type       Disambiguate name type: change|spec (validate)
-  --sort       Sort changes by recent or name (list, default: recent)
+   --version    Print version
+   --help       Print this help message
+   --json       Output structured JSON (status, validate, list, instructions)
+   --strict     Treat warnings as errors (validate)
+   --all        Validate all changes and specs
+   --changes    Validate all changes only
+   --specs      Validate all specs only
+   --type       Disambiguate name type: change|spec (validate)
+   --sort       Sort changes by recent, name, or deps (list, default: recent)
 `)
 }
 
@@ -170,6 +173,222 @@ func cmdUpdate(args []string) {
 	}
 }
 
+func cmdView(args []string) {
+	if hasHelpFlag(args) {
+		printViewHelp()
+		return
+	}
+	checkUnknownFlags(args, map[string]bool{})
+
+	root, err := internal.FindProjectRoot()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+
+	specs, err := internal.ListSpecs(root)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+
+	changes, err := internal.ListChanges(root)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+
+	totalSpecs := len(specs)
+	totalReqs := 0
+	for _, s := range specs {
+		totalReqs += s.RequirementCount
+	}
+
+	activeChanges := len(changes)
+	draftChanges := 0
+	totalCompletedTasks := 0
+	totalTasks := 0
+
+	for _, c := range changes {
+		if c.TotalTasks == 0 {
+			draftChanges++
+		}
+		totalCompletedTasks += c.CompletedTasks
+		totalTasks += c.TotalTasks
+	}
+
+	taskCompletion := 0
+	if totalTasks > 0 {
+		taskCompletion = int(float64(totalCompletedTasks) / float64(totalTasks) * 100)
+	}
+
+	fmt.Println("Summary")
+	fmt.Println("-------")
+	fmt.Printf("  Specs: %d\n", totalSpecs)
+	fmt.Printf("  Requirements: %d\n", totalReqs)
+	fmt.Printf("  Active Changes: %d\n", activeChanges)
+	fmt.Printf("  Draft Changes: %d\n", draftChanges)
+	if totalTasks > 0 {
+		fmt.Printf("  Task Completion: %d%%\n", taskCompletion)
+	} else {
+		fmt.Printf("  Task Completion: N/A\n")
+	}
+	fmt.Println()
+
+	fmt.Println("Active Changes")
+	fmt.Println("--------------")
+	if len(changes) == 0 {
+		fmt.Println("  (none)")
+	} else {
+		for _, c := range changes {
+			status := changeStatusText(c)
+			relTime := internal.FormatRelativeTime(c.LastModified)
+			fmt.Printf("  %-20s %-16s %s\n", c.Name, status, relTime)
+		}
+	}
+	fmt.Println()
+
+	fmt.Println("Specifications")
+	fmt.Println("-------------")
+	if len(specs) == 0 {
+		fmt.Println("  (none)")
+	} else {
+		for _, s := range specs {
+			fmt.Printf("  %-20s %d requirements\n", s.Name, s.RequirementCount)
+		}
+	}
+
+	depMap, err := internal.LoadDepMap(root)
+	if err != nil {
+		return
+	}
+
+	hasDeps := false
+	for _, deps := range depMap {
+		if len(deps) > 0 {
+			hasDeps = true
+			break
+		}
+	}
+
+	if hasDeps {
+		fmt.Println()
+		fmt.Println("Dependency Graph")
+		fmt.Println("-----------------")
+		renderDependencyGraph(depMap, changes)
+	}
+}
+
+func renderDependencyGraph(depMap map[string][]string, changes []internal.ChangeInfo) {
+	allNodes := make(map[string]bool)
+	for _, c := range changes {
+		allNodes[c.Name] = true
+	}
+	for _, deps := range depMap {
+		for _, dep := range deps {
+			allNodes[dep] = true
+		}
+	}
+
+	reverseMap := make(map[string][]string)
+	for name, deps := range depMap {
+		for _, dep := range deps {
+			reverseMap[dep] = append(reverseMap[dep], name)
+		}
+	}
+
+	related := make(map[string]bool)
+	for name, deps := range depMap {
+		if len(deps) > 0 || len(reverseMap[name]) > 0 {
+			related[name] = true
+		}
+		for _, dep := range deps {
+			if len(reverseMap[dep]) > 0 {
+				related[dep] = true
+			}
+		}
+	}
+
+	var unrelated []string
+	for name := range allNodes {
+		if !related[name] {
+			unrelated = append(unrelated, name)
+		}
+	}
+
+	if len(related) == 0 {
+		if len(unrelated) > 0 {
+			sort.Strings(unrelated)
+			fmt.Println("\nUnrelated:")
+			for _, name := range unrelated {
+				fmt.Printf("  - %s\n", name)
+			}
+		}
+		return
+	}
+
+	var roots []string
+	for name := range related {
+		isRoot := true
+		for _, deps := range depMap {
+			for _, dep := range deps {
+				if dep == name {
+					isRoot = false
+					break
+				}
+			}
+			if !isRoot {
+				break
+			}
+		}
+		if isRoot {
+			roots = append(roots, name)
+		}
+	}
+
+	sort.Strings(roots)
+
+	seen := make(map[string]bool)
+
+	var printNode func(name string, prefix string, isLast bool)
+	printNode = func(name string, prefix string, isLast bool) {
+		if seen[name] {
+			return
+		}
+		seen[name] = true
+
+		connector := "├── "
+		if isLast {
+			connector = "└── "
+		}
+		fmt.Printf("%s%s%s\n", prefix, connector, name)
+
+		children := depMap[name]
+		sort.Strings(children)
+		for i, child := range children {
+			newPrefix := prefix
+			if isLast {
+				newPrefix += "    "
+			} else {
+				newPrefix += "│   "
+			}
+			printNode(child, newPrefix, i == len(children)-1)
+		}
+	}
+
+	for i, root := range roots {
+		printNode(root, "", i == len(roots)-1)
+	}
+
+	if len(unrelated) > 0 {
+		sort.Strings(unrelated)
+		fmt.Println("\nUnrelated:")
+		for _, name := range unrelated {
+			fmt.Printf("  - %s\n", name)
+		}
+	}
+}
+
 func cmdList(args []string) {
 	if hasHelpFlag(args) {
 		printListHelp()
@@ -188,7 +407,7 @@ func cmdList(args []string) {
 			asJSON = true
 		case "--sort":
 			if i+1 >= len(args) {
-				fmt.Fprintf(os.Stderr, "error: --sort requires a value (recent or name)\n")
+				fmt.Fprintf(os.Stderr, "error: --sort requires a value (recent, name, or deps)\n")
 				os.Exit(1)
 			}
 			sortBy = args[i+1]
@@ -199,8 +418,8 @@ func cmdList(args []string) {
 	if sortBy == "" {
 		sortBy = "recent"
 	}
-	if sortBy != "recent" && sortBy != "name" {
-		fmt.Fprintf(os.Stderr, "error: --sort must be 'recent' or 'name', got %q\n", sortBy)
+	if sortBy != "recent" && sortBy != "name" && sortBy != "deps" {
+		fmt.Fprintf(os.Stderr, "error: --sort must be 'recent', 'name', or 'deps', got %q\n", sortBy)
 		os.Exit(1)
 	}
 
@@ -238,15 +457,20 @@ func cmdList(args []string) {
 				fmt.Fprintf(os.Stderr, "error: %v\n", listErr)
 				os.Exit(1)
 			}
-			sortChanges(changes, sortBy)
+			sortChanges(changes, sortBy, root)
 			for _, c := range changes {
-				out.Changes = append(out.Changes, internal.ChangeListItemJSON{
+				item := internal.ChangeListItemJSON{
 					Name:           c.Name,
 					CompletedTasks: c.CompletedTasks,
 					TotalTasks:     c.TotalTasks,
 					LastModified:   c.LastModified.Format(time.RFC3339),
 					Status:         internal.ChangeListStatus(c.CompletedTasks, c.TotalTasks),
-				})
+				}
+				meta, metaErr := internal.ReadChangeMeta(root, c.Name)
+				if metaErr == nil && len(meta.DependsOn) > 0 {
+					item.DependsOn = meta.DependsOn
+				}
+				out.Changes = append(out.Changes, item)
 			}
 		}
 
@@ -284,7 +508,7 @@ func cmdList(args []string) {
 		fmt.Fprintf(os.Stderr, "error: %v\n", listErr)
 		os.Exit(1)
 	}
-	sortChanges(changes, sortBy)
+	sortChanges(changes, sortBy, root)
 	fmt.Println("Changes:")
 	if len(changes) == 0 {
 		fmt.Println("  (none)")
@@ -665,6 +889,16 @@ func cmdArchive(args []string) {
 				os.Exit(1)
 			}
 		}
+
+		dependents, depErr := internal.GetDependents(root, name)
+		if depErr != nil {
+			fmt.Fprintf(os.Stderr, "error checking dependents: %v\n", depErr)
+			os.Exit(1)
+		}
+		if len(dependents) > 0 {
+			fmt.Fprintf(os.Stderr, "ERROR  active changes depend on %q: %s. Archive them first or use --allow-incomplete.\n", name, strings.Join(dependents, ", "))
+			os.Exit(1)
+		}
 	}
 
 	writes, err := internal.PrepareArchiveWrites(root, name)
@@ -813,19 +1047,20 @@ Examples:
 }
 
 func printListHelp() {
-	fmt.Print(`Usage: litespec list [--specs|--changes] [--sort recent|name] [--json]
+	fmt.Print(`Usage: litespec list [--specs|--changes] [--sort recent|name|deps] [--json]
 
 List active changes in the project (default) or specs with --specs.
 
 Flags:
   --specs           List specs instead of changes
   --changes         List changes (default)
-  --sort <field>    Sort changes by 'recent' (default) or 'name'
+  --sort <field>    Sort changes by 'recent' (default), 'name', or 'deps'
   --json            Output as JSON
 
 Examples:
   litespec list
   litespec list --changes --sort name
+  litespec list --sort deps
   litespec list --specs --json
 `)
 }
@@ -906,6 +1141,16 @@ Examples:
 `)
 }
 
+func printViewHelp() {
+	fmt.Print(`Usage: litespec view
+
+Display a dashboard overview of specs, changes, and their dependency relationships.
+
+Examples:
+  litespec view
+`)
+}
+
 func splitCSV(s string) []string {
 	parts := strings.Split(s, ",")
 	for i := range parts {
@@ -923,12 +1168,19 @@ func contains(slice []string, val string) bool {
 	return false
 }
 
-func sortChanges(changes []internal.ChangeInfo, sortBy string) {
+func sortChanges(changes []internal.ChangeInfo, sortBy string, root string) {
 	switch sortBy {
 	case "name":
 		sort.Slice(changes, func(i, j int) bool {
 			return changes[i].Name < changes[j].Name
 		})
+	case "deps":
+		depMap, err := internal.LoadDepMap(root)
+		if err != nil {
+			return
+		}
+		sorted := internal.TopologicalSort(changes, depMap)
+		copy(changes, sorted)
 	default:
 		sort.Slice(changes, func(i, j int) bool {
 			return changes[i].LastModified.After(changes[j].LastModified)
