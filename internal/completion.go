@@ -90,6 +90,7 @@ func completeCommands() []Completion {
 		{"validate", "Validate changes and specs"},
 		{"instructions", "Get artifact instructions"},
 		{"archive", "Apply deltas and archive change"},
+		{"view", "Dashboard overview with dependency graph"},
 		{"update", "Regenerate skills and adapters"},
 		{"completion", "Generate shell completion script"},
 	}
@@ -163,7 +164,7 @@ var commandFlagDefs = map[string]commandFlags{
 		flags: map[string]string{
 			"--specs":   "List specs instead of changes",
 			"--changes": "List changes (default)",
-			"--sort":    "Sort by 'recent' or 'name'",
+			"--sort":    "Sort by 'recent', 'name', or 'deps'",
 			"--json":    "Output as JSON",
 		},
 	},
@@ -203,6 +204,7 @@ var commandFlagDefs = map[string]commandFlags{
 			"--tools": "Tool IDs (comma-separated)",
 		},
 	},
+	"view":       {},
 	"completion": {},
 }
 
@@ -307,6 +309,7 @@ func completeFlagValue(root string, cmd string, flag string) []Completion {
 		return []Completion{
 			{"recent", "Sort by last modified"},
 			{"name", "Sort alphabetically"},
+			{"deps", "Sort by dependency order"},
 		}
 	case "--type":
 		return []Completion{

@@ -147,15 +147,15 @@ func TestCompleteValidateFlags(t *testing.T) {
 
 func TestCompleteSortValues(t *testing.T) {
 	result := Complete("", []string{"list", "--sort", ""})
-	if len(result) != 2 {
-		t.Fatalf("expected 2 sort values, got %d", len(result))
+	if len(result) != 3 {
+		t.Fatalf("expected 3 sort values, got %d", len(result))
 	}
 	names := make(map[string]bool)
 	for _, c := range result {
 		names[c.Candidate] = true
 	}
-	if !names["recent"] || !names["name"] {
-		t.Errorf("expected recent and name, got %v", names)
+	if !names["recent"] || !names["name"] || !names["deps"] {
+		t.Errorf("expected recent, name, and deps, got %v", names)
 	}
 }
 

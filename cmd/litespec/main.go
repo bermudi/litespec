@@ -280,14 +280,9 @@ func cmdView(args []string) {
 }
 
 func renderDependencyGraph(depMap map[string][]string, changes []internal.ChangeInfo) {
-	allNodes := make(map[string]bool)
+	activeNames := make(map[string]bool)
 	for _, c := range changes {
-		allNodes[c.Name] = true
-	}
-	for _, deps := range depMap {
-		for _, dep := range deps {
-			allNodes[dep] = true
-		}
+		activeNames[c.Name] = true
 	}
 
 	reverseMap := make(map[string][]string)
@@ -298,19 +293,19 @@ func renderDependencyGraph(depMap map[string][]string, changes []internal.Change
 	}
 
 	related := make(map[string]bool)
-	for name, deps := range depMap {
-		if len(deps) > 0 || len(reverseMap[name]) > 0 {
+	for name := range activeNames {
+		if len(depMap[name]) > 0 || len(reverseMap[name]) > 0 {
 			related[name] = true
 		}
-		for _, dep := range deps {
-			if len(reverseMap[dep]) > 0 {
+		for _, dep := range depMap[name] {
+			if activeNames[dep] {
 				related[dep] = true
 			}
 		}
 	}
 
 	var unrelated []string
-	for name := range allNodes {
+	for name := range activeNames {
 		if !related[name] {
 			unrelated = append(unrelated, name)
 		}
@@ -329,19 +324,7 @@ func renderDependencyGraph(depMap map[string][]string, changes []internal.Change
 
 	var roots []string
 	for name := range related {
-		isRoot := true
-		for _, deps := range depMap {
-			for _, dep := range deps {
-				if dep == name {
-					isRoot = false
-					break
-				}
-			}
-			if !isRoot {
-				break
-			}
-		}
-		if isRoot {
+		if len(depMap[name]) == 0 {
 			roots = append(roots, name)
 		}
 	}
@@ -363,7 +346,7 @@ func renderDependencyGraph(depMap map[string][]string, changes []internal.Change
 		}
 		fmt.Printf("%s%s%s\n", prefix, connector, name)
 
-		children := depMap[name]
+		children := reverseMap[name]
 		sort.Strings(children)
 		for i, child := range children {
 			newPrefix := prefix
@@ -720,24 +703,17 @@ func cmdValidate(args []string) {
 		validateSpecs := flagSpecs || flagAll || (!flagChanges && !flagSpecs)
 		validateChanges := flagChanges || flagAll || (!flagChanges && !flagSpecs)
 
-		result = &internal.ValidationResult{Valid: true}
-
-		if validateSpecs {
-			specResult, specErr := internal.ValidateSpecs(root)
-			if specErr != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", specErr)
-				os.Exit(1)
-			}
-			result.Errors = append(result.Errors, specResult.Errors...)
-			result.Warnings = append(result.Warnings, specResult.Warnings...)
-		}
-
-		if validateChanges {
+		if validateSpecs && validateChanges {
+			result, err = internal.ValidateAll(root, strict)
+		} else if validateSpecs {
+			result, err = internal.ValidateSpecs(root)
+		} else {
 			changes, listErr := internal.ListChanges(root)
 			if listErr != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", listErr)
 				os.Exit(1)
 			}
+			result = &internal.ValidationResult{Valid: true}
 			for _, ci := range changes {
 				changeResult, changeErr := internal.ValidateChange(root, ci.Name)
 				if changeErr != nil {
@@ -747,11 +723,26 @@ func cmdValidate(args []string) {
 				result.Errors = append(result.Errors, changeResult.Errors...)
 				result.Warnings = append(result.Warnings, changeResult.Warnings...)
 			}
-		}
 
-		result.Valid = len(result.Errors) == 0
-		if strict && len(result.Warnings) > 0 {
-			result.Valid = false
+			depMap, depErr := internal.LoadDepMap(root)
+			if depErr == nil {
+				cycles := internal.DetectCycles(depMap)
+				for _, cycle := range cycles {
+					path := strings.Join(cycle, " -> ")
+					result.Errors = append(result.Errors, internal.ValidationIssue{
+						Severity: internal.SeverityError,
+						Message:  fmt.Sprintf("dependency cycle detected: %s", path),
+					})
+				}
+
+				overlaps := internal.DetectOverlaps(root, changes, depMap)
+				result.Warnings = append(result.Warnings, overlaps...)
+			}
+
+			result.Valid = len(result.Errors) == 0
+			if strict && len(result.Warnings) > 0 {
+				result.Valid = false
+			}
 		}
 	}
 
@@ -889,13 +880,17 @@ func cmdArchive(args []string) {
 				os.Exit(1)
 			}
 		}
+	}
 
-		dependents, depErr := internal.GetDependents(root, name)
-		if depErr != nil {
-			fmt.Fprintf(os.Stderr, "error checking dependents: %v\n", depErr)
-			os.Exit(1)
-		}
-		if len(dependents) > 0 {
+	dependents, depErr := internal.GetDependents(root, name)
+	if depErr != nil {
+		fmt.Fprintf(os.Stderr, "error checking dependents: %v\n", depErr)
+		os.Exit(1)
+	}
+	if len(dependents) > 0 {
+		if allowIncomplete {
+			fmt.Fprintf(os.Stderr, "WARN  active changes depend on %q: %s\n", name, strings.Join(dependents, ", "))
+		} else {
 			fmt.Fprintf(os.Stderr, "ERROR  active changes depend on %q: %s. Archive them first or use --allow-incomplete.\n", name, strings.Join(dependents, ", "))
 			os.Exit(1)
 		}
@@ -1177,6 +1172,16 @@ func sortChanges(changes []internal.ChangeInfo, sortBy string, root string) {
 	case "deps":
 		depMap, err := internal.LoadDepMap(root)
 		if err != nil {
+			return
+		}
+		cycles := internal.DetectCycles(depMap)
+		if len(cycles) > 0 {
+			for _, cycle := range cycles {
+				fmt.Fprintf(os.Stderr, "WARN  dependency cycle: %s\n", strings.Join(cycle, " -> "))
+			}
+			sort.Slice(changes, func(i, j int) bool {
+				return changes[i].Name < changes[j].Name
+			})
 			return
 		}
 		sorted := internal.TopologicalSort(changes, depMap)

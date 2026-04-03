@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 type ResolvedDep struct {
@@ -169,41 +170,30 @@ func TopologicalSort(changes []ChangeInfo, depMap map[string][]string) []ChangeI
 		}
 	}
 
-	var queue []string
+	var level []string
 	for name, deg := range inDegree {
 		if deg == 0 {
-			queue = append(queue, name)
+			level = append(level, name)
 		}
 	}
+	sort.Strings(level)
 
-	sortStrings := func(s []string) {
-		for i := 0; i < len(s); i++ {
-			for j := i + 1; j < len(s); j++ {
-				if s[i] > s[j] {
-					s[i], s[j] = s[j], s[i]
+	var result []ChangeInfo
+	for len(level) > 0 {
+		var nextLevel []string
+		for _, name := range level {
+			result = append(result, changeMap[name])
+			neighbors := append([]string{}, adj[name]...)
+			sort.Strings(neighbors)
+			for _, neighbor := range neighbors {
+				inDegree[neighbor]--
+				if inDegree[neighbor] == 0 {
+					nextLevel = append(nextLevel, neighbor)
 				}
 			}
 		}
-	}
-
-	sortStrings(queue)
-
-	var result []ChangeInfo
-	for len(queue) > 0 {
-		name := queue[0]
-		queue = queue[1:]
-		result = append(result, changeMap[name])
-
-		neighbors := append([]string{}, adj[name]...)
-		sortStrings(neighbors)
-
-		for _, neighbor := range neighbors {
-			inDegree[neighbor]--
-			if inDegree[neighbor] == 0 {
-				queue = append(queue, neighbor)
-				sortStrings(queue)
-			}
-		}
+		sort.Strings(nextLevel)
+		level = nextLevel
 	}
 
 	for _, c := range changes {
@@ -220,13 +210,6 @@ func TopologicalSort(changes []ChangeInfo, depMap map[string][]string) []ChangeI
 	}
 
 	return result
-}
-
-type OverlapPair struct {
-	ChangeA     string
-	ChangeB     string
-	Capability  string
-	Requirement string
 }
 
 func DetectOverlaps(root string, changes []ChangeInfo, depMap map[string][]string) []ValidationIssue {

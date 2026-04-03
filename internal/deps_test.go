@@ -338,11 +338,11 @@ func TestTopologicalSortUnrelated(t *testing.T) {
 	if result[0].Name != "a" {
 		t.Errorf("first should be a, got %s", result[0].Name)
 	}
-	if result[1].Name != "b" {
-		t.Errorf("second should be b (in-degree reaches 0 before c is processed), got %s", result[1].Name)
+	if result[1].Name != "c" {
+		t.Errorf("second should be c (level-0 alphabetical), got %s", result[1].Name)
 	}
-	if result[2].Name != "c" {
-		t.Errorf("third should be c, got %s", result[2].Name)
+	if result[2].Name != "b" {
+		t.Errorf("third should be b (level-1), got %s", result[2].Name)
 	}
 }
 

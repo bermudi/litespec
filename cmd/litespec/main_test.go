@@ -707,6 +707,9 @@ The system SHALL work.
 	if !strings.Contains(out, "archived successfully") {
 		t.Errorf("expected archive success, got: %s", out)
 	}
+	if !strings.Contains(out, "WARN") || !strings.Contains(out, "active changes depend on") {
+		t.Errorf("expected warning about active dependents, got: %s", out)
+	}
 }
 
 func TestCLIListSortDeps(t *testing.T) {
@@ -880,11 +883,26 @@ func TestCLIViewWithDependencyGraph(t *testing.T) {
 	if !strings.Contains(out, "Dependency Graph") {
 		t.Error("expected Dependency Graph section when dependencies exist")
 	}
-	if !strings.Contains(out, "parent-change") {
+	lines := strings.Split(out, "\n")
+	parentIdx := -1
+	childIdx := -1
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "parent-change" || strings.HasSuffix(trimmed, "parent-change") {
+			parentIdx = i
+		}
+		if strings.Contains(line, "child-change") && !strings.Contains(line, "Active Changes") {
+			childIdx = i
+		}
+	}
+	if parentIdx == -1 {
 		t.Error("expected parent-change in graph")
 	}
-	if !strings.Contains(out, "child-change") {
+	if childIdx == -1 {
 		t.Error("expected child-change in graph")
+	}
+	if parentIdx != -1 && childIdx != -1 && childIdx <= parentIdx {
+		t.Errorf("expected parent-change (line %d) before child-change (line %d) in tree", parentIdx, childIdx)
 	}
 	if !strings.Contains(out, "└──") {
 		t.Error("expected box-drawing characters in graph")
@@ -918,5 +936,84 @@ func TestCLIViewUnknownFlag(t *testing.T) {
 	_, code := runCLI(t, bin, root, "view", "--bogus")
 	if code != 1 {
 		t.Fatalf("expected exit 1 for unknown flag, got %d", code)
+	}
+}
+
+func TestCLIValidateChangesDetectsCycle(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	changeDirA := filepath.Join(root, "specs", "changes", "change-a")
+	os.MkdirAll(changeDirA, 0o755)
+	os.WriteFile(filepath.Join(changeDirA, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - change-b\n"), 0o644)
+
+	changeDirB := filepath.Join(root, "specs", "changes", "change-b")
+	os.MkdirAll(changeDirB, 0o755)
+	os.WriteFile(filepath.Join(changeDirB, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - change-a\n"), 0o644)
+
+	out, code := runCLI(t, bin, root, "validate", "--changes", "--json")
+	if code != 1 {
+		t.Fatalf("expected exit 1 for cycle, got %d: %s", code, out)
+	}
+	if !strings.Contains(out, "cycle") {
+		t.Errorf("expected cycle error in output, got: %s", out)
+	}
+}
+
+func TestCLIValidateAllDetectsCycle(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	changeDirA := filepath.Join(root, "specs", "changes", "change-a")
+	os.MkdirAll(changeDirA, 0o755)
+	os.WriteFile(filepath.Join(changeDirA, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - change-b\n"), 0o644)
+
+	changeDirB := filepath.Join(root, "specs", "changes", "change-b")
+	os.MkdirAll(changeDirB, 0o755)
+	os.WriteFile(filepath.Join(changeDirB, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - change-a\n"), 0o644)
+
+	out, code := runCLI(t, bin, root, "validate", "--all", "--json")
+	if code != 1 {
+		t.Fatalf("expected exit 1 for cycle, got %d: %s", code, out)
+	}
+	if !strings.Contains(out, "cycle") {
+		t.Errorf("expected cycle error in output, got: %s", out)
+	}
+}
+
+func TestCLIListSortDepsWithCycle(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	changeDirA := filepath.Join(root, "specs", "changes", "change-a")
+	os.MkdirAll(changeDirA, 0o755)
+	os.WriteFile(filepath.Join(changeDirA, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - change-b\n"), 0o644)
+
+	changeDirB := filepath.Join(root, "specs", "changes", "change-b")
+	os.MkdirAll(changeDirB, 0o755)
+	os.WriteFile(filepath.Join(changeDirB, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - change-a\n"), 0o644)
+
+	out, code := runCLI(t, bin, root, "list", "--sort", "deps", "--json")
+	if code != 0 {
+		t.Fatalf("expected exit 0 for sort deps with cycle, got %d: %s", code, out)
+	}
+	if !strings.Contains(out, "WARN") {
+		t.Errorf("expected cycle warning, got: %s", out)
+	}
+
+	jsonStart := strings.Index(out, "{")
+	if jsonStart < 0 {
+		t.Fatalf("no JSON found in output: %s", out)
+	}
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out[jsonStart:]), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	changes := result["changes"].([]interface{})
+	if len(changes) != 2 {
+		t.Fatalf("expected 2 changes, got %d", len(changes))
+	}
+	if changes[0].(map[string]interface{})["name"] != "change-a" {
+		t.Errorf("expected alphabetical order, first = %v", changes[0].(map[string]interface{})["name"])
+	}
+	if changes[1].(map[string]interface{})["name"] != "change-b" {
+		t.Errorf("expected alphabetical order, second = %v", changes[1].(map[string]interface{})["name"])
 	}
 }
