@@ -1,6 +1,6 @@
 # skill-generation
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Template Missing Error
 
