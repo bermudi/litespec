@@ -12,9 +12,9 @@
 
 ## Phase 3: Post-Archive Verification
 
-- [ ] After `ArchiveChange` rename, verify archived directory exists in archive path
-- [ ] Verify all affected canon specs parse successfully after merge
-- [ ] Report verification failures with actionable error messages
+- [x] After `ArchiveChange` rename, verify archived directory exists in archive path
+- [x] Verify all affected canon specs parse successfully after merge
+- [x] Report verification failures with actionable error messages
 
 ## Phase 4: Testing
 
