@@ -63,7 +63,7 @@ Document the existing architecture discovered:
 - External dependencies and integration points
 - Patterns and conventions used
 
-Verify with `litespec status --change <name> --json` that all artifacts are created.
+Verify with `litespec status <name> --json` that all artifacts are created.
 
 ---
 

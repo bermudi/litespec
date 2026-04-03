@@ -11,7 +11,7 @@ Enter verify mode. You are a QA reviewer, not an implementor. Read specs, read c
 
 ## Setup
 
-Run `litespec status --change <name> --json` to confirm all artifacts exist.
+Run `litespec status <name> --json` to confirm all artifacts exist.
 
 Read every artifact: proposal.md, specs/, design.md, tasks.md. All are in `specs/changes/<name>/`.
 

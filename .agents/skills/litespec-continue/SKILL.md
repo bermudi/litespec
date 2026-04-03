@@ -11,7 +11,7 @@ Continue the next missing artifact for an existing change. Create exactly ONE ar
 
 Run `litespec list --json` to see changes. If no name given, prompt user to select.
 
-Run `litespec status --change <name> --json` to get artifact states.
+Run `litespec status <name> --json` to get artifact states.
 Response: {changeName, schemaName, isComplete, artifacts: [{id, outputPath, status, missingDeps}]}
 
 ---
@@ -28,8 +28,8 @@ All artifacts exist. Do NOT create anything. Tell the user:
 ### At least one artifact is "ready"
 Pick the **first** ready artifact. This is your one task.
 
-Run `litespec instructions <artifact-id> --change <name> --json` for that artifact.
-Response: {changeName, artifactId, changeDir, outputPath, description, instruction, template, dependencies: [{id, done, path}], unlocks}
+Run `litespec instructions <artifact-id> --json` for that artifact.
+Response: {artifactId, description, instruction, template, outputPath}
 
 ### All remaining artifacts are "blocked"
 Nothing can be created. Tell the user exactly which artifacts are blocked and which dependencies are missing:
@@ -40,7 +40,7 @@ Nothing can be created. Tell the user exactly which artifacts are blocked and wh
 
 ## Creating the Artifact
 
-1. Read every dependency file listed in `dependencies` — these are your inputs
+1. Read every dependency file listed in `missingDeps` — these are your inputs (check the change directory for existing artifacts)
 2. Follow the `instruction` and `template` structure exactly
 3. Write the file to `outputPath` within the change directory
 
@@ -58,5 +58,5 @@ Do not chain into the next artifact. Do not check if more are ready. Do not loop
 
 Report:
 - Which artifact was created
-- What artifacts it unlocked (check `unlocks` from the instructions response)
+- What artifacts it may have unblocked (based on artifact dependency order)
 - That the user should invoke continue again for the next one

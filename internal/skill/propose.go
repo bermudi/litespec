@@ -14,7 +14,7 @@ Ask the user what they want to build. Derive a kebab-case change name from the d
 
 Then check if it already exists:
 ` + "```bash" + `
-litespec status --change <name> --json
+litespec status <name> --json
 ` + "```" + `
 
 **If the change exists**, pick up where it left off — check which artifacts are already done and continue from the next missing one. Do not re-create completed artifacts.
@@ -32,17 +32,17 @@ Work through artifacts in dependency order. Repeat until all artifacts are creat
 
 1. **Check status:**
 ` + "```bash" + `
-litespec status --change <name> --json
+litespec status <name> --json
 ` + "```" + `
    Response: ` + "`{changeName, schemaName, isComplete, artifacts: [{id, outputPath, status, missingDeps}]}`" + `
 
 2. **Get instructions for the next "ready" artifact:**
 ` + "```bash" + `
-litespec instructions <artifact-id> --change <name> --json
+litespec instructions <artifact-id> --json
 ` + "```" + `
-   Response: ` + "`{changeName, artifactId, changeDir, outputPath, description, instruction, template, dependencies: [{id, done, path}], unlocks}`" + `
+   Response: ` + "`{artifactId, description, instruction, template, outputPath}`" + `
 
-3. **Read dependency files** listed in ` + "`dependencies`" + ` — these are inputs that inform the current artifact.
+3. **Read dependency files** — earlier artifacts in the dependency order (proposal → specs → design/tasks) are inputs that inform the current artifact.
 
 4. **Create the artifact file** at ` + "`outputPath`" + `, using the template structure as a guide.
 

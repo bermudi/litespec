@@ -4,7 +4,7 @@ func init() {
 	Register("archive", archiveTemplate)
 }
 
-const archiveTemplate = `Run ` + "`litespec validate --change <name>`" + ` to verify the change.
+const archiveTemplate = `Run ` + "`litespec validate <name>`" + ` to verify the change.
 
 Review validation output. If errors exist, fix them before proceeding.
 

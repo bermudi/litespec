@@ -169,11 +169,13 @@ Convention over configuration. No config file. All defaults baked in. If a need 
 | Command | Purpose |
 |---------|---------|
 | `litespec init [--tools ...]` | Scaffold `specs/` dir + generate skills (+ optional tool-specific commands) |
+| `litespec new <name>` | Create a new change directory with `.litespec.yaml` metadata |
 | `litespec validate [<name>] [--all\|--changes\|--specs] [--type change\|spec] [--strict]` | Validate artifact structure, delta syntax, dangling deltas, dependency cycles/overlaps |
 | `litespec status [<name>]` | Show artifact graph state (BLOCKED/READY/DONE) |
 | `litespec instructions <artifact>` | Return artifact-specific instructions for AI to create an artifact |
 | `litespec list [--specs\|--changes] [--sort name\|recent\|deps]` | List specs or changes (deps sort uses topological order) |
 | `litespec view` | Display dashboard overview with progress bars, specs, changes, and dependency graph |
+| `litespec update [--tools ...]` | Regenerate skills and adapter symlinks |
 | `litespec archive <change> [--allow-incomplete]` | Apply deltas + move to archive (warns if other changes depend on this one) |
 | `litespec completion <shell>` | Print shell completion script (bash, zsh, fish) |
 | `litespec __complete <words...>` | Hidden backend for dynamic shell completions |

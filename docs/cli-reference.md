@@ -66,6 +66,7 @@ litespec new <name>
 - Creates `specs/changes/<name>/specs/` directory for delta specs
 - Creates `.litespec.yaml` with metadata (schema, timestamp)
 - Fails if change already exists
+- Validates change name (rejects empty, path separators, `..`, whitespace, reserved names like `canon`/`changes`/`archive`, names longer than 100 characters)
 
 **Examples:**
 ```bash
@@ -87,7 +88,7 @@ litespec new fix-rate-limit
 List active changes or canonical specs with metadata.
 
 ```
-litespec list [--specs|--changes] [--sort recent|name] [--json]
+litespec list [--specs|--changes] [--sort recent|name|deps] [--json]
 ```
 
 **Flags:**
@@ -96,7 +97,7 @@ litespec list [--specs|--changes] [--sort recent|name] [--json]
 |------|-------------|
 | `--specs` | List specs instead of changes |
 | `--changes` | List changes (default) |
-| `--sort <field>` | Sort by `recent` (default) or `name` |
+| `--sort <field>` | Sort by `recent` (default), `name`, or `deps` (topological) |
 | `--json` | Output as JSON |
 
 **Default output (changes):**
@@ -135,9 +136,11 @@ Changes:
       "completedTasks": 5,
       "totalTasks": 8,
       "lastModified": "2026-04-02T10:30:00Z",
-      "status": "in-progress"
+      "status": "in-progress",
+      "dependsOn": ["core-setup"]
     }
-  ]
+  ],
+  "warnings": []
 }
 ```
 
@@ -219,20 +222,23 @@ litespec status add-auth --json
 
 All changes:
 ```json
-[
-  {
-    "changeName": "add-auth",
-    "schemaName": "spec-driven",
-    "isComplete": false,
-    "artifacts": [
-      {
-        "id": "proposal",
-        "outputPath": "proposal.md",
-        "status": "done"
-      }
-    ]
-  }
-]
+{
+  "changes": [
+    {
+      "changeName": "add-auth",
+      "schemaName": "spec-driven",
+      "isComplete": false,
+      "artifacts": [
+        {
+          "id": "proposal",
+          "outputPath": "proposal.md",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}
 ```
 
 **Tips:**
@@ -269,6 +275,17 @@ litespec validate [<name>] [--all|--changes|--specs] [--type change|spec] [--str
 - Delta spec syntax (ADDED/MODIFIED/REMOVED/RENAMED markers)
 - Dangling deltas (references to non-existent requirements)
 - Spec format requirements (SHALL/MUST in body, scenarios for ADDED/MODIFIED)
+- Whole-word keyword matching (SHALL/MUST not counted inside code blocks)
+- Duplicate requirement names within a delta spec
+- Duplicate scenario names within a requirement
+- Scenario content validation (WHEN and THEN markers required)
+- Cross-operation conflict detection (same requirement targeted by multiple operations)
+- RENAMED same-name detection (warning when old name equals new name)
+- Dependency cycle detection (with `--all` or `--changes`)
+- Dependency overlap detection (unrelated changes modifying same requirement)
+- Skill template validation (warning for missing templates)
+- Tasks.md phase heading requirement
+- Dependency resolution (declared deps must exist as active or archived changes)
 
 **Default behavior (no arguments):**
 - Validates all changes and all specs (equivalent to `--all`)
@@ -384,7 +401,7 @@ litespec instructions tasks
 
 **Tips:**
 - Each artifact has unique guidance (proposal focuses on motivation/scope, specs on delta format, design on architecture, tasks on phases)
-- Instructions are generated from canonical specs
+- Instructions are static templates that provide consistent guidance for each artifact type
 - Use this to understand expected artifact structure
 
 ---
@@ -477,6 +494,61 @@ litespec update --tools claude
 - Use after modifying canonical specs to regenerate skills
 - Faster than `init` for skill refresh
 - Does not create project structure (assumes it exists)
+
+---
+
+### `view`
+
+Display a dashboard overview with progress bars, change categories, and dependency graph.
+
+```
+litespec view
+```
+
+**Behavior:**
+- Shows summary section (spec count, draft/active/completed changes, task progress)
+- Lists active changes with progress bars `[█████░░░░░]` and percentage
+- Lists draft changes (no tasks yet)
+- Lists completed changes (all tasks done)
+- Lists specifications sorted by requirement count (highest first)
+- Renders dependency graph with box-drawing characters when any active change has `dependsOn`
+
+**Example output:**
+```
+
+Litespec Dashboard
+
+════════════════════════════════════════════════════════════
+Summary:
+  ● Specifications: 14 specs, 70 requirements
+  ● Draft Changes: 1
+  ● Active Changes: 2 in progress
+  ● Completed Changes: 1
+  ● Task Progress: 15/20 (75% complete)
+
+Active Changes
+────────────────────────────────────────────────────────────
+  ◉ add-rate-limiting                [██████████░░░░░░░░░] 53%
+  ◉ refactor-auth                    [████████████████░░░░] 80%
+
+Specifications
+────────────────────────────────────────────────────────────
+  ▪ validate                         13 requirements
+  ▪ docs-site                         8 requirements
+
+Dependency Graph
+────────────────────────────────────────────────────────────
+  ├── core-setup
+  │   └── add-rate-limiting
+
+════════════════════════════════════════════════════════════
+```
+
+**Tips:**
+- Use for a quick overview of project status
+- Active changes are sorted by completion percentage (lowest first)
+- Dependency graph only appears when at least one change has `dependsOn`
+- Use `litespec list` for more detailed change/spec information
 
 ---
 
