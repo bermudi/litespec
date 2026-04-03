@@ -5,10 +5,10 @@
 
 ## Phase 2: Atomic Write Flow
 
-- [ ] Implement `writeAtomic(path string, content string, backup *string) error` — writes to `path.tmp`, verifies parse, renames to final
-- [ ] Implement rollback that restores backup content if atomic write fails partway
-- [ ] Refactor `WritePendingSpecs` to use atomic writes with backups
-- [ ] Update `cmdArchive` in `main.go` to use the new flow
+- [x] Implement `writeAtomic(path string, content string, backup *string) error` — writes to `path.tmp`, verifies parse, renames to final
+- [x] Implement rollback that restores backup content if atomic write fails partway
+- [x] Refactor `WritePendingSpecs` to use atomic writes with backups
+- [x] Update `cmdArchive` in `main.go` to use the new flow
 
 ## Phase 3: Post-Archive Verification
 
