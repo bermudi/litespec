@@ -17,7 +17,7 @@ func TestCompleteCommandNames(t *testing.T) {
 		names[c.Candidate] = true
 	}
 
-	for _, cmd := range []string{"init", "new", "list", "status", "validate", "instructions", "archive", "update", "completion"} {
+	for _, cmd := range []string{"init", "new", "list", "status", "validate", "instructions", "archive", "view", "update", "completion"} {
 		if !names[cmd] {
 			t.Errorf("missing command %q in completions", cmd)
 		}

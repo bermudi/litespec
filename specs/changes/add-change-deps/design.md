@@ -67,9 +67,9 @@ No new external dependencies. Graph algorithms are standard Go (DFS + topologica
 - Affects: `ChangeMeta` YAML serialization/deserialization
 
 ### `internal/deps.go` (NEW)
-- `ResolveDep(root, name string) (resolvedName string, isActive bool, found bool)` — resolve a single dependency name to active/archived
+- `ResolveDep(root, name string) (ResolvedDep, bool)` — resolve a single dependency name to active/archived
 - `ResolveDeps(root string, deps []string) ([]ResolvedDep, error)` — resolve all deps for a change, error on missing
-- `DetectCycles(root string) ([][]string, error)` — find all cycles in active change graph
+- `DetectCycles(depMap map[string][]string) [][]string` — find all cycles in active change graph
 - `TopologicalSort(changes []ChangeInfo, depMap map[string][]string) []ChangeInfo` — sort changes by dependency order
 - `DetectOverlaps(root string, changes []ChangeInfo, depMap map[string][]string) []ValidationIssue` — find overlapping delta targets
 

@@ -239,9 +239,7 @@ func cmdView(args []string) {
 
 	fmt.Println("Summary:")
 	fmt.Printf("  ● Specifications: %d specs, %d requirements\n", len(specs), totalReqs)
-	if len(draft) > 0 {
-		fmt.Printf("  ● Draft Changes: %d\n", len(draft))
-	}
+	fmt.Printf("  ● Draft Changes: %d\n", len(draft))
 	fmt.Printf("  ● Active Changes: %d in progress\n", len(active))
 	fmt.Printf("  ● Completed Changes: %d\n", len(completed))
 	if totalTasks > 0 {

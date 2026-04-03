@@ -255,6 +255,44 @@ func ChangeExists(root, name string) bool {
 	return err == nil
 }
 
+func ListArchivedChanges(root string) ([]string, error) {
+	archiveDir := ArchivePath(root)
+	entries, err := os.ReadDir(archiveDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read archive directory: %w", err)
+	}
+
+	var names []string
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		names = append(names, ParseArchivedName(entry.Name()))
+	}
+	return names, nil
+}
+
+func GetDependents(root, name string) ([]string, error) {
+	depMap, err := LoadDepMap(root)
+	if err != nil {
+		return nil, err
+	}
+
+	var dependents []string
+	for changeName, deps := range depMap {
+		for _, dep := range deps {
+			if dep == name {
+				dependents = append(dependents, changeName)
+				break
+			}
+		}
+	}
+	return dependents, nil
+}
+
 func ReadChangeMeta(root, name string) (*ChangeMeta, error) {
 	metaPath := filepath.Join(ChangePath(root, name), MetaFileName)
 	data, err := os.ReadFile(metaPath)

@@ -213,4 +213,4 @@ Changes can declare optional `dependsOn` relationships in `.litespec.yaml`. This
 - **Archive guard** — `archive` warns when other active changes depend on the change being archived; errors unless `--allow-incomplete`
 - **Dependency graph** — `view` renders a tree-style DAG with box-drawing characters when any active change has `dependsOn`
 
-Resolution ignores archived changes — dependencies reference active changes only.
+Resolution checks active changes first, then archived changes. Active takes priority on name collision. Archived change names are extracted by stripping the date prefix.

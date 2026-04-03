@@ -12,26 +12,6 @@ type ResolvedDep struct {
 	IsActive bool
 }
 
-func ListArchivedChanges(root string) ([]string, error) {
-	archiveDir := ArchivePath(root)
-	entries, err := os.ReadDir(archiveDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("read archive directory: %w", err)
-	}
-
-	var names []string
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		names = append(names, ParseArchivedName(entry.Name()))
-	}
-	return names, nil
-}
-
 func ResolveDep(root, depName string) (ResolvedDep, bool) {
 	if ChangeExists(root, depName) {
 		return ResolvedDep{Name: depName, IsActive: true}, true
@@ -83,24 +63,6 @@ func LoadDepMap(root string) (map[string][]string, error) {
 		}
 	}
 	return depMap, nil
-}
-
-func GetDependents(root, name string) ([]string, error) {
-	depMap, err := LoadDepMap(root)
-	if err != nil {
-		return nil, err
-	}
-
-	var dependents []string
-	for changeName, deps := range depMap {
-		for _, dep := range deps {
-			if dep == name {
-				dependents = append(dependents, changeName)
-				break
-			}
-		}
-	}
-	return dependents, nil
 }
 
 func DetectCycles(depMap map[string][]string) [][]string {

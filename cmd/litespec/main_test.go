@@ -857,6 +857,19 @@ func TestCLIViewNoSpecs(t *testing.T) {
 	}
 }
 
+func TestCLIViewNoProjectRoot(t *testing.T) {
+	bin := buildBinary(t)
+	root := t.TempDir()
+
+	out, code := runCLI(t, bin, root, "view")
+	if code == 0 {
+		t.Fatalf("expected non-zero exit code in dir without specs/: %s", out)
+	}
+	if !strings.Contains(out, "error") {
+		t.Errorf("expected error message, got: %s", out)
+	}
+}
+
 func TestCLIViewWithDependencyGraph(t *testing.T) {
 	bin, root := setupCLITest(t)
 

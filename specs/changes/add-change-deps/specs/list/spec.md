@@ -32,4 +32,4 @@ The `litespec list` command SHALL support a `--sort` flag accepting `recent` (de
 #### Scenario: Sort deps with cycles
 
 - **WHEN** `litespec list --sort deps` is run and a dependency cycle exists among active changes
-- **THEN** changes involved in the cycle are sorted alphabetically and a warning is printed to stderr
+- **THEN** all changes are sorted alphabetically as a fallback and a warning is printed to stderr
