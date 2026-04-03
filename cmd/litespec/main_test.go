@@ -1,13 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/bermudi/litespec/internal"
 )
@@ -1375,5 +1378,432 @@ func TestCmdUpdateDirect_UnknownTool(t *testing.T) {
 	err := cmdUpdate([]string{"--tools", "bogus"})
 	if err == nil {
 		t.Fatal("expected error for unknown tool")
+	}
+}
+
+func TestCreateProgressBar_Half(t *testing.T) {
+	got := createProgressBar(5, 10, 10)
+	want := "[█████░░░░░]"
+	if got != want {
+		t.Errorf("createProgressBar(5,10,10) = %q, want %q", got, want)
+	}
+}
+
+func TestCreateProgressBar_Zero(t *testing.T) {
+	got := createProgressBar(0, 5, 10)
+	want := "[░░░░░░░░░░]"
+	if got != want {
+		t.Errorf("createProgressBar(0,5,10) = %q, want %q", got, want)
+	}
+}
+
+func TestCreateProgressBar_Complete(t *testing.T) {
+	got := createProgressBar(5, 5, 10)
+	want := "[██████████]"
+	if got != want {
+		t.Errorf("createProgressBar(5,5,10) = %q, want %q", got, want)
+	}
+}
+
+func TestCreateProgressBar_ZeroTotal(t *testing.T) {
+	got := createProgressBar(0, 0, 10)
+	want := "──────────"
+	if got != want {
+		t.Errorf("createProgressBar(0,0,10) = %q, want %q", got, want)
+	}
+}
+
+func TestCreateProgressBar_Width(t *testing.T) {
+	got := createProgressBar(3, 6, 20)
+	if utf8.RuneCountInString(got) != 22 {
+		t.Errorf("rune count of createProgressBar(3,6,20) = %d, want 22", utf8.RuneCountInString(got))
+	}
+}
+
+func captureStdout(fn func()) string {
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	fn()
+	w.Close()
+	os.Stdout = old
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	return buf.String()
+}
+
+func TestRenderDependencyGraph_SimpleTree(t *testing.T) {
+	depMap := map[string][]string{
+		"child": {"parent"},
+	}
+	changes := []internal.ChangeInfo{
+		{Name: "parent"},
+		{Name: "child"},
+	}
+
+	output := captureStdout(func() {
+		renderDependencyGraph(depMap, changes)
+	})
+
+	parentIdx := strings.Index(output, "parent")
+	childIdx := strings.Index(output, "child")
+	if parentIdx == -1 {
+		t.Error("expected parent in output")
+	}
+	if childIdx == -1 {
+		t.Error("expected child in output")
+	}
+	if parentIdx != -1 && childIdx != -1 && childIdx <= parentIdx {
+		t.Error("expected parent before child in tree")
+	}
+	if !strings.Contains(output, "└──") {
+		t.Error("expected └── connector in output")
+	}
+}
+
+func TestRenderDependencyGraph_MultipleChildren(t *testing.T) {
+	depMap := map[string][]string{
+		"child-a": {"parent"},
+		"child-b": {"parent"},
+	}
+	changes := []internal.ChangeInfo{
+		{Name: "parent"},
+		{Name: "child-a"},
+		{Name: "child-b"},
+	}
+
+	output := captureStdout(func() {
+		renderDependencyGraph(depMap, changes)
+	})
+
+	if !strings.Contains(output, "child-a") {
+		t.Error("expected child-a in output")
+	}
+	if !strings.Contains(output, "child-b") {
+		t.Error("expected child-b in output")
+	}
+	if !strings.Contains(output, "parent") {
+		t.Error("expected parent in output")
+	}
+}
+
+func TestRenderDependencyGraph_UnrelatedChanges(t *testing.T) {
+	depMap := map[string][]string{
+		"child": {"parent"},
+	}
+	changes := []internal.ChangeInfo{
+		{Name: "parent"},
+		{Name: "child"},
+		{Name: "lonely"},
+	}
+
+	output := captureStdout(func() {
+		renderDependencyGraph(depMap, changes)
+	})
+
+	if !strings.Contains(output, "Unrelated:") {
+		t.Error("expected Unrelated section in output")
+	}
+	if !strings.Contains(output, "lonely") {
+		t.Error("expected lonely change in Unrelated section")
+	}
+}
+
+func TestRenderDependencyGraph_DeepChain(t *testing.T) {
+	depMap := map[string][]string{
+		"B": {"A"},
+		"C": {"B"},
+	}
+	changes := []internal.ChangeInfo{
+		{Name: "A"},
+		{Name: "B"},
+		{Name: "C"},
+	}
+
+	output := captureStdout(func() {
+		renderDependencyGraph(depMap, changes)
+	})
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+
+	aIdx := -1
+	bIdx := -1
+	cIdx := -1
+	for i, line := range lines {
+		if strings.Contains(line, "A") && !strings.Contains(line, "Unrelated") {
+			aIdx = i
+		}
+		if strings.Contains(line, "B") && !strings.Contains(line, "Unrelated") {
+			bIdx = i
+		}
+		if strings.Contains(line, "C") && !strings.Contains(line, "Unrelated") {
+			cIdx = i
+		}
+	}
+
+	if aIdx == -1 || bIdx == -1 || cIdx == -1 {
+		t.Fatalf("expected A, B, C in output:\n%s", output)
+	}
+	if !(aIdx < bIdx && bIdx < cIdx) {
+		t.Errorf("expected A < B < C line order, got A=%d B=%d C=%d", aIdx, bIdx, cIdx)
+	}
+
+	cLine := lines[cIdx]
+	if !strings.HasPrefix(strings.TrimSpace(cLine), "└── C") && !strings.HasPrefix(strings.TrimSpace(cLine), "├── C") {
+		t.Errorf("expected C to have tree connector, got: %q", cLine)
+	}
+
+	indentA := len(lines[aIdx]) - len(strings.TrimLeft(lines[aIdx], " │├└─"))
+	indentC := len(lines[cIdx]) - len(strings.TrimLeft(lines[cIdx], " │├└─"))
+	if indentC <= indentA {
+		t.Errorf("expected C to be indented deeper than A, got A indent=%d C indent=%d", indentA, indentC)
+	}
+}
+
+func TestCmdValidateDirect_AllJSON(t *testing.T) {
+	setupDirectTest(t)
+	if err := cmdValidate([]string{"--all", "--json"}); err != nil {
+		t.Fatalf("cmdValidate --all --json on empty project: %v", err)
+	}
+}
+
+func TestCmdValidateDirect_ChangesJSON(t *testing.T) {
+	setupDirectTest(t)
+	if err := cmdValidate([]string{"--changes", "--json"}); err != nil {
+		t.Fatalf("cmdValidate --changes --json on empty project: %v", err)
+	}
+}
+
+func TestCmdValidateDirect_SpecsJSON(t *testing.T) {
+	setupDirectTest(t)
+	if err := cmdValidate([]string{"--specs", "--json"}); err != nil {
+		t.Fatalf("cmdValidate --specs --json on empty project: %v", err)
+	}
+}
+
+func TestCmdValidateDirect_SpecificChange(t *testing.T) {
+	root := setupDirectTest(t)
+	createChangeWithArtifacts(t, root, "my-change")
+	if err := cmdValidate([]string{"my-change"}); err != nil {
+		t.Fatalf("cmdValidate my-change: %v", err)
+	}
+}
+
+func TestCmdValidateDirect_SpecificSpec(t *testing.T) {
+	root := setupDirectTest(t)
+	createSpec(t, root, "auth")
+	if err := cmdValidate([]string{"auth"}); err != nil {
+		t.Fatalf("cmdValidate auth: %v", err)
+	}
+}
+
+func TestCmdValidateDirect_StrictOnEmpty(t *testing.T) {
+	setupDirectTest(t)
+	if err := cmdValidate([]string{"--strict", "--all"}); err != nil {
+		t.Fatalf("cmdValidate --strict --all on empty project: %v", err)
+	}
+}
+
+func TestCmdValidateDirect_DefaultBulk(t *testing.T) {
+	setupDirectTest(t)
+	if err := cmdValidate([]string{}); err != nil {
+		t.Fatalf("cmdValidate with no args on empty project: %v", err)
+	}
+}
+
+func setupEmptyDir(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	t.Chdir(root)
+	return root
+}
+
+func TestCmdArchiveDirect_HappyPath(t *testing.T) {
+	root := setupDirectTest(t)
+	createChangeWithArtifacts(t, root, "my-change")
+	tasksPath := filepath.Join(root, "specs", "changes", "my-change", "tasks.md")
+	os.WriteFile(tasksPath, []byte("## Phase 1\n- [x] Done"), 0o644)
+	err := cmdArchive([]string{"my-change"})
+	if err != nil {
+		t.Fatalf("cmdArchive: %v", err)
+	}
+}
+
+func TestCmdArchiveDirect_UnknownFlag(t *testing.T) {
+	setupDirectTest(t)
+	err := cmdArchive([]string{"foo", "--bogus"})
+	if err == nil {
+		t.Fatal("expected error for unknown flag")
+	}
+}
+
+func TestCmdArchiveDirect_NonexistentChange(t *testing.T) {
+	setupDirectTest(t)
+	err := cmdArchive([]string{"nonexistent"})
+	if err == nil {
+		t.Fatal("expected error for nonexistent change")
+	}
+}
+
+func TestCmdArchiveDirect_IncompleteTasks(t *testing.T) {
+	root := setupDirectTest(t)
+	createChangeWithArtifacts(t, root, "my-change")
+	err := cmdArchive([]string{"my-change"})
+	if err == nil {
+		t.Fatal("expected error for incomplete tasks")
+	}
+	if !strings.Contains(err.Error(), "tasks") {
+		t.Errorf("expected tasks error, got: %v", err)
+	}
+}
+
+func TestCmdArchiveDirect_AllowIncomplete(t *testing.T) {
+	root := setupDirectTest(t)
+	createChangeWithArtifacts(t, root, "my-change")
+	err := cmdArchive([]string{"my-change", "--allow-incomplete"})
+	if err != nil {
+		t.Fatalf("cmdArchive --allow-incomplete: %v", err)
+	}
+}
+
+func TestCmdInitDirect_HappyPath(t *testing.T) {
+	root := setupEmptyDir(t)
+	if err := cmdInit([]string{}); err != nil {
+		t.Fatalf("cmdInit: %v", err)
+	}
+	for _, dir := range []string{
+		filepath.Join(root, "specs", "canon"),
+		filepath.Join(root, "specs", "changes"),
+		filepath.Join(root, "specs", "changes", "archive"),
+		filepath.Join(root, ".agents", "skills"),
+	} {
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			t.Errorf("expected %s to exist", dir)
+		}
+	}
+}
+
+func TestCmdInitDirect_WithTools(t *testing.T) {
+	root := setupEmptyDir(t)
+	if err := cmdInit([]string{"--tools", "claude"}); err != nil {
+		t.Fatalf("cmdInit --tools claude: %v", err)
+	}
+	claudeSkills := filepath.Join(root, ".claude", "skills")
+	if _, err := os.Stat(claudeSkills); os.IsNotExist(err) {
+		t.Fatal("expected .claude/skills/ to exist")
+	}
+	entries, err := os.ReadDir(claudeSkills)
+	if err != nil {
+		t.Fatalf("reading .claude/skills: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Error("expected symlinks in .claude/skills/")
+	}
+	for _, e := range entries {
+		linkPath := filepath.Join(claudeSkills, e.Name())
+		target, err := os.Readlink(linkPath)
+		if err != nil {
+			t.Errorf("expected %s to be a symlink: %v", e.Name(), err)
+		}
+		resolved := filepath.Join(claudeSkills, target)
+		if _, statErr := os.Stat(resolved); os.IsNotExist(statErr) {
+			t.Errorf("symlink %s target %s does not exist", e.Name(), target)
+		}
+	}
+}
+
+func TestCmdInitDirect_UnknownTool(t *testing.T) {
+	setupEmptyDir(t)
+	err := cmdInit([]string{"--tools", "bogus"})
+	if err == nil {
+		t.Fatal("expected error for unknown tool")
+	}
+}
+
+func TestCmdInitDirect_HelpFlag(t *testing.T) {
+	setupEmptyDir(t)
+	if err := cmdInit([]string{"--help"}); err != nil {
+		t.Fatalf("cmdInit --help: %v", err)
+	}
+}
+
+func TestFindProjectRoot_InProjectRoot(t *testing.T) {
+	oldDir, _ := os.Getwd()
+	defer os.Chdir(oldDir)
+
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "specs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.Chdir(root)
+
+	got, err := internal.FindProjectRoot()
+	if err != nil {
+		t.Fatalf("FindProjectRoot: %v", err)
+	}
+	if got != root {
+		t.Errorf("got %q, want %q", got, root)
+	}
+}
+
+func TestFindProjectRoot_InSubdirectory(t *testing.T) {
+	oldDir, _ := os.Getwd()
+	defer os.Chdir(oldDir)
+
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "specs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	deep := filepath.Join(root, "subdir", "deep")
+	if err := os.MkdirAll(deep, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.Chdir(deep)
+
+	got, err := internal.FindProjectRoot()
+	if err != nil {
+		t.Fatalf("FindProjectRoot: %v", err)
+	}
+	if got != root {
+		t.Errorf("got %q, want %q", got, root)
+	}
+}
+
+func TestFindProjectRoot_NoSpecs(t *testing.T) {
+	oldDir, _ := os.Getwd()
+	defer os.Chdir(oldDir)
+
+	root := t.TempDir()
+	os.Chdir(root)
+
+	got, err := internal.FindProjectRoot()
+	if err != nil {
+		t.Fatalf("FindProjectRoot: %v", err)
+	}
+	if got != root {
+		t.Errorf("got %q, want cwd %q", got, root)
+	}
+}
+
+func TestFindProjectRoot_SymlinkedSpecs(t *testing.T) {
+	oldDir, _ := os.Getwd()
+	defer os.Chdir(oldDir)
+
+	root := t.TempDir()
+	realSpecs := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(realSpecs, "specs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(realSpecs, "specs"), filepath.Join(root, "specs")); err != nil {
+		t.Fatal(err)
+	}
+	os.Chdir(root)
+
+	got, err := internal.FindProjectRoot()
+	if err != nil {
+		t.Fatalf("FindProjectRoot: %v", err)
+	}
+	if got != root {
+		t.Errorf("got %q, want %q", got, root)
 	}
 }
