@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"gopkg.in/yaml.v3"
 )
 
 func setupTestProject(t *testing.T) string {
@@ -904,12 +902,11 @@ The system SHALL authenticate.
 
 func writeChangeMeta(t *testing.T, root, changeName string, meta ChangeMeta) {
 	t.Helper()
-	metaPath := filepath.Join(ChangePath(root, changeName), MetaFileName)
-	data, err := yaml.Marshal(&meta)
-	if err != nil {
-		t.Fatalf("marshal meta: %v", err)
+	existing, err := ReadChangeMeta(root, changeName)
+	if err == nil && !existing.Created.IsZero() {
+		meta.Created = existing.Created
 	}
-	if err := os.WriteFile(metaPath, data, 0o644); err != nil {
+	if err := WriteChangeMeta(root, changeName, &meta); err != nil {
 		t.Fatalf("write meta: %v", err)
 	}
 }

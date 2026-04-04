@@ -376,6 +376,27 @@ func ReadChangeMeta(root, name string) (*ChangeMeta, error) {
 	return &meta, nil
 }
 
+func WriteChangeMeta(root, name string, meta *ChangeMeta) error {
+	metaPath := filepath.Join(ChangePath(root, name), MetaFileName)
+	data, err := yaml.Marshal(meta)
+	if err != nil {
+		return fmt.Errorf("marshal change metadata: %w", err)
+	}
+	if err := os.WriteFile(metaPath, data, 0o644); err != nil {
+		return fmt.Errorf("write change metadata: %w", err)
+	}
+	return nil
+}
+
+func UpdateChangeDeps(root, name string, deps []string) error {
+	meta, err := ReadChangeMeta(root, name)
+	if err != nil {
+		return fmt.Errorf("read change metadata for update: %w", err)
+	}
+	meta.DependsOn = deps
+	return WriteChangeMeta(root, name, meta)
+}
+
 func GetLastModified(dir string) (time.Time, error) {
 	var maxTime time.Time
 	info, err := os.Stat(dir)

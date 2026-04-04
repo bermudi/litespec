@@ -81,17 +81,8 @@ func TestChangeMetaReadWithDependsOn(t *testing.T) {
 		t.Fatalf("CreateChange: %v", err)
 	}
 
-	metaPath := filepath.Join(ChangePath(root, "child-change"), MetaFileName)
-	updated := ChangeMeta{
-		Schema:    "spec-driven",
-		DependsOn: []string{"parent-change"},
-	}
-	data, err := yaml.Marshal(&updated)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	if err := os.WriteFile(metaPath, data, 0o644); err != nil {
-		t.Fatalf("write meta: %v", err)
+	if err := UpdateChangeDeps(root, "child-change", []string{"parent-change"}); err != nil {
+		t.Fatalf("UpdateChangeDeps: %v", err)
 	}
 
 	meta, err := ReadChangeMeta(root, "child-change")
@@ -370,13 +361,9 @@ func TestGetDependents(t *testing.T) {
 	CreateChange(root, "add-auth")
 	CreateChange(root, "add-rate-limiting")
 
-	metaPath := filepath.Join(ChangePath(root, "add-rate-limiting"), MetaFileName)
-	updated := ChangeMeta{
-		Schema:    "spec-driven",
-		DependsOn: []string{"add-auth"},
+	if err := UpdateChangeDeps(root, "add-rate-limiting", []string{"add-auth"}); err != nil {
+		t.Fatalf("UpdateChangeDeps: %v", err)
 	}
-	data, _ := yaml.Marshal(&updated)
-	os.WriteFile(metaPath, data, 0o644)
 
 	dependents, err := GetDependents(root, "add-auth")
 	if err != nil {
@@ -405,13 +392,9 @@ func TestLoadDepMap(t *testing.T) {
 	CreateChange(root, "add-auth")
 	CreateChange(root, "add-rate-limiting")
 
-	metaPath := filepath.Join(ChangePath(root, "add-rate-limiting"), MetaFileName)
-	updated := ChangeMeta{
-		Schema:    "spec-driven",
-		DependsOn: []string{"add-auth"},
+	if err := UpdateChangeDeps(root, "add-rate-limiting", []string{"add-auth"}); err != nil {
+		t.Fatalf("UpdateChangeDeps: %v", err)
 	}
-	data, _ := yaml.Marshal(&updated)
-	os.WriteFile(metaPath, data, 0o644)
 
 	depMap, err := LoadDepMap(root)
 	if err != nil {
