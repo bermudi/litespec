@@ -144,6 +144,12 @@ func parseSemver(tag string) (int, int, int, error) {
 	if idx := strings.IndexByte(patchStr, '-'); idx >= 0 {
 		patchStr = patchStr[:idx]
 	}
+	if idx := strings.IndexByte(patchStr, '+'); idx >= 0 {
+		patchStr = patchStr[:idx]
+	}
+	if idx := strings.IndexByte(patchStr, '+'); idx >= 0 {
+		patchStr = patchStr[:idx]
+	}
 	patch, err := strconv.Atoi(patchStr)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("invalid semver patch: %q", parts[2])
