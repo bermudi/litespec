@@ -59,6 +59,8 @@ func run() error {
 		return nil
 	case "view":
 		return cmdView(os.Args[2:])
+	case "import":
+		return cmdImport(os.Args[2:])
 	default:
 		printUsage()
 		return fmt.Errorf("unknown command: %s", os.Args[1])
@@ -77,6 +79,7 @@ Commands:
   instructions <artifact>                                     Get artifact instructions
   archive <name>                                              Apply deltas and archive change
   view                                                        Dashboard overview with dependency graph
+  import [--source <dir>] [--dry-run] [--force]               Import OpenSpec project to litespec
   update [--tools <ids>]                                      Regenerate skills and adapters
   upgrade                                                     Check for and install the latest version
   completion <shell>                                          Generate shell completion script (bash, zsh, fish)
