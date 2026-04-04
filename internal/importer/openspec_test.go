@@ -539,6 +539,47 @@ func TestImportOpenSpecProject(t *testing.T) {
 			t.Errorf("expected warning about malformed date, got warnings: %v", stats.Warnings)
 		}
 	})
+
+	t.Run("warns about dropped unsupported metadata fields", func(t *testing.T) {
+		src := t.TempDir()
+		dst := t.TempDir()
+
+		changeDir := filepath.Join(src, "openspec", "changes", "dropped-fields")
+		os.MkdirAll(changeDir, 0755)
+		os.WriteFile(filepath.Join(changeDir, ".openspec.yaml"),
+			[]byte("schema: spec-driven\ncreated: 2026-03-01\nprovides:\n  - foo\nrequires:\n  - bar\ntouches:\n  - baz\nparent: some-parent\n"), 0644)
+		os.WriteFile(filepath.Join(changeDir, "proposal.md"), []byte("## Motivation\n"), 0644)
+
+		stats, err := ImportOpenSpecProject(src, dst)
+		if err != nil {
+			t.Fatalf("ImportOpenSpecProject() error: %v", err)
+		}
+
+		found := false
+		for _, w := range stats.Warnings {
+			if strings.Contains(w, "skipped unsupported fields") &&
+				strings.Contains(w, "provides") &&
+				strings.Contains(w, "requires") &&
+				strings.Contains(w, "touches") &&
+				strings.Contains(w, "parent") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected warning about dropped fields, got warnings: %v", stats.Warnings)
+		}
+
+		liteMeta, err := os.ReadFile(filepath.Join(dst, "specs", "changes", "dropped-fields", ".litespec.yaml"))
+		if err != nil {
+			t.Fatalf("read litespec metadata: %v", err)
+		}
+		content := string(liteMeta)
+		if strings.Contains(content, "provides") || strings.Contains(content, "requires") ||
+			strings.Contains(content, "touches") || strings.Contains(content, "parent") {
+			t.Errorf("dropped fields should not appear in output metadata: %q", content)
+		}
+	})
 }
 
 func TestPreviewImport(t *testing.T) {
@@ -583,6 +624,49 @@ func TestPreviewImport(t *testing.T) {
 		}
 		if stats.Archives != 1 {
 			t.Errorf("Archives = %d, want 1", stats.Archives)
+		}
+	})
+	t.Run("collects entry names during preview", func(t *testing.T) {
+		src := t.TempDir()
+
+		for _, name := range []string{"alpha", "beta"} {
+			dir := filepath.Join(src, "openspec", "specs", name)
+			os.MkdirAll(dir, 0755)
+			os.WriteFile(filepath.Join(dir, "spec.md"), []byte("# "+name+"\n"), 0644)
+		}
+
+		changeDir := filepath.Join(src, "openspec", "changes", "active-change")
+		os.MkdirAll(changeDir, 0755)
+		os.WriteFile(filepath.Join(changeDir, ".openspec.yaml"), []byte("schema: spec-driven\n"), 0644)
+
+		archiveDir := filepath.Join(src, "openspec", "changes", "archive", "2025-01-11-old")
+		os.MkdirAll(archiveDir, 0755)
+
+		stats, err := PreviewImport(src)
+		if err != nil {
+			t.Fatalf("PreviewImport() error: %v", err)
+		}
+
+		if len(stats.CanonSpecNames) != 2 {
+			t.Errorf("CanonSpecNames = %v, want 2 entries", stats.CanonSpecNames)
+		}
+		foundAlpha, foundBeta := false, false
+		for _, n := range stats.CanonSpecNames {
+			if n == "alpha" {
+				foundAlpha = true
+			}
+			if n == "beta" {
+				foundBeta = true
+			}
+		}
+		if !foundAlpha || !foundBeta {
+			t.Errorf("CanonSpecNames missing entries, got: %v", stats.CanonSpecNames)
+		}
+		if len(stats.ActiveChangeNames) != 1 || stats.ActiveChangeNames[0] != "active-change" {
+			t.Errorf("ActiveChangeNames = %v, want [active-change]", stats.ActiveChangeNames)
+		}
+		if len(stats.ArchiveNames) != 1 || stats.ArchiveNames[0] != "2025-01-11-old" {
+			t.Errorf("ArchiveNames = %v, want [2025-01-11-old]", stats.ArchiveNames)
 		}
 	})
 }

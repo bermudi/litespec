@@ -27,11 +27,14 @@ type OpenSpecMeta struct {
 }
 
 type ImportStats struct {
-	CanonSpecs    int
-	ActiveChanges int
-	Archives      int
-	SkippedFiles  []string
-	Warnings      []string
+	CanonSpecs        int
+	ActiveChanges     int
+	Archives          int
+	CanonSpecNames    []string
+	ActiveChangeNames []string
+	ArchiveNames      []string
+	SkippedFiles      []string
+	Warnings          []string
 }
 
 func DetectOpenSpecProject(source string) bool {
@@ -136,6 +139,7 @@ func copyCanonSpecs(source, target string, stats *ImportStats, dryRun bool) erro
 		for _, entry := range entries {
 			if entry.IsDir() {
 				stats.CanonSpecs++
+				stats.CanonSpecNames = append(stats.CanonSpecNames, entry.Name())
 			}
 		}
 		return nil
@@ -212,6 +216,7 @@ func migrateChanges(source, target string, stats *ImportStats, dryRun bool) erro
 
 		if dryRun {
 			stats.ActiveChanges++
+			stats.ActiveChangeNames = append(stats.ActiveChangeNames, name)
 			continue
 		}
 
@@ -298,6 +303,7 @@ func migrateArchives(source, target string, stats *ImportStats, dryRun bool) err
 		for _, entry := range entries {
 			if entry.IsDir() {
 				stats.Archives++
+				stats.ArchiveNames = append(stats.ArchiveNames, entry.Name())
 			}
 		}
 		return nil
@@ -435,6 +441,22 @@ func convertMetaFile(source, target string, stats *ImportStats) error {
 	data, err := os.ReadFile(srcMeta)
 	if err != nil {
 		return fmt.Errorf("read openspec metadata: %w", err)
+	}
+
+	var raw map[string]any
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("parse openspec metadata: %w", err)
+	}
+
+	unsupportedFields := []string{"provides", "requires", "touches", "parent"}
+	var dropped []string
+	for _, field := range unsupportedFields {
+		if _, ok := raw[field]; ok {
+			dropped = append(dropped, field)
+		}
+	}
+	if len(dropped) > 0 {
+		stats.Warnings = append(stats.Warnings, fmt.Sprintf("skipped unsupported fields in %s: %s", filepath.Base(source), strings.Join(dropped, ", ")))
 	}
 
 	var openMeta OpenSpecMeta

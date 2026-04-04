@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -133,5 +135,42 @@ func TestCmdImportWithArchive(t *testing.T) {
 	archiveMeta := filepath.Join(dstDir, "specs", "changes", "archive", "2025-01-11-old-change", ".litespec.yaml")
 	if _, err := os.Stat(archiveMeta); os.IsNotExist(err) {
 		t.Error("synthesized metadata not created for archive")
+	}
+}
+
+func TestCmdImportPostImportMessage(t *testing.T) {
+	srcDir := t.TempDir()
+	dstDir := t.TempDir()
+
+	specsDir := filepath.Join(srcDir, "openspec", "specs", "test-cap")
+	os.MkdirAll(specsDir, 0755)
+	os.WriteFile(filepath.Join(specsDir, "spec.md"), []byte("# test-cap\n\n## Purpose\n"), 0644)
+
+	origWd, _ := os.Getwd()
+	os.Chdir(dstDir)
+	defer os.Chdir(origWd)
+
+	var buf bytes.Buffer
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	args := []string{"--source", srcDir}
+	err := cmdImport(args)
+
+	w.Close()
+	os.Stdout = oldStdout
+	buf.ReadFrom(r)
+
+	if err != nil {
+		t.Fatalf("cmdImport failed: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "litespec update") {
+		t.Errorf("output should mention 'litespec update', got: %q", output)
+	}
+	if !strings.Contains(output, "Import replaces init") {
+		t.Errorf("output should mention 'Import replaces init', got: %q", output)
 	}
 }

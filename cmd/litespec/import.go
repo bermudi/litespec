@@ -90,9 +90,19 @@ func cmdImport(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("  Canon specs: %d\n", stats.CanonSpecs)
-		fmt.Printf("  Active changes: %d\n", stats.ActiveChanges)
-		fmt.Printf("  Archives: %d\n", stats.Archives)
+		printNameList := func(label string, count int, names []string) {
+			if count == 0 {
+				fmt.Printf("  %s: 0\n", label)
+				return
+			}
+			fmt.Printf("  %s (%d):\n", label, count)
+			for _, n := range names {
+				fmt.Printf("    - %s\n", n)
+			}
+		}
+		printNameList("Canon specs", stats.CanonSpecs, stats.CanonSpecNames)
+		printNameList("Active changes", stats.ActiveChanges, stats.ActiveChangeNames)
+		printNameList("Archives", stats.Archives, stats.ArchiveNames)
 		if len(stats.Warnings) > 0 {
 			fmt.Println("\nWarnings:")
 			for _, w := range stats.Warnings {
@@ -131,6 +141,7 @@ func cmdImport(args []string) error {
 	}
 
 	fmt.Println("\n✓ Import complete. Run 'litespec update' to generate skills.")
+	fmt.Println("  (Import replaces init — no separate initialization needed.)")
 	return nil
 }
 
