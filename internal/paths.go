@@ -33,19 +33,14 @@ var Skills = []SkillInfo{
 		Description: "Materialize a complete change proposal with all planning artifacts (proposal, specs, design, tasks). Use when the user wants to create a new change, start a feature, or says \"propose\".",
 	},
 	{
-		ID:          "continue",
-		Name:        "litespec-continue",
-		Description: "Create exactly one missing artifact for an existing change, then stop. Use when the user wants to fill in the next missing piece of a change or says \"continue\".",
+		ID:          "review",
+		Name:        "litespec-review",
+		Description: "Context-aware review that adapts to change lifecycle: artifact review (pre-implementation), implementation review (during implementation), and pre-archive review (post-implementation). Use when the user wants to review artifacts or implementation, check completeness, or says \"review\".",
 	},
 	{
 		ID:          "apply",
 		Name:        "litespec-apply",
 		Description: "Implement the next phase of tasks from a change proposal, one phase per session. Use when the user is ready to start coding, wants to execute tasks, or says \"apply\".",
-	},
-	{
-		ID:          "verify",
-		Name:        "litespec-verify",
-		Description: "Context-aware review that adapts to change lifecycle: artifact review (pre-implementation), implementation review (during implementation), and pre-archive review (post-implementation). Use when the user wants to verify artifacts or implementation, check completeness, or says \"verify\".",
 	},
 	{
 		ID:          "adopt",
