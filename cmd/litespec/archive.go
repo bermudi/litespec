@@ -41,6 +41,10 @@ func cmdArchive(args []string) error {
 		return err
 	}
 
+	if _, err := os.Stat(filepath.Join(root, internal.ProjectDirName)); err != nil {
+		return fmt.Errorf("not a litespec project. Run 'litespec init' first")
+	}
+
 	result, err := internal.ValidateChange(root, name)
 	if err != nil {
 		return err

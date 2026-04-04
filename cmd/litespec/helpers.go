@@ -217,6 +217,10 @@ func sortChanges(changes []internal.ChangeInfo, sortBy string, root string) {
 	case "deps":
 		depMap, err := internal.LoadDepMap(root)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "WARN  could not load dependency map, falling back to alphabetical sort\n")
+			sort.Slice(changes, func(i, j int) bool {
+				return changes[i].Name < changes[j].Name
+			})
 			return
 		}
 		cycles := internal.DetectCycles(depMap)

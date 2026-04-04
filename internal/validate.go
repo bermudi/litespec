@@ -396,6 +396,12 @@ func ValidateSpecs(root string) (*ValidationResult, error) {
 	entries, err := os.ReadDir(specsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
+			result.Valid = false
+			result.Errors = append(result.Errors, ValidationIssue{
+				Severity: SeverityError,
+				Message:  "specs directory does not exist",
+				File:     specsDir,
+			})
 			return result, nil
 		}
 		return nil, fmt.Errorf("read specs directory: %w", err)

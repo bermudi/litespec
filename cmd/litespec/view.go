@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -21,6 +23,10 @@ func cmdView(args []string) error {
 	root, err := internal.FindProjectRoot()
 	if err != nil {
 		return err
+	}
+
+	if _, err := os.Stat(filepath.Join(root, internal.ProjectDirName)); err != nil {
+		return fmt.Errorf("not a litespec project. Run 'litespec init' first")
 	}
 
 	specs, err := internal.ListSpecs(root)
