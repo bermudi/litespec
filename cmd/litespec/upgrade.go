@@ -48,7 +48,7 @@ func cmdUpgrade(args []string) error {
 		return err
 	}
 
-	fmt.Printf("\nUpdated to %s\n", latestTag)
+	fmt.Printf("\nUpgraded to %s\n", latestTag)
 	fmt.Println("Run 'litespec update' in your projects to refresh generated artifacts")
 	return nil
 }
