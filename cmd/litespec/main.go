@@ -5,12 +5,28 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
+	"strings"
 	"time"
 )
 
 const jsonFlag = "--json"
 
-const version = "0.4.0"
+var version = "dev"
+
+func init() {
+	if v := resolveVersion(); v != "" {
+		version = v
+	}
+}
+
+func resolveVersion() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok || info.Main.Version == "" || info.Main.Version == "(devel)" {
+		return ""
+	}
+	return strings.TrimPrefix(info.Main.Version, "v")
+}
 
 func main() {
 	if err := run(); err != nil {
