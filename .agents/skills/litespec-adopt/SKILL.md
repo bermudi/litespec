@@ -83,4 +83,4 @@ Report what was adopted:
 - How many capabilities and requirements were discovered
 - Which files were analyzed
 - Any surprises or notable findings
-- Suggest next steps: verify (review the specs for accuracy), or use the specs as a baseline for future changes
+- Suggest next steps: review (review the specs for accuracy), or use the specs as a baseline for future changes

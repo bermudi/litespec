@@ -96,11 +96,11 @@ Rules:
 ## Behavioral Guardrails
 
 - **Verify every file after writing.** Confirm the artifact landed at `outputPath`. If it did not, write it again before moving on.
-- **Decide, do not block.** If the user is vague or a detail is unclear, make a reasonable decision and note what you chose in the artifact. The user can correct it during apply or verify. Momentum matters more than perfection at this stage.
+- **Decide, do not block.** If the user is vague or a detail is unclear, make a reasonable decision and note what you chose in the artifact. The user can correct it during apply or review. Momentum matters more than perfection at this stage.
 - **Resume, do not restart.** If the change already exists, check status and continue from the first incomplete artifact. Never overwrite completed work.
 - **Show a summary when done.** After all artifacts are created, print a brief summary of what was created and the file paths. Then suggest next steps:
   - `apply` to start implementing
-  - `verify` to review the proposal against specs
+   - `review` to review the proposal against specs
 
 ---
 

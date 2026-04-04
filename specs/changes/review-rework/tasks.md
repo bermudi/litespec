@@ -15,9 +15,9 @@
 
 ## Phase 3: Generated Skills
 
-- [ ] Delete `.agents/skills/litespec-continue/` directory
-- [ ] Delete `.agents/skills/litespec-verify/` directory
-- [ ] Run `go run ./cmd/litespec update` to regenerate `.agents/skills/litespec-review/SKILL.md` from updated template
+- [x] Delete `.agents/skills/litespec-continue/` directory
+- [x] Delete `.agents/skills/litespec-verify/` directory
+- [x] Run `go run ./cmd/litespec update` to regenerate `.agents/skills/litespec-review/SKILL.md` from updated template
 
 ## Phase 4: Documentation
 
