@@ -41,7 +41,7 @@ func cmdUpgrade(args []string) error {
 		return nil
 	}
 
-	cmd := exec.Command("go", "install", modulePath+"@latest")
+	cmd := exec.Command("go", "install", modulePath+"/cmd/litespec@latest")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
