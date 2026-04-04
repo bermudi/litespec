@@ -10,8 +10,8 @@
 
 ## Phase 2: Canon Spec Rename
 
-- [ ] Rename `specs/canon/verify/` directory to `specs/canon/review/`
-- [ ] Update `specs/canon/review/spec.md`: change heading from `# verify` to `# review` and all prose references from `verify` to `review`
+- [x] Rename `specs/canon/verify/` directory to `specs/canon/review/`
+- [x] Update `specs/canon/review/spec.md`: change heading from `# verify` to `# review` and all prose references from `verify` to `review`
 
 ## Phase 3: Generated Skills
 
