@@ -21,12 +21,12 @@
 
 ## Phase 4: Documentation
 
-- [ ] Update `AGENTS.md`: workflow line, verify description in Workflow section, remove continue reference, update skill count
-- [ ] Update `DESIGN.md`: directory structure (remove continue, rename verify), workflow diagram, skills table (remove continue row, rename verify row)
-- [ ] Update `README.md`: workflow line
-- [ ] Update `docs/index.md`: workflow diagram, step table (remove continue row, rename verify row)
-- [ ] Update `docs/workflow.md`: remove continue section, rename verify section to review, update all workflow diagrams, update named patterns, update Decision Flow diagram
-- [ ] Update `docs/project-structure.md`: skills directory listing (remove continue, rename verify)
-- [ ] Update `docs/cli-reference.md`: skills directory listing (remove continue, rename verify)
-- [ ] Update `docs/tutorial.md`: section heading `## Verification` → `## Review` (line 317), "run verify" → "run review" (line 319), `litespec verify` → `litespec review` (line 322), `**Verify**` → `**Review**` in summary list (line 403)
-- [ ] Run `go build ./...`, `go test ./...` to verify final state
+- [x] Update `AGENTS.md`: workflow line, verify description in Workflow section, remove continue reference, update skill count
+- [x] Update `DESIGN.md`: directory structure (remove continue, rename verify), workflow diagram, skills table (remove continue row, rename verify row)
+- [x] Update `README.md`: workflow line
+- [x] Update `docs/index.md`: workflow diagram, step table (remove continue row, rename verify row)
+- [x] Update `docs/workflow.md`: remove continue section, rename verify section to review, update all workflow diagrams, update named patterns, update Decision Flow diagram
+- [x] Update `docs/project-structure.md`: skills directory listing (remove continue, rename verify)
+- [x] Update `docs/cli-reference.md`: skills directory listing (remove continue, rename verify)
+- [x] Update `docs/tutorial.md`: section heading `## Verification` → `## Review` (line 317), "run verify" → "run review" (line 319), `litespec verify` → `litespec review` (line 322), `**Verify**` → `**Review**` in summary list (line 403)
+- [x] Run `go build ./...`, `go test ./...` to verify final state

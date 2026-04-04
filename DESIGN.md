@@ -35,9 +35,8 @@ project/
     ├── litespec-explore/
     ├── litespec-grill/
     ├── litespec-propose/
-    ├── litespec-continue/
+    ├── litespec-review/
     ├── litespec-apply/
-    ├── litespec-verify/
     ├── litespec-adopt/
     └── litespec-archive/
 ```
@@ -47,9 +46,9 @@ project/
 Unidirectional flow:
 
 ```
-explore → grill → propose → apply → verify → archive
-                     ↑                          │
-                  continue                  adopt (separate path)
+explore → grill → propose → review → apply → review → archive
+                                          │
+                                      adopt (separate path)
 ```
 
 No backward flow. If something is wrong after propose, start over from explore/grill.
@@ -61,9 +60,8 @@ No backward flow. If something is wrong after propose, start over from explore/g
 | `explore` | Ephemeral | Thinking mode. No artifacts, no change dir. Conversational. |
 | `grill` | Ephemeral | Relentless Q&A on the explored idea. No artifacts. Resolves every branch of the design tree before proceeding. |
 | `propose` | Materializes | Creates change dir + proposal + specs + design + tasks (all at once). This is the commit point. |
-| `continue` | Incremental | Creates next missing artifact one at a time. For when propose only partially completes or artifacts need re-creation. |
 | `apply` | Phase-based | Implements tasks per phase in `tasks.md`. One phase per invocation. AI focuses on one area without doing the whole implementation at once. |
-| `verify` | AI review | Context-aware review that adapts to change lifecycle: artifact review (0 tasks checked — evaluates planning artifacts for quality, consistency, readiness), implementation review (some tasks checked — compares code against specs), pre-archive review (all tasks checked — reviews both artifacts and code comprehensively before archiving). Pure AI review — no test/lint running. |
+| `review` | AI review | Context-aware review that adapts to change lifecycle: artifact review (0 tasks checked — evaluates planning artifacts for quality, consistency, readiness), implementation review (some tasks checked — compares code against specs), pre-archive review (all tasks checked — reviews both artifacts and code comprehensively before archiving). Pure AI review — no test/lint running. |
 | `adopt` | Reverse-engineer | Takes a file/directory path. Generates a change proposal with specs from existing code. For code that has no spec yet. |
 | `archive` | Merge + move | Validates task completion (blocks if unchecked), applies delta operations (RENAMED→REMOVED→MODIFIED→ADDED) into `specs/canon/`, strips the change's `specs/` subtree, then moves the remaining planning artifacts to `archive/`. Bypass with `--allow-incomplete`. |
 

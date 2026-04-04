@@ -12,7 +12,7 @@ The CLI is a read-only context provider. The AI writes artifacts directly. lites
 
 **Convention over configuration** — zero config files. All defaults, all the time. No stub `config.yaml` to fill in — it works out of the box.
 
-**Unidirectional workflow** — `explore → grill → propose → apply → verify → archive`. No going backward. If something's wrong after propose, start over. This prevents partial states and confusion.
+**Unidirectional workflow** — `explore → grill → propose → review → apply → review → archive`. No going backward. If something's wrong after propose, start over. This prevents partial states and confusion.
 
 **Lean skills** — minimal tokens, zero boilerplate. Each skill is focused instructions, not pages of boilerplate that waste your AI context.
 
@@ -38,9 +38,9 @@ The CLI is a read-only context provider. The AI writes artifacts directly. lites
 ## The workflow
 
 ```
-explore → grill → propose → apply → verify → archive
-                     ↑                          │
-                  continue                  adopt (separate path)
+explore → grill → propose → review → apply → review → archive
+                                          │
+                                      adopt (separate path)
 ```
 
 | Step | What happens |
@@ -48,9 +48,8 @@ explore → grill → propose → apply → verify → archive
 | `explore` | Ephemeral thinking. No artifacts. Conversational. |
 | `grill` | Relentless Q&A. Resolves every branch of the design tree before moving on. |
 | `propose` | Materializes everything: change dir, proposal, specs, design, tasks. This is the commit point. |
-| `continue` | Creates the next missing artifact one at a time. For partial proposals. |
+| `review` | Context-aware AI review. Adapts to change lifecycle. |
 | `apply` | Implements tasks per phase. One phase per invocation. |
-| `verify` | Pure AI review of code vs specs. |
 | `adopt` | Reverse-engineers specs from existing code. Separate path. |
 | `archive` | Applies delta operations, moves change to archive. |
 

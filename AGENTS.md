@@ -36,9 +36,9 @@ The design emerged from a structured grilling session — question by question, 
 ## Workflow
 
 ```
-explore → grill → propose → apply → verify → archive
-                     ↑                          │
-                  continue                  adopt (separate path)
+explore → grill → propose → review → apply → review → archive
+                                          │
+                                      adopt (separate path)
 ```
 
 Unidirectional. No backward flow.
@@ -47,7 +47,7 @@ Unidirectional. No backward flow.
 - **propose** is the commit point. If something is wrong after proposing, start over from explore/grill.
 - **apply** works on one phase at a time. Each phase = one agent session = one commit. Re-invoke for the next phase.
 - **adopt** is a separate path — reverse-engineers specs from existing code given a file/directory path.
-- **verify** is context-aware AI review: artifact review when no tasks are checked (evaluates planning artifacts), implementation review when some tasks are checked (code vs specs), pre-archive review when all tasks are checked (both artifacts and code). No test/lint running.
+- **review** is context-aware AI review: artifact review when no tasks are checked (evaluates planning artifacts), implementation review when some tasks are checked (code vs specs), pre-archive review when all tasks are checked (both artifacts and code). No test/lint running.
 
 ## Key Design Decisions
 

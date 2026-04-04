@@ -3,9 +3,9 @@
 The litespec workflow is unidirectional — you move forward through phases, never backward. This design prevents the "drifting proposal" problem where plans and implementation get out of sync.
 
 ```
-explore → grill → propose → apply → verify → archive
-                      ↑                          │
-                   continue                  adopt (separate path)
+explore → grill → propose → review → apply → review → archive
+                                          │
+                                      adopt (separate path)
 ```
 
 Each step has a clear purpose and produces specific artifacts. Choose the right pattern for your situation.
@@ -60,20 +60,6 @@ Each step has a clear purpose and produces specific artifacts. Choose the right 
 
 ---
 
-### continue: Incremental Mode
-
-**What happens:** Creates exactly one missing artifact for an existing change, then stops.
-
-**What the AI does:** Checks the change status, finds the first ready artifact, creates it, and stops.
-
-**Artifacts created:** One artifact (proposal, specs, design, or tasks)
-
-**When to use:** When propose partially completes or you need to recreate an artifact without starting from scratch.
-
-**Example:** "Continue" the docs-site change — I deleted design.md by mistake.
-
----
-
 ### apply: Implementation Mode
 
 **What happens:** Implements tasks one phase at a time. Each phase is one agent session, one commit.
@@ -93,7 +79,7 @@ Each step has a clear purpose and produces specific artifacts. Choose the right 
 
 ---
 
-### verify: Review Mode
+### review: Review Mode
 
 **What happens:** Context-aware AI review that adapts to the change lifecycle.
 
@@ -106,7 +92,7 @@ Each step has a clear purpose and produces specific artifacts. Choose the right 
 
 **When to use:** Before starting implementation (artifact review), during implementation (implementation review), or before archiving (pre-archive review).
 
-**Example:** "Verify" the docs-site change. We're in Phase 2 and I want to check if the code matches the specs.
+**Example:** "Review" the docs-site change. We're in Phase 2 and I want to check if the code matches the specs.
 
 ---
 
@@ -163,7 +149,7 @@ Each step has a clear purpose and produces specific artifacts. Choose the right 
 
 ### Exploratory Pattern
 
-**Flow:** explore → grill → propose → apply → verify → archive
+**Flow:** explore → grill → propose → review → apply → review → archive
 
 **When to use:** Complex features, architectural changes, or anything with significant uncertainty.
 
@@ -175,27 +161,15 @@ Each step has a clear purpose and produces specific artifacts. Choose the right 
 
 ---
 
-### Incremental Pattern
-
-**Flow:** propose → continue → apply → verify → archive
-
-**When to use:** When propose partially completes or you need to iterate on artifacts without starting over.
-
-**Example:** You ran propose, but the AI timed out after creating proposal.md and specs.md. Use continue to create the remaining artifacts (design.md, tasks.md).
-
-**Why use continue:** It fills in missing pieces one at a time without re-creating completed work.
-
----
-
 ### Adopt Pattern (Separate Path)
 
 **Flow:** adopt → archive
 
 **When to use:** Documenting existing code that has no spec yet. This is the reverse of the normal workflow — you're extracting specs from code rather than writing code from specs.
 
-**Example:** "We have a config parser that works but no tests. Adopt it to understand what it does, then we can verify it."
+**Example:** "We have a config parser that works but no tests. Adopt it to understand what it does, then we can review it."
 
-**Why adopt first:** The code already exists. You need to understand it before you can verify or improve it.
+**Why adopt first:** The code already exists. You need to understand it before you can review or improve it.
 
 ---
 
@@ -210,13 +184,9 @@ Is this existing code without a spec?
 
 No → How much uncertainty do you have?
 │
-├─ Zero → Use Quick Feature (propose → apply → archive)
+├─ Zero → Use Quick Feature (propose → review → apply → review → archive)
 │
-└─ Some or a lot → Is the design well-defined?
-│
-  ├─ Yes → Use Incremental (propose → continue → apply → verify → archive)
-  │
-  └─ No → Use Exploratory (explore → grill → propose → apply → verify → archive)
+└─ Some or a lot → Use Exploratory (explore → grill → propose → review → apply → review → archive)
 ```
 
 **Guidelines:**
@@ -253,7 +223,7 @@ The `docs-site` change in this repo followed the Exploratory pattern:
 2. **grill:** Stress-tested the choice of MkDocs Material, questioned the scope (why not add search now?), verified that docs-as-source-of-truth made sense
 3. **propose:** Created a complete proposal with specs, design, and tasks
 4. **apply:** Implemented in three phases — infrastructure (pyproject.toml, mkdocs.yml), content (8 doc pages), deployment (GitHub Actions)
-5. **verify:** Ran artifact review, implementation review, and pre-archive review
+5. **review:** Ran artifact review, implementation review, and pre-archive review
 6. **archive:** Merged delta specs into `specs/canon/docs-site/spec.md` and moved to archive
 
 This change had significant uncertainty (which docs engine? what scope? deployment strategy?), so it benefited from the full exploratory workflow. A simpler change like `shell-completions` could have used Quick Feature.

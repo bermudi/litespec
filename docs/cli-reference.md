@@ -694,9 +694,8 @@ project/
     ├── litespec-explore/
     ├── litespec-grill/
     ├── litespec-propose/
-    ├── litespec-continue/
+    ├── litespec-review/
     ├── litespec-apply/
-    ├── litespec-verify/
     ├── litespec-adopt/
     └── litespec-archive/
 ```

@@ -314,12 +314,12 @@ After Phase 1, AI marks tasks as complete in `tasks.md`:
 
 It commits with message `phase 1: Core Rate Limiting Logic` and stops. One phase per session. Re-invoke for Phase 2, then Phase 3.
 
-## Verification
+## Review
 
-After implementation, run verify to check code against specs:
+After implementation, run review to check code against specs:
 
 ```bash
-$ litespec verify add-rate-limiting
+$ litespec review add-rate-limiting
 ```
 
 The AI reads all artifacts and the implemented code, comparing:
@@ -400,7 +400,7 @@ You've completed your first litespec change:
 3. **Propose** — AI created all planning artifacts (proposal, specs, design, tasks)
 4. **Validate** — Confirmed artifacts are well-formed
 5. **Apply** — Implemented the change phase by phase
-6. **Verify** — Reviewed code against specs
+6. **Review** — Reviewed code against specs
 7. **Archive** — Merged delta specs into canon, moved change to archive
 
 The spec is now the single source of truth for the rate limiting capability. Future changes can reference it, modify it, or depend on it.
