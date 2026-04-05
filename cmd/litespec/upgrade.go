@@ -41,9 +41,10 @@ func cmdUpgrade(args []string) error {
 		return nil
 	}
 
-	cmd := exec.Command("go", "install", modulePath+"/cmd/litespec@latest")
+	cmd := exec.Command("go", "install", modulePath+"/cmd/litespec@"+latestTag)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Env = append(os.Environ(), "GOPROXY=https://proxy.golang.org,direct")
 	if err := cmd.Run(); err != nil {
 		return err
 	}
