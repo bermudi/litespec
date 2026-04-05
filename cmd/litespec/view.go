@@ -94,7 +94,7 @@ func cmdView(args []string) error {
 		for _, c := range active {
 			bar := createProgressBar(c.CompletedTasks, c.TotalTasks, 20)
 			pct := int(math.Round(float64(c.CompletedTasks) / float64(c.TotalTasks) * 100))
-			fmt.Printf("  ◉ %-30s %s %d%%\n", c.Name, bar, pct)
+			fmt.Printf("  ◉ %-30s %s %d%%%s\n", c.Name, bar, pct, formatTimestamps(c))
 		}
 	}
 
@@ -103,7 +103,7 @@ func cmdView(args []string) error {
 		fmt.Println("Draft Changes")
 		fmt.Println(strings.Repeat("─", 60))
 		for _, c := range draft {
-			fmt.Printf("  ○ %s\n", c.Name)
+			fmt.Printf("  ○ %s%s\n", c.Name, formatTimestamps(c))
 		}
 	}
 
@@ -112,7 +112,7 @@ func cmdView(args []string) error {
 		fmt.Println("Completed Changes")
 		fmt.Println(strings.Repeat("─", 60))
 		for _, c := range completed {
-			fmt.Printf("  ✓ %s\n", c.Name)
+			fmt.Printf("  ✓ %s%s\n", c.Name, formatTimestamps(c))
 		}
 	}
 
@@ -160,6 +160,20 @@ func cmdView(args []string) error {
 	return nil
 }
 
+func formatTimestamps(c internal.ChangeInfo) string {
+	var parts []string
+	if !c.Created.IsZero() {
+		parts = append(parts, "born "+c.Created.Format("2006-01-02"))
+	}
+	if !c.LastModified.IsZero() {
+		parts = append(parts, "touched "+internal.FormatRelativeTime(c.LastModified))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "  (" + strings.Join(parts, ", ") + ")"
+}
+
 func createProgressBar(completed, total, width int) string {
 	if total == 0 {
 		return strings.Repeat("─", width)
@@ -171,6 +185,11 @@ func createProgressBar(completed, total, width int) string {
 }
 
 func renderDependencyGraph(depMap map[string][]string, changes []internal.ChangeInfo) {
+	changeMap := make(map[string]internal.ChangeInfo)
+	for _, c := range changes {
+		changeMap[c.Name] = c
+	}
+
 	activeNames := make(map[string]bool)
 	for _, c := range changes {
 		activeNames[c.Name] = true
@@ -207,7 +226,7 @@ func renderDependencyGraph(depMap map[string][]string, changes []internal.Change
 			sort.Strings(unrelated)
 			fmt.Println("\nUnrelated:")
 			for _, name := range unrelated {
-				fmt.Printf("  - %s\n", name)
+				fmt.Printf("  - %s%s\n", name, formatTimestamps(changeMap[name]))
 			}
 		}
 		return
@@ -235,7 +254,7 @@ func renderDependencyGraph(depMap map[string][]string, changes []internal.Change
 		if isLast {
 			connector = "└── "
 		}
-		fmt.Printf("%s%s%s\n", prefix, connector, name)
+		fmt.Printf("%s%s%s%s\n", prefix, connector, name, formatTimestamps(changeMap[name]))
 
 		children := reverseMap[name]
 		sort.Strings(children)
@@ -258,7 +277,7 @@ func renderDependencyGraph(depMap map[string][]string, changes []internal.Change
 		sort.Strings(unrelated)
 		fmt.Println("\nUnrelated:")
 		for _, name := range unrelated {
-			fmt.Printf("  - %s\n", name)
+			fmt.Printf("  - %s%s\n", name, formatTimestamps(changeMap[name]))
 		}
 	}
 }

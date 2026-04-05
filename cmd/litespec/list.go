@@ -88,13 +88,10 @@ func cmdList(args []string) error {
 					TotalTasks:     c.TotalTasks,
 					LastModified:   c.LastModified.Format(time.RFC3339),
 					Status:         internal.ChangeListStatus(c.CompletedTasks, c.TotalTasks),
+					DependsOn:      c.DependsOn,
 				}
-				meta, metaErr := internal.ReadChangeMeta(root, c.Name)
-				if metaErr == nil && len(meta.DependsOn) > 0 {
-					item.DependsOn = meta.DependsOn
-				}
-				if metaErr != nil {
-					out.Warnings = append(out.Warnings, fmt.Sprintf("error reading metadata for %q: %v", c.Name, metaErr))
+				if !c.Created.IsZero() {
+					item.Born = c.Created.Format(time.RFC3339)
 				}
 				out.Changes = append(out.Changes, item)
 			}
@@ -143,8 +140,12 @@ func cmdList(args []string) error {
 	maxName := maxNameWidthChanges(changes)
 	for _, c := range changes {
 		status := changeStatusText(c)
+		born := ""
+		if !c.Created.IsZero() {
+			born = c.Created.Format("2006-01-02")
+		}
 		relTime := internal.FormatRelativeTime(c.LastModified)
-		fmt.Printf("  %-*s  %-16s %s\n", maxName, c.Name, status, relTime)
+		fmt.Printf("  %-*s  %-16s %-12s %s\n", maxName, c.Name, status, born, relTime)
 	}
 	return nil
 }

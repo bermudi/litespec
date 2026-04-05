@@ -18,6 +18,7 @@ type ChangeInfo struct {
 	TotalTasks     int
 	Created        time.Time
 	LastModified   time.Time
+	DependsOn      []string
 }
 
 type SpecInfo struct {
@@ -102,9 +103,11 @@ func ListChanges(root string) ([]ChangeInfo, error) {
 		}
 
 		var created time.Time
+		var dependsOn []string
 		meta, metaErr := ReadChangeMeta(root, name)
 		if metaErr == nil {
 			created = meta.Created
+			dependsOn = meta.DependsOn
 		}
 
 		result = append(result, ChangeInfo{
@@ -113,6 +116,7 @@ func ListChanges(root string) ([]ChangeInfo, error) {
 			TotalTasks:     total,
 			Created:        created,
 			LastModified:   lastMod,
+			DependsOn:      dependsOn,
 		})
 	}
 	return result, nil

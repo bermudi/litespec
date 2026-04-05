@@ -766,6 +766,108 @@ func TestCLIListSortDeps(t *testing.T) {
 	}
 }
 
+func TestCLIListTextShowsBornColumn(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	changeDir := filepath.Join(root, "specs", "changes", "ts-change")
+	if err := os.MkdirAll(changeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-03-15T10:30:00Z\n"), 0o644)
+	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1\n- [x] Done\n"), 0o644)
+
+	out, code := runCLI(t, bin, root, "list")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	if !strings.Contains(out, "ts-change") {
+		t.Error("expected ts-change in output")
+	}
+	if !strings.Contains(out, "2026-03-15") {
+		t.Errorf("expected born date 2026-03-15 in output, got:\n%s", out)
+	}
+	lines := strings.Split(out, "\n")
+	var dataLine string
+	for _, line := range lines {
+		if strings.Contains(line, "ts-change") {
+			dataLine = line
+			break
+		}
+	}
+	if dataLine == "" {
+		t.Fatal("no data line found for ts-change")
+	}
+	fields := strings.Fields(strings.TrimSpace(dataLine))
+	if len(fields) < 4 {
+		t.Errorf("expected at least 4 columns, got %d: %q", len(fields), fields)
+	}
+}
+
+func TestCLIListJSONShowsBornField(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	changeDir := filepath.Join(root, "specs", "changes", "ts-change")
+	if err := os.MkdirAll(changeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-03-15T10:30:00Z\n"), 0o644)
+	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1\n- [x] Done\n"), 0o644)
+
+	out, code := runCLI(t, bin, root, "list", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	changes := result["changes"].([]interface{})
+	if len(changes) != 1 {
+		t.Fatalf("expected 1 change, got %d", len(changes))
+	}
+	c := changes[0].(map[string]interface{})
+	if c["born"] == nil {
+		t.Error("expected born field in JSON output")
+	}
+	born, ok := c["born"].(string)
+	if !ok {
+		t.Errorf("expected born to be string, got %T", c["born"])
+	}
+	if !strings.HasPrefix(born, "2026-03-15") {
+		t.Errorf("expected born to start with 2026-03-15, got %q", born)
+	}
+}
+
+func TestCLIListJSONBornEmptyWhenNoCreated(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	changeDir := filepath.Join(root, "specs", "changes", "no-ts")
+	if err := os.MkdirAll(changeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
+
+	out, code := runCLI(t, bin, root, "list", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	changes := result["changes"].([]interface{})
+	if len(changes) != 1 {
+		t.Fatalf("expected 1 change, got %d", len(changes))
+	}
+	c := changes[0].(map[string]interface{})
+	if _, exists := c["born"]; exists {
+		t.Errorf("expected born field to be omitted when no created, got %q", c["born"])
+	}
+}
+
 func TestCLIViewHelp(t *testing.T) {
 	bin := buildBinary(t)
 	root := t.TempDir()
@@ -915,11 +1017,8 @@ func TestCLIViewWithDependencyGraph(t *testing.T) {
 	parentIdx := -1
 	childIdx := -1
 	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "parent-change" || strings.HasSuffix(trimmed, "parent-change") {
-			if !strings.Contains(line, "Active Changes") && !strings.Contains(line, "Draft Changes") {
-				parentIdx = i
-			}
+		if strings.Contains(line, "parent-change") && !strings.Contains(line, "Active Changes") && !strings.Contains(line, "Draft Changes") {
+			parentIdx = i
 		}
 		if strings.Contains(line, "child-change") && !strings.Contains(line, "Active Changes") && !strings.Contains(line, "Draft Changes") {
 			childIdx = i
@@ -966,6 +1065,74 @@ func TestCLIViewUnknownFlag(t *testing.T) {
 	_, code := runCLI(t, bin, root, "view", "--bogus")
 	if code != 1 {
 		t.Fatalf("expected exit 1 for unknown flag, got %d", code)
+	}
+}
+
+func TestCLIViewTimestampsInAllSections(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	activeDir := filepath.Join(root, "specs", "changes", "active-change")
+	os.MkdirAll(activeDir, 0o755)
+	os.WriteFile(filepath.Join(activeDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-04-01T12:00:00Z\n"), 0o644)
+	os.WriteFile(filepath.Join(activeDir, "tasks.md"), []byte("## Phase 1\n- [x] Done\n- [ ] Todo\n"), 0o644)
+
+	draftDir := filepath.Join(root, "specs", "changes", "draft-change")
+	os.MkdirAll(draftDir, 0o755)
+	os.WriteFile(filepath.Join(draftDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-04-02T08:00:00Z\n"), 0o644)
+
+	completedDir := filepath.Join(root, "specs", "changes", "completed-change")
+	os.MkdirAll(completedDir, 0o755)
+	os.WriteFile(filepath.Join(completedDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-04-03T15:00:00Z\n"), 0o644)
+	os.WriteFile(filepath.Join(completedDir, "tasks.md"), []byte("## Phase 1\n- [x] Done\n"), 0o644)
+
+	out, code := runCLI(t, bin, root, "view")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	for _, section := range []struct {
+		name    string
+		born    string
+		section string
+	}{
+		{"active-change", "2026-04-01", "Active Changes"},
+		{"draft-change", "2026-04-02", "Draft Changes"},
+		{"completed-change", "2026-04-03", "Completed Changes"},
+	} {
+		if !strings.Contains(out, "born "+section.born) {
+			t.Errorf("expected 'born %s' in %s section, got:\n%s", section.born, section.section, out)
+		}
+	}
+
+	if !strings.Contains(out, "touched") {
+		t.Errorf("expected 'touched' in output, got:\n%s", out)
+	}
+}
+
+func TestCLIViewDependencyGraphTimestamps(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	parentDir := filepath.Join(root, "specs", "changes", "parent-ts")
+	os.MkdirAll(parentDir, 0o755)
+	os.WriteFile(filepath.Join(parentDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-04-01T10:00:00Z\n"), 0o644)
+
+	childDir := filepath.Join(root, "specs", "changes", "child-ts")
+	os.MkdirAll(childDir, 0o755)
+	os.WriteFile(filepath.Join(childDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-04-02T10:00:00Z\ndependsOn:\n  - parent-ts\n"), 0o644)
+
+	out, code := runCLI(t, bin, root, "view")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	if !strings.Contains(out, "Dependency Graph") {
+		t.Error("expected Dependency Graph section")
+	}
+	if !strings.Contains(out, "born 2026-04-01") {
+		t.Errorf("expected parent born date in graph, got:\n%s", out)
+	}
+	if !strings.Contains(out, "born 2026-04-02") {
+		t.Errorf("expected child born date in graph, got:\n%s", out)
 	}
 }
 
