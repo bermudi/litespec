@@ -2239,3 +2239,123 @@ func TestFindProjectRoot_SymlinkedSpecs(t *testing.T) {
 		t.Errorf("got %q, want %q", got, root)
 	}
 }
+
+func TestCLIListTextEmptyBorn(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	changeDir := filepath.Join(root, "specs", "changes", "no-born")
+	if err := os.MkdirAll(changeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
+	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1\n- [x] Done\n"), 0o644)
+
+	out, code := runCLI(t, bin, root, "list")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	if !strings.Contains(out, "no-born") {
+		t.Error("expected no-born in output")
+	}
+	if strings.Contains(out, "0001-01-01") {
+		t.Errorf("expected no zero-date in output, got:\n%s", out)
+	}
+
+	lines := strings.Split(out, "\n")
+	var dataLine string
+	for _, line := range lines {
+		if strings.Contains(line, "no-born") {
+			dataLine = line
+			break
+		}
+	}
+	if dataLine == "" {
+		t.Fatal("no data line found for no-born")
+	}
+	fields := strings.Fields(strings.TrimSpace(dataLine))
+	bornField := fields[2]
+	if bornField == "0001-01-01" {
+		t.Errorf("expected empty born column, got zero date in: %q", dataLine)
+	}
+}
+
+func TestFormatTimestampsBothZero(t *testing.T) {
+	c := internal.ChangeInfo{Name: "test"}
+	got := formatTimestamps(c)
+	if got != "" {
+		t.Errorf("expected empty string for zero timestamps, got %q", got)
+	}
+}
+
+func TestFormatTimestampsOnlyBorn(t *testing.T) {
+	c := internal.ChangeInfo{
+		Name:    "test",
+		Created: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
+	}
+	got := formatTimestamps(c)
+	if !strings.Contains(got, "born 2026-04-01") {
+		t.Errorf("expected born date, got %q", got)
+	}
+	if strings.Contains(got, "touched") {
+		t.Errorf("expected no touched for zero LastModified, got %q", got)
+	}
+}
+
+func TestCLIViewZeroTimestamps(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	changeDir := filepath.Join(root, "specs", "changes", "bare-change")
+	if err := os.MkdirAll(changeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
+	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1\n- [x] Done\n"), 0o644)
+
+	out, code := runCLI(t, bin, root, "view")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	if !strings.Contains(out, "bare-change") {
+		t.Error("expected bare-change in output")
+	}
+	if strings.Contains(out, "0001-01-01") {
+		t.Errorf("expected no zero-date in view output, got:\n%s", out)
+	}
+}
+
+func TestCLIListJSONLastModifiedNotZero(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	changeDir := filepath.Join(root, "specs", "changes", "ghost")
+	if err := os.MkdirAll(changeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
+
+	out, code := runCLI(t, bin, root, "list", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	changes := result["changes"].([]interface{})
+	if len(changes) != 1 {
+		t.Fatalf("expected 1 change, got %d", len(changes))
+	}
+	c := changes[0].(map[string]interface{})
+	if _, exists := c["born"]; exists {
+		t.Errorf("expected born field to be omitted, got %q", c["born"])
+	}
+	lm, ok := c["lastModified"].(string)
+	if !ok {
+		t.Fatalf("expected lastModified string, got %T", c["lastModified"])
+	}
+	if strings.HasPrefix(lm, "0001-01-01") {
+		t.Errorf("expected non-zero lastModified, got %q", lm)
+	}
+}

@@ -52,7 +52,7 @@ type ChangeListItemJSON struct {
 	CompletedTasks int      `json:"completedTasks"`
 	TotalTasks     int      `json:"totalTasks"`
 	Born           string   `json:"born,omitempty"`
-	LastModified   string   `json:"lastModified"`
+	LastModified   string   `json:"lastModified,omitempty"`
 	Status         string   `json:"status"`
 	DependsOn      []string `json:"dependsOn,omitempty"`
 }

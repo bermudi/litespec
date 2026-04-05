@@ -86,9 +86,11 @@ func cmdList(args []string) error {
 					Name:           c.Name,
 					CompletedTasks: c.CompletedTasks,
 					TotalTasks:     c.TotalTasks,
-					LastModified:   c.LastModified.Format(time.RFC3339),
 					Status:         internal.ChangeListStatus(c.CompletedTasks, c.TotalTasks),
 					DependsOn:      c.DependsOn,
+				}
+				if !c.LastModified.IsZero() {
+					item.LastModified = c.LastModified.Format(time.RFC3339)
 				}
 				if !c.Created.IsZero() {
 					item.Born = c.Created.Format(time.RFC3339)
@@ -144,7 +146,10 @@ func cmdList(args []string) error {
 		if !c.Created.IsZero() {
 			born = c.Created.Format("2006-01-02")
 		}
-		relTime := internal.FormatRelativeTime(c.LastModified)
+		relTime := ""
+		if !c.LastModified.IsZero() {
+			relTime = internal.FormatRelativeTime(c.LastModified)
+		}
 		fmt.Printf("  %-*s  %-16s %-12s %s\n", maxName, c.Name, status, born, relTime)
 	}
 	return nil

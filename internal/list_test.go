@@ -335,6 +335,13 @@ func TestListChangesCreatedMissingMeta(t *testing.T) {
 	}
 }
 
+func TestFormatRelativeTimeZeroValue(t *testing.T) {
+	result := FormatRelativeTime(time.Time{})
+	if result != "0001-01-01" {
+		t.Errorf("got %q, want %q", result, "0001-01-01")
+	}
+}
+
 func TestGetLastModifiedNonexistentDir(t *testing.T) {
 	_, err := GetLastModified("/nonexistent/path/that/does/not/exist")
 	if err == nil {
