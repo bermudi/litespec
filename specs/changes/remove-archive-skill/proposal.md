@@ -11,12 +11,12 @@ A skill that wraps two CLI commands adds overhead with no value. It should be re
 - Delete `.agents/skills/litespec-archive/SKILL.md`
 - Update `DESIGN.md` — remove `archive` from the skills table and directory listing
 - Update `AGENTS.md` — remove archive from workflow description and skills listing
-- Update `cmd/litespec/init.go` and any skill-generation code that produces the archive skill
-- Ensure `litespec init` and `litespec update` no longer generate the archive skill
-- `the-drill` skill already handles archive as part of its end-of-session ritual — no changes needed there since it invokes the CLI directly
+- Remove archive skill references from `docs/project-structure.md`, `docs/cli-reference.md`, and `docs/workflow.md`
+- Ensure `litespec init` and `litespec update` no longer generate the archive skill (removing from `internal.Skills` handles both)
+
 
 ## Non-Goals
 
 - Changing the `litespec archive` CLI command behavior — it stays exactly as-is
 - Changing the review skill's pre-archive review mode — it already covers this
-- Changing `the-drill` — it already calls `litespec archive` directly without the skill
+

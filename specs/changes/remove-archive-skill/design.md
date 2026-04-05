@@ -20,3 +20,6 @@ The skill system (`internal/skill/`) uses a registry pattern: each skill registe
 - `internal/skill/skill_test.go` — remove `"archive"` from `knownIDs` in `TestGet_ReturnsNonEmptyForKnownIDs`
 - `DESIGN.md` — remove `archive` from the skills table, remove `litespec-archive/` from directory listing
 - `AGENTS.md` — remove archive skill references from the workflow description and skills listing
+- `docs/project-structure.md` — remove `litespec-archive/` from the skills directory tree listing
+- `docs/cli-reference.md` — remove `litespec-archive/` from the skills directory tree listing
+- `docs/workflow.md` — update the "archive: Finalization Mode" section to describe running the CLI command directly rather than a skill mode

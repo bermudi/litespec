@@ -47,11 +47,6 @@ var Skills = []SkillInfo{
 		Name:        "litespec-adopt",
 		Description: "Reverse-engineer specs from existing code. Use when the user provides a file or directory path to document, wants to spec existing code, or says \"adopt\".",
 	},
-	{
-		ID:          "archive",
-		Name:        "litespec-archive",
-		Description: "Validate and archive a completed change, applying delta operations to merge specs. Use when a change is done and the user wants to finalize it or says \"archive\".",
-	},
 }
 
 var Adapters = []ToolAdapter{

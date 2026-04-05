@@ -696,8 +696,7 @@ project/
     ├── litespec-propose/
     ├── litespec-review/
     ├── litespec-apply/
-    ├── litespec-adopt/
-    └── litespec-archive/
+    └── litespec-adopt/
 ```
 
 ---

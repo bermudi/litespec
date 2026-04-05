@@ -100,18 +100,17 @@ Each step has a clear purpose and produces specific artifacts. Choose the right 
 
 **What happens:** Validates task completion, merges delta specs into the canonical source of truth, and moves the change to archive.
 
-**What the AI does:**
-1. Runs validation (artifacts exist, delta syntax valid, no dangling deltas)
-2. Checks that all tasks are complete (use `--allow-incomplete` to bypass)
-3. Applies delta operations in strict order: RENAMED → REMOVED → MODIFIED → ADDED
-4. Strips the change's `specs/` subtree (deltas are now merged)
-5. Moves to `specs/changes/archive/YYYY-MM-DD-<name>/`
+**How to run it:** Use the CLI commands directly — no dedicated skill is needed:
+1. `litespec validate <name>` — verify artifacts exist, delta syntax is valid, no dangling deltas
+2. `litespec archive <name>` — applies deltas, strips the change's `specs/` subtree, and moves to `specs/changes/archive/YYYY-MM-DD-<name>/`
+
+You can also pass `--allow-incomplete` to bypass the task-completion check.
 
 **Artifacts created:** Updated canonical specs (`specs/canon/`), archived change
 
 **When to use:** When all implementation is done and you're ready to finalize the change.
 
-**Example:** "Archive" the docs-site change. All phases are complete.
+**Example:** `litespec archive docs-site` — all phases are complete.
 
 ---
 

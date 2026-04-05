@@ -208,8 +208,7 @@ AI skills are generated into `.agents/skills/` — this is the canonical locatio
 ├── litespec-propose/           # Create change + artifacts
 ├── litespec-review/            # Context-aware review
 ├── litespec-apply/             # Implement one phase
-├── litespec-adopt/             # Reverse-engineer from code
-└── litespec-archive/           # Merge deltas + archive
+└── litespec-adopt/             # Reverse-engineer from code
 ```
 
 Each skill is a single `SKILL.md` file with YAML frontmatter:
