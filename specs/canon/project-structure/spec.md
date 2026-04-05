@@ -4,7 +4,7 @@
 
 ### Requirement: Per-Command File Organization
 
-The CLI entry point MUST be split into separate files, one per command, following the pattern `cmd/litespec/<command>.go`. The `main.go` file SHALL contain only the `main()` function, the command dispatcher, and shared helpers. Each command file SHALL define its command function at package level.
+The CLI entry point MUST be split into separate files, one per command, following the pattern `cmd/litespec/<command>.go`. The `main.go` file SHALL contain only the `main()` function, the command dispatcher, and shared helpers. Each command file SHALL define its command function at package level. The `archive.go` command file SHALL remain — the archive CLI command is unaffected by removal of the archive skill.
 
 #### Scenario: Command files exist
 
