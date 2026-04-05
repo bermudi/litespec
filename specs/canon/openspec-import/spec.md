@@ -1,6 +1,6 @@
 # openspec-import
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: OpenSpec Project Detection
 
