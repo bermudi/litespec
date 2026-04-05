@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestGetLastModifiedNestedFiles(t *testing.T) {
@@ -273,6 +275,63 @@ func TestFormatRelativeTimeBoundaries(t *testing.T) {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestListChangesCreatedFromMeta(t *testing.T) {
+	root := setupTestProject(t)
+
+	changeDir := ChangePath(root, "ts-change")
+	if err := os.MkdirAll(changeDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	createdTime := time.Date(2026, 3, 15, 10, 30, 0, 0, time.UTC)
+	meta := ChangeMeta{
+		Schema:  "spec-driven",
+		Created: createdTime,
+	}
+	data, err := yaml.Marshal(&meta)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(changeDir, MetaFileName), data, 0o644); err != nil {
+		t.Fatalf("write meta: %v", err)
+	}
+
+	changes, err := ListChanges(root)
+	if err != nil {
+		t.Fatalf("ListChanges: %v", err)
+	}
+	if len(changes) != 1 {
+		t.Fatalf("changes count = %d, want 1", len(changes))
+	}
+	c := changes[0]
+	if c.Created.IsZero() {
+		t.Error("Created is zero, should be populated from .litespec.yaml")
+	}
+	if !c.Created.Equal(createdTime) {
+		t.Errorf("Created = %v, want %v", c.Created, createdTime)
+	}
+}
+
+func TestListChangesCreatedMissingMeta(t *testing.T) {
+	root := setupTestProject(t)
+
+	changeDir := ChangePath(root, "no-meta-change")
+	if err := os.MkdirAll(changeDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	changes, err := ListChanges(root)
+	if err != nil {
+		t.Fatalf("ListChanges: %v", err)
+	}
+	if len(changes) != 1 {
+		t.Fatalf("changes count = %d, want 1", len(changes))
+	}
+	if !changes[0].Created.IsZero() {
+		t.Error("Created should be zero when no .litespec.yaml exists")
 	}
 }
 

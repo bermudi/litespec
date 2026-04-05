@@ -1,9 +1,9 @@
 ## Phase 1: Data Layer
-- [ ] Add `Created time.Time` field to `ChangeInfo` struct in `internal/change.go` (Enriched Internal Types)
-- [ ] Update `ListChanges()` to call `ReadChangeMeta` for each change and populate `Created` on `ChangeInfo`
-- [ ] Add `Born string` field to `ChangeListItemJSON` in `internal/json.go` (Enriched JSON Output)
-- [ ] Add tests verifying `ListChanges` populates `Created` from `.litespec.yaml`
-- [ ] Run `go build`, `go test`, `go vet`
+- [x] Add `Created time.Time` field to `ChangeInfo` struct in `internal/change.go` (Enriched Internal Types)
+- [x] Update `ListChanges()` to call `ReadChangeMeta` for each change and populate `Created` on `ChangeInfo`
+- [x] Add `Born string` field to `ChangeListItemJSON` in `internal/json.go` (Enriched JSON Output)
+- [x] Add tests verifying `ListChanges` populates `Created` from `.litespec.yaml`
+- [x] Run `go build`, `go test`, `go vet`
 
 ## Phase 2: List Output
 - [ ] Update text output in `cmd/litespec/list.go` to show four columns: name, status, born (YYYY-MM-DD), last-touched (Enriched Change Listing)

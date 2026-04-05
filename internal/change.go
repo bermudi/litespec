@@ -16,6 +16,7 @@ type ChangeInfo struct {
 	Name           string
 	CompletedTasks int
 	TotalTasks     int
+	Created        time.Time
 	LastModified   time.Time
 }
 
@@ -100,10 +101,17 @@ func ListChanges(root string) ([]ChangeInfo, error) {
 			}
 		}
 
+		var created time.Time
+		meta, metaErr := ReadChangeMeta(root, name)
+		if metaErr == nil {
+			created = meta.Created
+		}
+
 		result = append(result, ChangeInfo{
 			Name:           name,
 			CompletedTasks: completed,
 			TotalTasks:     total,
+			Created:        created,
 			LastModified:   lastMod,
 		})
 	}
