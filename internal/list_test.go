@@ -209,6 +209,18 @@ func TestListSpecsParseFailureReturnsZero(t *testing.T) {
 	}
 }
 
+func TestListSpecsMissingCanonDir(t *testing.T) {
+	root := t.TempDir()
+
+	specs, err := ListSpecs(root)
+	if err != nil {
+		t.Fatalf("ListSpecs with missing canon dir: %v", err)
+	}
+	if len(specs) != 0 {
+		t.Fatalf("specs count = %d, want 0", len(specs))
+	}
+}
+
 func TestListSpecsNoSpecMD(t *testing.T) {
 	root := setupTestProject(t)
 	dir := filepath.Join(CanonPath(root), "empty-cap")

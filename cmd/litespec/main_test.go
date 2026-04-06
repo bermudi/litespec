@@ -942,10 +942,6 @@ func TestCLIViewNoSpecs(t *testing.T) {
 	bin := buildBinary(t)
 	root := t.TempDir()
 
-	specsDir := filepath.Join(root, "specs", "canon")
-	if err := os.MkdirAll(specsDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
 	changesDir := filepath.Join(root, "specs", "changes")
 	if err := os.MkdirAll(changesDir, 0o755); err != nil {
 		t.Fatal(err)

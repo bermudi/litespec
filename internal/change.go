@@ -126,6 +126,9 @@ func ListSpecs(root string) ([]SpecInfo, error) {
 	specsDir := CanonPath(root)
 	entries, err := os.ReadDir(specsDir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("read specs directory: %w", err)
 	}
 
