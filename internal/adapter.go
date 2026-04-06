@@ -21,6 +21,10 @@ func GenerateAdapterCommands(root string, toolIDs []string) error {
 			return fmt.Errorf("create %s: %w", adapter.SkillsDir, err)
 		}
 
+		if err := cleanStaleSymlinks(skillsDir); err != nil {
+			return fmt.Errorf("clean stale symlinks in %s: %w", adapter.SkillsDir, err)
+		}
+
 		for _, si := range Skills {
 			tmpl := skill.Get(si.ID)
 			if tmpl == "" {
@@ -36,6 +40,29 @@ func GenerateAdapterCommands(root string, toolIDs []string) error {
 			if err := os.Symlink(target, linkPath); err != nil {
 				return fmt.Errorf("symlink skill %s: %w", si.Name, err)
 			}
+		}
+	}
+	return nil
+}
+
+func cleanStaleSymlinks(dir string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return fmt.Errorf("read adapter dir: %w", err)
+	}
+	valid := make(map[string]bool, len(Skills))
+	for _, si := range Skills {
+		valid[si.Name] = true
+	}
+	for _, entry := range entries {
+		if valid[entry.Name()] {
+			continue
+		}
+		if entry.Type()&os.ModeSymlink == 0 {
+			continue
+		}
+		if err := os.Remove(filepath.Join(dir, entry.Name())); err != nil {
+			return fmt.Errorf("remove stale symlink %s: %w", entry.Name(), err)
 		}
 	}
 	return nil
