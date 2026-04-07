@@ -321,10 +321,15 @@ func ArchiveChange(root, name string) error {
 		return fmt.Errorf("change %q does not exist", name)
 	}
 
+	archiveDir := ArchivePath(root)
+	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
+		return fmt.Errorf("creating archive directory: %w", err)
+	}
+
 	os.RemoveAll(ChangeSpecsPath(root, name))
 
 	archivedName := time.Now().Format("2006-01-02") + "-" + name
-	dest := filepath.Join(ArchivePath(root), archivedName)
+	dest := filepath.Join(archiveDir, archivedName)
 
 	if err := os.Rename(changeDir, dest); err != nil {
 		return fmt.Errorf("archive change: %w", err)

@@ -165,3 +165,31 @@ func TestParseDeltaSpecMultipleInSameSection(t *testing.T) {
 		}
 	}
 }
+
+func TestParseDeltaSpecRejectsUnknownH2(t *testing.T) {
+	input := `# Pipeline
+
+## ADDED Requirements
+
+### Requirement: Branch Creation
+The system SHALL create a branch.
+
+#### Scenario: Clean
+- **WHEN** worktree is clean
+
+## DELTA Requirements
+
+### Requirement: Empty Commit Handling
+The system MUST skip commits when no changes.
+`
+	_, err := ParseDeltaSpec(input)
+	if err == nil {
+		t.Fatal("expected error for unknown H2 section ## DELTA Requirements")
+	}
+	if !containsSubstr(err.Error(), "unexpected H2 section") {
+		t.Errorf("error = %q, want mention of unexpected H2 section", err.Error())
+	}
+	if !containsSubstr(err.Error(), "## DELTA Requirements") {
+		t.Errorf("error = %q, want mention of ## DELTA Requirements", err.Error())
+	}
+}

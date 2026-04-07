@@ -185,6 +185,10 @@ func ParseDeltaSpec(content string) (*DeltaSpec, error) {
 			continue
 		}
 
+		if isH2(trimmed) {
+			return nil, fmt.Errorf("unexpected H2 section %q; expected ## ADDED/MODIFIED/REMOVED/RENAMED Requirements", trimmed)
+		}
+
 		if isReqHeading(trimmed) {
 			flush()
 			if flushErr != nil {

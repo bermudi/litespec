@@ -807,6 +807,49 @@ func TestAtomicWriteRollbackOnWriteFailure(t *testing.T) {
 	}
 }
 
+func TestArchiveAutoCreatesArchiveDirectory(t *testing.T) {
+	root := setupTestProject(t)
+	writeChangeFile(t, root, "auto-dir", "proposal.md", "# Proposal")
+	writeChangeFile(t, root, "auto-dir", "design.md", "# Design")
+	writeChangeFile(t, root, "auto-dir", "tasks.md", "## Phase 1\n- [x] Done")
+
+	deltaContent := `# rate-limit
+
+## ADDED Requirements
+
+### Requirement: Rate Limiting
+The system SHALL limit API requests.
+
+#### Scenario: Exceeds limit
+- **WHEN** user exceeds limit
+- **THEN** return 429
+`
+	writeDeltaSpecFile(t, root, "auto-dir", "rate-limit", "spec.md", deltaContent)
+
+	if err := os.RemoveAll(ArchivePath(root)); err != nil {
+		t.Fatalf("remove archive dir: %v", err)
+	}
+
+	runArchivePipeline(t, root, "auto-dir")
+
+	if _, err := os.Stat(ArchivePath(root)); os.IsNotExist(err) {
+		t.Error("archive directory should have been auto-created")
+	}
+	archiveEntries, _ := os.ReadDir(ArchivePath(root))
+	found := false
+	for _, e := range archiveEntries {
+		if strings.HasSuffix(e.Name(), "-auto-dir") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("archived directory not found in archive")
+	}
+	if _, err := os.Stat(ChangePath(root, "auto-dir")); !os.IsNotExist(err) {
+		t.Error("change directory should be gone after archive")
+	}
+}
+
 func TestDeterministicDeltaOrdering(t *testing.T) {
 	root := setupTestProject(t)
 
