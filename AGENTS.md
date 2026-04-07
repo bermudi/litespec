@@ -18,7 +18,7 @@ The design emerged from a structured grilling session — question by question, 
 
 - **Language:** Go
 - **Module:** `github.com/bermudi/litespec`
-- **Binary:** `litespec` (use `go run ./cmd/litespec` when working in this repo)
+- **Binary:** `litespec`
 - **Design doc:** `DESIGN.md` — read it first
 
 ## Core Concepts
@@ -71,10 +71,3 @@ These came from deliberate debate. Respect the reasoning:
 - No `any` equivalents — explicit types everywhere
 - No comments unless absolutely necessary for non-obvious logic
 - When changes affect workflow, skills, or core concepts, update `AGENTS.md` and `DESIGN.md` to match. These are living documents — if the system changes, they change too.
-
-## What's Next
-
-Things we know we want but haven't built yet:
-
-- Git-native workflow integration (branch per change, phase commits, PR creation)
-- Skill template refinement based on real usage
