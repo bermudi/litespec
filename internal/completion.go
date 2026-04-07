@@ -194,7 +194,7 @@ var commandFlagDefs = map[string]commandFlags{
 	},
 	"archive": {
 		flags: map[string]string{
-			"--allow-incomplete": "Archive even with incomplete tasks",
+			"--allow-incomplete": "Archive even with incomplete tasks or unarchived dependencies",
 		},
 		hasPositional: true,
 		posResolver:   completeChangeNames,

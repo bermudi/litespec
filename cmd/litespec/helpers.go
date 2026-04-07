@@ -160,7 +160,7 @@ Arguments:
   <name>            Change name to archive
 
 Flags:
-  --allow-incomplete    Archive even with incomplete tasks
+  --allow-incomplete    Archive even with incomplete tasks or unarchived dependencies
 
 Examples:
   litespec archive my-change

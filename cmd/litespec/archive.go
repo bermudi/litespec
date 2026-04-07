@@ -70,15 +70,20 @@ func cmdArchive(args []string) error {
 		}
 	}
 
-	dependents, depErr := internal.GetDependents(root, name)
-	if depErr != nil {
-		return fmt.Errorf("checking dependents: %w", depErr)
-	}
-	if len(dependents) > 0 {
-		if allowIncomplete {
-			fmt.Fprintf(os.Stderr, "WARN  active changes depend on %q: %s\n", name, strings.Join(dependents, ", "))
-		} else {
-			return fmt.Errorf("active changes depend on %q: %s. Archive them first or use --allow-incomplete", name, strings.Join(dependents, ", "))
+	meta, metaErr := internal.ReadChangeMeta(root, name)
+	if metaErr == nil && len(meta.DependsOn) > 0 {
+		var unarchived []string
+		for _, dep := range meta.DependsOn {
+			if internal.ChangeExists(root, dep) {
+				unarchived = append(unarchived, dep)
+			}
+		}
+		if len(unarchived) > 0 {
+			if allowIncomplete {
+				fmt.Fprintf(os.Stderr, "WARN  unarchived dependencies: %s\n", strings.Join(unarchived, ", "))
+			} else {
+				return fmt.Errorf("unarchived dependencies: %s. Archive them first or use --allow-incomplete", strings.Join(unarchived, ", "))
+			}
 		}
 	}
 

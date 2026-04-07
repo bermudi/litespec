@@ -617,14 +617,14 @@ func TestCLIValidateTypeMissingValue(t *testing.T) {
 	}
 }
 
-func TestCLIArchiveBlocksOnActiveDependent(t *testing.T) {
+func TestCLIArchiveBlocksOnUnarchivedDependency(t *testing.T) {
 	bin, root := setupCLITest(t)
 
-	changeDir := filepath.Join(root, "specs", "changes", "parent")
+	changeDir := filepath.Join(root, "specs", "changes", "child")
 	if err := os.MkdirAll(changeDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
+	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - parent\n"), 0o644)
 	os.WriteFile(filepath.Join(changeDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
 	os.WriteFile(filepath.Join(changeDir, "design.md"), []byte("# Design\nTest."), 0o644)
 	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1: Test\n- [x] Task one"), 0o644)
@@ -640,43 +640,32 @@ The system SHALL work.
 - **THEN** expected result
 `), 0o644)
 
-	childDir := filepath.Join(root, "specs", "changes", "child")
-	if err := os.MkdirAll(childDir, 0o755); err != nil {
+	parentDir := filepath.Join(root, "specs", "changes", "parent")
+	if err := os.MkdirAll(parentDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	os.WriteFile(filepath.Join(childDir, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - parent\n"), 0o644)
-	os.WriteFile(filepath.Join(childDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
-	os.WriteFile(filepath.Join(childDir, "design.md"), []byte("# Design\nTest."), 0o644)
-	os.WriteFile(filepath.Join(childDir, "tasks.md"), []byte("## Phase 1: Test\n- [ ] Task one"), 0o644)
-	childSpecsDir := filepath.Join(childDir, "specs", "cap2")
-	os.MkdirAll(childSpecsDir, 0o755)
-	os.WriteFile(filepath.Join(childSpecsDir, "spec.md"), []byte(`## ADDED Requirements
+	os.WriteFile(filepath.Join(parentDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
+	os.WriteFile(filepath.Join(parentDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
+	os.WriteFile(filepath.Join(parentDir, "design.md"), []byte("# Design\nTest."), 0o644)
+	os.WriteFile(filepath.Join(parentDir, "tasks.md"), []byte("## Phase 1: Test\n- [ ] Task one"), 0o644)
 
-### Requirement: R1
-The system SHALL work.
-
-#### Scenario: S1
-- **WHEN** triggered
-- **THEN** expected result
-`), 0o644)
-
-	out, code := runCLI(t, bin, root, "archive", "parent")
+	out, code := runCLI(t, bin, root, "archive", "child")
 	if code != 1 {
-		t.Fatalf("expected exit 1 for active dependent, got %d: %s", code, out)
+		t.Fatalf("expected exit 1 for unarchived dependency, got %d: %s", code, out)
 	}
-	if !strings.Contains(out, "active changes depend on") {
-		t.Errorf("expected dependent warning, got: %s", out)
+	if !strings.Contains(out, "unarchived dependencies") {
+		t.Errorf("expected unarchived dependencies error, got: %s", out)
 	}
 }
 
-func TestCLIArchiveAllowsIncompleteWithDependents(t *testing.T) {
+func TestCLIArchiveAllowsIncompleteWithUnarchivedDeps(t *testing.T) {
 	bin, root := setupCLITest(t)
 
-	changeDir := filepath.Join(root, "specs", "changes", "parent")
+	changeDir := filepath.Join(root, "specs", "changes", "child")
 	if err := os.MkdirAll(changeDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
+	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - parent\n"), 0o644)
 	os.WriteFile(filepath.Join(changeDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
 	os.WriteFile(filepath.Join(changeDir, "design.md"), []byte("# Design\nTest."), 0o644)
 	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1: Test\n- [x] Task one"), 0o644)
@@ -692,35 +681,65 @@ The system SHALL work.
 - **THEN** expected result
 `), 0o644)
 
-	childDir := filepath.Join(root, "specs", "changes", "child")
-	if err := os.MkdirAll(childDir, 0o755); err != nil {
+	parentDir := filepath.Join(root, "specs", "changes", "parent")
+	if err := os.MkdirAll(parentDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	os.WriteFile(filepath.Join(childDir, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - parent\n"), 0o644)
-	os.WriteFile(filepath.Join(childDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
-	os.WriteFile(filepath.Join(childDir, "design.md"), []byte("# Design\nTest."), 0o644)
-	os.WriteFile(filepath.Join(childDir, "tasks.md"), []byte("## Phase 1: Test\n- [ ] Task one"), 0o644)
-	childSpecsDir := filepath.Join(childDir, "specs", "cap2")
-	os.MkdirAll(childSpecsDir, 0o755)
-	os.WriteFile(filepath.Join(childSpecsDir, "spec.md"), []byte(`## ADDED Requirements
+	os.WriteFile(filepath.Join(parentDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
+	os.WriteFile(filepath.Join(parentDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
+	os.WriteFile(filepath.Join(parentDir, "design.md"), []byte("# Design\nTest."), 0o644)
+	os.WriteFile(filepath.Join(parentDir, "tasks.md"), []byte("## Phase 1: Test\n- [ ] Task one"), 0o644)
 
-### Requirement: R1
-The system SHALL work.
-
-#### Scenario: S1
-- **WHEN** triggered
-- **THEN** expected result
-`), 0o644)
-
-	out, code := runCLI(t, bin, root, "archive", "parent", "--allow-incomplete")
+	out, code := runCLI(t, bin, root, "archive", "child", "--allow-incomplete")
 	if code != 0 {
 		t.Fatalf("expected success with --allow-incomplete, got %d: %s", code, out)
 	}
 	if !strings.Contains(out, "archived successfully") {
 		t.Errorf("expected archive success, got: %s", out)
 	}
-	if !strings.Contains(out, "WARN") || !strings.Contains(out, "active changes depend on") {
-		t.Errorf("expected warning about active dependents, got: %s", out)
+	if !strings.Contains(out, "WARN") || !strings.Contains(out, "unarchived dependencies") {
+		t.Errorf("expected warning about unarchived dependencies, got: %s", out)
+	}
+}
+
+func TestCLIArchiveParentWithActiveDependent(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	parentDir := filepath.Join(root, "specs", "changes", "parent")
+	if err := os.MkdirAll(parentDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(parentDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
+	os.WriteFile(filepath.Join(parentDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
+	os.WriteFile(filepath.Join(parentDir, "design.md"), []byte("# Design\nTest."), 0o644)
+	os.WriteFile(filepath.Join(parentDir, "tasks.md"), []byte("## Phase 1: Test\n- [x] Task one"), 0o644)
+	specsDir := filepath.Join(parentDir, "specs", "cap")
+	os.MkdirAll(specsDir, 0o755)
+	os.WriteFile(filepath.Join(specsDir, "spec.md"), []byte(`## ADDED Requirements
+
+### Requirement: R1
+The system SHALL work.
+
+#### Scenario: S1
+- **WHEN** triggered
+- **THEN** expected result
+`), 0o644)
+
+	childDir := filepath.Join(root, "specs", "changes", "child")
+	if err := os.MkdirAll(childDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(childDir, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - parent\n"), 0o644)
+	os.WriteFile(filepath.Join(childDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
+	os.WriteFile(filepath.Join(childDir, "design.md"), []byte("# Design\nTest."), 0o644)
+	os.WriteFile(filepath.Join(childDir, "tasks.md"), []byte("## Phase 1: Test\n- [ ] Task one"), 0o644)
+
+	out, code := runCLI(t, bin, root, "archive", "parent")
+	if code != 0 {
+		t.Fatalf("expected success archiving parent, got %d: %s", code, out)
+	}
+	if !strings.Contains(out, "archived successfully") {
+		t.Errorf("expected archive success, got: %s", out)
 	}
 }
 
