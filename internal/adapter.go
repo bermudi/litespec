@@ -68,6 +68,41 @@ func cleanStaleSymlinks(dir string) error {
 	return nil
 }
 
+func DetectActiveAdapters(root string) []string {
+	canonicalSkills := filepath.Join(root, SkillsDir)
+	var active []string
+	for _, adapter := range Adapters {
+		adapterDir := filepath.Join(root, adapter.SkillsDir)
+		entries, err := os.ReadDir(adapterDir)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			if entry.Type()&os.ModeSymlink == 0 {
+				continue
+			}
+			linkPath := filepath.Join(adapterDir, entry.Name())
+			target, err := os.Readlink(linkPath)
+			if err != nil {
+				continue
+			}
+			resolved := target
+			if !filepath.IsAbs(resolved) {
+				resolved = filepath.Join(adapterDir, resolved)
+			}
+			rel, err := filepath.Rel(canonicalSkills, resolved)
+			if err != nil {
+				continue
+			}
+			if !strings.HasPrefix(rel, "..") {
+				active = append(active, adapter.ID)
+				break
+			}
+		}
+	}
+	return active
+}
+
 func GetAdapter(toolID string) *ToolAdapter {
 	for i := range Adapters {
 		if Adapters[i].ID == toolID {

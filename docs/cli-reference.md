@@ -33,6 +33,7 @@ litespec init [--tools <ids>]
 - Creates `.agents/skills/` — generated skill files
 - Generates skills from canonical specs
 - Optionally creates tool-specific symlinks
+- Auto-detects existing adapters from previous runs
 
 **Examples:**
 ```bash
@@ -473,7 +474,8 @@ litespec update [--tools <ids>]
 
 **Behavior:**
 - Regenerates all skills in `.agents/skills/`
-- Updates tool-specific symlinks if `--tools` provided
+- Auto-detects active tool adapters by scanning for existing symlinks (e.g., `.claude/skills/`)
+- When `--tools` is provided, only the listed adapters are updated
 - Does not modify `specs/` directory
 - Fails if not a litespec project
 
@@ -494,6 +496,7 @@ litespec update --tools claude
 - Use after modifying canonical specs to regenerate skills
 - Faster than `init` for skill refresh
 - Does not create project structure (assumes it exists)
+- Auto-detects active adapters — no need to pass `--tools` if you've set them up before
 
 ---
 

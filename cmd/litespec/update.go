@@ -47,13 +47,7 @@ func cmdUpdate(args []string) error {
 			return err
 		}
 	} else {
-		cfg, err := internal.ReadProjectConfig(root)
-		if err != nil {
-			return fmt.Errorf("read project config: %w", err)
-		}
-		if len(cfg.Tools) > 0 {
-			toolIDs = cfg.Tools
-		}
+		toolIDs = internal.DetectActiveAdapters(root)
 	}
 
 	if len(toolIDs) > 0 {
@@ -61,11 +55,6 @@ func cmdUpdate(args []string) error {
 			return err
 		}
 		fmt.Printf("Updated adapter symlinks for: %s\n", strings.Join(toolIDs, ","))
-		if tools != "" {
-			if err := saveToolIDs(root, toolIDs); err != nil {
-				return err
-			}
-		}
 	}
 	return nil
 }

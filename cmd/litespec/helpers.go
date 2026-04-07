@@ -312,12 +312,3 @@ func validateToolIDs(toolIDs []string) error {
 	}
 	return nil
 }
-
-func saveToolIDs(root string, toolIDs []string) error {
-	cfg, err := internal.ReadProjectConfig(root)
-	if err != nil {
-		return err
-	}
-	cfg.Tools = toolIDs
-	return internal.WriteProjectConfig(root, cfg)
-}

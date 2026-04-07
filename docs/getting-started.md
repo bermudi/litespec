@@ -86,7 +86,7 @@ If you're using **Claude Code**, generate symlinks so Claude can find the skills
 litespec init --tools claude
 ```
 
-This creates symlinks in `.claude/skills/` pointing to the generated skills in `.agents/skills/`.
+This creates symlinks in `.claude/skills/` pointing to the generated skills in `.agents/skills/`. Subsequent `litespec update` commands will auto-detect and refresh these symlinks without needing `--tools` again.
 
 ## Enable Shell Completions
 

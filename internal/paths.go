@@ -14,7 +14,6 @@ const (
 	MetaFileName       = ".litespec.yaml"
 	ProjectDirName     = "specs"
 	SkillsDir          = ".agents/skills"
-	ConfigFileName     = "config.yaml"
 )
 
 var Skills = []SkillInfo{

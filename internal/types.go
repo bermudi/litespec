@@ -100,7 +100,3 @@ type ToolAdapter struct {
 	Name      string
 	SkillsDir string
 }
-
-type ProjectConfig struct {
-	Tools []string `yaml:"tools,omitempty"`
-}

@@ -1893,6 +1893,80 @@ func TestCmdInitDirect_HelpFlag(t *testing.T) {
 	}
 }
 
+func TestCmdInitDirect_WithTools_NoConfigYaml(t *testing.T) {
+	root := setupEmptyDir(t)
+	if err := cmdInit([]string{"--tools", "claude"}); err != nil {
+		t.Fatalf("cmdInit --tools claude: %v", err)
+	}
+	configPath := filepath.Join(root, "specs", "config.yaml")
+	if _, err := os.Stat(configPath); err == nil {
+		t.Error("expected specs/config.yaml to NOT exist")
+	}
+}
+
+func TestCmdUpdateDirect_WithTools_NoConfigYaml(t *testing.T) {
+	root := setupDirectTest(t)
+	if err := internal.InitProject(root); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdUpdate([]string{"--tools", "claude"}); err != nil {
+		t.Fatalf("cmdUpdate --tools claude: %v", err)
+	}
+	configPath := filepath.Join(root, "specs", "config.yaml")
+	if _, err := os.Stat(configPath); err == nil {
+		t.Error("expected specs/config.yaml to NOT exist")
+	}
+}
+
+func TestCmdUpdateDirect_AutoDetectAdapters(t *testing.T) {
+	root := setupDirectTest(t)
+	if err := internal.InitProject(root); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdUpdate([]string{"--tools", "claude"}); err != nil {
+		t.Fatalf("cmdUpdate --tools claude: %v", err)
+	}
+	if err := cmdUpdate([]string{}); err != nil {
+		t.Fatalf("cmdUpdate (auto-detect): %v", err)
+	}
+	claudeSkills := filepath.Join(root, ".claude", "skills")
+	entries, err := os.ReadDir(claudeSkills)
+	if err != nil {
+		t.Fatalf("reading .claude/skills: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Error("expected auto-detected symlinks to be refreshed in .claude/skills/")
+	}
+}
+
+func TestCmdUpdateDirect_NoAdaptersNoFlag(t *testing.T) {
+	root := setupDirectTest(t)
+	if err := internal.InitProject(root); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdUpdate([]string{}); err != nil {
+		t.Fatalf("cmdUpdate (no adapters, no flag): %v", err)
+	}
+}
+
+func TestCmdInitDirect_AutoDetectExistingAdapters(t *testing.T) {
+	root := setupEmptyDir(t)
+	if err := cmdInit([]string{"--tools", "claude"}); err != nil {
+		t.Fatalf("first init --tools claude: %v", err)
+	}
+	if err := cmdInit([]string{}); err != nil {
+		t.Fatalf("second init (auto-detect): %v", err)
+	}
+	claudeSkills := filepath.Join(root, ".claude", "skills")
+	entries, err := os.ReadDir(claudeSkills)
+	if err != nil {
+		t.Fatalf("reading .claude/skills: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Error("expected auto-detected symlinks to be refreshed in .claude/skills/")
+	}
+}
+
 func TestMarshalJSONErrorPropagation(t *testing.T) {
 	_, err := internal.MarshalJSON(map[string]chan int{"ch": make(chan int)})
 	if err == nil {

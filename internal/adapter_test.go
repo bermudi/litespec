@@ -157,6 +157,71 @@ func TestCleanStaleSymlinks_SkipsNonSymlinks(t *testing.T) {
 	}
 }
 
+func TestDetectActiveAdapters_ActiveAdapter(t *testing.T) {
+	root := t.TempDir()
+	canonicalSkills := filepath.Join(root, SkillsDir)
+	os.MkdirAll(canonicalSkills, 0o755)
+
+	for _, si := range Skills {
+		os.WriteFile(filepath.Join(canonicalSkills, si.Name), []byte("template"), 0o644)
+	}
+
+	adapterDir := filepath.Join(root, ".claude", "skills")
+	os.MkdirAll(adapterDir, 0o755)
+	for _, si := range Skills {
+		target := filepath.Join("..", "..", SkillsDir, si.Name)
+		os.Symlink(target, filepath.Join(adapterDir, si.Name))
+	}
+
+	active := DetectActiveAdapters(root)
+	if len(active) != 1 || active[0] != "claude" {
+		t.Errorf("expected [claude], got %v", active)
+	}
+}
+
+func TestDetectActiveAdapters_NoAdapters(t *testing.T) {
+	root := t.TempDir()
+	active := DetectActiveAdapters(root)
+	if len(active) != 0 {
+		t.Errorf("expected empty, got %v", active)
+	}
+}
+
+func TestDetectActiveAdapters_AdapterDirEmpty(t *testing.T) {
+	root := t.TempDir()
+	adapterDir := filepath.Join(root, ".claude", "skills")
+	os.MkdirAll(adapterDir, 0o755)
+
+	active := DetectActiveAdapters(root)
+	if len(active) != 0 {
+		t.Errorf("expected empty when adapter dir has no symlinks, got %v", active)
+	}
+}
+
+func TestDetectActiveAdapters_AdapterDirWithNonSymlinks(t *testing.T) {
+	root := t.TempDir()
+	adapterDir := filepath.Join(root, ".claude", "skills")
+	os.MkdirAll(adapterDir, 0o755)
+	os.WriteFile(filepath.Join(adapterDir, "notes.txt"), []byte("data"), 0o644)
+
+	active := DetectActiveAdapters(root)
+	if len(active) != 0 {
+		t.Errorf("expected empty when adapter dir has only regular files, got %v", active)
+	}
+}
+
+func TestDetectActiveAdapters_SymlinkPointsOutside(t *testing.T) {
+	root := t.TempDir()
+	adapterDir := filepath.Join(root, ".claude", "skills")
+	os.MkdirAll(adapterDir, 0o755)
+	os.Symlink("/some/other/path/skill", filepath.Join(adapterDir, "external-skill"))
+
+	active := DetectActiveAdapters(root)
+	if len(active) != 0 {
+		t.Errorf("expected empty when symlinks point outside .agents/skills, got %v", active)
+	}
+}
+
 func TestGenerateAdapterCommands_CleansStaleSymlinks(t *testing.T) {
 	root := t.TempDir()
 
