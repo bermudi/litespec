@@ -422,14 +422,16 @@ litespec archive <name> [--allow-incomplete]
 
 | Flag | Description |
 |------|-------------|
-| `--allow-incomplete` | Archive even with incomplete tasks |
+| `--allow-incomplete` | Archive even with incomplete tasks or unarchived dependencies |
 
 **Archive Process:**
 1. **Validate** — Run full validation on the change
-2. **Check tasks** — Verify all tasks complete (unless `--allow-incomplete`)
-3. **Merge deltas** — Apply RENAMED→REMOVED→MODIFIED→ADDED to `specs/canon/`
-4. **Strip specs/** — Remove change's `specs/` directory
+2. **Check dependencies** — Verify all declared `dependsOn` are archived (unless `--allow-incomplete`). Errors if unarchived dependencies exist.
+3. **Check tasks** — Verify all tasks complete (unless `--allow-incomplete`)
+4. **Merge deltas** — Apply RENAMED→REMOVED→MODIFIED→ADDED to `specs/canon/`
 5. **Move** — Relocate to `specs/changes/archive/<YYYY-MM-DD>-<name>/`
+
+The archive operation is transactional: the change is moved to the archive first, then canonical specs are written atomically. If the write fails, the change is restored from archive.
 
 **Delta Merge Order:**
 1. `RENAMED` — Establish correct headers
@@ -451,8 +453,7 @@ litespec archive add-auth --allow-incomplete
 - `1` — Validation failed, tasks incomplete, or error
 
 **Tips:**
-- Archived directory contains only: `.litespec.yaml`, `proposal.md`, `design.md`, `tasks.md`
-- `specs/` subtree is stripped — content merged into canonical specs
+- Archived directory contains planning artifacts plus `specs/` subtree for auditability
 - Canon creates new directories if capability doesn't exist
 - Date prefix in archive path prevents conflicts
 
@@ -552,6 +553,76 @@ Dependency Graph
 - Active changes are sorted by completion percentage (lowest first)
 - Dependency graph only appears when at least one change has `dependsOn`
 - Use `litespec list` for more detailed change/spec information
+
+---
+
+### `upgrade`
+
+Check for the latest version and upgrade the binary.
+
+```
+litespec upgrade
+```
+
+**Behavior:**
+- Queries GitHub Releases for the latest version tag
+- Compares with current installed version
+- Upgrades via `go install github.com/bermudi/litespec@latest`
+- Only works for installations via `go install` — reports error otherwise
+
+**Examples:**
+```bash
+# Check for updates and upgrade
+litespec upgrade
+```
+
+**Exit Codes:**
+- `0` — Already at latest version or upgrade successful
+- `1` — Error (not installed via go install, network error, etc.)
+
+---
+
+### `import`
+
+Import an OpenSpec project to litespec format.
+
+```
+litespec import --source <directory> [--dry-run] [--force]
+```
+
+**Arguments:**
+- `--source <directory>` — Path to the OpenSpec project root (required)
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Show what would be imported without making changes |
+| `--force` | Overwrite existing files without prompting |
+
+**Behavior:**
+- Detects OpenSpec project structure (canonical specs and changes)
+- Migrates canonical specs to `specs/canon/`
+- Migrates active and archived changes to `specs/changes/`
+- Converts OpenSpec metadata format to litespec format
+- Preserves all delta operations and scenario content
+
+**Examples:**
+```bash
+# Import an OpenSpec project
+litespec import --source /path/to/openspec-project
+
+# Preview what would be imported
+litespec import --source /path/to/openspec-project --dry-run
+
+# Force overwrite existing files
+litespec import --source /path/to/openspec-project --force
+```
+
+**Tips:**
+- Use `--dry-run` first to see the plan before committing to changes
+- The source directory is not modified — import is always a one-way migration
+- Archived changes retain their original date prefix in the archive name
 
 ---
 

@@ -192,10 +192,11 @@ specs/changes/archive/
     ├── .litespec.yaml
     ├── proposal.md
     ├── design.md
-    └── tasks.md                # No specs/ subtree!
+    ├── tasks.md
+    └── specs/                  # Kept for auditability
 ```
 
-**Critical:** Archived changes contain only planning artifacts. The `specs/` subtree is stripped because its contents have been merged into `specs/canon/` — the single source of truth.
+Archived changes preserve the `specs/` subtree for auditability. The deltas have been merged into `specs/canon/`, but the original change specs remain available for reference.
 
 ## The `.agents/skills/` Directory
 
@@ -277,7 +278,8 @@ project/
 │               ├── .litespec.yaml
 │               ├── proposal.md
 │               ├── design.md
-│               └── tasks.md      # Planning artifacts only
+│               ├── tasks.md
+│               └── specs/
 └── .agents/skills/
     └── litespec-<skill>/
         └── SKILL.md              # Canonical skill file

@@ -27,7 +27,7 @@ The design emerged from a structured grilling session — question by question, 
 - **Changes** live in `specs/changes/<name>/` — isolated proposed modifications
 - **Delta specs** use ADDED/MODIFIED/REMOVED/RENAMED markers merged in strict order at archive time
 - **Change dependencies** — optional `dependsOn` field in `.litespec.yaml` for prerequisite relationships between changes. Enables cycle/overlap detection, topological sorting, archive guards, and dependency graph visualization.
-- **Skills** are generated into `.agents/skills/` (canonical). This is the only skill directory we target — nearly all AI coding agents (opencode, Cursor, Windsurf, Amazon Q, Auggie, Roo, Kilo Code, Codex, etc.) now discover `.agents/skills/` natively. Claude Code is the sole exception: it reads from `.claude/skills/`, so `--tools claude` creates symlinks there.
+- **Skills** are generated into `.agents/skills/` (canonical). Nearly all AI coding agents (opencode, Cursor, Windsurf, Amazon Q, Auggie, Roo, Kilo Code, Codex, etc.) now discover `.agents/skills/` natively. Claude Code is the sole exception: it reads from `.claude/skills/`, so `--tools claude` creates symlinks there.
 - **Scenarios** — each requirement has named scenarios (`#### Scenario: <name>`) with WHEN/THEN format. ADDED and MODIFIED requirements must have at least one scenario. Body text must contain SHALL or MUST.
 - **Artifact-specific instructions** — `litespec instructions <artifact>` returns distinct guidance per artifact (proposal: motivation/scope/non-goals; specs: delta format + capabilities; design: architecture/decisions/file changes; tasks: phased checklist). The `template` field retains the propose workflow for context.
 - **Phased tasks** — `tasks.md` organizes work into phases, applied one phase at a time
@@ -53,7 +53,7 @@ Unidirectional. No backward flow.
 
 These came from deliberate debate. Respect the reasoning:
 
-- **Convention over configuration** — no config files unless a concrete need arises. OpenSpec ships a stub config.yaml that nobody fills in. We skip it entirely until needed.
+- **Convention over configuration** — no config files unless a concrete need arises. OpenSpec ships a stub config.yaml that nobody fills in. We skip it entirely until needed. Tool adapters are auto-detected by scanning for symlinks in adapter skill directories (e.g., `.claude/skills/`) that point into `.agents/skills/`.
 - **`.agents/skills/` is canonical** — one source of truth, discovered natively by nearly every AI coding agent. `--tools claude` creates symlinks in `.claude/skills/` as the only exception (Claude Code does not read `.agents/`). No other tool-specific adapters are needed.
 - **Lean skills** — minimal token usage. Each skill is focused instructions, not pages of boilerplate.
 - **Dangling delta detection during `validate`** — not just at archive time. This is an improvement over OpenSpec.

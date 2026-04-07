@@ -30,7 +30,7 @@ project/
 │               ├── .litespec.yaml
 │               ├── proposal.md
 │               ├── design.md
-│               └── tasks.md      # planning artifacts only — no specs/ subtree
+│               └── tasks.md      # planning artifacts
 └── .agents/skills/               # generated skills (canonical)
     ├── litespec-explore/
     ├── litespec-grill/
@@ -100,6 +100,18 @@ Applied in strict order at archive time:
 3. `MODIFIED` — updates remaining requirements
 4. `ADDED` — appends new requirements
 
+### Glossary Operations
+
+Glossary entries support the same delta operations as requirements:
+
+| Operation | Syntax | Merge Behavior |
+|-----------|--------|----------------|
+| `ADDED` | `## ADDED Glossary` | Append to canon glossary |
+| `MODIFIED` | `## MODIFIED Glossary` | Replace definition of existing term |
+| `REMOVED` | `## REMOVED Glossary` | Delete term from canon glossary |
+
+ADDED terms must not already exist in canon. MODIFIED/REMOVED terms must exist in canon.
+
 ### Improvement over OpenSpec: Dangling Delta Detection
 
 `validate` catches dangling deltas — MODIFIED/REMOVED operations referencing requirements that don't exist in the target spec. OpenSpec only fails on these at archive time. litespec catches them during validation.
@@ -137,6 +149,20 @@ Rules:
 - REMOVED requirements are name-only — no body or scenarios
 - RENAMED requirements preserve content and scenarios under the new name
 
+### Glossary (optional)
+
+Canonical specs MAY include a `## Glossary` H2 section after `## Requirements`:
+
+```markdown
+## Glossary
+
+- **TermName**: definition text
+```
+
+- Entries use `- **TermName**: definition` format
+- Term names must be non-empty and unique within a spec
+- No other H2 sections are permitted after `## Glossary`
+
 ## Artifact Dependency Graph
 
 ```
@@ -160,33 +186,37 @@ States:
 
 Convention over configuration. No config file. All defaults baked in. If a need arises later, add it then.
 
+Tool adapters are auto-detected by scanning for symlinks in adapter skill directories (e.g., `.claude/skills/`) that point into `.agents/skills/`.
+
 ## CLI Commands
 
 | Command | Purpose |
 |---------|---------|
 | `litespec init [--tools ...]` | Scaffold `specs/` dir + generate skills (+ optional tool-specific commands) |
 | `litespec new <name>` | Create a new change directory with `.litespec.yaml` metadata |
-| `litespec validate [<name>] [--all\|--changes\|--specs] [--type change\|spec] [--strict]` | Validate artifact structure, delta syntax, dangling deltas, dependency cycles/overlaps |
+| `litespec validate [<name>] [--all|--changes|--specs] [--type change|spec] [--strict]` | Validate artifact structure, delta syntax, dangling deltas, dependency cycles/overlaps |
 | `litespec status [<name>]` | Show artifact graph state (BLOCKED/READY/DONE) |
 | `litespec instructions <artifact>` | Return artifact-specific instructions for AI to create an artifact |
-| `litespec list [--specs\|--changes] [--sort name\|recent\|deps]` | List specs or changes (deps sort uses topological order) |
+| `litespec list [--specs|--changes] [--sort name|recent|deps]` | List specs or changes (deps sort uses topological order) |
 | `litespec view` | Display dashboard overview with progress bars, specs, changes, and dependency graph |
 | `litespec update [--tools ...]` | Regenerate skills and adapter symlinks |
-| `litespec archive <change> [--allow-incomplete]` | Apply deltas + move to archive (warns if other changes depend on this one) |
+| `litespec archive <change> [--allow-incomplete]` | Apply deltas + move to archive (errors if unarchived dependencies exist) |
 | `litespec completion <shell>` | Print shell completion script (bash, zsh, fish) |
 | `litespec __complete <words...>` | Hidden backend for dynamic shell completions |
+| `litespec upgrade` | Check for latest version and upgrade via `go install` |
+| `litespec import --source <dir>` | Import an OpenSpec project to litespec format |
 
 ## Archive Behavior
 
 `litespec archive <change>` performs these steps in order:
 
 1. **Validate** — run `ValidateChange` (artifacts exist, delta syntax valid, no dangling deltas)
-2. **Check tasks** — all checkboxes must be checked, unless `--allow-incomplete`
-3. **Merge deltas** — apply RENAMED→REMOVED→MODIFIED→ADDED into `specs/canon/<capability>/spec.md`
-4. **Strip specs/ subtree** — remove the change's `specs/` directory before archiving
+2. **Check dependencies** — error if the change has unarchived dependencies; warn with `--allow-incomplete`
+3. **Check tasks** — all checkboxes must be checked, unless `--allow-incomplete`
+4. **Merge deltas** — apply RENAMED→REMOVED→MODIFIED→ADDED into `specs/canon/<capability>/spec.md`
 5. **Move** — relocate the change directory to `specs/changes/archive/<YYYY-MM-DD>-<name>/`
 
-The archived directory MUST contain only planning artifacts (`.litespec.yaml`, `proposal.md`, `design.md`, `tasks.md`). The `specs/` subtree MUST NOT be present — its contents have already been merged into the canonical `specs/canon/` source of truth.
+The archive operation is transactional: the change is moved to the archive first, then canonical specs are written atomically. If the write fails, the change is restored from archive.
 
 ## Change Metadata
 
@@ -208,7 +238,15 @@ Changes can declare optional `dependsOn` relationships in `.litespec.yaml`. This
 - **Cycle detection** — `validate --changes` and `validate --all` detect circular dependencies
 - **Overlap detection** — validates that changes sharing a dependency don't modify the same capability requirements
 - **Topological sorting** — `list --changes --sort deps` orders changes by dependency (level-by-level BFS, alphabetical within each level); falls back to alphabetical on cycles
-- **Archive guard** — `archive` warns when other active changes depend on the change being archived; errors unless `--allow-incomplete`
+- **Archive guard** — `archive` errors when the change being archived has unarchived dependencies; warns with `--allow-incomplete`
 - **Dependency graph** — `view` renders a tree-style DAG with box-drawing characters when any active change has `dependsOn`
 
 Resolution checks active changes first, then archived changes. Active takes priority on name collision. Archived change names are extracted by stripping the date prefix.
+
+### Dependency Glossary Loading
+
+When validating a change with `dependsOn`, `validate` loads glossary terms from each dependency's specs (delta specs if active, canonical specs if archived). Terms are unioned across spec files, deduplicated by name, with warnings on conflicting definitions. Loaded glossary terms are included in the `ValidationResult` for downstream consumers (e.g., the review skill performs semantic cross-referencing on these terms).
+
+## Glossary
+
+**Glossary** — An optional section in canonical and delta specs that exports term definitions for downstream consumers. Enables cross-change consistency checking when a change declares `dependsOn`.
