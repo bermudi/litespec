@@ -50,6 +50,8 @@ litespec instructions <artifact-id> --json
 
 6. **Loop** back to step 1 until ` + "`isComplete`" + ` is true.
 
+7. **Validate the artifact** — run ` + "`litespec validate <artifact-id>`" + ` to make sure the artifacts pass validation.
+
 ---
 
 ## Context and Rules Are Constraints, Not Content
