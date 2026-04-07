@@ -315,27 +315,30 @@ func restoreBackups(writes []PendingWrite, count int) {
 	}
 }
 
-func ArchiveChange(root, name string) error {
+func ArchiveChange(root, name string) (string, error) {
 	changeDir := ChangePath(root, name)
 	if _, err := os.Stat(changeDir); err != nil {
-		return fmt.Errorf("change %q does not exist", name)
+		return "", fmt.Errorf("change %q does not exist", name)
 	}
 
 	archiveDir := ArchivePath(root)
 	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
-		return fmt.Errorf("creating archive directory: %w", err)
+		return "", fmt.Errorf("creating archive directory: %w", err)
 	}
-
-	os.RemoveAll(ChangeSpecsPath(root, name))
 
 	archivedName := time.Now().Format("2006-01-02") + "-" + name
 	dest := filepath.Join(archiveDir, archivedName)
 
 	if err := os.Rename(changeDir, dest); err != nil {
-		return fmt.Errorf("archive change: %w", err)
+		return "", fmt.Errorf("archive change: %w", err)
 	}
 
-	return nil
+	return dest, nil
+}
+
+func RestoreChange(root, archiveDest, name string) error {
+	changeDir := ChangePath(root, name)
+	return os.Rename(archiveDest, changeDir)
 }
 
 func ChangeExists(root, name string) bool {

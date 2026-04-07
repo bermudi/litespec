@@ -15,12 +15,14 @@ func runArchivePipeline(t *testing.T, root, changeName string) {
 		t.Fatalf("PrepareArchiveWrites: %v", err)
 	}
 
-	if err := WritePendingSpecsAtomic(writes); err != nil {
-		t.Fatalf("WritePendingSpecsAtomic: %v", err)
+	archiveDest, err := ArchiveChange(root, changeName)
+	if err != nil {
+		t.Fatalf("ArchiveChange: %v", err)
 	}
 
-	if err := ArchiveChange(root, changeName); err != nil {
-		t.Fatalf("ArchiveChange: %v", err)
+	if err := WritePendingSpecsAtomic(writes); err != nil {
+		RestoreChange(root, archiveDest, changeName)
+		t.Fatalf("WritePendingSpecsAtomic: %v", err)
 	}
 }
 
@@ -82,13 +84,13 @@ The system SHALL limit API requests.
 	}
 }
 
-func TestArchiveStripsSpecsSubtree(t *testing.T) {
+func TestArchiveKeepsSpecsSubtree(t *testing.T) {
 	root := setupTestProject(t)
-	writeChangeFile(t, root, "strip-test", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "strip-test", "design.md", "# Design")
-	writeChangeFile(t, root, "strip-test", "tasks.md", "## Phase 1\n- [x] Done")
+	writeChangeFile(t, root, "keep-specs", "proposal.md", "# Proposal")
+	writeChangeFile(t, root, "keep-specs", "design.md", "# Design")
+	writeChangeFile(t, root, "keep-specs", "tasks.md", "## Phase 1\n- [x] Done")
 
-	writeDeltaSpecFile(t, root, "strip-test", "auth", "spec.md", `## ADDED Requirements
+	writeDeltaSpecFile(t, root, "keep-specs", "auth", "spec.md", `## ADDED Requirements
 
 ### Requirement: Login
 The system SHALL authenticate.
@@ -97,12 +99,12 @@ The system SHALL authenticate.
 - **WHEN** valid creds
 `)
 
-	runArchivePipeline(t, root, "strip-test")
+	runArchivePipeline(t, root, "keep-specs")
 
 	archiveEntries, _ := os.ReadDir(ArchivePath(root))
 	var archivedName string
 	for _, e := range archiveEntries {
-		if strings.HasSuffix(e.Name(), "-strip-test") {
+		if strings.HasSuffix(e.Name(), "-keep-specs") {
 			archivedName = e.Name()
 		}
 	}
@@ -111,8 +113,8 @@ The system SHALL authenticate.
 	}
 
 	specsSubtree := filepath.Join(ArchivePath(root), archivedName, "specs")
-	if _, err := os.Stat(specsSubtree); !os.IsNotExist(err) {
-		t.Errorf("archived directory MUST NOT contain specs/ subtree, but %s exists", specsSubtree)
+	if _, err := os.Stat(specsSubtree); os.IsNotExist(err) {
+		t.Errorf("archived directory SHOULD contain specs/ subtree for auditability, but %s does not exist", specsSubtree)
 	}
 
 	proposalPath := filepath.Join(ArchivePath(root), archivedName, "proposal.md")
@@ -644,7 +646,7 @@ func TestPrepareArchiveWritesNoDeltas(t *testing.T) {
 		t.Fatalf("writes = %d, want 0", len(writes))
 	}
 
-	if err := ArchiveChange(root, "no-deltas"); err != nil {
+	if _, err := ArchiveChange(root, "no-deltas"); err != nil {
 		t.Fatalf("ArchiveChange: %v", err)
 	}
 	if _, err := os.Stat(ChangePath(root, "no-deltas")); !os.IsNotExist(err) {
@@ -907,5 +909,77 @@ The system SHALL do A first.
 	}
 	if spec.Requirements[2].Name != "Z-Last" {
 		t.Errorf("third requirement = %q, want %q (from zzz-last.md)", spec.Requirements[2].Name, "Z-Last")
+	}
+}
+
+func TestArchiveRollbackOnWriteFailure(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("skipping: test requires non-root user")
+	}
+
+	root := setupTestProject(t)
+
+	writeMainSpecFile(t, root, "auth", `# auth
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+- **WHEN** valid creds
+`)
+
+	writeChangeFile(t, root, "rollback-test", "proposal.md", "# Proposal")
+	writeChangeFile(t, root, "rollback-test", "design.md", "# Design")
+	writeChangeFile(t, root, "rollback-test", "tasks.md", "## Phase 1\n- [x] Done")
+
+	writeDeltaSpecFile(t, root, "rollback-test", "auth", "spec.md", `## MODIFIED Requirements
+
+### Requirement: Login
+The system SHALL authenticate via OAuth.
+
+#### Scenario: OAuth
+- **WHEN** OAuth token valid
+`)
+
+	writes, err := PrepareArchiveWrites(root, "rollback-test")
+	if err != nil {
+		t.Fatalf("PrepareArchiveWrites: %v", err)
+	}
+
+	readOnlyDir := filepath.Join(CanonPath(root), "auth")
+	if err := os.Chmod(readOnlyDir, 0o555); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	defer os.Chmod(readOnlyDir, 0o755)
+
+	archiveDest, archiveErr := ArchiveChange(root, "rollback-test")
+	if archiveErr != nil {
+		t.Fatalf("ArchiveChange: %v", archiveErr)
+	}
+
+	writeErr := WritePendingSpecsAtomic(writes)
+	if writeErr == nil {
+		t.Fatal("expected WritePendingSpecsAtomic to fail with read-only dir")
+	}
+
+	restoreErr := RestoreChange(root, archiveDest, "rollback-test")
+	if restoreErr != nil {
+		t.Fatalf("RestoreChange: %v", restoreErr)
+	}
+
+	if _, statErr := os.Stat(ChangePath(root, "rollback-test")); os.IsNotExist(statErr) {
+		t.Fatal("change directory should be restored after rollback")
+	}
+
+	if _, statErr := os.Stat(archiveDest); !os.IsNotExist(statErr) {
+		t.Error("archive directory should be gone after restore")
+	}
+
+	mainData, _ := os.ReadFile(filepath.Join(CanonPath(root), "auth", "spec.md"))
+	mainSpec, _ := ParseMainSpec(string(mainData))
+	if len(mainSpec.Requirements) != 1 || mainSpec.Requirements[0].Content != "The system SHALL authenticate." {
+		t.Fatal("main spec should be unchanged after rollback")
 	}
 }

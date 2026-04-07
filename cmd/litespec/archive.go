@@ -87,16 +87,20 @@ func cmdArchive(args []string) error {
 		return err
 	}
 
+	archiveDest, err := internal.ArchiveChange(root, name)
+	if err != nil {
+		return fmt.Errorf("archiving change: %w", err)
+	}
+
 	if err := internal.WritePendingSpecsAtomic(writes); err != nil {
+		if restoreErr := internal.RestoreChange(root, archiveDest, name); restoreErr != nil {
+			fmt.Fprintf(os.Stderr, "WARNING: failed to restore change after write failure: %v\n", restoreErr)
+		}
 		return err
 	}
 
 	for _, w := range writes {
 		fmt.Printf("Updated spec: %s\n", w.Capability)
-	}
-
-	if err := internal.ArchiveChange(root, name); err != nil {
-		return fmt.Errorf("archiving change: %w", err)
 	}
 
 	archiveEntries, archiveErr := os.ReadDir(internal.ArchivePath(root))
