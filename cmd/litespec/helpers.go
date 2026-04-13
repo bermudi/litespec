@@ -154,7 +154,7 @@ Examples:
 func printArchiveHelp() {
 	fmt.Print(`Usage: litespec archive <name> [--allow-incomplete]
 
-Apply deltas and archive a completed change.
+Apply deltas to canonical specs and archive a change (marks it as implemented).
 
 Arguments:
   <name>            Change name to archive

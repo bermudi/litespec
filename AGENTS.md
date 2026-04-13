@@ -31,7 +31,7 @@ The design emerged from a structured grilling session — question by question, 
 - **Scenarios** — each requirement has named scenarios (`#### Scenario: <name>`) with WHEN/THEN format. ADDED and MODIFIED requirements must have at least one scenario. Body text must contain SHALL or MUST.
 - **Artifact-specific instructions** — `litespec instructions <artifact>` returns distinct guidance per artifact (proposal: motivation/scope/non-goals; specs: delta format + capabilities; design: architecture/decisions/file changes; tasks: phased checklist). The `template` field retains the propose workflow for context.
 - **Phased tasks** — `tasks.md` organizes work into phases, applied one phase at a time
-- **`view` command** — displays a dashboard with progress bars `[████░░░]`, change categories (draft/active/completed), specs sorted by requirement count, and an optional dependency graph section when any change has `dependsOn`
+- **`view` command** — displays a dashboard with progress bars `[████░░░]`, change categories (draft/active/ready to archive), specs sorted by requirement count, and an optional dependency graph section when any change has `dependsOn`
 
 ## Workflow
 
@@ -48,6 +48,7 @@ Unidirectional. No backward flow.
 - **apply** works on one phase at a time. Each phase = one agent session = one commit. Re-invoke for the next phase.
 - **adopt** is a separate path — reverse-engineers specs from existing code given a file/directory path.
 - **review** is context-aware AI review: artifact review when no tasks are checked (evaluates planning artifacts), implementation review when some tasks are checked (code vs specs), pre-archive review when all tasks are checked (both artifacts and code). No test/lint running.
+- **archive** is the commit to implemented — applying deltas to canonical specs and moving the change to the archive. Until archived, a change's deltas are tentative.
 
 ## Key Design Decisions
 

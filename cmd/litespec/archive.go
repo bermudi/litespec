@@ -133,6 +133,6 @@ func cmdArchive(args []string) error {
 		}
 	}
 
-	fmt.Printf("Change %q archived successfully.\n", name)
+	fmt.Printf("Change %q archived — deltas applied, change marked as implemented.\n", name)
 	return nil
 }

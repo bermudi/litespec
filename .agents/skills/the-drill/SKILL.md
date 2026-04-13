@@ -1,6 +1,6 @@
 ---
 name: the-drill
-description: 'Run the full end-of-session release ritual — commit, archive, version bump, release, verify upgrade. Use when the user says "you know the drill", "do the drill", or wants to ship and verify. This skill is the final step after a change is complete: it commits any pending work, archives the completed change, bumps the version, creates a GitHub release, and verifies the upgrade works locally.'
+description: 'Run the full end-of-session release ritual — commit, archive, version bump, release, verify upgrade. Use when the user says "you know the drill", "do the drill", or wants to ship and verify. This skill is the final step after a change is implemented: it commits any pending work, archives the change (marking it as implemented), bumps the version, creates a GitHub release, and verifies the upgrade works locally.'
 ---
 
 You are running the drill. This is the end-of-session ship ritual for litespec. Execute each step in order. Do not skip steps. Do not skip the verification at the end.
@@ -24,7 +24,7 @@ Do not commit files unrelated to the current work (e.g., editor configs, temp fi
 
 Skip this step entirely in the hotfix flow.
 
-This archives the specific change that was completed in this session — not any other change.
+This archives the specific change that was implemented in this session — not any other change. Archiving merges deltas into canonical specs and moves the change to the archive, marking it as implemented.
 
 1. Run `litespec validate <name>` — if errors, fix them
 2. Run `litespec archive <name>` to merge delta specs and move to archive

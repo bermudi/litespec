@@ -25,7 +25,7 @@ project/
 │       │   └── specs/            # delta specs
 │       │       └── <capability>/
 │       │           └── spec.md
-│       └── archive/              # completed changes (YYYY-MM-DD-<name>/)
+│       └── archive/              # implemented changes (YYYY-MM-DD-<name>/)
 │           └── <date>-<name>/
 │               ├── .litespec.yaml
 │               ├── proposal.md
@@ -198,15 +198,17 @@ Tool adapters are auto-detected by scanning for symlinks in adapter skill direct
 | `litespec status [<name>]` | Show artifact graph state (BLOCKED/READY/DONE) |
 | `litespec instructions <artifact>` | Return artifact-specific instructions for AI to create an artifact |
 | `litespec list [--specs|--changes] [--sort name|recent|deps]` | List specs or changes (deps sort uses topological order) |
-| `litespec view` | Display dashboard overview with progress bars, specs, changes, and dependency graph |
+| `litespec view` | Display dashboard overview with progress bars, specs, changes (draft/active/ready-to-archive), and dependency graph |
 | `litespec update [--tools ...]` | Regenerate skills and adapter symlinks |
-| `litespec archive <change> [--allow-incomplete]` | Apply deltas + move to archive (errors if unarchived dependencies exist) |
+| `litespec archive <change> [--allow-incomplete]` | Apply deltas to canon + move to archive (marks change as implemented; errors if unarchived dependencies exist) |
 | `litespec completion <shell>` | Print shell completion script (bash, zsh, fish) |
 | `litespec __complete <words...>` | Hidden backend for dynamic shell completions |
 | `litespec upgrade` | Check for latest version and upgrade via `go install` |
 | `litespec import --source <dir>` | Import an OpenSpec project to litespec format |
 
 ## Archive Behavior
+
+Archiving a change **promotes it to implemented**: deltas are merged into canonical specs (the source of truth), and the change directory is moved to the archive. Until a change is archived, its deltas are tentative — not part of the canonical spec.
 
 `litespec archive <change>` performs these steps in order:
 

@@ -694,7 +694,7 @@ The system SHALL work.
 	if code != 0 {
 		t.Fatalf("expected success with --allow-incomplete, got %d: %s", code, out)
 	}
-	if !strings.Contains(out, "archived successfully") {
+	if !strings.Contains(out, "archived — deltas applied, change marked as implemented") {
 		t.Errorf("expected archive success, got: %s", out)
 	}
 	if !strings.Contains(out, "WARN") || !strings.Contains(out, "unarchived dependencies") {
@@ -738,7 +738,7 @@ The system SHALL work.
 	if code != 0 {
 		t.Fatalf("expected success archiving parent, got %d: %s", code, out)
 	}
-	if !strings.Contains(out, "archived successfully") {
+	if !strings.Contains(out, "archived — deltas applied, change marked as implemented") {
 		t.Errorf("expected archive success, got: %s", out)
 	}
 }
@@ -1112,7 +1112,7 @@ func TestCLIViewTimestampsInAllSections(t *testing.T) {
 	}{
 		{"active-change", "2026-04-01", "Active Changes"},
 		{"draft-change", "2026-04-02", "Draft Changes"},
-		{"completed-change", "2026-04-03", "Completed Changes"},
+		{"completed-change", "2026-04-03", "Ready to Archive"},
 	} {
 		if !strings.Contains(out, "born "+section.born) {
 			t.Errorf("expected 'born %s' in %s section, got:\n%s", section.born, section.section, out)
