@@ -9,7 +9,28 @@ import (
 
 func cmdCompletion(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: litespec completion <shell>\nSupported shells: bash, zsh, fish")
+		fmt.Print(`Usage: litespec completion <shell>
+
+Supported shells: bash, zsh, fish
+
+Loading completions:
+
+  Bash:
+    litespec completion bash > ~/.local/share/bash-completion/completions/litespec
+    # Or add to ~/.bashrc:
+    #   eval "$(litespec completion bash)"
+
+  Zsh:
+    litespec completion zsh > ~/.zfunc/_litespec
+    # Ensure ~/.zfunc is in your fpath (add to ~/.zshrc):
+    #   fpath+=~/.zfunc
+    #   autoload -Uz compinit && compinit
+
+  Fish:
+    litespec completion fish > ~/.config/fish/completions/litespec.fish
+
+`)
+		return nil
 	}
 
 	shell := args[0]

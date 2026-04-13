@@ -7,7 +7,7 @@ _litespec() {
 
   case $state in
     command)
-      local -a cmd_cands cmd_descs
+      local -a values
       local -a raw
       local IFS=$'\n'
       raw=(${(f)"$(litespec __complete litespec "" 2>/dev/null)"})
@@ -16,30 +16,27 @@ _litespec() {
       for line in "${raw[@]}"; do
         IFS=$'\t' read -r cand desc <<< "$line"
         if [[ -n "$cand" ]]; then
-          cmd_cands+=("$cand")
-          cmd_descs+=("${desc:-}")
+          values+=("${cand}${desc:+\:${desc//:/\\:}}")
         fi
       done
 
-      _describe 'command' cmd_cands cmd_descs
+      _describe 'command' values
       ;;
     args)
-      local -a candidates
+      local -a values
       local IFS=$'\n'
-      candidates=(${(f)"$(litespec __complete "${words[@]}" 2>/dev/null)"})
+      local -a raw
+      raw=(${(f)"$(litespec __complete "${words[@]}" 2>/dev/null)"})
 
-      local -a comp_cands
-      local -a comp_descs
       local cand desc
-      for line in "${candidates[@]}"; do
+      for line in "${raw[@]}"; do
         IFS=$'\t' read -r cand desc <<< "$line"
         if [[ -n "$cand" ]]; then
-          comp_cands+=("$cand")
-          comp_descs+=("${desc:-}")
+          values+=("${cand}${desc:+\:${desc//:/\\:}}")
         fi
       done
 
-      _describe 'candidate' comp_cands comp_descs
+      _describe 'argument' values
       ;;
   esac
 }

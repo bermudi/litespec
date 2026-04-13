@@ -8,9 +8,11 @@ _litespec() {
 		cword=$COMP_CWORD
 	fi
 
+	local -a args=("${words[@]:0:$((cword+1))}")
+
 	local IFS=$'\n'
 	local candidates
-	candidates=$(litespec __complete "${words[@]}" 2>/dev/null)
+	candidates=$(litespec __complete "${args[@]}" 2>/dev/null)
 
 	COMPREPLY=()
 	while IFS=$'\t' read -r cand desc; do

@@ -1475,8 +1475,8 @@ func TestCmdInitDirect_UnknownFlag(t *testing.T) {
 
 func TestCmdCompletionDirect_NoArgs(t *testing.T) {
 	err := cmdCompletion([]string{})
-	if err == nil {
-		t.Fatal("expected error for no args")
+	if err != nil {
+		t.Fatalf("expected no error for no args (usage), got: %v", err)
 	}
 }
 

@@ -23,10 +23,14 @@ func Complete(root string, words []string) []Completion {
 	}
 
 	if len(words) == 1 {
-		if strings.HasPrefix(words[0], "-") {
+		w := words[0]
+		if strings.HasPrefix(w, "-") {
 			return completeFlags(root, "")
 		}
-		return completeCommands()
+		if _, ok := commandFlagDefs[w]; ok {
+			return completeCommandArgs(root, w, []string{""})
+		}
+		return filterCompletions(completeCommands(), w)
 	}
 
 	cmd := words[0]
@@ -34,10 +38,6 @@ func Complete(root string, words []string) []Completion {
 
 	if cmd == "__complete" {
 		return nil
-	}
-
-	if cmd == "completion" {
-		return completeCompletionCmd(rest)
 	}
 
 	return completeCommandArgs(root, cmd, rest)
@@ -204,8 +204,11 @@ var commandFlagDefs = map[string]commandFlags{
 			"--tools": "Tool IDs (comma-separated)",
 		},
 	},
-	"view":       {},
-	"completion": {},
+	"view": {},
+	"completion": {
+		hasPositional: true,
+		posResolver:   func(root string) []Completion { return completeShells() },
+	},
 }
 
 func completeFlags(root string, cmd string) []Completion {
@@ -230,23 +233,6 @@ func completeGlobalFlags() []Completion {
 		{"--version", "Print version"},
 		{"--help", "Print help message"},
 	}
-}
-
-func completeCompletionCmd(rest []string) []Completion {
-	if len(rest) == 0 || (len(rest) == 1 && rest[0] == "") {
-		return completeShells()
-	}
-
-	arg := rest[0]
-	if strings.HasPrefix(arg, "-") {
-		return nil
-	}
-
-	if len(rest) == 1 {
-		return filterCompletions(completeShells(), arg)
-	}
-
-	return nil
 }
 
 func completeCommandArgs(root string, cmd string, rest []string) []Completion {
@@ -277,11 +263,12 @@ func completeCommandArgs(root string, cmd string, rest []string) []Completion {
 	}
 
 	if prevWord != "" && flagTakesValue(cmd, prevWord) {
-		return completeFlagValue(root, cmd, prevWord)
+		return filterCompletions(completeFlagValue(root, cmd, prevWord), last)
 	}
 
-	if def.hasPositional && !hasPositionalArg(rest, def) {
-		if def.posResolver != nil {
+	if def.hasPositional && def.posResolver != nil {
+		completedPositionals := countPositionalArgs(rest[:lastIdx], cmd)
+		if completedPositionals == 0 {
 			return filterCompletions(def.posResolver(root), last)
 		}
 	}
@@ -320,29 +307,21 @@ func completeFlagValue(root string, cmd string, flag string) []Completion {
 	return nil
 }
 
-func hasPositionalArg(rest []string, def commandFlags) bool {
-	for _, w := range rest {
+func countPositionalArgs(rest []string, cmd string) int {
+	count := 0
+	for i, w := range rest {
 		if w == "" || strings.HasPrefix(w, "-") {
 			continue
 		}
-
-		prevIsFlagArg := false
-		for i, r := range rest {
-			if r == w && i > 0 {
-				prev := rest[i-1]
-				if flagTakesValue("", prev) {
-					prevIsFlagArg = true
-					break
-				}
+		if i > 0 {
+			prev := rest[i-1]
+			if flagTakesValue(cmd, prev) {
+				continue
 			}
 		}
-		if prevIsFlagArg {
-			continue
-		}
-
-		return true
+		count++
 	}
-	return false
+	return count
 }
 
 func filterCompletions(candidates []Completion, prefix string) []Completion {
