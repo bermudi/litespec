@@ -7,13 +7,11 @@ import (
 	"github.com/bermudi/litespec/internal"
 )
 
-func cmdCompletion(args []string) error {
-	if len(args) == 0 {
-		fmt.Print(`Usage: litespec completion <shell>
+const completionHelp = `Usage: litespec completion <shell>
 
 Supported shells: bash, zsh, fish
 
-Loading completions:
+Persist completions (loaded on every new shell):
 
   Bash:
     litespec completion bash > ~/.local/share/bash-completion/completions/litespec
@@ -29,7 +27,19 @@ Loading completions:
   Fish:
     litespec completion fish > ~/.config/fish/completions/litespec.fish
 
-`)
+Load temporarily (current session only):
+
+  Bash:   eval "$(litespec completion bash)"
+  Zsh:    eval "$(litespec completion zsh)"
+  Fish:   source (litespec completion fish | psub)
+
+  Note: Zsh may need 'autoload -Uz compinit && compinit' first
+  if completions are not already initialized in the session.
+`
+
+func cmdCompletion(args []string) error {
+	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
+		fmt.Print(completionHelp)
 		return nil
 	}
 

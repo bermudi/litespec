@@ -16,7 +16,7 @@ _litespec() {
       for line in "${raw[@]}"; do
         IFS=$'\t' read -r cand desc <<< "$line"
         if [[ -n "$cand" ]]; then
-          values+=("${cand}${desc:+\:${desc//:/\\:}}")
+          values+=("${cand}:${desc}")
         fi
       done
 
@@ -32,7 +32,7 @@ _litespec() {
       for line in "${raw[@]}"; do
         IFS=$'\t' read -r cand desc <<< "$line"
         if [[ -n "$cand" ]]; then
-          values+=("${cand}${desc:+\:${desc//:/\\:}}")
+          values+=("${cand}:${desc}")
         fi
       done
 
@@ -41,4 +41,4 @@ _litespec() {
   esac
 }
 
-_litespec "$@"
+compdef _litespec litespec
