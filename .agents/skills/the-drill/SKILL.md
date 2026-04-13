@@ -71,6 +71,8 @@ GOPROXY=https://proxy.golang.org,direct go install github.com/bermudi/litespec/c
 ```
 Then verify again. Do not report success until `litespec --version` shows the new version.
 
+**Never** use `go install ./cmd/litespec` or any local build to verify — that builds from local source, not the released tag. Verification must install from the published tag to confirm the release is actually consumable.
+
 ---
 
 ## Completion

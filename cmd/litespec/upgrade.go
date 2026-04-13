@@ -32,12 +32,17 @@ func cmdUpgrade(args []string) error {
 		return err
 	}
 
-	cmp, err := compareSemver(version, latestTag)
+	localVersion := version
+	if localVersion == "dev" || localVersion == "" {
+		localVersion = "0.0.0"
+	}
+
+	cmp, err := compareSemver(localVersion, latestTag)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot determine current version (%q): %w", version, err)
 	}
 	if cmp >= 0 {
-		fmt.Printf("Already up to date (v%s)\n", version)
+		fmt.Printf("Already up to date (v%s)\n", localVersion)
 		return nil
 	}
 
