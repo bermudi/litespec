@@ -33,6 +33,11 @@ var Skills = []SkillInfo{
 		Description: "Materialize a complete change proposal with all planning artifacts (proposal, specs, design, tasks). Use when the user wants to create a new change, start a feature, or says \"propose\".",
 	},
 	{
+		ID:          "research",
+		Name:        "litespec-research",
+		Description: "Gather knowledge for a proposed change — APIs, schemas, library docs, auth flows. Use after proposing when the change involves external dependencies, unfamiliar libraries, or novel APIs. Produces research skills into .agents/skills/research-<topic>/. Triggers on \"research this change\", \"gather docs for\", \"look up the API\", \"research phase\", or when preparing to implement a change that references external systems.",
+	},
+	{
 		ID:          "review",
 		Name:        "litespec-review",
 		Description: "Context-aware review that adapts to change lifecycle: artifact review (pre-implementation), implementation review (during implementation), and pre-archive review (post-implementation). Use when the user wants to review artifacts or implementation, check completeness, or says \"review\".",

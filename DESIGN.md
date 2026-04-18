@@ -35,9 +35,11 @@ project/
     ├── litespec-explore/
     ├── litespec-grill/
     ├── litespec-propose/
+    ├── litespec-research/
     ├── litespec-review/
     ├── litespec-apply/
-    └── litespec-adopt/
+    ├── litespec-adopt/
+    └── research-<topic>/         # research skills (optional, produced by research phase)
 ```
 
 ## Workflow
@@ -45,12 +47,12 @@ project/
 Unidirectional flow:
 
 ```
-explore → grill → propose → review → apply → review → archive
+explore → grill → propose → [research →] apply → review → archive
                                           │
                                       adopt (separate path)
 ```
 
-No backward flow. If something is wrong after propose, start over from explore/grill.
+No backward flow. If something is wrong after propose, start over from explore/grill. Research is optional — skip it when the change doesn't involve external dependencies.
 
 ## Skills
 
@@ -59,7 +61,8 @@ No backward flow. If something is wrong after propose, start over from explore/g
 | `explore` | Ephemeral | Thinking mode. No artifacts, no change dir. Conversational. |
 | `grill` | Ephemeral | Relentless Q&A on the explored idea. No artifacts. Resolves every branch of the design tree before proceeding. |
 | `propose` | Materializes | Creates change dir + proposal + specs + design + tasks (all at once). This is the commit point. |
-| `apply` | Phase-based | Implements tasks per phase in `tasks.md`. One phase per invocation. AI focuses on one area without doing the whole implementation at once. |
+| `research` | Knowledge-gathering | Reads artifacts, identifies knowledge gaps, gathers docs/APIs/schemas, produces research skills into `.agents/skills/research-<topic>/`. Uses skill-creator conventions for formatting. |
+| `apply` | Phase-based | Implements tasks per phase in `tasks.md`. One phase per invocation. AI focuses on one area without doing the whole implementation at once. Consumes research skills via natural discovery. |
 | `review` | AI review | Context-aware review that adapts to change lifecycle: artifact review (0 tasks checked — evaluates planning artifacts for quality, consistency, readiness), implementation review (some tasks checked — compares code against specs), pre-archive review (all tasks checked — reviews both artifacts and code comprehensively before archiving). Pure AI review — no test/lint running. |
 | `adopt` | Reverse-engineer | Takes a file/directory path. Generates a change proposal with specs from existing code. For code that has no spec yet. |
 

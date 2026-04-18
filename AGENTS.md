@@ -36,7 +36,7 @@ The design emerged from a structured grilling session — question by question, 
 ## Workflow
 
 ```
-explore → grill → propose → review → apply → review → archive
+explore → grill → propose → [research →] apply → review → archive
                                           │
                                       adopt (separate path)
 ```
@@ -45,7 +45,8 @@ Unidirectional. No backward flow.
 
 - **explore** and **grill** are ephemeral — no artifacts, no change directory. The AI keeps context in its window. `propose` is what materializes everything to disk.
 - **propose** is the commit point. If something is wrong after proposing, start over from explore/grill.
-- **apply** works on one phase at a time. Each phase = one agent session = one commit. Re-invoke for the next phase.
+- **research** is optional — runs after propose when external knowledge is needed. Reads artifacts from disk, identifies knowledge gaps (APIs, schemas, libraries), gathers docs, and produces research skills into `.agents/skills/research-<topic>/`. Uses skill-creator conventions for formatting. Stance is risk-scoped: skip what LLMs know cold, go deep on novel APIs/libraries. Research skills persist after archive — they accumulate as project knowledge.
+- **apply** works on one phase at a time. Each phase = one agent session = one commit. Re-invoke for the next phase. Consumes research skills via natural agent discovery.
 - **adopt** is a separate path — reverse-engineers specs from existing code given a file/directory path.
 - **review** is context-aware AI review: artifact review when no tasks are checked (evaluates planning artifacts), implementation review when some tasks are checked (code vs specs), pre-archive review when all tasks are checked (both artifacts and code). No test/lint running.
 - **archive** is the commit to implemented — applying deltas to canonical specs and moving the change to the archive. Until archived, a change's deltas are tentative.
@@ -62,6 +63,7 @@ These came from deliberate debate. Respect the reasoning:
 - **Git-native workflow** — litespec manages specs. A separate harness (future work) will handle branch creation (`change/<name>`), per-phase commits, and PR creation. For now, the skills offer prompts: "Would you like a new branch?" and "Would you like a PR?"
 - **CLI is a read-only context provider** — the AI never writes through the CLI. It writes artifact files directly. The CLI exists to give the AI structured data (status, instructions, validation).
 - **Artifact-specific instructions** — each artifact (proposal, specs, design, tasks) gets its own instruction template via `litespec instructions <artifact>`, not a single generic template. The propose skill template is kept as a `template` field for workflow context.
+- **Research skills** — produced into `.agents/skills/research-<topic>/SKILL.md` during the research phase. They are project-level agent skills containing reference documentation (API schemas, library docs, auth flows). They persist after archive as accumulated project knowledge. The apply agent discovers them naturally through skill descriptions. No CLI command needed — the research skill itself is the instructions.
 
 ## Working Conventions
 
@@ -72,3 +74,13 @@ These came from deliberate debate. Respect the reasoning:
 - No `any` equivalents — explicit types everywhere
 - No comments unless absolutely necessary for non-obvious logic
 - When changes affect workflow, skills, or core concepts, update `AGENTS.md` and `DESIGN.md` to match. These are living documents — if the system changes, they change too.
+
+### Skill Generation
+
+Skills are **not written directly** to `.agents/skills/`. The pipeline is:
+
+1. Add a `SkillInfo` entry to `internal/paths.go` (`Skills` slice) — defines ID, name, and description
+2. Create a template file in `internal/skill/<name>.go` — registers the template body via `init()`
+3. Run `litespec update` — generates `.agents/skills/<name>/SKILL.md` from the `SkillInfo` metadata + registered template
+
+Never write to `.agents/skills/` directly. Always edit the Go templates and regenerate.
