@@ -301,6 +301,14 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 				Message:  "tasks.md has no phase headings (## Phase)",
 				File:     tasksPath,
 			})
+		} else {
+			for _, prob := range validateTasksChecklist(string(tasksData)) {
+				result.Errors = append(result.Errors, ValidationIssue{
+					Severity: SeverityError,
+					Message:  prob,
+					File:     tasksPath,
+				})
+			}
 		}
 	}
 
@@ -330,6 +338,38 @@ func hasPhaseHeading(content string) bool {
 		}
 	}
 	return false
+}
+
+var checkboxLineRe = regexp.MustCompile(`(?i)^\s*- \[[ xX]\]`)
+
+func validateTasksChecklist(content string) []string {
+	var problems []string
+	inPhase := false
+	hasCheckbox := false
+	phaseName := ""
+
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "## Phase") {
+			if inPhase && !hasCheckbox {
+				problems = append(problems, fmt.Sprintf("phase %q has no checklist items (- [ ])", phaseName))
+			}
+			inPhase = true
+			hasCheckbox = false
+			phaseName = trimmed
+		} else if strings.HasPrefix(trimmed, "## ") && !strings.HasPrefix(trimmed, "## Phase") {
+			if inPhase && !hasCheckbox {
+				problems = append(problems, fmt.Sprintf("phase %q has no checklist items (- [ ])", phaseName))
+			}
+			inPhase = false
+		} else if inPhase && checkboxLineRe.MatchString(line) {
+			hasCheckbox = true
+		}
+	}
+	if inPhase && !hasCheckbox {
+		problems = append(problems, fmt.Sprintf("phase %q has no checklist items (- [ ])", phaseName))
+	}
+	return problems
 }
 
 var keywordRe = regexp.MustCompile(`\b(SHALL|MUST)\b`)

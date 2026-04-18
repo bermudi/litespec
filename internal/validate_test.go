@@ -402,6 +402,86 @@ The system SHALL work.
 	}
 }
 
+func TestValidateChangeTasksPhaseWithoutChecklist(t *testing.T) {
+	root := setupTestProject(t)
+	makeValidChange(t, root, "change", `## ADDED Requirements
+
+### Requirement: REQ1
+The system SHALL do something.
+
+#### Scenario: S1
+- **WHEN** triggered
+- **THEN** result
+`)
+	writeChangeFile(t, root, "change", "tasks.md", `## Phase 1: Setup
+
+Some prose description here.
+
+## Phase 2: Implementation
+
+- [ ] Actual task
+`)
+	writeChangeFile(t, root, "change", "tasks.md", `## Phase 1: Setup
+
+Some prose description here.
+
+## Phase 2: Implementation
+
+- [ ] Actual task
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected invalid (phase without checklist)")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if strings.Contains(e.Message, "Phase 1") && strings.Contains(e.Message, "no checklist items") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected phase checklist error for Phase 1")
+	}
+}
+
+func TestValidateChangeTasksValidChecklist(t *testing.T) {
+	root := setupTestProject(t)
+	makeValidChange(t, root, "change", `## ADDED Requirements
+
+### Requirement: REQ1
+The system SHALL do something.
+
+#### Scenario: S1
+- **WHEN** triggered
+- **THEN** result
+`)
+	writeChangeFile(t, root, "change", "tasks.md", `## Phase 1: Setup
+
+- [ ] Create project structure
+- [ ] Add dependencies
+
+## Phase 2: Implementation
+
+- [x] Done task
+- [ ] Pending task
+`)
+
+	result, err := ValidateChange(root, "change")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if !result.Valid {
+		for _, e := range result.Errors {
+			t.Logf("unexpected error: %s", e.Message)
+		}
+		t.Fatal("expected valid (all phases have checklists)")
+	}
+}
+
 func TestValidateChangeNonexistent(t *testing.T) {
 	root := setupTestProject(t)
 	_, err := ValidateChange(root, "ghost")
