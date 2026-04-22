@@ -2,12 +2,12 @@
 
 ## Phase 1: Internal Package
 
-- [ ] Create `internal/preview.go` with `PreviewOperation`, `PreviewCapability`, `PreviewTotals`, `PreviewResult` types
-- [ ] Implement `ComputePreviewResult(writes []PendingWrite, root string) (*PreviewResult, error)` — diff current canon against merged content
-- [ ] Implement text formatter `FormatPreviewText(result *PreviewResult) string`
-- [ ] Implement JSON formatter `FormatPreviewJSON(result *PreviewResult) ([]byte, error)`
-- [ ] Unit tests: new capability, modified capability, mixed operations, empty change, no net change (MODIFIED with identical content omitted)
-- [ ] Unit tests: JSON shape matches spec
+- [x] Create `internal/preview.go` with `PreviewOperation`, `PreviewCapability`, `PreviewTotals`, `PreviewResult` types
+- [x] Implement `ComputePreviewResult(writes []PendingWrite, root string) (*PreviewResult, error)` — diff current canon against merged content
+- [x] Implement text formatter `FormatPreviewText(result *PreviewResult) string`
+- [x] Implement JSON formatter `FormatPreviewJSON(result *PreviewResult) ([]byte, error)`
+- [x] Unit tests: new capability, modified capability, mixed operations, empty change, no net change (MODIFIED with identical content omitted)
+- [x] Unit tests: JSON shape matches spec
 
 ## Phase 2: CLI Command
 
