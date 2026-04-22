@@ -24,7 +24,6 @@ type ArtifactInstructionsStandaloneJSON struct {
 	ArtifactID  string `json:"artifactId"`
 	Description string `json:"description"`
 	Instruction string `json:"instruction"`
-	Template    string `json:"template"`
 	OutputPath  string `json:"outputPath"`
 }
 
@@ -146,13 +145,11 @@ func BuildArtifactInstructionsStandaloneJSON(artifactID string) (*ArtifactInstru
 	}
 
 	instruction := GetSkillTemplate(ArtifactInstructionID(artifactID))
-	template := GetSkillTemplate("propose")
 
 	return &ArtifactInstructionsStandaloneJSON{
 		ArtifactID:  artifactID,
 		Description: info.Description,
 		Instruction: instruction,
-		Template:    template,
 		OutputPath:  info.Filename,
 	}, nil
 }

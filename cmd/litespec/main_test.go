@@ -291,7 +291,7 @@ func TestCLIInstructionsJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &result); err != nil {
 		t.Fatalf("json: %v\n%s", err, out)
 	}
-	for _, field := range []string{"artifactId", "description", "instruction", "template", "outputPath"} {
+	for _, field := range []string{"artifactId", "description", "instruction", "outputPath"} {
 		if _, ok := result[field]; !ok {
 			t.Errorf("missing field %q in JSON output", field)
 		}

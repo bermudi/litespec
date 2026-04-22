@@ -63,7 +63,7 @@ func TestArtifactInstructionID_AllTemplatesDistinct(t *testing.T) {
 	}
 }
 
-func TestBuildArtifactInstructionsStandaloneJSON_InstructionDiffersFromTemplate(t *testing.T) {
+func TestBuildArtifactInstructionsStandaloneJSON_InstructionNotEmpty(t *testing.T) {
 	instr, err := BuildArtifactInstructionsStandaloneJSON("proposal")
 	if err != nil {
 		t.Fatalf("BuildArtifactInstructionsStandaloneJSON: %v", err)
@@ -71,12 +71,6 @@ func TestBuildArtifactInstructionsStandaloneJSON_InstructionDiffersFromTemplate(
 
 	if instr.Instruction == "" {
 		t.Error("Instruction is empty")
-	}
-	if instr.Template == "" {
-		t.Error("Template is empty")
-	}
-	if instr.Instruction == instr.Template {
-		t.Error("Instruction and Template are identical — artifact-specific instructions not working")
 	}
 }
 
@@ -111,17 +105,6 @@ func TestBuildArtifactInstructionsStandaloneJSON_InstructionPerArtifact(t *testi
 	}
 }
 
-func TestBuildArtifactInstructionsStandaloneJSON_TemplateIsAlwaysPropose(t *testing.T) {
-	for _, id := range []string{"proposal", "specs", "design", "tasks"} {
-		instr, err := BuildArtifactInstructionsStandaloneJSON(id)
-		if err != nil {
-			t.Fatalf("BuildArtifactInstructionsStandaloneJSON(%q): %v", id, err)
-		}
-		if instr.Template != skill.Get("propose") {
-			t.Errorf("artifact %q: Template does not match propose skill", id)
-		}
-	}
-}
 
 func TestBuildArtifactInstructionsStandaloneJSON_InstructionContainsArtifactMarkers(t *testing.T) {
 	expectedMarkers := map[string]string{
