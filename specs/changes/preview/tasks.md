@@ -30,8 +30,8 @@
 
 ## Phase 4: Verification
 
-- [ ] Run `go build ./...`, `go vet ./...`, `go test ./...`
-- [ ] Manual E2E: `litespec preview <active-change>` on a real change
-- [ ] Manual E2E: `litespec preview <active-change> --json` and verify JSON structure
-- [ ] Manual E2E: attempt `litespec preview <archived-change>` and verify error
-- [ ] Manual E2E: attempt `litespec preview` with no name and verify error
+- [x] Run `go build ./...`, `go vet ./...`, `go test ./...`
+- [x] Manual E2E: `litespec preview <active-change>` on a real change
+- [x] Manual E2E: `litespec preview <active-change> --json` and verify JSON structure
+- [x] Manual E2E: attempt `litespec preview <archived-change>` and verify error
+- [x] Manual E2E: attempt `litespec preview` with no name and verify error
