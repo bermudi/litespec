@@ -557,3 +557,58 @@ Content here.
 		t.Fatal("expected error for corrupted merged content")
 	}
 }
+
+func TestComputePreviewResultRenamedWithContentChange(t *testing.T) {
+	root := setupTestProject(t)
+
+	mainSpec := `# auth
+
+## Requirements
+
+### Requirement: Two-Factor
+The system SHALL support two-factor auth.
+`
+	writeMainSpecFile(t, root, "auth", mainSpec)
+
+	// Rename via RENAMED + modify content via MODIFIED on the new name
+	delta := `# auth
+
+## RENAMED Requirements
+
+### Requirement: Two-Factor → MFA
+The system SHALL support two-factor auth.
+
+## MODIFIED Requirements
+
+### Requirement: MFA
+The system SHALL support multi-factor auth with TOTP.
+`
+	writeDeltaSpecFile(t, root, "rename-modify-auth", "auth", "spec.md", delta)
+
+	writes, err := PrepareArchiveWrites(root, "rename-modify-auth")
+	if err != nil {
+		t.Fatalf("PrepareArchiveWrites: %v", err)
+	}
+
+	result, err := ComputePreviewResult(writes, root)
+	if err != nil {
+		t.Fatalf("ComputePreviewResult: %v", err)
+	}
+
+	// RENAMED changes the name (keeping old content), then MODIFIED updates the content.
+	// Since content now differs from original Two-Factor, the heuristic can't match.
+	// Result: REMOVED Two-Factor + ADDED MFA (heuristic limitation).
+	if len(result.Capabilities) != 1 {
+		t.Fatalf("capabilities = %d, want 1", len(result.Capabilities))
+	}
+	cap := result.Capabilities[0]
+	if len(cap.Operations) != 2 {
+		t.Fatalf("operations = %d, want 2 (REMOVED + ADDED)", len(cap.Operations))
+	}
+	if cap.Operations[0].Type != "REMOVED" || cap.Operations[0].Requirement != "Two-Factor" {
+		t.Errorf("op[0] = {%q, %q}, want {REMOVED, Two-Factor}", cap.Operations[0].Type, cap.Operations[0].Requirement)
+	}
+	if cap.Operations[1].Type != "ADDED" || cap.Operations[1].Requirement != "MFA" {
+		t.Errorf("op[1] = {%q, %q}, want {ADDED, MFA}", cap.Operations[1].Type, cap.Operations[1].Requirement)
+	}
+}

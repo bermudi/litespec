@@ -19,7 +19,7 @@ func cmdPreview(args []string) error {
 	}
 
 	if len(args) == 0 {
-		return fmt.Errorf("usage: litespec preview <change-name> [--json]")
+		return fmt.Errorf("change name is required. Usage: litespec preview <change-name> [--json]")
 	}
 
 	useJSON := false
@@ -79,7 +79,7 @@ func cmdPreview(args []string) error {
 		if err != nil {
 			return fmt.Errorf("formatting JSON: %w", err)
 		}
-		fmt.Print(string(data))
+		fmt.Println(string(data))
 	} else {
 		fmt.Print(internal.FormatPreviewText(result))
 	}

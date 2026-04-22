@@ -38,6 +38,10 @@ complete -c litespec -n '__fish_seen_subcommand_from instructions; and not __fis
 complete -c litespec -n '__fish_seen_subcommand_from archive' -l allow-incomplete -d 'Archive even with incomplete tasks'
 complete -c litespec -n '__fish_seen_subcommand_from archive; and not __fish_seen_argument' -a '(litespec __complete litespec archive "" 2>/dev/null | string replace \t "	")' -d 'change'
 
+# preview
+complete -c litespec -n '__fish_seen_subcommand_from preview' -l json -d 'Output as JSON'
+complete -c litespec -n '__fish_seen_subcommand_from preview; and not __fish_seen_argument' -a '(litespec __complete litespec preview "" 2>/dev/null | string replace \t "	")' -d 'change'
+
 # update
 complete -c litespec -n '__fish_seen_subcommand_from update' -l tools -d 'Tool IDs (comma-separated)'
 complete -c litespec -n '__fish_seen_subcommand_from update' -a '(litespec __complete litespec update --tools 2>/dev/null | string replace \t "	")'

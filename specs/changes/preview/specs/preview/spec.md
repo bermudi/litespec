@@ -61,7 +61,7 @@ The preview output MUST conclude with a summary line showing: the number of capa
 
 ### Requirement: JSON Output
 
-The `litespec preview` command MUST support a `--json` flag. When provided, the command SHALL output a single JSON object to stdout containing a `capabilities` array and a `totals` object. Each capability entry SHALL include `name`, `isNew`, and `operations` (an array of objects with `type` and `requirement` fields). The `totals` object SHALL include `capabilities`, `added`, `modified`, `removed`, and `renamed` as integers.
+The `litespec preview` command MUST support a `--json` flag. When provided, the command SHALL output a single JSON object to stdout containing a `capabilities` array and a `totals` object. Each capability entry SHALL include `name`, `isNew`, and `operations` (an array of objects with `type` and `requirement` fields). For `RENAMED` operations, the object SHALL additionally include an `oldName` field indicating the previous requirement name. The `totals` object SHALL include `capabilities`, `added`, `modified`, `removed`, and `renamed` as integers.
 
 #### Scenario: JSON output for mixed change
 

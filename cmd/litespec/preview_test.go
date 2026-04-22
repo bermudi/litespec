@@ -237,8 +237,8 @@ func TestCmdPreviewNoName(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing name")
 	}
-	if !strings.Contains(err.Error(), "usage:") {
-		t.Errorf("error = %q, want usage message", err.Error())
+	if !strings.Contains(err.Error(), "change name is required") {
+		t.Errorf("error = %q, want 'change name is required'", err.Error())
 	}
 }
 

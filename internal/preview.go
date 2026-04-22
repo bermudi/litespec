@@ -73,7 +73,6 @@ func ComputePreviewResult(writes []PendingWrite, root string) (*PreviewResult, e
 		result.Capabilities = append(result.Capabilities, cap)
 
 		for _, op := range ops {
-			result.Totals.Capabilities = len(result.Capabilities)
 			switch op.Type {
 			case "ADDED":
 				result.Totals.Added++

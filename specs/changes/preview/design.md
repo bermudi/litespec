@@ -61,8 +61,8 @@ The comparison logic:
 2. Parse both the current spec (if it exists) and the merged content.
 3. Walk requirements in merge order: compare names and content to categorize operations.
    - Requirement exists in merged but not in canon → `ADDED`
-   - Requirement exists in canon but not in merged → `REMOVED`
-   - Requirement name appears in a RENAMED block → `RENAMED` (old name recorded)
+   - Requirement exists in merged but not in canon, with matching content to a removed requirement → `RENAMED` (detected by content-matching heuristic)
+   - Requirement exists in canon but not in merged and not matched as a rename source → `REMOVED`
    - Requirement exists in both but content differs → `MODIFIED`
    - Requirement exists in both with identical content → omitted (no net change)
 
