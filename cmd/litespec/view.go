@@ -71,6 +71,8 @@ func cmdView(args []string) error {
 		totalTasks += c.TotalTasks
 	}
 
+	decisions, decErr := internal.ListDecisions(root)
+
 	fmt.Println()
 	fmt.Println("Litespec Dashboard")
 	fmt.Println()
@@ -85,6 +87,15 @@ func cmdView(args []string) error {
 	if totalTasks > 0 {
 		pct := int(math.Round(float64(totalCompletedTasks) / float64(totalTasks) * 100))
 		fmt.Printf("  ● Task Progress: %d/%d (%d%% complete)\n", totalCompletedTasks, totalTasks, pct)
+	}
+	if decErr == nil && len(decisions) > 0 {
+		activeDec := 0
+		for _, d := range decisions {
+			if d.Status != internal.StatusSuperseded {
+				activeDec++
+			}
+		}
+		fmt.Printf("  ● Decisions: %d/%d\n", activeDec, len(decisions))
 	}
 
 	if len(active) > 0 {
@@ -129,6 +140,31 @@ func cmdView(args []string) error {
 				label = "requirements"
 			}
 			fmt.Printf("  ▪ %-30s %d %s\n", s.Name, s.RequirementCount, label)
+		}
+	}
+
+	// Decisions section
+	if decErr == nil && len(decisions) > 0 {
+		var activeDecs []*internal.Decision
+		supersededCount := 0
+		for _, d := range decisions {
+			if d.Status != internal.StatusSuperseded {
+				activeDecs = append(activeDecs, d)
+			} else {
+				supersededCount++
+			}
+		}
+		sort.Slice(activeDecs, func(i, j int) bool {
+			return activeDecs[i].Number < activeDecs[j].Number
+		})
+		fmt.Println()
+		fmt.Println("Decisions")
+		fmt.Println(strings.Repeat("─", 60))
+		for _, d := range activeDecs {
+			fmt.Printf("  %04d  %-30s  %s\n", d.Number, d.Slug, d.Status)
+		}
+		if supersededCount > 0 {
+			fmt.Printf("  superseded: %d\n", supersededCount)
 		}
 	}
 

@@ -61,6 +61,16 @@ type SpecListItemJSON struct {
 	RequirementCount int    `json:"requirementCount"`
 }
 
+type DecisionListItemJSON struct {
+	Number       int      `json:"number"`
+	Slug         string   `json:"slug"`
+	Title        string   `json:"title"`
+	Status       string   `json:"status"`
+	Supersedes   []string `json:"supersedes,omitempty"`
+	SupersededBy []string `json:"supersededBy,omitempty"`
+	LastModified string   `json:"lastModified,omitempty"`
+}
+
 type ValidationResultJSON struct {
 	Valid    bool                  `json:"valid"`
 	Errors   []ValidationIssueJSON `json:"errors"`
@@ -81,6 +91,7 @@ type ValidationSummaryJSON struct {
 	Capabilities int `json:"capabilities"`
 	Requirements int `json:"requirements"`
 	Scenarios    int `json:"scenarios"`
+	Decisions    int `json:"decisions,omitempty"`
 }
 
 func BuildValidationResultJSON(r *ValidationResult) ValidationResultJSON {
@@ -103,6 +114,7 @@ func BuildValidationResultJSON(r *ValidationResult) ValidationResultJSON {
 			Capabilities: r.CapabilitiesCount,
 			Requirements: r.RequirementsCount,
 			Scenarios:    r.ScenariosCount,
+			Decisions:    r.DecisionsCount,
 		},
 	}
 }

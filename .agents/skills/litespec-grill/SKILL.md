@@ -13,4 +13,6 @@ Provide your recommended answer for each question.
 
 If a question can be answered by exploring the codebase, explore it instead of asking.
 
+When a locked architectural ruling emerges that is broader than the current change, suggest creating a decision via `litespec decide <slug>` rather than burying it in design.md.
+
 When the plan is fully resolved, offer to proceed to propose.

@@ -1750,3 +1750,224 @@ The system SHALL authenticate via SSO.
 		}
 	}
 }
+
+func TestValidateDecisionValid(t *testing.T) {
+	root := setupTestProject(t)
+	decDir := DecisionsPath(root)
+	writeDecisionFile(t, decDir, "0001-test-decision.md", makeDecision(1, "test-decision", "accepted"))
+
+	result, err := ValidateDecision(root, "test-decision")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Valid {
+		t.Errorf("expected valid, got errors: %v", result.Errors)
+	}
+}
+
+func TestValidateDecisionNotFound(t *testing.T) {
+	root := setupTestProject(t)
+	_, err := ValidateDecision(root, "nonexistent")
+	if err == nil {
+		t.Fatal("expected error for nonexistent decision")
+	}
+}
+
+func TestValidateDecisionsDuplicateNumber(t *testing.T) {
+	root := setupTestProject(t)
+	decDir := DecisionsPath(root)
+	writeDecisionFile(t, decDir, "0001-foo.md", makeDecision(1, "foo", "accepted"))
+	writeDecisionFile(t, decDir, "0001-bar.md", makeDecision(1, "bar", "accepted"))
+
+	result, err := ValidateDecisions(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Valid {
+		t.Error("expected invalid for duplicate numbers")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if strings.Contains(e.Message, "duplicate decision number") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected duplicate number error")
+	}
+}
+
+func TestValidateDecisionsSupersedeDanglingPointer(t *testing.T) {
+	root := setupTestProject(t)
+	decDir := DecisionsPath(root)
+
+	supersedesContent := `# New Model
+
+## Status
+
+accepted
+
+## Context
+
+ctx
+
+## Decision
+
+dec
+
+## Consequences
+
+con
+
+## Supersedes
+
+- 0001-nonexistent
+`
+	writeDecisionFile(t, decDir, "0002-new-model.md", supersedesContent)
+
+	result, err := ValidateDecisions(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Valid {
+		t.Error("expected invalid for dangling pointer")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if strings.Contains(e.Message, "does not resolve") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected dangling pointer error")
+	}
+}
+
+func TestValidateDecisionsSupersededWithoutForwardPointer(t *testing.T) {
+	root := setupTestProject(t)
+	decDir := DecisionsPath(root)
+	writeDecisionFile(t, decDir, "0001-old.md", makeDecision(1, "old", "superseded"))
+
+	result, err := ValidateDecisions(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Valid {
+		t.Error("expected invalid for superseded without forward pointer")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if strings.Contains(e.Message, "no Superseded-By pointer") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected missing Superseded-By error")
+	}
+}
+
+func TestValidateDecisionsSupersedeResolves(t *testing.T) {
+	root := setupTestProject(t)
+	decDir := DecisionsPath(root)
+
+	oldContent := `# Old Model
+
+## Status
+
+superseded
+
+## Context
+
+old ctx
+
+## Decision
+
+old dec
+
+## Consequences
+
+old con
+
+## Superseded-By
+
+- 0002-new-model
+`
+	writeDecisionFile(t, decDir, "0001-old-model.md", oldContent)
+
+	newContent := `# New Model
+
+## Status
+
+accepted
+
+## Context
+
+new ctx
+
+## Decision
+
+new dec
+
+## Consequences
+
+new con
+
+## Supersedes
+
+- 0001-old-model
+`
+	writeDecisionFile(t, decDir, "0002-new-model.md", newContent)
+
+	result, err := ValidateDecisions(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Valid {
+		t.Errorf("expected valid, got errors: %v", result.Errors)
+	}
+}
+
+func TestValidateDecisionsIncludesDecisionsCount(t *testing.T) {
+	root := setupTestProject(t)
+	decDir := DecisionsPath(root)
+	writeDecisionFile(t, decDir, "0001-foo.md", makeDecision(1, "foo", "accepted"))
+	writeDecisionFile(t, decDir, "0002-bar.md", makeDecision(2, "bar", "proposed"))
+
+	result, err := ValidateDecisions(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.DecisionsCount != 2 {
+		t.Errorf("DecisionsCount = %d, want 2", result.DecisionsCount)
+	}
+}
+
+func TestValidateAllIncludesDecisions(t *testing.T) {
+	root := setupTestProject(t)
+	decDir := DecisionsPath(root)
+	writeDecisionFile(t, decDir, "0001-foo.md", makeDecision(1, "foo", "accepted"))
+
+	result, err := ValidateAll(root, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.DecisionsCount != 1 {
+		t.Errorf("DecisionsCount = %d, want 1", result.DecisionsCount)
+	}
+}
+
+func TestValidateDecisionsJSONShape(t *testing.T) {
+	root := setupTestProject(t)
+	decDir := DecisionsPath(root)
+	writeDecisionFile(t, decDir, "0001-foo.md", makeDecision(1, "foo", "accepted"))
+
+	result, err := ValidateDecisions(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	json := BuildValidationResultJSON(result)
+	if json.Summary.Decisions != 1 {
+		t.Errorf("Summary.Decisions = %d, want 1", json.Summary.Decisions)
+	}
+}

@@ -91,6 +91,7 @@ func completeCommands() []Completion {
 		{"instructions", "Get artifact instructions"},
 		{"archive", "Apply deltas and archive change"},
 		{"view", "Dashboard overview with dependency graph"},
+		{"decide", "Create a new architectural decision record"},
 		{"update", "Regenerate skills and adapters"},
 		{"completion", "Generate shell completion script"},
 	}
@@ -162,10 +163,12 @@ var commandFlagDefs = map[string]commandFlags{
 	},
 	"list": {
 		flags: map[string]string{
-			"--specs":   "List specs instead of changes",
-			"--changes": "List changes (default)",
-			"--sort":    "Sort by 'recent', 'name', or 'deps'",
-			"--json":    "Output as JSON",
+			"--specs":     "List specs instead of changes",
+			"--changes":   "List changes (default)",
+			"--decisions": "List architectural decision records",
+			"--sort":      "Sort by 'recent', 'name', 'deps', or 'number'",
+			"--status":    "Filter decisions by status (requires --decisions)",
+			"--json":      "Output as JSON",
 		},
 	},
 	"status": {
@@ -177,12 +180,13 @@ var commandFlagDefs = map[string]commandFlags{
 	},
 	"validate": {
 		flags: map[string]string{
-			"--all":     "Validate all changes and specs",
-			"--changes": "Validate all changes only",
-			"--specs":   "Validate all specs only",
-			"--strict":  "Treat warnings as errors",
-			"--json":    "Output as JSON",
-			"--type":    "Disambiguate name: change|spec",
+			"--all":       "Validate all changes, specs, and decisions",
+			"--changes":   "Validate all changes only",
+			"--specs":     "Validate all specs only",
+			"--decisions": "Validate all decisions only",
+			"--strict":    "Treat warnings as errors",
+			"--json":      "Output as JSON",
+			"--type":      "Disambiguate name: change|spec|decision",
 		},
 	},
 	"instructions": {
@@ -198,6 +202,9 @@ var commandFlagDefs = map[string]commandFlags{
 		},
 		hasPositional: true,
 		posResolver:   completeChangeNames,
+	},
+	"decide": {
+		hasPositional: true,
 	},
 	"update": {
 		flags: map[string]string{
@@ -284,6 +291,8 @@ func flagTakesValue(cmd string, flag string) bool {
 		return true
 	case "--type":
 		return true
+	case "--status":
+		return true
 	}
 	return false
 }
@@ -297,11 +306,19 @@ func completeFlagValue(root string, cmd string, flag string) []Completion {
 			{"recent", "Sort by last modified"},
 			{"name", "Sort alphabetically"},
 			{"deps", "Sort by dependency order"},
+			{"number", "Sort by decision number"},
 		}
 	case "--type":
 		return []Completion{
 			{"change", "Disambiguate as change"},
 			{"spec", "Disambiguate as spec"},
+			{"decision", "Disambiguate as decision"},
+		}
+	case "--status":
+		return []Completion{
+			{"proposed", "Proposed decisions"},
+			{"accepted", "Accepted decisions"},
+			{"superseded", "Superseded decisions"},
 		}
 	}
 	return nil

@@ -14,12 +14,12 @@ func cmdValidate(args []string) error {
 		printValidateHelp()
 		return nil
 	}
-	if err := checkUnknownFlags(args, map[string]bool{"--all": true, "--changes": true, "--specs": true, "--strict": true, "--json": true, "--type": true}); err != nil {
+	if err := checkUnknownFlags(args, map[string]bool{"--all": true, "--changes": true, "--specs": true, "--decisions": true, "--strict": true, "--json": true, "--type": true}); err != nil {
 		return err
 	}
 
 	var positional string
-	var flagAll, flagChanges, flagSpecs, strict, asJSON bool
+	var flagAll, flagChanges, flagSpecs, flagDecisions, strict, asJSON bool
 	var typeFilter string
 
 	for i := 0; i < len(args); i++ {
@@ -30,6 +30,8 @@ func cmdValidate(args []string) error {
 			flagChanges = true
 		case "--specs":
 			flagSpecs = true
+		case "--decisions":
+			flagDecisions = true
 		case "--strict":
 			strict = true
 		case jsonFlag:
@@ -47,10 +49,10 @@ func cmdValidate(args []string) error {
 		}
 	}
 
-	hasBulk := flagAll || flagChanges || flagSpecs
+	hasBulk := flagAll || flagChanges || flagSpecs || flagDecisions
 
 	if positional != "" && hasBulk {
-		return fmt.Errorf("positional name and bulk flags (--all, --changes, --specs) are mutually exclusive")
+		return fmt.Errorf("positional name and bulk flags (--all, --changes, --specs, --decisions) are mutually exclusive")
 	}
 
 	if typeFilter != "" && positional == "" {
@@ -61,8 +63,8 @@ func cmdValidate(args []string) error {
 		return fmt.Errorf("--type cannot be used with bulk flags")
 	}
 
-	if typeFilter != "" && typeFilter != "change" && typeFilter != "spec" {
-		return fmt.Errorf("--type must be 'change' or 'spec', got %q", typeFilter)
+	if typeFilter != "" && typeFilter != "change" && typeFilter != "spec" && typeFilter != "decision" {
+		return fmt.Errorf("--type must be 'change', 'spec', or 'decision', got %q", typeFilter)
 	}
 
 	root, err := internal.FindProjectRoot()
@@ -89,35 +91,72 @@ func cmdValidate(args []string) error {
 		}
 		isChange := contains(changeNames, positional)
 		isSpec := contains(specNames, positional)
+		isDecision := false
+		decisionMatch, _ := internal.FindDecisionBySlug(root, positional)
+		if decisionMatch != nil {
+			isDecision = true
+		}
 
 		if typeFilter == "change" {
 			isSpec = false
+			isDecision = false
 		} else if typeFilter == "spec" {
 			isChange = false
+			isDecision = false
+		} else if typeFilter == "decision" {
+			isChange = false
+			isSpec = false
 		}
 
-		if isChange && isSpec {
-			return fmt.Errorf("%q is ambiguous — exists as both a change and a spec. Use --type change or --type spec", positional)
+		matches := 0
+		if isChange {
+			matches++
+		}
+		if isSpec {
+			matches++
+		}
+		if isDecision {
+			matches++
 		}
 
-		if !isChange && !isSpec {
-			return fmt.Errorf("%q not found as a change or spec", positional)
+		if matches > 1 {
+			return fmt.Errorf("%q is ambiguous — matches multiple artifact types. Use --type change, --type spec, or --type decision", positional)
+		}
+
+		if matches == 0 {
+			return fmt.Errorf("%q not found as a change, spec, or decision", positional)
 		}
 
 		if isChange {
 			result, err = internal.ValidateChange(root, positional)
-		} else {
+		} else if isSpec {
 			result, err = internal.ValidateSpec(root, positional)
+		} else {
+			result, err = internal.ValidateDecision(root, positional)
 		}
 	} else {
-		validateSpecs := flagSpecs || flagAll || (!flagChanges && !flagSpecs)
-		validateChanges := flagChanges || flagAll || (!flagChanges && !flagSpecs)
+		// Mutual exclusion: --decisions is exclusive with --changes and --specs
+		if flagDecisions && (flagChanges || flagSpecs) {
+			return fmt.Errorf("--decisions cannot be combined with --changes or --specs (use --all to validate everything)")
+		}
 
-		if validateSpecs && validateChanges {
-			result, err = internal.ValidateAll(root, strict)
-		} else if validateSpecs {
-			result, err = internal.ValidateSpecs(root)
+		if flagDecisions {
+			result, err = internal.ValidateDecisions(root)
+			if err != nil {
+				return err
+			}
+			if strict && len(result.Warnings) > 0 {
+				result.Valid = false
+			}
 		} else {
+			validateSpecs := flagSpecs || flagAll || (!flagChanges && !flagSpecs && !flagDecisions)
+			validateChanges := flagChanges || flagAll || (!flagChanges && !flagSpecs && !flagDecisions)
+
+			if validateSpecs && validateChanges {
+				result, err = internal.ValidateAll(root, strict)
+			} else if validateSpecs {
+				result, err = internal.ValidateSpecs(root)
+			} else {
 			changes, listErr := internal.ListChanges(root)
 			if listErr != nil {
 				return listErr
@@ -152,8 +191,9 @@ func cmdValidate(args []string) error {
 			}
 
 			result.Valid = len(result.Errors) == 0
-			if strict && len(result.Warnings) > 0 {
-				result.Valid = false
+				if strict && len(result.Warnings) > 0 {
+					result.Valid = false
+				}
 			}
 		}
 	}

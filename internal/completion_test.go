@@ -17,7 +17,7 @@ func TestCompleteCommandNames(t *testing.T) {
 		names[c.Candidate] = true
 	}
 
-	for _, cmd := range []string{"init", "new", "list", "status", "validate", "instructions", "archive", "view", "update", "completion"} {
+	for _, cmd := range []string{"init", "new", "list", "status", "validate", "instructions", "archive", "view", "update", "completion", "decide"} {
 		if !names[cmd] {
 			t.Errorf("missing command %q in completions", cmd)
 		}
@@ -147,29 +147,29 @@ func TestCompleteValidateFlags(t *testing.T) {
 
 func TestCompleteSortValues(t *testing.T) {
 	result := Complete("", []string{"list", "--sort", ""})
-	if len(result) != 3 {
-		t.Fatalf("expected 3 sort values, got %d", len(result))
+	if len(result) != 4 {
+		t.Fatalf("expected 4 sort values, got %d", len(result))
 	}
 	names := make(map[string]bool)
 	for _, c := range result {
 		names[c.Candidate] = true
 	}
-	if !names["recent"] || !names["name"] || !names["deps"] {
-		t.Errorf("expected recent, name, and deps, got %v", names)
+	if !names["recent"] || !names["name"] || !names["deps"] || !names["number"] {
+		t.Errorf("expected recent, name, deps, and number, got %v", names)
 	}
 }
 
 func TestCompleteTypeValues(t *testing.T) {
 	result := Complete("", []string{"validate", "--type", ""})
-	if len(result) != 2 {
-		t.Fatalf("expected 2 type values, got %d", len(result))
+	if len(result) != 3 {
+		t.Fatalf("expected 3 type values, got %d", len(result))
 	}
 	names := make(map[string]bool)
 	for _, c := range result {
 		names[c.Candidate] = true
 	}
-	if !names["change"] || !names["spec"] {
-		t.Errorf("expected change and spec, got %v", names)
+	if !names["change"] || !names["spec"] || !names["decision"] {
+		t.Errorf("expected change, spec, and decision, got %v", names)
 	}
 }
 

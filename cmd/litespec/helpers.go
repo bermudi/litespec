@@ -78,14 +78,16 @@ Examples:
 }
 
 func printListHelp() {
-	fmt.Print(`Usage: litespec list [--specs|--changes] [--sort recent|name|deps] [--json]
+	fmt.Print(`Usage: litespec list [--specs|--changes|--decisions] [--sort <mode>] [--status <state>] [--json]
 
-List active changes in the project (default) or specs with --specs.
+List active changes in the project (default) or specs with --specs or decisions with --decisions.
 
 Flags:
   --specs           List specs instead of changes
   --changes         List changes (default)
-  --sort <field>    Sort changes by 'recent' (default), 'name', or 'deps'
+  --decisions       List architectural decision records
+  --sort <field>    Sort by 'recent' (default), 'name', 'deps', or 'number' (decisions)
+  --status <state>  Filter decisions by status: proposed, accepted, superseded (requires --decisions)
   --json            Output as JSON
 
 Examples:
@@ -93,6 +95,8 @@ Examples:
   litespec list --changes --sort name
   litespec list --sort deps
   litespec list --specs --json
+  litespec list --decisions
+  litespec list --decisions --status accepted --sort recent
 `)
 }
 
@@ -115,18 +119,19 @@ Examples:
 }
 
 func printValidateHelp() {
-	fmt.Print(`Usage: litespec validate [<name>] [--all|--changes|--specs] [--type T] [--strict] [--json]
+	fmt.Print(`Usage: litespec validate [<name>] [--all|--changes|--specs|--decisions] [--type T] [--strict] [--json]
 
-Validate changes and specs.
+Validate changes, specs, and decisions.
 
 Arguments:
-  <name>            Validate a specific change or spec by name
+  <name>            Validate a specific change, spec, or decision by name
 
 Flags:
-  --all             Validate all changes and specs
+  --all             Validate all changes, specs, and decisions
   --changes         Validate all changes only
   --specs           Validate all specs only
-  --type <T>        Disambiguate name: change|spec
+  --decisions       Validate all decisions only
+  --type <T>        Disambiguate name: change|spec|decision
   --strict          Treat warnings as errors
   --json            Output as JSON
 
@@ -135,6 +140,7 @@ Examples:
   litespec validate my-change
   litespec validate --all --strict
   litespec validate shared --type spec
+  litespec validate --decisions
 `)
 }
 
@@ -320,6 +326,9 @@ func validateToolIDs(toolIDs []string) error {
 func pluralize(word string, count int) string {
 	if count == 1 {
 		return word
+	}
+	if strings.HasSuffix(word, "y") {
+		return word[:len(word)-1] + "ies"
 	}
 	return word + "s"
 }

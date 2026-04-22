@@ -78,6 +78,7 @@ type ValidationResult struct {
 	CapabilitiesCount int
 	RequirementsCount int
 	ScenariosCount    int
+	DecisionsCount    int
 }
 
 type SpecRequirement struct {

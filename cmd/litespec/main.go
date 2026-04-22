@@ -75,6 +75,8 @@ func run() error {
 		return nil
 	case "view":
 		return cmdView(os.Args[2:])
+	case "decide":
+		return cmdDecide(os.Args[2:])
 	case "import":
 		return cmdImport(os.Args[2:])
 	default:
@@ -89,12 +91,13 @@ func printUsage() {
 Commands:
   init [--tools <ids>]                                        Initialize project structure
   new <name>                                                  Create a new change
-  list [--specs|--changes] [--sort recent|name|deps]                   List specs or changes
+  list [--specs|--changes|--decisions] [--sort recent|name|deps|number] [--status <state>]   List specs, changes, or decisions
   status [<name>]                                             Show artifact states
-  validate [<name>] [--all|--changes|--specs] [--type T]      Validate changes and specs
+  validate [<name>] [--all|--changes|--specs|--decisions] [--type T]      Validate changes, specs, and decisions
   instructions <artifact>                                     Get artifact instructions
   archive <name>                                              Apply deltas and archive change
   view                                                        Dashboard overview with dependency graph
+  decide <slug>                                              Create a new architectural decision record
   import [--source <dir>] [--dry-run] [--force]               Import OpenSpec project to litespec
   update [--tools <ids>]                                      Regenerate skills and adapters
   upgrade                                                     Check for and install the latest version
@@ -108,10 +111,11 @@ Flags:
    --help       Print this help message
    --json       Output structured JSON (status, validate, list, instructions)
    --strict     Treat warnings as errors (validate)
-   --all        Validate all changes and specs
+   --all        Validate all changes, specs, and decisions
    --changes    Validate all changes only
    --specs      Validate all specs only
-   --type       Disambiguate name type: change|spec (validate)
+   --decisions  Validate all decisions only
+   --type       Disambiguate name type: change|spec|decision (validate)
     --sort       Sort changes by recent, name, or deps (list, default: recent)
 `)
 }

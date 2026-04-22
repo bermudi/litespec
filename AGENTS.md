@@ -25,6 +25,7 @@ The design emerged from a structured grilling session — question by question, 
 
 - **Specs** live in `specs/canon/` — the source of truth for current capabilities
 - **Changes** live in `specs/changes/<name>/` — isolated proposed modifications
+- **Decisions** live in `specs/decisions/` as `NNNN-<slug>.md` — persistent architectural rulings that span changes. Created via `litespec decide`, surfaced by `list --decisions`, `validate --decisions`, and `view`. Opt-in; absence is not an error.
 - **Delta specs** use ADDED/MODIFIED/REMOVED/RENAMED markers merged in strict order at archive time
 - **Change dependencies** — optional `dependsOn` field in `.litespec.yaml` for prerequisite relationships between changes. Enables cycle/overlap detection, topological sorting, archive guards, and dependency graph visualization.
 - **Skills** are generated into `.agents/skills/` (canonical). Nearly all AI coding agents (opencode, Cursor, Windsurf, Amazon Q, Auggie, Roo, Kilo Code, Codex, etc.) now discover `.agents/skills/` natively. Claude Code is the sole exception: it reads from `.claude/skills/`, so `--tools claude` creates symlinks there.

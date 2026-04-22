@@ -104,6 +104,8 @@ Rules:
   - `apply` to start implementing
    - `review` to review the proposal against specs
 
+**Standing rules check:** During design.md authoring, check whether any language sounds like a cross-cutting rule ("all changes must...", "we will never..."). If so, suggest citing an existing decision from `specs/decisions/` or creating one via `litespec decide <slug>`.
+
 ---
 
 ## What You Are Doing

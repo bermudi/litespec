@@ -2448,3 +2448,162 @@ func TestCLIListJSONLastModifiedNotZero(t *testing.T) {
 		t.Errorf("expected non-zero lastModified, got %q", lm)
 	}
 }
+
+func TestDecideFirst(t *testing.T) {
+	bin, root := setupCLITest(t)
+	out, code := runCLI(t, bin, root, "decide", "single-workspace")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "0001-single-workspace.md") {
+		t.Errorf("expected filename in output, got %s", out)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "specs", "decisions", "0001-single-workspace.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "## Status\n\nproposed") {
+		t.Error("scaffold missing proposed status")
+	}
+	if !strings.Contains(content, "## Context") {
+		t.Error("scaffold missing Context section")
+	}
+}
+
+func TestDecideSubsequent(t *testing.T) {
+	bin, root := setupCLITest(t)
+	runCLI(t, bin, root, "decide", "first-decision")
+	out, code := runCLI(t, bin, root, "decide", "second-decision")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "0002-second-decision.md") {
+		t.Errorf("expected 0002 filename, got %s", out)
+	}
+}
+
+func TestDecideDuplicateSlug(t *testing.T) {
+	bin, root := setupCLITest(t)
+	runCLI(t, bin, root, "decide", "foo")
+	out, code := runCLI(t, bin, root, "decide", "foo")
+	if code == 0 {
+		t.Fatal("expected error for duplicate slug")
+	}
+	if !strings.Contains(out, "already exists") {
+		t.Errorf("expected duplicate error, got %s", out)
+	}
+}
+
+func TestDecideInvalidSlug(t *testing.T) {
+	bin, root := setupCLITest(t)
+	out, code := runCLI(t, bin, root, "decide", "My Decision")
+	if code == 0 {
+		t.Fatal("expected error for invalid slug")
+	}
+	if !strings.Contains(out, "lowercase") {
+		t.Errorf("expected slug validation error, got %s", out)
+	}
+
+	out, code = runCLI(t, bin, root, "decide", "-leading-hyphen")
+	if code == 0 {
+		t.Fatal("expected error for leading hyphen")
+	}
+
+	out, code = runCLI(t, bin, root, "decide", "x")
+	if code == 0 {
+		t.Fatal("expected error for short slug")
+	}
+}
+
+func TestListDecisions(t *testing.T) {
+	bin, root := setupCLITest(t)
+	runCLI(t, bin, root, "decide", "first-decision")
+	runCLI(t, bin, root, "decide", "second-decision")
+
+	out, code := runCLI(t, bin, root, "list", "--decisions")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "0001") || !strings.Contains(out, "first-decision") {
+		t.Errorf("expected first decision in output, got %s", out)
+	}
+	if !strings.Contains(out, "0002") || !strings.Contains(out, "second-decision") {
+		t.Errorf("expected second decision in output, got %s", out)
+	}
+}
+
+func TestListDecisionsJSON(t *testing.T) {
+	bin, root := setupCLITest(t)
+	runCLI(t, bin, root, "decide", "test-decision")
+
+	out, code := runCLI(t, bin, root, "list", "--decisions", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	decisions := result["decisions"].([]interface{})
+	if len(decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(decisions))
+	}
+	d := decisions[0].(map[string]interface{})
+	for _, field := range []string{"number", "slug", "title", "status"} {
+		if _, ok := d[field]; !ok {
+			t.Errorf("missing field %q in decision JSON", field)
+		}
+	}
+}
+
+func TestListDecisionsMutualExclusion(t *testing.T) {
+	bin, root := setupCLITest(t)
+	_, code := runCLI(t, bin, root, "list", "--decisions", "--specs")
+	if code == 0 {
+		t.Fatal("expected error for --decisions + --specs")
+	}
+	_, code = runCLI(t, bin, root, "list", "--decisions", "--changes")
+	if code == 0 {
+		t.Fatal("expected error for --decisions + --changes")
+	}
+}
+
+func TestValidateDecisionsFlag(t *testing.T) {
+	bin, root := setupCLITest(t)
+	runCLI(t, bin, root, "decide", "test-decision")
+
+	out, code := runCLI(t, bin, root, "validate", "--decisions")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+}
+
+func TestValidateDecisionByName(t *testing.T) {
+	bin, root := setupCLITest(t)
+	runCLI(t, bin, root, "decide", "test-decision")
+
+	out, code := runCLI(t, bin, root, "validate", "test-decision")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+}
+
+func TestValidateDecisionTypeFlag(t *testing.T) {
+	bin, root := setupCLITest(t)
+	runCLI(t, bin, root, "decide", "test-decision")
+
+	out, code := runCLI(t, bin, root, "validate", "test-decision", "--type", "decision")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+}
+
+func TestValidateDecisionsMutualExclusion(t *testing.T) {
+	bin, root := setupCLITest(t)
+	_, code := runCLI(t, bin, root, "validate", "--decisions", "--changes")
+	if code == 0 {
+		t.Fatal("expected error for --decisions + --changes")
+	}
+}

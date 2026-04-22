@@ -31,6 +31,8 @@ project/
 │               ├── proposal.md
 │               ├── design.md
 │               └── tasks.md      # planning artifacts
+├── decisions/                    # architectural decision records (optional)
+│   └── NNNN-<slug>.md
 └── .agents/skills/               # generated skills (canonical)
     ├── litespec-explore/
     ├── litespec-grill/
