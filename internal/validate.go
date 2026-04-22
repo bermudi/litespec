@@ -46,13 +46,12 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 			File:     specsDir,
 		})
 	} else {
-		found := false
 		for _, e := range entries {
 			if e.IsDir() && hasMarkdownFiles(filepath.Join(specsDir, e.Name())) {
-				found = true
-				break
+				result.CapabilitiesCount++
 			}
 		}
+		found := result.CapabilitiesCount > 0
 		if !found {
 			result.Errors = append(result.Errors, ValidationIssue{
 				Severity: SeverityError,
@@ -90,6 +89,11 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 						File:     specPath,
 					})
 					continue
+				}
+
+				result.RequirementsCount += len(delta.Requirements)
+				for _, req := range delta.Requirements {
+					result.ScenariosCount += len(req.Scenarios)
 				}
 
 				for _, req := range delta.Requirements {
@@ -328,6 +332,7 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 	}
 
 	result.Valid = len(result.Errors) == 0
+	result.ChangesCount = 1
 	return result, nil
 }
 
@@ -423,8 +428,11 @@ func ValidateSpec(root, name string) (*ValidationResult, error) {
 				File:     specPath,
 			})
 		}
+		result.ScenariosCount += len(req.Scenarios)
 	}
 
+	result.CapabilitiesCount = 1
+	result.RequirementsCount = len(spec.Requirements)
 	result.Valid = len(result.Errors) == 0
 	return result, nil
 }
@@ -472,6 +480,9 @@ func ValidateSpecs(root string) (*ValidationResult, error) {
 			continue
 		}
 
+		result.CapabilitiesCount++
+		result.RequirementsCount += len(spec.Requirements)
+
 		if len(spec.Requirements) == 0 {
 			result.Warnings = append(result.Warnings, ValidationIssue{
 				Severity: SeverityWarning,
@@ -488,6 +499,7 @@ func ValidateSpecs(root string) (*ValidationResult, error) {
 					File:     specPath,
 				})
 			}
+			result.ScenariosCount += len(req.Scenarios)
 		}
 	}
 
@@ -504,6 +516,9 @@ func ValidateAll(root string, strict bool) (*ValidationResult, error) {
 	}
 	result.Errors = append(result.Errors, specResult.Errors...)
 	result.Warnings = append(result.Warnings, specResult.Warnings...)
+	result.CapabilitiesCount += specResult.CapabilitiesCount
+	result.RequirementsCount += specResult.RequirementsCount
+	result.ScenariosCount += specResult.ScenariosCount
 
 	changes, err := ListChanges(root)
 	if err != nil {
@@ -517,6 +532,10 @@ func ValidateAll(root string, strict bool) (*ValidationResult, error) {
 		}
 		result.Errors = append(result.Errors, changeResult.Errors...)
 		result.Warnings = append(result.Warnings, changeResult.Warnings...)
+		result.ChangesCount += changeResult.ChangesCount
+		result.CapabilitiesCount += changeResult.CapabilitiesCount
+		result.RequirementsCount += changeResult.RequirementsCount
+		result.ScenariosCount += changeResult.ScenariosCount
 	}
 
 	depMap, err := LoadDepMap(root)

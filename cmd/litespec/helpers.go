@@ -61,15 +61,19 @@ Examples:
 }
 
 func printNewHelp() {
-	fmt.Print(`Usage: litespec new <name>
+	fmt.Print(`Usage: litespec new <name> [--json]
 
-Create a new change directory under specs/changes/.
+Create a new change directory under specs/changes/ and show the artifact shape.
 
 Arguments:
   <name>            Change name (e.g., add-auth)
 
+Flags:
+  --json            Output artifact states as JSON
+
 Examples:
   litespec new add-auth
+  litespec new add-auth --json
 `)
 }
 
@@ -311,4 +315,11 @@ func validateToolIDs(toolIDs []string) error {
 		}
 	}
 	return nil
+}
+
+func pluralize(word string, count int) string {
+	if count == 1 {
+		return word
+	}
+	return word + "s"
 }

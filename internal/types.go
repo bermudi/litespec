@@ -71,9 +71,13 @@ type ValidationIssue struct {
 }
 
 type ValidationResult struct {
-	Valid    bool
-	Errors   []ValidationIssue
-	Warnings []ValidationIssue
+	Valid             bool
+	Errors            []ValidationIssue
+	Warnings          []ValidationIssue
+	ChangesCount      int
+	CapabilitiesCount int
+	RequirementsCount int
+	ScenariosCount    int
 }
 
 type SpecRequirement struct {

@@ -130,6 +130,10 @@ func cmdValidate(args []string) error {
 				}
 				result.Errors = append(result.Errors, changeResult.Errors...)
 				result.Warnings = append(result.Warnings, changeResult.Warnings...)
+				result.ChangesCount += changeResult.ChangesCount
+				result.CapabilitiesCount += changeResult.CapabilitiesCount
+				result.RequirementsCount += changeResult.RequirementsCount
+				result.ScenariosCount += changeResult.ScenariosCount
 			}
 
 			depMap, depErr := internal.LoadDepMap(root)
@@ -186,6 +190,10 @@ func cmdValidate(args []string) error {
 		return fmt.Errorf("validation failed")
 	}
 
-	fmt.Println("Validation passed.")
+	fmt.Printf("ok: %d %s, %d %s, %d %s, %d %s\n",
+		result.ChangesCount, pluralize("change", result.ChangesCount),
+		result.CapabilitiesCount, pluralize("capability", result.CapabilitiesCount),
+		result.RequirementsCount, pluralize("requirement", result.RequirementsCount),
+		result.ScenariosCount, pluralize("scenario", result.ScenariosCount))
 	return nil
 }

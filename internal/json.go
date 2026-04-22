@@ -75,8 +75,12 @@ type ValidationIssueJSON struct {
 }
 
 type ValidationSummaryJSON struct {
-	Total   int `json:"total"`
-	Invalid int `json:"invalid"`
+	Total        int `json:"total"`
+	Invalid      int `json:"invalid"`
+	Changes      int `json:"changes"`
+	Capabilities int `json:"capabilities"`
+	Requirements int `json:"requirements"`
+	Scenarios    int `json:"scenarios"`
 }
 
 func BuildValidationResultJSON(r *ValidationResult) ValidationResultJSON {
@@ -92,7 +96,14 @@ func BuildValidationResultJSON(r *ValidationResult) ValidationResultJSON {
 		Valid:    r.Valid,
 		Errors:   errors,
 		Warnings: warnings,
-		Summary:  ValidationSummaryJSON{Total: len(errors) + len(warnings), Invalid: len(errors)},
+		Summary: ValidationSummaryJSON{
+			Total:        len(errors) + len(warnings),
+			Invalid:      len(errors),
+			Changes:      r.ChangesCount,
+			Capabilities: r.CapabilitiesCount,
+			Requirements: r.RequirementsCount,
+			Scenarios:    r.ScenariosCount,
+		},
 	}
 }
 
