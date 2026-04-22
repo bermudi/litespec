@@ -90,6 +90,7 @@ func completeCommands() []Completion {
 		{"validate", "Validate changes and specs"},
 		{"instructions", "Get artifact instructions"},
 		{"archive", "Apply deltas and archive change"},
+		{"preview", "Preview what archive would do to canon specs"},
 		{"view", "Dashboard overview with dependency graph"},
 		{"decide", "Create a new architectural decision record"},
 		{"update", "Regenerate skills and adapters"},
@@ -199,6 +200,13 @@ var commandFlagDefs = map[string]commandFlags{
 	"archive": {
 		flags: map[string]string{
 			"--allow-incomplete": "Archive even with incomplete tasks or unarchived dependencies",
+		},
+		hasPositional: true,
+		posResolver:   completeChangeNames,
+	},
+	"preview": {
+		flags: map[string]string{
+			"--json": "Output as JSON",
 		},
 		hasPositional: true,
 		posResolver:   completeChangeNames,

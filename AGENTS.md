@@ -50,7 +50,7 @@ Unidirectional. No backward flow.
 - **apply** works on one phase at a time. Each phase = one agent session = one commit. Re-invoke for the next phase. Consumes research skills via natural agent discovery.
 - **adopt** is a separate path — reverse-engineers specs from existing code given a file/directory path.
 - **review** is context-aware AI review: artifact review when no tasks are checked (evaluates planning artifacts), implementation review when some tasks are checked (code vs specs), pre-archive review when all tasks are checked (both artifacts and code). No test/lint running.
-- **archive** is the commit to implemented — applying deltas to canonical specs and moving the change to the archive. Until archived, a change's deltas are tentative.
+- **archive** is the commit to implemented — applying deltas to canonical specs and moving the change to the archive. Until archived, a change's deltas are tentative. Use `litespec preview <name>` to see what archive would do without making changes.
 
 ## Key Design Decisions
 

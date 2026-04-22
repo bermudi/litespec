@@ -22,11 +22,11 @@
 
 ## Phase 3: Completions and Documentation
 
-- [ ] Add `preview` to `cmd/litespec/completion.go`
-- [ ] Add dynamic change-name completion for `preview <name>` in `internal/completion.go`
-- [ ] Update `DESIGN.md` CLI commands table to include `preview`
-- [ ] Update `AGENTS.md` if preview workflow guidance is needed
-- [ ] Regenerate skills with `litespec update` if any skill templates reference the new command
+- [x] Add `preview` to `cmd/litespec/completion.go`
+- [x] Add dynamic change-name completion for `preview <name>` in `internal/completion.go`
+- [x] Update `DESIGN.md` CLI commands table to include `preview`
+- [x] Update `AGENTS.md` if preview workflow guidance is needed
+- [x] Regenerate skills with `litespec update` if any skill templates reference the new command
 
 ## Phase 4: Verification
 

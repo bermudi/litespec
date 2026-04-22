@@ -206,6 +206,7 @@ Tool adapters are auto-detected by scanning for symlinks in adapter skill direct
 | `litespec view` | Display dashboard overview with progress bars, specs, changes (draft/active/ready-to-archive), and dependency graph |
 | `litespec update [--tools ...]` | Regenerate skills and adapter symlinks |
 | `litespec archive <change> [--allow-incomplete]` | Apply deltas to canon + move to archive (marks change as implemented; errors if unarchived dependencies exist) |
+| `litespec preview <change> [--json]` | Preview what archive would do to canonical specs without making changes |
 | `litespec completion <shell>` | Print shell completion script (bash, zsh, fish) |
 | `litespec __complete <words...>` | Hidden backend for dynamic shell completions |
 | `litespec upgrade` | Check for latest version and upgrade via `go install` |
