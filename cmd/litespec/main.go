@@ -73,6 +73,8 @@ func run() error {
 	case "__complete":
 		cmdComplete()
 		return nil
+	case "preview":
+		return cmdPreview(os.Args[2:])
 	case "view":
 		return cmdView(os.Args[2:])
 	case "decide":
@@ -96,6 +98,7 @@ Commands:
   validate [<name>] [--all|--changes|--specs|--decisions] [--type T]      Validate changes, specs, and decisions
   instructions <artifact>                                     Get artifact instructions
   archive <name>                                              Apply deltas and archive change
+  preview <name> [--json]                                     Preview what archive would do to canon specs
   view                                                        Dashboard overview with dependency graph
   decide <slug>                                              Create a new architectural decision record
   import [--source <dir>] [--dry-run] [--force]               Import OpenSpec project to litespec

@@ -11,14 +11,14 @@
 
 ## Phase 2: CLI Command
 
-- [ ] Create `cmd/litespec/preview.go` with `cmdPreview(args []string) error`
-- [ ] Parse positional change name and `--json` flag
-- [ ] Reject empty name, missing change, archived change with clear errors
-- [ ] Call `PrepareArchiveWrites` and `ComputePreviewResult`
-- [ ] Print text or JSON output to stdout
-- [ ] Register `preview` in `cmd/litespec/main.go` dispatcher
-- [ ] Unit tests: happy path, empty change, non-existent change, archived change, JSON flag
-- [ ] Integration test: preview output matches archive merge result for sample changes
+- [x] Create `cmd/litespec/preview.go` with `cmdPreview(args []string) error`
+- [x] Parse positional change name and `--json` flag
+- [x] Reject empty name, missing change, archived change with clear errors
+- [x] Call `PrepareArchiveWrites` and `ComputePreviewResult`
+- [x] Print text or JSON output to stdout
+- [x] Register `preview` in `cmd/litespec/main.go` dispatcher
+- [x] Unit tests: happy path, empty change, non-existent change, archived change, JSON flag
+- [x] Integration test: preview output matches archive merge result for sample changes
 
 ## Phase 3: Completions and Documentation
 
