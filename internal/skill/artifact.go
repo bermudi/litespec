@@ -106,10 +106,11 @@ Structure:
 - [ ] <task description>
 
 Rules:
-- Each phase is a coherent edit context — group tasks that share the same files, types, and mental model
-- Tasks that touch the same structs, files, or abstractions belong in the same phase, even if they differ in complexity
-- The goal is to minimize context switching: an agent loads a working set once, does everything that needs it, then moves on
-- Avoid over-decomposition: fewer, denser phases are better than many thin ones, as long as each phase has a clear boundary
-- Each phase must be independently committable — it should leave the codebase in a valid state
+- Each phase is a commit boundary — it must leave the codebase in a valid, buildable, test-passing state
+- Size phases by commit coherence, not implementation granularity: "Add parser and validator" is one phase if both touch the same types and the commit "Add delta parsing" makes sense
+- Group tasks that share files, types, and mental model; split when the commit message would become a list ("Add X and fix Y and refactor Z")
+- A valid phase ends with a commit message that describes one thing: 'phase 2: Add delta merge logic'
+- If a phase wouldn't survive 'go build && go test' (or your project's equivalent), it's incomplete — add verification tasks
+- Avoid over-decomposition: fewer, denser phases beat many thin ones, as long as the commit boundary is clean
 - Each task should be a single, verifiable unit of work
 - Tasks should reference specific spec requirements where applicable`
