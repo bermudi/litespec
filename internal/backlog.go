@@ -11,6 +11,7 @@ type BacklogSummary struct {
 	OpenQuestions int
 	Future        int
 	Other         int
+	Unrecognized  []string
 }
 
 func BacklogPath(root string) string {
@@ -29,6 +30,7 @@ func ParseBacklog(path string) (*BacklogSummary, error) {
 	content := string(data)
 	var currentSection string
 	var deferred, openQuestions, future, other int
+	var unrecognized []string
 
 	for _, line := range strings.Split(content, "\n") {
 		line = strings.TrimSuffix(line, "\r")
@@ -41,8 +43,11 @@ func ParseBacklog(path string) (*BacklogSummary, error) {
 				currentSection = "open-questions"
 			case "future versions", "future":
 				currentSection = "future"
-			default:
+			case "other":
 				currentSection = "other"
+			default:
+				currentSection = "unrecognized"
+				unrecognized = append(unrecognized, strings.TrimSpace(strings.TrimPrefix(line, "## ")))
 			}
 			continue
 		}
@@ -66,7 +71,7 @@ func ParseBacklog(path string) (*BacklogSummary, error) {
 		}
 	}
 
-	if deferred+openQuestions+future+other == 0 {
+	if deferred+openQuestions+future+other == 0 && len(unrecognized) == 0 {
 		return nil, nil
 	}
 
@@ -75,5 +80,6 @@ func ParseBacklog(path string) (*BacklogSummary, error) {
 		OpenQuestions: openQuestions,
 		Future:        future,
 		Other:         other,
+		Unrecognized:  unrecognized,
 	}, nil
 }

@@ -121,7 +121,7 @@ The summary section of the dashboard SHALL include a decision count when any dec
 
 ### Requirement: Backlog Summary in Dashboard
 
-When `specs/backlog.md` exists, the dashboard summary section SHALL display a backlog line showing item counts per recognized category. The recognized H2 section names are `## Deferred`, `## Open Questions`, and `## Future Versions` (case-insensitive; `## Future` is accepted as shorthand for `## Future Versions`). Items are counted as top-level lines starting with `- ` or `* ` (no leading whitespace) under each H2 section. Items under unrecognized H2 sections SHALL be counted as "other." The backlog line SHALL only include categories that have items (e.g., `● Backlog: 3 deferred, 2 open questions` when no future items exist). When `specs/backlog.md` does not exist, the backlog line SHALL be omitted entirely.
+When `specs/backlog.md` exists, the dashboard summary section SHALL display a backlog line showing item counts per recognized category. The recognized H2 section names are `## Deferred`, `## Open Questions`, `## Future Versions` (case-insensitive; `## Future` is accepted as shorthand for `## Future Versions`), and `## Other` (case-insensitive). Items are counted as top-level lines starting with `- ` or `* ` (no leading whitespace) under each H2 section. Items under unrecognized H2 sections SHALL NOT be counted. The backlog line SHALL only include categories that have items (e.g., `● Backlog: 3 deferred, 2 open questions` when no future items exist). When `specs/backlog.md` does not exist, the backlog line SHALL be omitted entirely. `litespec validate` SHALL warn about unrecognized H2 section names.
 
 #### Scenario: Backlog with all categories
 
@@ -131,6 +131,11 @@ When `specs/backlog.md` exists, the dashboard summary section SHALL display a ba
 #### Scenario: Backlog with unknown sections
 
 - **WHEN** `specs/backlog.md` exists with 1 item under `## Deferred` and 2 items under `## Nice-to-Have`
+- **THEN** the summary shows `● Backlog: 1 deferred` and `litespec validate` warns that `## Nice-to-Have` is not recognized
+
+#### Scenario: Explicit Other section
+
+- **WHEN** `specs/backlog.md` exists with 1 item under `## Deferred` and 2 items under `## Other`
 - **THEN** the summary shows `● Backlog: 1 deferred — 2 other`
 
 #### Scenario: No backlog file

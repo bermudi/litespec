@@ -386,10 +386,11 @@ type viewDecisionCountJSON struct {
 }
 
 type viewBacklogJSON struct {
-	Deferred      int `json:"deferred"`
-	OpenQuestions int `json:"openQuestions"`
-	Future        int `json:"future"`
-	Other         int `json:"other,omitempty"`
+	Deferred      int      `json:"deferred"`
+	OpenQuestions int      `json:"openQuestions"`
+	Future        int      `json:"future"`
+	Other         int      `json:"other,omitempty"`
+	Unrecognized  []string `json:"unrecognized,omitempty"`
 }
 
 type viewChangeJSON struct {
@@ -454,6 +455,7 @@ func renderViewJSON(root string, specs []internal.SpecInfo, draft, active, compl
 			OpenQuestions: backlog.OpenQuestions,
 			Future:        backlog.Future,
 			Other:         backlog.Other,
+			Unrecognized:  backlog.Unrecognized,
 		}
 	}
 

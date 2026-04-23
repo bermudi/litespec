@@ -75,8 +75,45 @@ func TestParseBacklog_UnknownSectionsAsOther(t *testing.T) {
 	if summary.Deferred != 1 {
 		t.Errorf("Deferred = %d, want 1", summary.Deferred)
 	}
+	if summary.Other != 0 {
+		t.Errorf("Other = %d, want 0 (Nice-to-Have is unrecognized, not other)", summary.Other)
+	}
+	if len(summary.Unrecognized) != 1 || summary.Unrecognized[0] != "Nice-to-Have" {
+		t.Errorf("Unrecognized = %v, want [Nice-to-Have]", summary.Unrecognized)
+	}
+}
+
+func TestParseBacklog_ExplicitOtherSection(t *testing.T) {
+	content := `## Deferred
+
+- Item one
+
+## Other
+
+- Wish A
+- Wish B
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "backlog.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err := ParseBacklog(path)
+	if err != nil {
+		t.Fatalf("ParseBacklog: %v", err)
+	}
+	if summary == nil {
+		t.Fatal("expected non-nil summary")
+	}
+	if summary.Deferred != 1 {
+		t.Errorf("Deferred = %d, want 1", summary.Deferred)
+	}
 	if summary.Other != 2 {
 		t.Errorf("Other = %d, want 2", summary.Other)
+	}
+	if len(summary.Unrecognized) != 0 {
+		t.Errorf("Unrecognized = %v, want empty", summary.Unrecognized)
 	}
 }
 
@@ -259,5 +296,63 @@ func TestBacklogPath(t *testing.T) {
 	want := filepath.Join(root, ProjectDirName, BacklogFileName)
 	if got != want {
 		t.Errorf("BacklogPath = %q, want %q", got, want)
+	}
+}
+
+func TestValidateBacklog_UnrecognizedSections(t *testing.T) {
+	content := `## Deferred
+
+- Real item
+
+## Deferred Items
+
+- Misplaced item
+
+## Nice-to-Have
+
+- Wish
+`
+	dir := t.TempDir()
+	root := dir
+	backlogDir := filepath.Join(root, "specs", "canon")
+	os.MkdirAll(backlogDir, 0o755)
+	backlogPath := filepath.Join(root, "specs", "backlog.md")
+	if err := os.WriteFile(backlogPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := ValidateBacklog(root)
+	if len(result.Warnings) != 2 {
+		t.Fatalf("expected 2 warnings, got %d: %v", len(result.Warnings), result.Warnings)
+	}
+	if result.Warnings[0].Message != `"Deferred Items" is not a recognized section — use ## Deferred, ## Open Questions, ## Future Versions, or ## Other` {
+		t.Errorf("unexpected warning: %s", result.Warnings[0].Message)
+	}
+	if result.Warnings[1].Message != `"Nice-to-Have" is not a recognized section — use ## Deferred, ## Open Questions, ## Future Versions, or ## Other` {
+		t.Errorf("unexpected warning: %s", result.Warnings[1].Message)
+	}
+}
+
+func TestValidateBacklog_NoUnrecognizedSections(t *testing.T) {
+	content := `## Deferred
+
+- Item one
+
+## Other
+
+- Wish A
+`
+	dir := t.TempDir()
+	root := dir
+	backlogDir := filepath.Join(root, "specs", "canon")
+	os.MkdirAll(backlogDir, 0o755)
+	backlogPath := filepath.Join(root, "specs", "backlog.md")
+	if err := os.WriteFile(backlogPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := ValidateBacklog(root)
+	if len(result.Warnings) != 0 {
+		t.Fatalf("expected 0 warnings, got %d: %v", len(result.Warnings), result.Warnings)
 	}
 }

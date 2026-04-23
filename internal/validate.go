@@ -764,10 +764,39 @@ func ValidateAll(root string, strict bool) (*ValidationResult, error) {
 		result.DecisionsCount += decResult.DecisionsCount
 	}
 
+	// Validate backlog if present
+	backlogResult := ValidateBacklog(root)
+	result.Warnings = append(result.Warnings, backlogResult.Warnings...)
+
 	result.Valid = len(result.Errors) == 0
 	if strict && len(result.Warnings) > 0 {
 		result.Valid = false
 	}
 
 	return result, nil
+}
+
+func ValidateBacklog(root string) *ValidationResult {
+	result := &ValidationResult{Valid: true}
+
+	backlogPath := BacklogPath(root)
+	backlog, _ := ParseBacklog(backlogPath)
+	if backlog == nil {
+		return result
+	}
+
+	backlogRel := filepath.Join(ProjectDirName, BacklogFileName)
+	for _, section := range backlog.Unrecognized {
+		result.Warnings = append(result.Warnings, ValidationIssue{
+			Severity: SeverityWarning,
+			Message:  fmt.Sprintf("%q is not a recognized section — use ## Deferred, ## Open Questions, ## Future Versions, or ## Other", section),
+			File:     backlogRel,
+		})
+	}
+
+	if len(result.Warnings) > 0 {
+		result.Valid = false
+	}
+
+	return result
 }
