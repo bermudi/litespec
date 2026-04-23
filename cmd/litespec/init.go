@@ -57,5 +57,6 @@ func cmdInit(args []string) error {
 	}
 
 	fmt.Println("Project initialized.")
+	fmt.Println("\nTip: Create specs/backlog.md with ## Deferred, ## Open Questions, and ## Future Versions sections to surface backlog counts in `litespec view`.")
 	return nil
 }

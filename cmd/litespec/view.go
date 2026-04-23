@@ -16,8 +16,15 @@ func cmdView(args []string) error {
 		printViewHelp()
 		return nil
 	}
-	if err := checkUnknownFlags(args, map[string]bool{}); err != nil {
+	if err := checkUnknownFlags(args, map[string]bool{"--json": true}); err != nil {
 		return err
+	}
+
+	var asJSON bool
+	for _, a := range args {
+		if a == jsonFlag {
+			asJSON = true
+		}
 	}
 
 	root, err := internal.FindProjectRoot()
@@ -72,6 +79,10 @@ func cmdView(args []string) error {
 	}
 
 	decisions, decErr := internal.ListDecisions(root)
+
+	if asJSON {
+		return renderViewJSON(root, specs, draft, active, completed, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr)
+	}
 
 	fmt.Println()
 	fmt.Println("Litespec Dashboard")
@@ -342,4 +353,238 @@ func renderDependencyGraph(depMap map[string][]string, changes []internal.Change
 			fmt.Printf("  - %s%s\n", name, formatTimestamps(changeMap[name]))
 		}
 	}
+}
+
+type viewJSON struct {
+	Summary   viewSummaryJSON   `json:"summary"`
+	Changes   []viewChangeJSON  `json:"changes,omitempty"`
+	Specs     []viewSpecJSON    `json:"specs,omitempty"`
+	Decisions []viewDecisionJSON `json:"decisions,omitempty"`
+	Graph     *viewGraphJSON    `json:"graph,omitempty"`
+}
+
+type viewSummaryJSON struct {
+	Specs              int                 `json:"specs"`
+	Requirements       int                 `json:"requirements"`
+	DraftChanges       int                 `json:"draftChanges"`
+	ActiveChanges      int                 `json:"activeChanges"`
+	ReadyToArchive     int                 `json:"readyToArchive"`
+	TaskProgress       *viewProgressJSON   `json:"taskProgress,omitempty"`
+	Decisions          *viewDecisionCountJSON `json:"decisions,omitempty"`
+	Backlog            *viewBacklogJSON    `json:"backlog,omitempty"`
+}
+
+type viewProgressJSON struct {
+	Completed  int `json:"completed"`
+	Total      int `json:"total"`
+	Percentage int `json:"percentage"`
+}
+
+type viewDecisionCountJSON struct {
+	Active int `json:"active"`
+	Total  int `json:"total"`
+}
+
+type viewBacklogJSON struct {
+	Deferred      int `json:"deferred"`
+	OpenQuestions int `json:"openQuestions"`
+	Future        int `json:"future"`
+	Other         int `json:"other,omitempty"`
+}
+
+type viewChangeJSON struct {
+	Name           string   `json:"name"`
+	Status         string   `json:"status"`
+	Born           string   `json:"born,omitempty"`
+	LastModified   string   `json:"lastModified,omitempty"`
+	CompletedTasks int      `json:"completedTasks,omitempty"`
+	TotalTasks     int      `json:"totalTasks,omitempty"`
+	Percentage     int      `json:"percentage,omitempty"`
+	DependsOn      []string `json:"dependsOn,omitempty"`
+}
+
+type viewSpecJSON struct {
+	Name             string `json:"name"`
+	RequirementCount int    `json:"requirementCount"`
+}
+
+type viewDecisionJSON struct {
+	Number int    `json:"number"`
+	Slug   string `json:"slug"`
+	Status string `json:"status"`
+}
+
+type viewGraphJSON struct {
+	Roots      []string                   `json:"roots"`
+	Unrelated  []string                   `json:"unrelated,omitempty"`
+}
+
+func renderViewJSON(root string, specs []internal.SpecInfo, draft, active, completed []internal.ChangeInfo, totalReqs, totalCompletedTasks, totalTasks int, decisions []*internal.Decision, decErr error) error {
+	summary := viewSummaryJSON{
+		Specs:          len(specs),
+		Requirements:   totalReqs,
+		DraftChanges:   len(draft),
+		ActiveChanges:  len(active),
+		ReadyToArchive: len(completed),
+	}
+
+	if totalTasks > 0 {
+		pct := int(math.Round(float64(totalCompletedTasks) / float64(totalTasks) * 100))
+		summary.TaskProgress = &viewProgressJSON{
+			Completed:  totalCompletedTasks,
+			Total:      totalTasks,
+			Percentage: pct,
+		}
+	}
+
+	if decErr == nil && len(decisions) > 0 {
+		activeDec := 0
+		for _, d := range decisions {
+			if d.Status != internal.StatusSuperseded {
+				activeDec++
+			}
+		}
+		summary.Decisions = &viewDecisionCountJSON{Active: activeDec, Total: len(decisions)}
+	}
+
+	backlog, _ := internal.ParseBacklog(internal.BacklogPath(root))
+	if backlog != nil {
+		summary.Backlog = &viewBacklogJSON{
+			Deferred:      backlog.Deferred,
+			OpenQuestions: backlog.OpenQuestions,
+			Future:        backlog.Future,
+			Other:         backlog.Other,
+		}
+	}
+
+	var changes []viewChangeJSON
+	for _, c := range draft {
+		changes = append(changes, viewChangeJSON{
+			Name:   c.Name,
+			Status: "draft",
+			Born:   bornStr(c), LastModified: modifiedStr(c),
+		})
+	}
+	for _, c := range active {
+		pct := 0
+		if c.TotalTasks > 0 {
+			pct = int(math.Round(float64(c.CompletedTasks) / float64(c.TotalTasks) * 100))
+		}
+		changes = append(changes, viewChangeJSON{
+			Name:           c.Name,
+			Status:         "active",
+			Born:           bornStr(c), LastModified: modifiedStr(c),
+			CompletedTasks: c.CompletedTasks,
+			TotalTasks:     c.TotalTasks,
+			Percentage:     pct,
+			DependsOn:      c.DependsOn,
+		})
+	}
+	for _, c := range completed {
+		changes = append(changes, viewChangeJSON{
+			Name:           c.Name,
+			Status:         "completed",
+			Born:           bornStr(c), LastModified: modifiedStr(c),
+			CompletedTasks: c.CompletedTasks,
+			TotalTasks:     c.TotalTasks,
+		})
+	}
+
+	var specEntries []viewSpecJSON
+	for _, s := range specs {
+		specEntries = append(specEntries, viewSpecJSON{
+			Name:             s.Name,
+			RequirementCount: s.RequirementCount,
+		})
+	}
+
+	var decEntries []viewDecisionJSON
+	if decErr == nil {
+		var activeDecs []*internal.Decision
+		for _, d := range decisions {
+			if d.Status != internal.StatusSuperseded {
+				activeDecs = append(activeDecs, d)
+			}
+		}
+		sort.Slice(activeDecs, func(i, j int) bool {
+			return activeDecs[i].Number < activeDecs[j].Number
+		})
+		for _, d := range activeDecs {
+			decEntries = append(decEntries, viewDecisionJSON{
+				Number: d.Number,
+				Slug:   d.Slug,
+				Status: string(d.Status),
+			})
+		}
+	}
+
+	var graph *viewGraphJSON
+	depMap, err := internal.LoadDepMap(root)
+	if err == nil {
+		hasDeps := false
+		for _, deps := range depMap {
+			if len(deps) > 0 {
+				hasDeps = true
+				break
+			}
+		}
+		if hasDeps {
+			var roots []string
+			for name, deps := range depMap {
+				if len(deps) == 0 {
+					roots = append(roots, name)
+				}
+			}
+			sort.Strings(roots)
+
+			related := make(map[string]bool)
+			allChanges := append(draft, active...)
+			allChanges = append(allChanges, completed...)
+			for _, c := range allChanges {
+				related[c.Name] = related[c.Name] || len(depMap[c.Name]) > 0
+				for _, dep := range depMap[c.Name] {
+					related[dep] = true
+				}
+			}
+
+			var unrelated []string
+			for _, c := range allChanges {
+				if !related[c.Name] && len(depMap[c.Name]) == 0 {
+					unrelated = append(unrelated, c.Name)
+				}
+			}
+			sort.Strings(unrelated)
+
+			graph = &viewGraphJSON{Roots: roots, Unrelated: unrelated}
+		}
+	}
+
+	out := viewJSON{
+		Summary:   summary,
+		Changes:   changes,
+		Specs:     specEntries,
+		Decisions: decEntries,
+		Graph:     graph,
+	}
+
+	data, err := internal.MarshalJSON(out)
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+	fmt.Println(string(data))
+	return nil
+}
+
+func bornStr(c internal.ChangeInfo) string {
+	if c.Created.IsZero() {
+		return ""
+	}
+	return c.Created.Format("2006-01-02")
+}
+
+func modifiedStr(c internal.ChangeInfo) string {
+	if c.LastModified.IsZero() {
+		return ""
+	}
+	return internal.FormatRelativeTime(c.LastModified)
 }

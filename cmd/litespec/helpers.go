@@ -179,12 +179,16 @@ Examples:
 }
 
 func printViewHelp() {
-	fmt.Print(`Usage: litespec view
+	fmt.Print(`Usage: litespec view [--json]
 
 Display a dashboard overview of specs, changes, and their dependency relationships.
 
+Flags:
+  --json  Output as JSON
+
 Examples:
   litespec view
+  litespec view --json
 `)
 }
 
