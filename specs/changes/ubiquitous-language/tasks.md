@@ -18,12 +18,12 @@
 
 ## Phase 3: Docs and Housekeeping
 
-- [ ] Create `docs/glossary.md` explaining the ubiquitous language concept, how litespec uses it, how to maintain it, and linking to `specs/glossary.md` as source of truth
-- [ ] Add `Glossary: glossary.md` to `mkdocs.yml` nav
-- [ ] Update DESIGN.md: remove `## Glossary` from canonical spec format, remove glossary delta operations, add `specs/glossary.md` as a project artifact, update the Glossary section at the bottom
-- [ ] Update AGENTS.md: add glossary to core concepts, mention which skills read it
-- [ ] Descope `cross-change-contracts`: update proposal.md to remove glossary structural layer, keep review skill enhancement
-- [ ] Descope `cross-change-contracts`: update design.md to remove glossary architecture/decisions/file changes, adapt review to read project glossary
-- [ ] Descope `cross-change-contracts`: update tasks.md to remove phases 1-3 (glossary types/parsing/merge/validation), keep phase 4 adapted
-- [ ] Descope `cross-change-contracts`: remove `specs/spec-format/spec.md` (all requirements are glossary-specific), remove `specs/validate/spec.md` (all requirements are glossary-specific), update `specs/review/spec.md` to reference project glossary as supplementary context
-- [ ] Run `uv run mkdocs build` to verify docs build cleanly
+- [x] Create `docs/glossary.md` explaining the ubiquitous language concept, how litespec uses it, how to maintain it, and linking to `specs/glossary.md` as source of truth
+- [x] Add `Glossary: glossary.md` to `mkdocs.yml` nav
+- [x] Update DESIGN.md: remove `## Glossary` from canonical spec format, remove glossary delta operations, add `specs/glossary.md` as a project artifact, update the Glossary section at the bottom
+- [x] Update AGENTS.md: add glossary to core concepts, mention which skills read it
+- [x] Descope `cross-change-contracts`: update proposal.md to remove glossary structural layer, keep review skill enhancement
+- [x] Descope `cross-change-contracts`: update design.md to remove glossary architecture/decisions/file changes, adapt review to read project glossary
+- [x] Descope `cross-change-contracts`: update tasks.md to remove phases 1-3 (glossary types/parsing/merge/validation), keep phase 4 adapted
+- [x] Descope `cross-change-contracts`: remove `specs/spec-format/spec.md` (all requirements are glossary-specific), remove `specs/validate/spec.md` (all requirements are glossary-specific), update `specs/review/spec.md` to reference project glossary as supplementary context
+- [x] Run `uv run mkdocs build` to verify docs build cleanly

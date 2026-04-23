@@ -33,6 +33,7 @@ The design emerged from a structured grilling session — question by question, 
 - **Artifact-specific instructions** — `litespec instructions <artifact>` returns distinct guidance per artifact (proposal: motivation/scope/non-goals; specs: delta format + capabilities; design: architecture/decisions/file changes; tasks: phased checklist). The `template` field retains the propose workflow for context.
 - **Phased tasks** — `tasks.md` organizes work into phases, applied one phase at a time
 - **`view` command** — displays a dashboard with progress bars `[████░░░]`, change categories (draft/active/ready to archive), specs sorted by requirement count, and an optional dependency graph section when any change has `dependsOn`
+- **Glossary** — the project's ubiquitous language lives in `specs/glossary.md`. A single, curated file defining shared terms. Read by explore, grill, and propose at session start (active — nudges when undefined terms surface). Apply references it passively. Review may consult it during cross-change review. The glossary skill manages the file. Graceful degradation if absent.
 
 ## Workflow
 

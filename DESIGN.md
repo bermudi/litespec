@@ -13,6 +13,7 @@ AI-native spec-driven development tool. A leaner, opinionated reimagining of [Op
 ```
 project/
 ├── specs/
+│   ├── glossary.md              # ubiquitous language (optional)
 │   ├── canon/                    # source of truth (accepted capabilities)
 │   │   └── <capability>/
 │   │       └── spec.md
@@ -105,18 +106,6 @@ Applied in strict order at archive time:
 3. `MODIFIED` — updates remaining requirements
 4. `ADDED` — appends new requirements
 
-### Glossary Operations
-
-Glossary entries support the same delta operations as requirements:
-
-| Operation | Syntax | Merge Behavior |
-|-----------|--------|----------------|
-| `ADDED` | `## ADDED Glossary` | Append to canon glossary |
-| `MODIFIED` | `## MODIFIED Glossary` | Replace definition of existing term |
-| `REMOVED` | `## REMOVED Glossary` | Delete term from canon glossary |
-
-ADDED terms must not already exist in canon. MODIFIED/REMOVED terms must exist in canon.
-
 ### Improvement over OpenSpec: Dangling Delta Detection
 
 `validate` catches dangling deltas — MODIFIED/REMOVED operations referencing requirements that don't exist in the target spec. OpenSpec only fails on these at archive time. litespec catches them during validation.
@@ -154,19 +143,7 @@ Rules:
 - REMOVED requirements are name-only — no body or scenarios
 - RENAMED requirements preserve content and scenarios under the new name
 
-### Glossary (optional)
 
-Canonical specs MAY include a `## Glossary` H2 section after `## Requirements`:
-
-```markdown
-## Glossary
-
-- **TermName**: definition text
-```
-
-- Entries use `- **TermName**: definition` format
-- Term names must be non-empty and unique within a spec
-- No other H2 sections are permitted after `## Glossary`
 
 ## Artifact Dependency Graph
 
@@ -251,10 +228,15 @@ Changes can declare optional `dependsOn` relationships in `.litespec.yaml`. This
 
 Resolution checks active changes first, then archived changes. Active takes priority on name collision. Archived change names are extracted by stripping the date prefix.
 
-### Dependency Glossary Loading
-
-When validating a change with `dependsOn`, `validate` loads glossary terms from each dependency's specs (delta specs if active, canonical specs if archived). Terms are unioned across spec files, deduplicated by name, with warnings on conflicting definitions. Loaded glossary terms are included in the `ValidationResult` for downstream consumers (e.g., the review skill performs semantic cross-referencing on these terms).
-
 ## Glossary
 
-**Glossary** — An optional section in canonical and delta specs that exports term definitions for downstream consumers. Enables cross-change consistency checking when a change declares `dependsOn`.
+The project's ubiquitous language lives in `specs/glossary.md` — a single, version-controlled markdown file containing term definitions. Curated by humans (with AI proposals), not auto-generated.
+
+Skills that read the glossary:
+- **explore/grill** — read at session start, nudge when undefined terms surface
+- **propose** — checks for new terms after writing specs, offers to update
+- **apply** — passive reference, no enforcement
+- **review** — supplementary context during cross-change review, no enforcement
+- **glossary** — dedicated skill for maintaining the file
+
+If the glossary doesn't exist, all skills degrade gracefully. Conversation skills may suggest creating one when stable terms emerge.
