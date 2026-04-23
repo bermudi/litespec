@@ -32,6 +32,14 @@ func GenerateSkills(root string) error {
 		}
 
 		skillDir := filepath.Join(skillsDir, s.Name)
+
+		// Clean stale files — only keep files we're about to write
+		writtenPaths := map[string]bool{"SKILL.md": true}
+		for relPath := range skill.GetResources(s.ID) {
+			writtenPaths[relPath] = true
+		}
+		cleanSkillDir(skillDir, writtenPaths)
+
 		if err := os.MkdirAll(skillDir, 0o755); err != nil {
 			return fmt.Errorf("create skill directory %s: %w", s.Name, err)
 		}
@@ -57,7 +65,35 @@ func GenerateSkills(root string) error {
 		if err := os.WriteFile(skillFile, []byte(sb.String()), 0o644); err != nil {
 			return fmt.Errorf("write skill file %s: %w", s.ID, err)
 		}
+
+		// Write reference files
+		for relPath, content := range skill.GetResources(s.ID) {
+			absPath := filepath.Join(skillDir, relPath)
+			if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
+				return fmt.Errorf("create resource directory for %s/%s: %w", s.ID, relPath, err)
+			}
+			if err := os.WriteFile(absPath, []byte(content), 0o644); err != nil {
+				return fmt.Errorf("write resource %s/%s: %w", s.ID, relPath, err)
+			}
+		}
 	}
 
 	return nil
+}
+
+// cleanSkillDir removes files not in keep. Preserves directories that contain kept files.
+func cleanSkillDir(skillDir string, keep map[string]bool) {
+	filepath.WalkDir(skillDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(skillDir, path)
+		if err != nil {
+			return nil
+		}
+		if !keep[rel] {
+			os.Remove(path)
+		}
+		return nil
+	})
 }

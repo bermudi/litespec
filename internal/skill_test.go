@@ -128,6 +128,87 @@ func TestGenerateSkills_MissingTemplate(t *testing.T) {
 	}
 }
 
+func TestGenerateSkills_WritesResourceFiles(t *testing.T) {
+	original := skill.All()
+	originalResources := skill.GetResources("review")
+	defer func() {
+		resetTemplates()
+		for k, v := range original {
+			skill.Register(k, v)
+		}
+	}()
+
+	registerAllTemplates(t)
+
+	root := t.TempDir()
+	if err := GenerateSkills(root); err != nil {
+		t.Fatalf("GenerateSkills: %v", err)
+	}
+
+	// If review has registered resources, verify they exist
+	if originalResources != nil {
+		for relPath := range originalResources {
+			absPath := filepath.Join(root, SkillsDir, "litespec-review", relPath)
+			if _, err := os.Stat(absPath); err != nil {
+				t.Errorf("resource file %s: %v", relPath, err)
+			}
+		}
+	}
+
+	// If workflow has registered resources, verify they exist
+	workflowResources := skill.GetResources("workflow")
+	if workflowResources != nil {
+		for relPath := range workflowResources {
+			absPath := filepath.Join(root, SkillsDir, "litespec-workflow", relPath)
+			if _, err := os.Stat(absPath); err != nil {
+				t.Errorf("resource file %s: %v", relPath, err)
+			}
+		}
+	}
+}
+
+func TestGenerateSkills_CleansStaleResources(t *testing.T) {
+	original := skill.All()
+	defer func() {
+		resetTemplates()
+		for k, v := range original {
+			skill.Register(k, v)
+		}
+	}()
+
+	registerAllTemplates(t)
+
+	root := t.TempDir()
+
+	// Pre-create a stale file in a skill directory
+	staleDir := filepath.Join(root, SkillsDir, Skills[0].Name)
+	if err := os.MkdirAll(staleDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	staleFile := filepath.Join(staleDir, "references", "old.md")
+	if err := os.MkdirAll(filepath.Dir(staleFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(staleFile, []byte("stale"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := GenerateSkills(root); err != nil {
+		t.Fatalf("GenerateSkills: %v", err)
+	}
+
+	// Stale file should have been removed
+	if _, err := os.Stat(staleFile); !os.IsNotExist(err) {
+		t.Error("stale resource file should have been removed")
+	}
+
+	// SKILL.md should still exist
+	skillFile := filepath.Join(staleDir, "SKILL.md")
+	if _, err := os.Stat(skillFile); err != nil {
+		t.Error("SKILL.md should still exist")
+	}
+}
+
 func TestGenerateSkills_ReadonlyDir(t *testing.T) {
 	original := skill.All()
 	defer func() {
