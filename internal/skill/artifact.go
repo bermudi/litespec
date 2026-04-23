@@ -107,10 +107,14 @@ Structure:
 
 Rules:
 - Each phase is a commit boundary — it must leave the codebase in a valid, buildable, test-passing state
-- Size phases by commit coherence, not implementation granularity: "Add parser and validator" is one phase if both touch the same types and the commit "Add delta parsing" makes sense
-- Group tasks that share files, types, and mental model; split when the commit message would become a list ("Add X and fix Y and refactor Z")
 - A valid phase ends with a commit message that describes one thing: 'phase 2: Add delta merge logic'
 - If a phase wouldn't survive 'go build && go test' (or your project's equivalent), it's incomplete — add verification tasks
-- Avoid over-decomposition: fewer, denser phases beat many thin ones, as long as the commit boundary is clean
 - Each task should be a single, verifiable unit of work
-- Tasks should reference specific spec requirements where applicable`
+- Tasks should reference specific spec requirements where applicable
+
+Phase sizing — not too fat, not too thin:
+- **A phase must change behavior.** If it only does cleanup, docs, or test backfill without introducing or modifying functional code, fold it into the phase that created that code. Tests and docs belong with the code they cover.
+- **One sentence without "and."** If the phase name needs "and" to describe what it does, it is probably two phases. "Add delta parser" is one phase. "Add delta parser and wire up validation and update CLI" is three.
+- **Stay within 2–3 packages.** If a phase requires reading and modifying code across more packages than that, the agent will lose context. Split it.
+- **Group by shared files and mental model.** "Add parser and validator" is one phase if both touch the same types. Split when the commit message would become a list.
+- **When in doubt, aim for ~10 files touched and ~500 lines changed.** This is a soft guideline, not a hard rule — but phases bigger than this risk exhausting the agent's context window.`
