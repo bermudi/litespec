@@ -1,6 +1,6 @@
 ---
 name: litespec-review
-description: 'Context-aware review that adapts to change lifecycle: artifact review (pre-implementation), implementation review (during implementation), and pre-archive review (post-implementation). Use when the user wants to review artifacts or implementation, check completeness, or says "review".'
+description: 'Context-aware review that adapts to change lifecycle: artifact review (pre-implementation), implementation review (adversarial + compliance phases), and pre-archive review (adversarial + compliance + build verification). Use when the user wants to review artifacts or implementation, check completeness, or says "review".'
 ---
 
 Enter review mode. You are a QA reviewer, not an implementor. Read specs, read code, find gaps. Report what you can prove.
@@ -70,11 +70,68 @@ Read: proposal.md, specs/, design.md, tasks.md. Do NOT read implementation files
 
 ## Section B: Implementation Review Mode
 
-Use this mode when some but not all tasks are checked. Implementation is in progress. Your job is to compare implemented code against specs — the current review behavior.
+Use this mode when some but not all tasks are checked. Implementation is in progress. Your job is two sequential review phases. **Phase 1 runs first so that adversarial scenario construction is not anchored by compliance findings.**
 
 Read all artifacts AND the implementation files in the codebase.
 
-### Dimensions
+---
+
+### Phase 1: Adversarial Review
+
+Phase 1 deliberately constructs adversarial scenarios to find interaction bugs, missing guards, and wiring gaps. It runs first so that scenario construction is not anchored by compliance findings.
+
+**Phase 1 operates under different rules than Phase 2.** The "prefer false negatives" and "no speculation" rules from Phase 2 are suspended here. You are expected to imagine how state transitions compose, where loops re-read stale state, and where declared code is never wired up. Noise is acceptable — a human will triage. Your job is to surface candidate bugs, not to be certain.
+
+**Skip Phase 1** if the change contains no stateful code paths (pure refactors, documentation, configuration-only changes). State `Phase 1 skipped: no stateful code paths detected` and proceed to Phase 2.
+
+#### Step 1: Enumerate adversarial scenarios (from specs, before reading code in detail)
+
+Before tracing implementation paths, read the specs and enumerate:
+- Every state transition the specs describe (conditions for X → Y)
+- Every place the specs describe multi-entity operations (loops, batches, cascades, bulk processing)
+- Every place the specs describe concurrent access (claims, locks, leases, workers competing for the same resource)
+- Every place the specs describe global guarantees (`across all X`, `in order of Y`, `the first available`)
+
+For each, construct 1–3 worst-case scenarios:
+- What if two of these happen simultaneously?
+- What if one succeeds and a related one fails mid-cascade?
+- What if the precondition changes between the check and the mutation?
+- What if the entity is already in a terminal state when the operation arrives?
+
+Write these down as a numbered list BEFORE tracing implementation code. This is red-team-before-blue-team — generate the adversarial frame from the spec's structure, not from pattern-matching against the code's surface.
+
+#### Step 2: Check each scenario against the implementation
+
+For each numbered adversarial scenario, trace the relevant code paths. Report:
+- **Handled**: code demonstrably prevents the scenario (with `file:line` reference)
+- **Missing**: code does not guard against it (with concrete `file:line` showing the gap)
+- **Uncertain**: can't determine from reading alone
+
+#### Step 3: Check for structural patterns
+
+**Multi-entity loop invariants**: When code iterates over a collection and each iteration mutates shared state, trace what happens if iteration N's state changes are visible to iteration N+1. Does each iteration re-query or re-validate its preconditions, or does it act on stale data from before the loop began?
+
+**State guard completeness**: For every endpoint/handler that transitions an entity's state, check that ALL preconditions are validated — not just the happy-path ones. If endpoint A checks "is lease expired?" and endpoint B transitions the same entity, does endpoint B also check? Enumerate every state-transition endpoint and verify each guards against every invalid current state.
+
+**Wiring completeness**: Are all declared functions/types actually referenced in the control flow? Functions defined in service modules but never called from handlers/routes are implementation gaps. Search for them. Types imported but never used in runtime paths are scaffolding without substance.
+
+**Scope-of-guarantee**: When the spec says "across all X" or describes global ordering/behavior, verify the implementation doesn't implicitly narrow scope to a subset (per-resource, per-file, per-request, per-run).
+
+#### Step 4: Test adequacy
+
+For each spec scenario, ask: would existing tests catch a violation of this scenario's guarantee?
+
+A test that only exercises the happy path does not count. Flag cases where:
+- A spec requirement has no corresponding negative test (invalid input, rejected transition, expired state)
+- A spec scenario is tested in isolation but never in combination with other scenarios that affect the same entity
+- A spec describes a cascade or multi-step interaction but tests only cover single-step cases
+- A state transition has no test for what happens when the entity is already in a terminal state
+
+---
+
+### Phase 2: Compliance Review
+
+Phase 2 reviews implementation for spec compliance, design adherence, and pattern coherence. It applies conservative heuristics — prefer false negatives, flag only what you can prove.
 
 #### Completeness — Is everything that should be there, there?
 
@@ -86,7 +143,7 @@ Read all artifacts AND the implementation files in the codebase.
 
 - **Requirement-to-implementation mapping**: Each `### Requirement:` marker in a spec should map to a concrete code location. If the mapping is missing or the code contradicts the requirement, flag it.
 - **Scenario coverage**: Each `#### Scenario:` in a spec describes expected behavior. Trace through the implementation and confirm the scenario is handled. Missing scenarios are correctness issues.
-- **Edge cases**: Specs often describe edge cases explicitly. Check that the code handles them. Do not invent edge cases the specs do not describe.
+- **Edge cases**: Specs often describe edge cases explicitly. Check that the code handles them. Do not invent edge cases the specs do not describe — that is Phase 1's job.
 
 #### Coherence — Does the implementation fit the system?
 
@@ -94,20 +151,12 @@ Read all artifacts AND the implementation files in the codebase.
 - **Pattern consistency**: Does the new code follow patterns already established in the codebase? Inconsistent error handling, naming, or structure is a coherence issue.
 - **Architectural alignment**: Does the change respect the system's architecture? Cross-layer violations, wrong dependency directions, misplaced abstractions — flag them.
 
-### Heuristics
+#### Heuristics (Phase 2 only)
 
 - **Prefer false negatives.** Only flag what you can verify from reading the code and specs. If you are unsure, do not flag it. A noisy report is worse than a permissive one.
 - **Every issue needs a specific, actionable recommendation.** "Fix this" is not actionable. "Add input validation in `handler.go:42` per spec requirement R-003" is.
 - **Graceful degradation.** If some artifacts are missing (no design.md, incomplete specs), work with what you have. State what was unavailable at the top of the report and exclude dimensions you could not evaluate.
-- **No speculation.** Do not imagine bugs. Do not flag theoretical risks. Only flag concrete, observable gaps between specs and implementation.
-
-### Scorecard
-
-| Dimension     | Pass | Fail | Not Evaluated |
-|---------------|------|------|---------------|
-| Completeness  | N    | N    | N             |
-| Correctness   | N    | N    | N             |
-| Coherence     | N    | N    | N             |
+- **No speculation.** Do not imagine bugs. Do not flag theoretical risks. Only flag concrete, observable gaps between specs and implementation. (Adversarial scenario construction is Phase 1's job.)
 
 ---
 
@@ -117,28 +166,24 @@ Use this mode when all tasks are checked. The change appears complete. Your job 
 
 Read all artifacts AND the implementation files in the codebase.
 
-### Dimensions
-
-Run ALL checks from both Section A and Section B:
-
-- **Artifact completeness, consistency, and readiness** (Section A dimensions)
-- **Implementation completeness, correctness, and coherence** (Section B dimensions)
-
-Additionally check:
+Run both phases from Section B (adversarial first, then compliance), then additionally check:
 
 - **Archive readiness**: Are all delta specs well-formed? Do ADDED/MODIFIED/REMOVED markers reference valid targets? Will the merge produce a consistent canon?
 - **Cross-artifact alignment**: Do the final artifacts accurately describe what was actually implemented? Flag any drift between specs, design, and code.
+- **Build verification**: Can the project build? Run the build command (e.g., `go build ./...`, `npm run build`). A broken build is a CRITICAL issue for pre-archive review. This is the one place where running a command is appropriate — the build must actually succeed, not just appear to.
 
 ### Scorecard
 
-| Dimension       | Pass | Fail | Not Evaluated |
-|-----------------|------|------|---------------|
-| Completeness    | N    | N    | N             |
-| Consistency     | N    | N    | N             |
-| Readiness       | N    | N    | N             |
-| Correctness     | N    | N    | N             |
-| Coherence       | N    | N    | N             |
-| Archive Ready   | N    | N    | N             |
+| Dimension              | Pass | Fail | Not Evaluated |
+|------------------------|------|------|---------------|
+| Interaction Correctness| N    | N    | N             |
+| Test Adequacy          | N    | N    | N             |
+| Completeness           | N    | N    | N             |
+| Consistency            | N    | N    | N             |
+| Readiness              | N    | N    | N             |
+| Correctness            | N    | N    | N             |
+| Coherence              | N    | N    | N             |
+| Archive Ready          | N    | N    | N             |
 
 ---
 
@@ -154,7 +199,25 @@ If any artifacts were unavailable, list them here. State which dimensions could 
 
 State which mode was detected and why (e.g., "Artifact Review: 0 of 6 tasks checked").
 
-### CRITICAL
+### Phase 1: Adversarial Findings
+
+Only present this section for Implementation Review and Pre-Archive Review modes. Skip entirely for Artifact Review.
+
+#### Adversarial Scenarios Enumerated
+
+Numbered list of scenarios from Step 1. Each should be a one-liner: "S1: Two workers claim the same step simultaneously", "S2: Expired lease cascades to blocked steps, but iteration unblocks them", etc.
+
+If Phase 1 was skipped, state `Phase 1 skipped: no stateful code paths detected`.
+
+#### CRITICAL / WARNING / SUGGESTION
+
+Issues found during adversarial review. Same format as Phase 2 findings.
+
+Tag each issue with the scenario number it relates to, when applicable (e.g., "S2: Missing state guard on...").
+
+### Phase 2: Compliance Findings
+
+#### CRITICAL
 
 Issues that mean the implementation is wrong or the artifacts have fundamental gaps. Each issue:
 
@@ -163,17 +226,27 @@ Issues that mean the implementation is wrong or the artifacts have fundamental g
 - **Location**: `file:line` reference
 - **Recommendation**: Specific, actionable fix
 
-### WARNING
+#### WARNING
 
 Issues that are likely wrong but require human judgment. Missing coverage, partial implementations, unclear mappings, vague scenarios. Same format as CRITICAL.
 
-### SUGGESTION
+#### SUGGESTION
 
 Improvements that would strengthen the artifacts or implementation but are not strictly required. Pattern alignment, consistency nudges, additional scenarios. Same format.
 
 ### Scorecard
 
 Use the scorecard table from the applicable mode section.
+
+For Implementation Review, use:
+
+| Dimension              | Pass | Fail | Not Evaluated |
+|------------------------|------|------|---------------|
+| Interaction Correctness| N    | N    | N             |
+| Test Adequacy          | N    | N    | N             |
+| Completeness           | N    | N    | N             |
+| Correctness            | N    | N    | N             |
+| Coherence              | N    | N    | N             |
 
 ---
 

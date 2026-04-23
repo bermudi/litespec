@@ -65,7 +65,7 @@ No backward flow. If something is wrong after propose, start over from explore/g
 | `propose` | Materializes | Creates change dir + proposal + specs + design + tasks (all at once). This is the commit point. |
 | `research` | Knowledge-gathering | Reads artifacts, identifies knowledge gaps, gathers docs/APIs/schemas, produces research skills into `.agents/skills/research-<topic>/`. Uses skill-creator conventions for formatting. |
 | `apply` | Phase-based | Implements tasks per phase in `tasks.md`. One phase per invocation. AI focuses on one area without doing the whole implementation at once. Consumes research skills via natural discovery. |
-| `review` | AI review | Context-aware review that adapts to change lifecycle: artifact review (0 tasks checked — evaluates planning artifacts for quality, consistency, readiness), implementation review (some tasks checked — compares code against specs), pre-archive review (all tasks checked — reviews both artifacts and code comprehensively before archiving). Pure AI review — no test/lint running. |
+| `review` | AI review | Context-aware review that adapts to change lifecycle: artifact review (0 tasks checked — evaluates planning artifacts), implementation review (some tasks checked — runs adversarial review then compliance review), pre-archive review (all tasks checked — adversarial + compliance + archive readiness + build verification). Adversarial review runs first to avoid anchoring bias. Pure AI review — no test/lint running (except build verification in pre-archive mode). |
 | `adopt` | Reverse-engineer | Takes a file/directory path. Generates a change proposal with specs from existing code. For code that has no spec yet. |
 
 ## Tasks (Phased)

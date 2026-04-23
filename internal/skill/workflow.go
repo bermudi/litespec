@@ -19,7 +19,7 @@ explore → grill → propose → [research →] apply → review → archive
 **propose** — Materialize the change. Creates proposal.md, specs/, design.md, tasks.md.
 **research** — Gather external knowledge (APIs, libraries, schemas). Produces research skills. Optional.
 **apply** — Implement one phase at a time. One session per phase, one commit per phase.
-**review** — Context-aware review: artifacts (pre-impl), code vs specs (during), both (pre-archive).
+**review** — Adversarial + compliance review: artifacts only (pre-impl), adversarial then compliance (during), adversarial + compliance + build verification (pre-archive).
 **archive** — Apply deltas to canonical specs and move the change to archive. The commit to implemented.
 **adopt** — Reverse-engineer specs from existing code. Separate path, does not use propose/apply.
 
@@ -109,6 +109,6 @@ Example:
 
 **"What is research for?"** — External knowledge gaps. Skip it if you know the APIs/libraries cold.
 
-**"When do I review?"** — Three times: after propose (artifacts), during apply (code vs specs), before archive (both). The review skill adapts automatically.
+**"When do I review?"** — Three times: after propose (artifacts), during apply (adversarial + compliance), before archive (adversarial + compliance + build verification). The review skill adapts automatically.
 
 **"What is adopt?"** — A separate path. Give it code, it reverse-engineers specs. No propose, no apply, no archive.`

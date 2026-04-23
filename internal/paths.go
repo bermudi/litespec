@@ -41,7 +41,7 @@ var Skills = []SkillInfo{
 	{
 		ID:          "review",
 		Name:        "litespec-review",
-		Description: "Context-aware review that adapts to change lifecycle: artifact review (pre-implementation), implementation review (during implementation), and pre-archive review (post-implementation). Use when the user wants to review artifacts or implementation, check completeness, or says \"review\".",
+		Description: "Context-aware review that adapts to change lifecycle: artifact review (pre-implementation), implementation review (adversarial + compliance phases), and pre-archive review (adversarial + compliance + build verification). Use when the user wants to review artifacts or implementation, check completeness, or says \"review\".",
 	},
 	{
 		ID:          "apply",

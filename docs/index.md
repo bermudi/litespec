@@ -48,7 +48,7 @@ explore → grill → propose → [research →] apply → review → archive
 | `explore` | Ephemeral thinking. No artifacts. Conversational. |
 | `grill` | Relentless Q&A. Resolves every branch of the design tree before moving on. |
 | `propose` | Materializes everything: change dir, proposal, specs, design, tasks. This is the commit point. |
-| `review` | Context-aware AI review. Adapts to change lifecycle. |
+| `review` | Context-aware AI review. Adapts to change lifecycle — adversarial review first (interaction bugs, missing guards, wiring gaps, test adequacy), then compliance review (spec mapping, design adherence). |
 | `apply` | Implements tasks per phase. One phase per invocation. |
 | `adopt` | Reverse-engineers specs from existing code. Separate path. |
 | `archive` | Applies delta operations, moves change to archive. |

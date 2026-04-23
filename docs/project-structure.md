@@ -207,7 +207,7 @@ AI skills are generated into `.agents/skills/` — this is the canonical locatio
 ├── litespec-explore/           # Thinking mode
 ├── litespec-grill/             # Relentless Q&A
 ├── litespec-propose/           # Create change + artifacts
-├── litespec-review/            # Context-aware review
+├── litespec-review/            # Adversarial + compliance review
 ├── litespec-apply/             # Implement one phase
 └── litespec-adopt/             # Reverse-engineer from code
 ```

@@ -322,10 +322,11 @@ After implementation, run review to check code against specs:
 $ litespec review add-rate-limiting
 ```
 
-The AI reads all artifacts and the implemented code, comparing:
-- Every spec requirement maps to concrete implementation
-- Every scenario is handled
-- Design decisions are followed
+The AI reads all artifacts and the implemented code, running two phases:
+
+**Phase 1 (Adversarial):** Enumerates failure scenarios from the specs (state transitions, concurrent access, cascading failures), then traces each against the code. Checks for interaction bugs, missing guards, unwired declarations, and test adequacy.
+
+**Phase 2 (Compliance):** Maps every spec requirement to code, verifies scenarios are handled, checks design adherence and pattern consistency.
 
 It reports:
 ```
@@ -333,11 +334,13 @@ It reports:
 Implementation Review: 10/14 tasks checked
 
 ### Scorecard
-| Dimension     | Pass | Fail | Not Evaluated |
-|---------------|------|------|---------------|
-| Completeness  | ✓    |      |              |
-| Correctness   | ✓    |      |              |
-| Coherence     | ✓    |      |              |
+| Dimension              | Pass | Fail | Not Evaluated |
+|------------------------|------|------|---------------|
+| Interaction Correctness| ✓    |      |              |
+| Test Adequacy          | ✓    |      |              |
+| Completeness           | ✓    |      |              |
+| Correctness            | ✓    |      |              |
+| Coherence              | ✓    |      |              |
 ```
 
 No issues. The implementation matches the specs.

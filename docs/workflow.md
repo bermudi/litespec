@@ -85,10 +85,12 @@ Each step has a clear purpose and produces specific artifacts. Choose the right 
 
 **What the AI does:** Detects task completion state and chooses an appropriate review:
 - **Artifact review** (0 tasks checked): Evaluates proposal, specs, design, tasks for quality, consistency, and readiness
-- **Implementation review** (some tasks checked): Compares implemented code against specs
-- **Pre-archive review** (all tasks checked): Comprehensive review of both artifacts and code
+- **Implementation review** (some tasks checked): Runs two phases — adversarial review first (constructs failure scenarios from specs, then traces them against code for interaction bugs, missing guards, wiring gaps, and test adequacy), then compliance review (spec compliance, design adherence, pattern coherence)
+- **Pre-archive review** (all tasks checked): Runs both phases from implementation review, plus archive readiness and build verification
 
-**Artifacts created:** Review report with CRITICAL, WARNING, SUGGESTION findings
+**Why adversarial first:** Phase 1 constructs adversarial scenarios from the spec structure before reading implementation code. This avoids anchoring bias — once a reviewer has traced code and formed a "this looks basically fine" mental model, it's harder to generate adversarial scenarios. Running adversarial review first means failure scenarios come from the spec, not from pattern-matching against the code.
+
+**Artifacts created:** Review report with Phase 1 (adversarial) findings and Phase 2 (compliance) findings, each with CRITICAL, WARNING, SUGGESTION categories
 
 **When to use:** Before starting implementation (artifact review), during implementation (implementation review), or before archiving (pre-archive review).
 
