@@ -43,6 +43,17 @@ litespec archive add-feature
 - **Read-only CLI** — the AI never writes through the CLI. It writes artifact files directly.
 - **Dangling delta detection** — catches broken deltas during `validate`, not just at archive time.
 
+## Contributing
+
+```bash
+git clone https://github.com/bermudi/litespec.git
+cd litespec
+go build ./cmd/litespec
+./litespec update    # generate skills into .agents/skills/
+```
+
+Skills are generated from Go templates in `internal/skill/` — they're not tracked in git. Run `litespec update` after cloning and after any template changes.
+
 ## Status
 
 This is an active experiment. Decisions made yesterday may be revised today if we find something better.
