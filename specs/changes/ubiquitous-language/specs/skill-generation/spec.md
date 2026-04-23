@@ -1,0 +1,91 @@
+# skill-generation
+
+## ADDED Requirements
+
+### Requirement: Glossary Skill Template
+
+The `Skills` list in `internal/paths.go` MUST include a `glossary` skill entry with ID "glossary", name "litespec-glossary", and a description indicating it manages the project's ubiquitous language. A corresponding Go template MUST be registered in `internal/skill/glossary.go` via `init()`. The template SHALL instruct the AI to read `specs/glossary.md`, propose new terms when it encounters undefined concepts, and maintain consistent formatting.
+
+#### Scenario: Glossary skill is generated
+
+- **WHEN** `litespec update` is run
+- **THEN** `.agents/skills/litespec-glossary/SKILL.md` is generated with valid frontmatter and glossary management instructions
+
+#### Scenario: Glossary skill appears in skill list
+
+- **WHEN** `litespec list --json` is run or `Skills` is inspected
+- **THEN** a skill with ID "glossary" and name "litespec-glossary" is present
+
+#### Scenario: Glossary skill handles missing glossary file
+
+- **WHEN** the glossary skill is invoked and `specs/glossary.md` does not exist
+- **THEN** the skill offers to create and seed the glossary file
+
+### Requirement: Apply Skill Glossary Reference
+
+The apply skill template SHALL include a passive reference to `specs/glossary.md` in a references section. The agent MAY consult the glossary for terminology after completing a phase. No enforcement, no nudge — purely optional context.
+
+#### Scenario: Apply skill references glossary
+
+- **WHEN** the apply skill template is rendered
+- **THEN** it contains a reference to `specs/glossary.md` as optional terminology context, without enforcement directives
+
+## MODIFIED Requirements
+
+### Requirement: Skill Templates Reference Backlog
+
+The skill templates for explore, propose, review, and grill SHALL include a prompt instructing the AI to read `specs/backlog.md` if it exists. The prompt SHALL be a single directive within each skill template, not programmatic integration. The explore skill SHALL read backlog for session context and SHALL read `specs/glossary.md` at session start to establish shared vocabulary, nudging the user when it encounters terms that should be defined. If no glossary exists, the explore skill SHALL suggest creating one when stable terms emerge. The propose skill SHALL suggest graduating backlog items when a proposal materializes one and SHALL check whether new terms introduced in the proposal exist in the glossary, offering to update it. The review skill SHALL suggest adding deferred scope to the backlog. The grill skill SHALL reference backlog items to challenge scope boundaries and SHALL read `specs/glossary.md` at session start, nudging when new terms emerge during the grilling process.
+
+#### Scenario: Explore skill reads backlog
+
+- **WHEN** the explore skill template is rendered
+- **THEN** it contains a directive to read `specs/backlog.md` for context on parked items
+
+#### Scenario: Explore skill reads glossary
+
+- **WHEN** the explore skill template is rendered
+- **THEN** it contains a directive to read `specs/glossary.md` if it exists at session start and nudge when undefined terms are encountered
+
+#### Scenario: Explore skill degrades without glossary
+
+- **WHEN** the explore skill template is rendered
+- **THEN** it contains a directive to suggest creating `specs/glossary.md` when stable terms emerge and no glossary exists
+
+#### Scenario: Propose skill suggests graduation
+
+- **WHEN** the propose skill template is rendered
+- **THEN** it contains a directive to check if the proposal materializes a backlog item and suggest removing it
+
+#### Scenario: Propose skill checks glossary
+
+- **WHEN** the propose skill template is rendered
+- **THEN** it contains a directive to check whether new terms are in `specs/glossary.md` and offer to update it
+
+#### Scenario: Review skill suggests deferral
+
+- **WHEN** the review skill template is rendered
+- **THEN** it contains a directive to suggest adding deferred scope to `specs/backlog.md`
+
+#### Scenario: Grill skill challenges scope
+
+- **WHEN** the grill skill template is rendered
+- **THEN** it contains a directive to read backlog and challenge scope overlaps
+
+#### Scenario: Grill skill reads glossary
+
+- **WHEN** the grill skill template is rendered
+- **THEN** it contains a directive to read `specs/glossary.md` if it exists at session start and nudge when new terms emerge
+
+### Requirement: Skill Generation Tests
+
+The `internal/skill/` package SHALL have test coverage for template registration, frontmatter marshaling, and the skill-to-skill consistency of generated output. Tests SHALL use standard Go testing patterns. The expected skill list in tests MUST NOT include `continue`, MUST NOT include `archive`, and MUST use `review` instead of `verify`.
+
+#### Scenario: Tests SHALL verify template registration
+
+- **WHEN** `go test ./internal/skill/` is run
+- **THEN** tests SHALL verify that `Get` returns non-empty content for all known skill IDs (explore, grill, propose, review, apply, adopt, glossary)
+
+#### Scenario: Tests SHALL verify frontmatter format
+
+- **WHEN** `go test ./internal/skill/` is run
+- **THEN** tests SHALL verify that generated skill files contain valid YAML frontmatter with name and description fields
