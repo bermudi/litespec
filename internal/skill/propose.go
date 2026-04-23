@@ -109,6 +109,8 @@ Rules:
 
 **Backlog graduation:** If ` + "`specs/backlog.md`" + ` exists, check whether this proposal materializes a backlog item. If so, suggest removing it from the backlog.
 
+**Glossary check:** After writing specs, check whether the specs introduce terms that aren't in ` + "`specs/glossary.md`" + `. If so, offer to update the glossary with the new terms. If no glossary exists and the proposal introduces stable shared terms, offer to seed one.
+
 ---
 
 ## What You Are Doing

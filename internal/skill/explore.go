@@ -61,6 +61,8 @@ This tells you if there are active changes and what the user might be working on
 
 **Backlog awareness:** If ` + "`specs/backlog.md`" + ` exists, read it for context on parked items and open questions before diving in.
 
+**Glossary awareness:** If ` + "`specs/glossary.md`" + ` exists, read it to establish shared vocabulary before the conversation starts. When a concept surfaces during exploration that seems foundational but isn't in the glossary, offer: "This looks like a term that should live in the glossary — want me to add it?" If no glossary exists, suggest creating one when stable terms emerge.
+
 ### When no change exists
 Think freely. When insights crystallize, offer to proceed to grill or create a proposal. No pressure.
 

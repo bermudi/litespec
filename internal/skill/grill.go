@@ -18,4 +18,6 @@ When a locked architectural ruling emerges that is broader than the current chan
 
 **Backlog scope challenge:** If ` + "`specs/backlog.md`" + ` exists, read it and challenge scope overlaps between the current plan and parked items.
 
+**Glossary awareness:** If ` + "`specs/glossary.md`" + ` exists, read it at session start to speak the same language as the project. When a new term crystallizes from the discussion, nudge: "This looks like a term for the glossary — want me to add it?"
+
 When the plan is fully resolved, offer to proceed to propose.`

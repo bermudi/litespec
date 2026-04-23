@@ -65,4 +65,10 @@ After completing a phase, report:
 - Any issues or notes surfaced during implementation
 - That the user can re-invoke apply for the next phase
 
-Do not offer to start the next phase yourself. One phase. Stop.`
+Do not offer to start the next phase yourself. One phase. Stop.
+
+---
+
+## References
+
+` + "`" + `specs/glossary.md` + "`" + ` — the project's ubiquitous language. You may consult it for terminology after completing a phase. No enforcement, purely optional context.`

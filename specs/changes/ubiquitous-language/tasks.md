@@ -10,11 +10,11 @@
 
 ## Phase 2: Skill Integration
 
-- [ ] Update explore template in `internal/skill/explore.go`: add glossary read at session start in "Litespec Awareness" section, add nudge behavior for undefined terms
-- [ ] Update grill template in `internal/skill/grill.go`: add glossary read at session start, add nudge for new terms during grilling
-- [ ] Update propose template in `internal/skill/propose.go`: add glossary check after specs are written, offer to update with new terms
-- [ ] Update apply template in `internal/skill/apply.go`: add passive glossary reference in a "References" section at the end
-- [ ] Run `go build ./cmd/litespec/` and `./litespec update` to regenerate skills, verify generated SKILL.md files contain glossary directives
+- [x] Update explore template in `internal/skill/explore.go`: add glossary read at session start in "Litespec Awareness" section, add nudge behavior for undefined terms
+- [x] Update grill template in `internal/skill/grill.go`: add glossary read at session start, add nudge for new terms during grilling
+- [x] Update propose template in `internal/skill/propose.go`: add glossary check after specs are written, offer to update with new terms
+- [x] Update apply template in `internal/skill/apply.go`: add passive glossary reference in a "References" section at the end
+- [x] Run `go build ./cmd/litespec/` and `./litespec update` to regenerate skills, verify generated SKILL.md files contain glossary directives
 
 ## Phase 3: Docs and Housekeeping
 
