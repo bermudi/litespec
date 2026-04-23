@@ -90,6 +90,10 @@ func run() error {
 func printUsage() {
 	fmt.Print(`Usage: litespec <command> [options]
 
+Workflow:
+  explore → grill → propose → apply → archive
+  Thinking → stress-test → materialize → implement → commit to specs
+
 Commands:
   init [--tools <ids>]                                        Initialize project structure
   new <name>                                                  Create a new change
