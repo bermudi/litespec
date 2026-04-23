@@ -338,6 +338,7 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 
 func hasPhaseHeading(content string) bool {
 	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSuffix(line, "\r")
 		if strings.HasPrefix(strings.TrimSpace(line), "## Phase") {
 			return true
 		}
@@ -354,7 +355,8 @@ func validateTasksChecklist(content string) []string {
 	phaseName := ""
 
 	for _, line := range strings.Split(content, "\n") {
-		trimmed := strings.TrimSpace(line)
+		trimmed := strings.TrimSuffix(line, "\r")
+		trimmed = strings.TrimSpace(trimmed)
 		if strings.HasPrefix(trimmed, "## Phase") {
 			if inPhase && !hasCheckbox {
 				problems = append(problems, fmt.Sprintf("phase %q has no checklist items (- [ ])", phaseName))

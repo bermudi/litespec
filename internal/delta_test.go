@@ -4,6 +4,42 @@ import (
 	"testing"
 )
 
+func TestParseMainSpec_CRLFLineEndings(t *testing.T) {
+	input := "# auth\r\n\r\n## Requirements\r\n\r\n### Requirement: Login\r\nThe system SHALL authenticate.\r\n\r\n#### Scenario: Valid creds\r\n- **WHEN** correct\r\n- **THEN** token\r\n"
+
+	spec, err := ParseMainSpec(input)
+	if err != nil {
+		t.Fatalf("ParseMainSpec: %v", err)
+	}
+	if spec.Capability != "auth" {
+		t.Errorf("Capability = %q, want %q", spec.Capability, "auth")
+	}
+	if len(spec.Requirements) != 1 {
+		t.Fatalf("Requirements count = %d, want 1", len(spec.Requirements))
+	}
+	if spec.Requirements[0].Name != "Login" {
+		t.Errorf("Name = %q, want %q", spec.Requirements[0].Name, "Login")
+	}
+}
+
+func TestParseDeltaSpec_CRLFLineEndings(t *testing.T) {
+	input := "# auth\r\n\r\n## ADDED Requirements\r\n\r\n### Requirement: Rate Limiting\r\nThe system SHALL limit requests.\r\n\r\n#### Scenario: Exceeds limit\r\n- **WHEN** too many\r\n- **THEN** return 429\r\n"
+
+	delta, err := ParseDeltaSpec(input)
+	if err != nil {
+		t.Fatalf("ParseDeltaSpec: %v", err)
+	}
+	if delta.Capability != "auth" {
+		t.Errorf("Capability = %q, want %q", delta.Capability, "auth")
+	}
+	if len(delta.Requirements) != 1 {
+		t.Fatalf("Requirements count = %d, want 1", len(delta.Requirements))
+	}
+	if delta.Requirements[0].Name != "Rate Limiting" {
+		t.Errorf("Name = %q, want %q", delta.Requirements[0].Name, "Rate Limiting")
+	}
+}
+
 func TestParseMainSpecWithScenarios(t *testing.T) {
 	input := `# auth
 

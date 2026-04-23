@@ -315,6 +315,33 @@ func containsStr(s, sub string) bool {
 	return len(s) >= len(sub) && searchStr(s, sub)
 }
 
+func TestParseDecision_CRLFLineEndings(t *testing.T) {
+	content := "# Single Shared Workspace\r\n\r\n## Status\r\n\r\naccepted\r\n\r\n## Context\r\n\r\nWe need a workspace model.\r\n\r\n## Decision\r\n\r\nOne workspace per agent.\r\n\r\n## Consequences\r\n\r\nSimplifies state management.\r\n"
+
+	dir := t.TempDir()
+	writeDecisionFile(t, dir, "0001-crlf-test.md", content)
+
+	d, err := ParseDecision(filepath.Join(dir, "0001-crlf-test.md"))
+	if err != nil {
+		t.Fatalf("ParseDecision: %v", err)
+	}
+	if d.Title != "Single Shared Workspace" {
+		t.Errorf("Title = %q, want %q", d.Title, "Single Shared Workspace")
+	}
+	if d.Status != StatusAccepted {
+		t.Errorf("Status = %q, want %q", d.Status, StatusAccepted)
+	}
+	if d.Context == "" {
+		t.Error("Context is empty")
+	}
+	if d.Decision == "" {
+		t.Error("Decision is empty")
+	}
+	if d.Consequences == "" {
+		t.Error("Consequences is empty")
+	}
+}
+
 func searchStr(s, sub string) bool {
 	for i := 0; i <= len(s)-len(sub); i++ {
 		if s[i:i+len(sub)] == sub {

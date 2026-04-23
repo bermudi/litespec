@@ -1971,3 +1971,18 @@ func TestValidateDecisionsJSONShape(t *testing.T) {
 		t.Errorf("Summary.Decisions = %d, want 1", json.Summary.Decisions)
 	}
 }
+
+func TestHasPhaseHeading_CRLFLineEndings(t *testing.T) {
+	content := "## Phase 1: Setup\r\n\r\n- [x] Task one\r\n"
+	if !hasPhaseHeading(content) {
+		t.Error("expected CRLF phase heading to be detected")
+	}
+}
+
+func TestValidateTasksChecklist_CRLFLineEndings(t *testing.T) {
+	content := "## Phase 1: Setup\r\n\r\n- [x] Done\r\n- [ ] Todo\r\n"
+	problems := validateTasksChecklist(content)
+	if len(problems) != 0 {
+		t.Errorf("expected no problems with CRLF tasks, got %v", problems)
+	}
+}

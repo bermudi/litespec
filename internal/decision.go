@@ -165,6 +165,7 @@ func FindDecisionBySlug(root, slug string) (*Decision, error) {
 
 func extractH1(content string) string {
 	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSuffix(line, "\r")
 		if strings.HasPrefix(line, "# ") && !strings.HasPrefix(line, "## ") {
 			return strings.TrimSpace(strings.TrimPrefix(line, "# "))
 		}
@@ -178,6 +179,7 @@ func splitH2Sections(content string) map[string]string {
 	var buf strings.Builder
 
 	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSuffix(line, "\r")
 		if strings.HasPrefix(line, "## ") && !strings.HasPrefix(line, "### ") {
 			if current != "" {
 				sections[current] = strings.TrimSpace(buf.String())
@@ -214,6 +216,7 @@ func parseSlugList(content string) []string {
 	}
 	var slugs []string
 	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSuffix(line, "\r")
 		line = strings.TrimSpace(line)
 		if slugListItemRe.MatchString(line) {
 			slug := strings.TrimSpace(strings.TrimPrefix(line, "-"))

@@ -9,6 +9,10 @@ func ParseMainSpec(content string) (*Spec, error) {
 	spec := &Spec{}
 	lines := strings.Split(content, "\n")
 
+	for i := range lines {
+		lines[i] = strings.TrimSuffix(lines[i], "\r")
+	}
+
 	type sectionState int
 	const (
 		statePreamble sectionState = iota
@@ -133,6 +137,10 @@ func ParseMainSpec(content string) (*Spec, error) {
 func ParseDeltaSpec(content string) (*DeltaSpec, error) {
 	delta := &DeltaSpec{}
 	lines := strings.Split(content, "\n")
+
+	for i := range lines {
+		lines[i] = strings.TrimSuffix(lines[i], "\r")
+	}
 
 	opSections := map[string]DeltaOperation{
 		"## ADDED Requirements":    DeltaAdded,
