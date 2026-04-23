@@ -52,6 +52,11 @@ var Skills = []SkillInfo{
 		Name:        "litespec-adopt",
 		Description: "Reverse-engineer specs from existing code. Use when the user provides a file or directory path to document, wants to spec existing code, or says \"adopt\".",
 	},
+	{
+		ID:          "workflow",
+		Name:        "litespec-workflow",
+		Description: "Explain the litespec workflow and determine the user's current phase. Use when the user asks how litespec works, what the workflow is, what to do next, or says \"workflow\".",
+	},
 }
 
 var Adapters = []ToolAdapter{

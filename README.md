@@ -37,7 +37,7 @@ litespec archive add-feature
 ## What Makes litespec Different
 
 - **Convention over configuration** — zero config files. All defaults.
-- **Unidirectional workflow** — `explore → grill → propose → review → apply → review → archive`. No backward flow.
+- **Unidirectional workflow** — `explore → grill → propose → [research →] apply → review → archive`. No backward flow.
 - **Lean skills** — minimal tokens, zero boilerplate.
 - **Git-native** — specs live in your repo. Branch per change, per-phase commits.
 - **Read-only CLI** — the AI never writes through the CLI. It writes artifact files directly.

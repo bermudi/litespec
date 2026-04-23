@@ -3,7 +3,7 @@
 The litespec workflow is unidirectional — you move forward through phases, never backward. This design prevents the "drifting proposal" problem where plans and implementation get out of sync.
 
 ```
-explore → grill → propose → review → apply → review → archive
+explore → grill → propose → [research →] apply → review → archive
                                           │
                                       adopt (separate path)
 ```
@@ -148,7 +148,7 @@ You can also pass `--allow-incomplete` to bypass the task-completion check.
 
 ### Exploratory Pattern
 
-**Flow:** explore → grill → propose → review → apply → review → archive
+**Flow:** explore → grill → propose → [research →] apply → review → archive
 
 **When to use:** Complex features, architectural changes, or anything with significant uncertainty.
 
@@ -185,7 +185,7 @@ No → How much uncertainty do you have?
 │
 ├─ Zero → Use Quick Feature (propose → review → apply → review → archive)
 │
-└─ Some or a lot → Use Exploratory (explore → grill → propose → review → apply → review → archive)
+└─ Some or a lot → Use Exploratory (explore → grill → propose → [research →] apply → review → archive)
 ```
 
 **Guidelines:**

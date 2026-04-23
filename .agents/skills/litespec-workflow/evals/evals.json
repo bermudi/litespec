@@ -1,0 +1,20 @@
+{
+  "skill_name": "litespec-workflow",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "how does litespec work?",
+      "expected_output": "Explains the unidirectional workflow (explore → grill → propose → apply → archive) with phase descriptions"
+    },
+    {
+      "id": 2,
+      "prompt": "what do I do next?",
+      "expected_output": "Detects project state via litespec commands, identifies current phase, and gives exact next step"
+    },
+    {
+      "id": 3,
+      "prompt": "I proposed a change but realized the scope is wrong. Can I just edit the proposal?",
+      "expected_output": "Explains no backward flow - must start over from explore/grill"
+    }
+  ]
+}

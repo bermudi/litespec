@@ -1,18 +1,17 @@
-package skill
+---
+name: litespec-workflow
+description: Explain the litespec workflow and determine the user's current phase. Use when the user asks how litespec works, what the workflow is, what to do next, or says "workflow".
+---
 
-func init() {
-	Register("workflow", workflowTemplate)
-}
-
-const workflowTemplate = `Explain the litespec workflow and determine the user's current phase.
+Explain the litespec workflow and determine the user's current phase.
 
 **The workflow is unidirectional:**
 
-` + "```" + `
+```
 explore → grill → propose → [research →] apply → review → archive
                                           │
                                       adopt (separate path)
-` + "```" + `
+```
 
 **explore** — Think freely. No artifacts, no change directory. Read code, ask questions, map architecture. Never implement.
 **grill** — Stress-test a plan. Relentless Q&A on tradeoffs, risks, edge cases. No artifacts.
@@ -46,10 +45,10 @@ Do not dump the full workflow on the user. Detect their current state and explai
 
 Run these commands silently:
 
-` + "```bash" + `
+```bash
 litespec list --json
 litespec status --json
-` + "```" + `
+```
 
 **Interpreting litespec list --json:**
 - changes[].status: "in-progress" = active, "complete" = ready to archive
@@ -111,4 +110,4 @@ Example:
 
 **"When do I review?"** — Three times: after propose (artifacts), during apply (code vs specs), before archive (both). The review skill adapts automatically.
 
-**"What is adopt?"** — A separate path. Give it code, it reverse-engineers specs. No propose, no apply, no archive.`
+**"What is adopt?"** — A separate path. Give it code, it reverse-engineers specs. No propose, no apply, no archive.

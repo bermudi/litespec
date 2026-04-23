@@ -12,7 +12,7 @@ The CLI is a read-only context provider. The AI writes artifacts directly. lites
 
 **Convention over configuration** — zero config files. All defaults, all the time. No stub `config.yaml` to fill in — it works out of the box.
 
-**Unidirectional workflow** — `explore → grill → propose → review → apply → review → archive`. No going backward. If something's wrong after propose, start over. This prevents partial states and confusion.
+**Unidirectional workflow** — `explore → grill → propose → [research →] apply → review → archive`. No going backward. If something's wrong after propose, start over. This prevents partial states and confusion.
 
 **Lean skills** — minimal tokens, zero boilerplate. Each skill is focused instructions, not pages of boilerplate that waste your AI context.
 
@@ -38,7 +38,7 @@ The CLI is a read-only context provider. The AI writes artifacts directly. lites
 ## The workflow
 
 ```
-explore → grill → propose → review → apply → review → archive
+explore → grill → propose → [research →] apply → review → archive
                                           │
                                       adopt (separate path)
 ```
@@ -65,7 +65,7 @@ litespec init
 litespec new add-user-auth
 
 # See what's going on
-litespec status --change add-user-auth
+litespec status add-user-auth
 
 # Check everything is valid
 litespec validate
