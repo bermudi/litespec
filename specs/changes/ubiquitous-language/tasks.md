@@ -2,11 +2,11 @@
 
 ## Phase 1: Glossary Artifact and Skill
 
-- [ ] Create `specs/glossary.md` with initial project terms seeded from AGENTS.md and DESIGN.md (canon, change, delta, archive, phase, skill, artifact, spec, scenario, proposal, design, tasks)
-- [ ] Add `glossary` entry to `Skills` slice in `internal/paths.go`
-- [ ] Create `internal/skill/glossary.go` with glossary skill template registered via `init()`
-- [ ] Update expected skill IDs in `internal/skill/skill_test.go` to include "glossary"
-- [ ] Run `go test ./internal/skill/` and `go build ./cmd/litespec/` to verify
+- [x] Create `specs/glossary.md` with initial project terms seeded from AGENTS.md and DESIGN.md (canon, change, delta, archive, phase, skill, artifact, spec, scenario, proposal, design, tasks)
+- [x] Add `glossary` entry to `Skills` slice in `internal/paths.go`
+- [x] Create `internal/skill/glossary.go` with glossary skill template registered via `init()`
+- [x] Update expected skill IDs in `internal/skill/skill_test.go` to include "glossary"
+- [x] Run `go test ./internal/skill/` and `go build ./cmd/litespec/` to verify
 
 ## Phase 2: Skill Integration
 

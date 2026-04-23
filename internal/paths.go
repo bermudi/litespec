@@ -58,6 +58,11 @@ var Skills = []SkillInfo{
 		Name:        "litespec-workflow",
 		Description: "Explain the litespec workflow and determine the user's current phase. Use when the user asks how litespec works, what the workflow is, what to do next, or says \"workflow\".",
 	},
+	{
+		ID:          "glossary",
+		Name:        "litespec-glossary",
+		Description: "Manage the project's ubiquitous language in specs/glossary.md. Use when the user wants to review, update, or seed the project glossary, or says \"glossary\".",
+	},
 }
 
 var Adapters = []ToolAdapter{

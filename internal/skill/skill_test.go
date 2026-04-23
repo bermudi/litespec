@@ -7,7 +7,7 @@ import (
 func TestGet_ReturnsNonEmptyForKnownIDs(t *testing.T) {
 	knownIDs := []string{
 		"explore", "grill", "propose", "review",
-		"apply", "adopt",
+		"apply", "adopt", "glossary",
 		"artifact-proposal", "artifact-specs",
 		"artifact-design", "artifact-tasks",
 	}
