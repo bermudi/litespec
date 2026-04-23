@@ -98,6 +98,25 @@ func cmdView(args []string) error {
 		fmt.Printf("  ● Decisions: %d/%d\n", activeDec, len(decisions))
 	}
 
+	backlog, _ := internal.ParseBacklog(internal.BacklogPath(root))
+	if backlog != nil {
+		var parts []string
+		if backlog.Deferred > 0 {
+			parts = append(parts, formatCount(backlog.Deferred, "deferred"))
+		}
+		if backlog.OpenQuestions > 0 {
+			parts = append(parts, formatCount(backlog.OpenQuestions, "open questions"))
+		}
+		if backlog.Future > 0 {
+			parts = append(parts, formatCount(backlog.Future, "future"))
+		}
+		line := "  ● Backlog: " + strings.Join(parts, ", ")
+		if backlog.Other > 0 {
+			line += " — " + formatCount(backlog.Other, "other")
+		}
+		fmt.Println(line)
+	}
+
 	if len(active) > 0 {
 		fmt.Println()
 		fmt.Println("Active Changes")
@@ -194,6 +213,13 @@ func cmdView(args []string) error {
 	fmt.Println(sep)
 	fmt.Printf("\nUse litespec list --changes or litespec list --specs for detailed views\n")
 	return nil
+}
+
+func formatCount(n int, label string) string {
+	if n == 1 {
+		return fmt.Sprintf("%d %s", n, label)
+	}
+	return fmt.Sprintf("%d %s", n, label)
 }
 
 func formatTimestamps(c internal.ChangeInfo) string {
