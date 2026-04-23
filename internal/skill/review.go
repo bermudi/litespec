@@ -26,6 +26,13 @@ Read every artifact: proposal.md, specs/, design.md, tasks.md. All are in ` + "`
 - **Some but not all checked** → **Implementation Review** — Read ` + "`references/adversarial-review.md`" + ` then ` + "`references/compliance-review.md`" + ` (adversarial first to avoid anchoring)
 - **All checked** → **Pre-Archive Review** — Read ` + "`references/adversarial-review.md`" + `, then ` + "`references/compliance-review.md`" + `, then ` + "`references/pre-archive-review.md`" + `
 
+**Cross-change dependencies:** Check ` + "`.litespec.yaml`" + ` for a ` + "`dependsOn`" + ` field. If present, for each dependency:
+1. If the dependency is an active change, read its specs/ and design.md from ` + "`specs/changes/<dep-name>/`" + `
+2. If the dependency is archived, read its merged specs from ` + "`specs/canon/`" + `
+3. Also read ` + "`specs/glossary.md`" + ` if it exists for supplementary terminology context
+
+Keep these dependency artifacts loaded — you will cross-reference them during review.
+
 Do NOT read implementation files for Artifact Review mode. Read all artifacts AND implementation files for the other two modes.
 
 ---
@@ -62,6 +69,11 @@ Likely wrong but require human judgment. Same format.
 #### SUGGESTION
 Improvements that would strengthen but are not strictly required. Same format.
 
+### Cross-Change Consistency
+(Only if ` + "`dependsOn`" + ` is present. Skip otherwise.)
+
+Cross-reference interface names, method signatures, config keys, type names, and glossary terms between the reviewed change and its declared dependencies. Report name drift as **WARNING** findings — not CRITICAL. Examples of drift: ` + "`EventHandler`" + ` vs ` + "`Events`" + `, ` + "`*RPCAgent`" + ` vs ` + "`RPCAgent`" + `, ` + "`OutputEvent`" + ` vs ` + "`Event`" + `. The AI performs semantic matching that code cannot do well — affix variants, pluralization, pointer wrappers are all in scope.
+
 ### Scorecard
 Use the scorecard table from the applicable reference file.
 
@@ -73,7 +85,9 @@ The report is the output. No follow-up actions from you. The user reads it and d
 
 **Backlog deferral:** If the change explicitly defers scope not already in ` + "`specs/backlog.md`" + `, suggest adding deferred items to the backlog.
 
-**Cross-cutting rules:** When reviewing design.md, flag imperative language that reads like a standing architectural ruling ("all subagents must...", "we will never..."). Recommend promoting via ` + "`litespec decide <slug>`" + `.`
+**Cross-cutting rules:** When reviewing design.md, flag imperative language that reads like a standing architectural ruling ("all subagents must...", "we will never..."). Recommend promoting via ` + "`litespec decide <slug>`" + `.
+
+**Cross-change consistency** (when ` + "`dependsOn`" + ` is present): Cross-reference interface names, method signatures, config keys, type names, and glossary terms against dependency artifacts. Name drift is WARNING severity. Use semantic matching to catch affix variants, pluralization, and pointer wrappers.`
 
 const artifactReviewTemplate = `Use this mode when zero tasks are checked. The change is planned but not yet implemented. Your job is to review the planning artifacts for quality, consistency, and readiness — not to review code.
 
