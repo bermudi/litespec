@@ -121,7 +121,7 @@ The summary section of the dashboard SHALL include a decision count when any dec
 
 ### Requirement: Backlog Summary in Dashboard
 
-When `specs/backlog.md` exists, the dashboard summary section SHALL display a backlog line showing item counts per recognized category. The recognized H2 section names are `## Deferred`, `## Open Questions`, and `## Future Versions`. Items are counted as top-level lines starting with `- ` (no leading whitespace) under each H2 section. Items under unrecognized H2 sections SHALL be counted as "other." The backlog line SHALL only include categories that have items (e.g., `● Backlog: 3 deferred, 2 open questions` when no future items exist). When `specs/backlog.md` does not exist, the backlog line SHALL be omitted entirely.
+When `specs/backlog.md` exists, the dashboard summary section SHALL display a backlog line showing item counts per recognized category. The recognized H2 section names are `## Deferred`, `## Open Questions`, and `## Future Versions` (case-insensitive; `## Future` is accepted as shorthand for `## Future Versions`). Items are counted as top-level lines starting with `- ` or `* ` (no leading whitespace) under each H2 section. Items under unrecognized H2 sections SHALL be counted as "other." The backlog line SHALL only include categories that have items (e.g., `● Backlog: 3 deferred, 2 open questions` when no future items exist). When `specs/backlog.md` does not exist, the backlog line SHALL be omitted entirely.
 
 #### Scenario: Backlog with all categories
 
@@ -147,3 +147,18 @@ When `specs/backlog.md` exists, the dashboard summary section SHALL display a ba
 
 - **WHEN** `specs/backlog.md` exists but contains no items (empty or only headings)
 - **THEN** the backlog line is omitted from the summary
+
+#### Scenario: Future shorthand
+
+- **WHEN** `specs/backlog.md` exists with 2 items under `## Future`
+- **THEN** the summary shows `● Backlog: 2 future`
+
+#### Scenario: Asterisk bullets
+
+- **WHEN** `specs/backlog.md` exists with 3 items under `## Deferred` using `* ` bullets
+- **THEN** the summary shows `● Backlog: 3 deferred`
+
+#### Scenario: Case-insensitive headers
+
+- **WHEN** `specs/backlog.md` exists with items under `## deferred`, `## open questions`, and `## future versions`
+- **THEN** items are counted in their respective categories

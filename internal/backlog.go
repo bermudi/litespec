@@ -33,13 +33,13 @@ func ParseBacklog(path string) (*BacklogSummary, error) {
 	for _, line := range strings.Split(content, "\n") {
 		line = strings.TrimSuffix(line, "\r")
 		if strings.HasPrefix(line, "## ") && !strings.HasPrefix(line, "### ") {
-			section := strings.TrimSpace(strings.TrimPrefix(line, "## "))
+			section := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(line, "## ")))
 			switch section {
-			case "Deferred":
+			case "deferred":
 				currentSection = "deferred"
-			case "Open Questions":
+			case "open questions":
 				currentSection = "open-questions"
-			case "Future Versions":
+			case "future versions", "future":
 				currentSection = "future"
 			default:
 				currentSection = "other"
@@ -51,8 +51,8 @@ func ParseBacklog(path string) (*BacklogSummary, error) {
 			continue
 		}
 
-		// Count top-level `- ` items only (no leading whitespace)
-		if strings.HasPrefix(line, "- ") {
+		// Count top-level `- ` or `* ` items only (no leading whitespace)
+		if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* ") {
 			switch currentSection {
 			case "deferred":
 				deferred++
