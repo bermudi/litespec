@@ -63,6 +63,11 @@ var Skills = []SkillInfo{
 		Name:        "litespec-glossary",
 		Description: "Manage the project's ubiquitous language in specs/glossary.md. Use when the user wants to review, update, or seed the project glossary, or says \"glossary\".",
 	},
+	{
+		ID:          "patch",
+		Name:        "litespec-patch",
+		Description: "Create a patch-mode change for small, single-capability deltas. Use when the user wants a quick fix, minor flag addition, or small behavioral tweak, or says \"patch\".",
+	},
 }
 
 var Adapters = []ToolAdapter{

@@ -47,12 +47,12 @@
 
 ## Phase 6: Patch skill, workflow update, and regenerated artifacts
 
-- [ ] Append a `SkillInfo{ID: "litespec-patch", ...}` entry to the `Skills` slice in `internal/paths.go` with description matching the registry guidelines
-- [ ] Create `internal/skill/patch.go` registering the template via `init()`; body explains when to use patch vs propose, the `patch → implement → archive` flow, and that no proposal/design/tasks artifacts are produced
-- [ ] Update `internal/skill/workflow.go` template to document the patch lane as a sibling of the propose flow with a short "when to choose" guidance
-- [ ] Update `internal/skill/skill_test.go` expected skill ID list to include `patch`
-- [ ] Run `litespec update` to regenerate `.agents/skills/litespec-patch/SKILL.md` and refresh `.agents/skills/litespec-workflow/SKILL.md`
-- [ ] Update `AGENTS.md` Workflow section to document the patch lane and the rule "the delta is the contract; planning artifacts are optional scaffolding"
-- [ ] Update `DESIGN.md` to document `IsPatchMode` and where it is used
-- [ ] Run `go build ./...`, `go vet ./...`, `go test ./...` — all green
-- [ ] End-to-end smoke: create a patch change, run `litespec validate`, `litespec status`, `litespec view`, then `litespec archive`; verify canon updated and archive directory contains no specs/ subtree
+- [x] Append a `SkillInfo{ID: "litespec-patch", ...}` entry to the `Skills` slice in `internal/paths.go` with description matching the registry guidelines
+- [x] Create `internal/skill/patch.go` registering the template via `init()`; body explains when to use patch vs propose, the `patch → implement → archive` flow, and that no proposal/design/tasks artifacts are produced
+- [x] Update `internal/skill/workflow.go` template to document the patch lane as a sibling of the propose flow with a short "when to choose" guidance
+- [x] Update `internal/skill/skill_test.go` expected skill ID list to include `patch`
+- [x] Run `litespec update` to regenerate `.agents/skills/litespec-patch/SKILL.md` and refresh `.agents/skills/litespec-workflow/SKILL.md`
+- [x] Update `AGENTS.md` Workflow section to document the patch lane and the rule "the delta is the contract; planning artifacts are optional scaffolding"
+- [x] Update `DESIGN.md` to document `IsPatchMode` and where it is used
+- [x] Run `go build ./...`, `go vet ./...`, `go test ./...` — all green
+- [x] End-to-end smoke: create a patch change, run `litespec validate`, `litespec status`, `litespec view`, then `litespec archive`; verify canon updated and archive directory contains no specs/ subtree

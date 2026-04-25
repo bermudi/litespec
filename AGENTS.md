@@ -41,12 +41,15 @@ The design emerged from a structured grilling session — question by question, 
 explore → grill → propose → [research →] apply → review → archive
                                           │
                                       adopt (separate path)
+
+patch → archive  (lightweight lane for small, single-capability changes)
 ```
 
 Unidirectional. No backward flow.
 
 - **explore** and **grill** are ephemeral — no artifacts, no change directory. The AI keeps context in its window. `propose` is what materializes everything to disk.
 - **propose** is the commit point. If something is wrong after proposing, start over from explore/grill.
+- **patch** is a lightweight lane — `litespec patch <name> <capability>` creates a delta-only change with no planning artifacts. The delta is the contract; planning artifacts are optional scaffolding. Use for small, single-capability changes that need no design discussion.
 - **research** is optional — runs after propose when external knowledge is needed. Reads artifacts from disk, identifies knowledge gaps (APIs, schemas, libraries), gathers docs, and produces research skills into `.agents/skills/research-<topic>/`. Uses skill-creator conventions for formatting. Stance is risk-scoped: skip what LLMs know cold, go deep on novel APIs/libraries. Research skills persist after archive — they accumulate as project knowledge.
 - **apply** works on one phase at a time. Each phase = one agent session = one commit. Re-invoke for the next phase. Consumes research skills via natural agent discovery.
 - **adopt** is a separate path — reverse-engineers specs from existing code given a file/directory path.

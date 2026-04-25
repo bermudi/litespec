@@ -53,9 +53,13 @@ Unidirectional flow:
 explore → grill → propose → [research →] apply → review → archive
                                           │
                                       adopt (separate path)
+
+patch → archive  (lightweight lane for small, single-capability changes)
 ```
 
 No backward flow. If something is wrong after propose, start over from explore/grill. Research is optional — skip it when the change doesn't involve external dependencies.
+
+**Patch lane:** `litespec patch <name> <capability>` creates a delta-only change with `mode: patch` in `.litespec.yaml`. No planning artifacts (proposal, design, tasks). The delta is the contract. `IsPatchMode(root, name)` reads the metadata and returns true when `mode == "patch"`. Patch-mode changes are reflected in `LoadArtifactStates` (returns only `{specs: DONE}`), `status` (shows only specs line + "(patch mode)"), `view` (separate "Patch Changes" section with ◆ bullet), and JSON output (`mode: "patch"` field).
 
 ## Skills
 
@@ -68,6 +72,7 @@ No backward flow. If something is wrong after propose, start over from explore/g
 | `apply` | Phase-based | Implements tasks per phase in `tasks.md`. One phase per invocation. AI focuses on one area without doing the whole implementation at once. Consumes research skills via natural discovery. |
 | `review` | AI review | Context-aware review that adapts to change lifecycle: artifact review (0 tasks checked — evaluates planning artifacts), implementation review (some tasks checked — runs adversarial review then compliance review), pre-archive review (all tasks checked — adversarial + compliance + archive readiness + build verification). Adversarial review runs first to avoid anchoring bias. Pure AI review — no test/lint running (except build verification in pre-archive mode). |
 | `adopt` | Reverse-engineer | Takes a file/directory path. Generates a change proposal with specs from existing code. For code that has no spec yet. |
+| `patch` | Lightweight | Creates a delta-only change via `litespec patch <name> <capability>`. No planning artifacts. The delta is the contract. For small, single-capability changes. |
 
 ## Tasks (Phased)
 

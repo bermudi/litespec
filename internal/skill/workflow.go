@@ -14,6 +14,8 @@ const workflowTemplate = `Explain the litespec workflow and determine the user's
 explore → grill → propose → [research →] apply → review → archive
                                           │
                                       adopt (separate path)
+
+patch → archive  (lightweight lane for small, single-capability changes)
 ` + "```" + `
 
 **explore** — Think freely. No artifacts, no change directory. Read code, ask questions, map architecture. Never implement.
@@ -24,6 +26,7 @@ explore → grill → propose → [research →] apply → review → archive
 **review** — Adversarial + compliance review: artifacts only (pre-impl), adversarial then compliance (during), adversarial + compliance + build verification (pre-archive).
 **archive** — Apply deltas to canonical specs and move the change to archive. The commit to implemented.
 **adopt** — Reverse-engineer specs from existing code. Separate path, does not use propose/apply.
+**patch** — Lightweight lane for small changes. ` + "`litespec patch <name> <capability>`" + ` creates a delta-only change (no proposal/design/tasks). Use when the change is small, single-capability, and needs no design discussion.
 
 ---
 

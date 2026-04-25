@@ -193,7 +193,8 @@ func BuildChangeStatusJSON(change *Change) ChangeStatusJSON {
 
 		var missing []string
 		for _, req := range info.Requires {
-			if change.Artifacts[req] != ArtifactDone {
+			reqState, reqExists := change.Artifacts[req]
+			if reqExists && reqState != ArtifactDone {
 				missing = append(missing, req)
 			}
 		}
