@@ -1,6 +1,6 @@
 # patch
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Patch Command Scaffold
 

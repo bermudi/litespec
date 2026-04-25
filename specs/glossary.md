@@ -8,7 +8,7 @@ Project-wide ubiquitous language. Read this before every conversation.
 - **Change**: An isolated proposed modification in `specs/changes/<name>/`. Contains planning artifacts (proposal, specs, design, tasks). Tentative until archived.
 - **Delta**: A spec describing differences against canon using ADDED/MODIFIED/REMOVED/RENAMED markers. Not a standalone spec — only meaningful relative to a canonical spec.
 - **Design**: The architecture artifact of a change — decisions, file changes, and impact analysis. Created after specs so it can reference requirements.
-- **Patch**: A lightweight change mode for small, single-capability modifications. Creates only a delta stub — no proposal, design, or tasks artifacts. The delta is the contract. Created via `litespec patch <name> <capability>`.
+- **Patch**: A lightweight change mode for small, single-capability modifications. Does not require proposal, design, or tasks artifacts. The delta is the contract. Created via `litespec patch <name> <capability>`.
 - **Patch mode**: A change classification stored as `mode: patch` in `.litespec.yaml`. Patch-mode changes skip planning artifacts and are rendered separately in status and view outputs.
 - **Phase**: A group of related tasks in `tasks.md`. One phase = one apply session = one commit. The first phase with unchecked tasks is the current phase.
 - **Proposal**: The first artifact of a change — motivation, scope, and non-goals. Sets the contract for everything that follows.
