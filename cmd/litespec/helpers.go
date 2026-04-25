@@ -60,6 +60,24 @@ Examples:
 `)
 }
 
+func printPatchHelp() {
+	fmt.Print(`Usage: litespec patch <name> <capability>
+
+Create a patch-mode change with only a delta spec. No proposal, design, or tasks.
+
+Patch mode is for small, single-capability changes where the delta is the contract.
+For larger changes or anything needing design discussion, use 'litespec new' instead.
+
+Arguments:
+  <name>            Change name (e.g., add-verbose-flag)
+  <capability>     Capability to patch (e.g., cli)
+
+Examples:
+  litespec patch add-verbose-flag cli
+  litespec patch fix-output-format status
+`)
+}
+
 func printNewHelp() {
 	fmt.Print(`Usage: litespec new <name> [--json]
 

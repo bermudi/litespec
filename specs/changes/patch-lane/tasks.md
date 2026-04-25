@@ -21,12 +21,12 @@
 
 ## Phase 3: `litespec patch` command
 
-- [ ] Create `cmd/litespec/patch.go` implementing `cmdPatch(args []string) error` — parses `<name> <capability>` positional args, validates them with the same rules as `litespec new`, refuses if `specs/changes/<name>/` exists, creates `specs/changes/<name>/specs/<capability>/spec.md` with stub content (`# <capability>\n\n## ADDED Requirements\n`), writes `.litespec.yaml` with `mode: patch`
-- [ ] Wire `patch` into the command dispatcher in `cmd/litespec/main.go` and add to `printUsage()`
-- [ ] Add `printPatchHelp()` following the pattern of other commands
-- [ ] Create `cmd/litespec/patch_test.go` covering: happy path (creates expected files, no proposal/design/tasks), missing args error, existing change error, invalid name error
-- [ ] End-to-end smoke: from a temp project, run `litespec patch foo bar`, then `litespec validate foo` — both succeed
-- [ ] Run `go build ./...`, `go vet ./...`, `go test ./...` — all green
+- [x] Create `cmd/litespec/patch.go` implementing `cmdPatch(args []string) error` — parses `<name> <capability>` positional args, validates them with the same rules as `litespec new`, refuses if `specs/changes/<name>/` exists, creates `specs/changes/<name>/specs/<capability>/spec.md` with stub content (`# <capability>\n\n## ADDED Requirements\n`), writes `.litespec.yaml` with `mode: patch`
+- [x] Wire `patch` into the command dispatcher in `cmd/litespec/main.go` and add to `printUsage()`
+- [x] Add `printPatchHelp()` following the pattern of other commands
+- [x] Create `cmd/litespec/patch_test.go` covering: happy path (creates expected files, no proposal/design/tasks), missing args error, existing change error, invalid name error
+- [x] End-to-end smoke: from a temp project, run `litespec patch foo bar`, then `litespec validate foo` — both succeed
+- [x] Run `go build ./...`, `go vet ./...`, `go test ./...` — all green
 
 ## Phase 4: Status command patch-mode rendering
 
