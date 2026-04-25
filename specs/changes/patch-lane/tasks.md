@@ -11,13 +11,13 @@
 
 ## Phase 2: Patch-mode detection via metadata and artifact state handling
 
-- [ ] Add `Mode string` field (yaml tag `"mode,omitempty"`) to `ChangeMeta` in `internal/types.go`
-- [ ] Add `IsPatchMode(root, name string) bool` in `internal/change.go` — reads `ChangeMeta` via `ReadChangeMeta`, returns true when `Mode == "patch"`; returns false on read error (graceful degradation)
-- [ ] Modify `LoadArtifactStates` in `internal/artifact.go` to return only `{specs: ArtifactDone}` for patch-mode changes (omit `proposal`, `design`, `tasks` keys entirely)
-- [ ] Verify `LoadChangeContext` in `internal/change.go` still works correctly since it wraps `LoadArtifactStates` — no change needed unless tests reveal otherwise
-- [ ] Add tests in `internal/change_test.go` for `IsPatchMode`: true for change with `mode: patch` in metadata, false for change without mode field, false for change with no `.litespec.yaml`, false for change with `mode: ""` (empty string)
-- [ ] Add tests in `internal/artifact_test.go` verifying `LoadArtifactStates` returns single-key map for patch mode and full four-key map for full proposal
-- [ ] Run `go build ./...`, `go vet ./...`, `go test ./...` — all green
+- [x] Add `Mode string` field (yaml tag `"mode,omitempty"`) to `ChangeMeta` in `internal/types.go`
+- [x] Add `IsPatchMode(root, name string) bool` in `internal/change.go` — reads `ChangeMeta` via `ReadChangeMeta`, returns true when `Mode == "patch"`; returns false on read error (graceful degradation)
+- [x] Modify `LoadArtifactStates` in `internal/artifact.go` to return only `{specs: ArtifactDone}` for patch-mode changes (omit `proposal`, `design`, `tasks` keys entirely)
+- [x] Verify `LoadChangeContext` in `internal/change.go` still works correctly since it wraps `LoadArtifactStates` — no change needed unless tests reveal otherwise
+- [x] Add tests in `internal/change_test.go` for `IsPatchMode`: true for change with `mode: patch` in metadata, false for change without mode field, false for change with no `.litespec.yaml`, false for change with `mode: ""` (empty string)
+- [x] Add tests in `internal/artifact_test.go` verifying `LoadArtifactStates` returns single-key map for patch mode and full four-key map for full proposal
+- [x] Run `go build ./...`, `go vet ./...`, `go test ./...` — all green
 
 ## Phase 3: `litespec patch` command
 

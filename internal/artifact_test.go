@@ -286,6 +286,74 @@ func TestGetNextArtifact_AllDone(t *testing.T) {
 	}
 }
 
+func TestLoadArtifactStates_PatchMode(t *testing.T) {
+	root := setupTestProject(t)
+	deltaContent := `## ADDED Requirements
+
+### Requirement: R1
+The system SHALL work.
+
+#### Scenario: S1
+- **WHEN** triggered
+- **THEN** expected result
+`
+	writeDeltaSpecFile(t, root, "pchange", "cap", "spec.md", deltaContent)
+	meta := ChangeMeta{
+		Schema:  "spec-driven",
+		Created: time.Now().UTC().Truncate(time.Second),
+		Mode:    "patch",
+	}
+	writeChangeMeta(t, root, "pchange", meta)
+
+	states, err := LoadArtifactStates(root, "pchange")
+	if err != nil {
+		t.Fatalf("LoadArtifactStates: %v", err)
+	}
+
+	if len(states) != 1 {
+		t.Fatalf("expected 1 artifact state, got %d", len(states))
+	}
+	if states["specs"] != ArtifactDone {
+		t.Errorf("expected specs=DONE, got %s", states["specs"])
+	}
+	for _, key := range []string{"proposal", "design", "tasks"} {
+		if _, ok := states[key]; ok {
+			t.Errorf("expected no %q in patch-mode states", key)
+		}
+	}
+}
+
+func TestLoadArtifactStates_FullProposal(t *testing.T) {
+	root := setupTestProject(t)
+	writeChangeFile(t, root, "mychange", "proposal.md", "# Proposal")
+	writeChangeFile(t, root, "mychange", "design.md", "# Design")
+	writeChangeFile(t, root, "mychange", "tasks.md", "## Phase 1\n- [ ] Task")
+	deltaContent := `## ADDED Requirements
+
+### Requirement: R1
+The system SHALL work.
+
+#### Scenario: S1
+- **WHEN** triggered
+- **THEN** expected result
+`
+	writeDeltaSpecFile(t, root, "mychange", "cap", "spec.md", deltaContent)
+
+	states, err := LoadArtifactStates(root, "mychange")
+	if err != nil {
+		t.Fatalf("LoadArtifactStates: %v", err)
+	}
+
+	if len(states) != 4 {
+		t.Fatalf("expected 4 artifact states, got %d", len(states))
+	}
+	for _, art := range Artifacts {
+		if states[art.ID] != ArtifactDone {
+			t.Errorf("expected %s=DONE, got %s", art.ID, states[art.ID])
+		}
+	}
+}
+
 func TestLoadChangeContext_ValidWithMetadata(t *testing.T) {
 	root := setupTestProject(t)
 	writeChangeFile(t, root, "mychange", "proposal.md", "# Proposal")

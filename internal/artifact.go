@@ -42,6 +42,10 @@ func hasMarkdownFiles(dir string) bool {
 }
 
 func LoadArtifactStates(root, changeName string) (map[string]ArtifactState, error) {
+	if IsPatchMode(root, changeName) {
+		return map[string]ArtifactState{"specs": ArtifactDone}, nil
+	}
+
 	states := make(map[string]ArtifactState)
 
 	for _, art := range Artifacts {

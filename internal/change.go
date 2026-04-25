@@ -341,6 +341,14 @@ func RestoreChange(root, archiveDest, name string) error {
 	return os.Rename(archiveDest, changeDir)
 }
 
+func IsPatchMode(root, name string) bool {
+	meta, err := ReadChangeMeta(root, name)
+	if err != nil {
+		return false
+	}
+	return meta.Mode == "patch"
+}
+
 func ChangeExists(root, name string) bool {
 	_, err := os.Stat(ChangePath(root, name))
 	return err == nil
