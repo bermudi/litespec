@@ -38,12 +38,12 @@
 
 ## Phase 5: View dashboard patch-mode category
 
-- [ ] In `cmd/litespec/view.go`, partition active changes into patch-mode and full-proposal buckets when collecting changes
-- [ ] Render new "Patch Changes" section after Active Changes, before Completed Changes; use `◆` bullet; show change name, born date, touched-relative; no progress bar
-- [ ] Update summary section to include patch-changes count alongside draft/active/completed counts
-- [ ] Omit the section entirely when no patch changes exist
-- [ ] Update existing dashboard tests in `cmd/litespec/main_test.go` / `view_test.go` to verify patch section appears, summary count updates, and absent section when no patch changes
-- [ ] Run `go build ./...`, `go vet ./...`, `go test ./...` — all green
+- [x] In `cmd/litespec/view.go`, partition active changes into patch-mode and full-proposal buckets when collecting changes
+- [x] Render new "Patch Changes" section after Active Changes, before Completed Changes; use `◆` bullet; show change name, born date, touched-relative; no progress bar
+- [x] Update summary section to include patch-changes count alongside draft/active/completed counts
+- [x] Omit the section entirely when no patch changes exist
+- [x] Update existing dashboard tests in `cmd/litespec/main_test.go` / `view_test.go` to verify patch section appears, summary count updates, and absent section when no patch changes
+- [x] Run `go build ./...`, `go vet ./...`, `go test ./...` — all green
 
 ## Phase 6: Patch skill, workflow update, and regenerated artifacts
 

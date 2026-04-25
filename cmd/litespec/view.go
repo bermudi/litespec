@@ -46,9 +46,11 @@ func cmdView(args []string) error {
 		return err
 	}
 
-	var draft, active, completed []internal.ChangeInfo
+	var draft, active, completed, patch []internal.ChangeInfo
 	for _, c := range changes {
-		if c.TotalTasks == 0 {
+		if internal.IsPatchMode(root, c.Name) {
+			patch = append(patch, c)
+		} else if c.TotalTasks == 0 {
 			draft = append(draft, c)
 		} else if c.CompletedTasks == c.TotalTasks {
 			completed = append(completed, c)
@@ -81,7 +83,7 @@ func cmdView(args []string) error {
 	decisions, decErr := internal.ListDecisions(root)
 
 	if asJSON {
-		return renderViewJSON(root, specs, draft, active, completed, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr)
+		return renderViewJSON(root, specs, draft, active, completed, patch, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr)
 	}
 
 	fmt.Println()
@@ -94,6 +96,9 @@ func cmdView(args []string) error {
 	fmt.Printf("  ● Specifications: %d specs, %d requirements\n", len(specs), totalReqs)
 	fmt.Printf("  ● Draft Changes: %d\n", len(draft))
 	fmt.Printf("  ● Active Changes: %d in progress\n", len(active))
+	if len(patch) > 0 {
+		fmt.Printf("  ● Patch Changes: %d\n", len(patch))
+	}
 	fmt.Printf("  ● Ready to Archive: %d (all tasks done — archive to canonical specs)\n", len(completed))
 	if totalTasks > 0 {
 		pct := int(math.Round(float64(totalCompletedTasks) / float64(totalTasks) * 100))
@@ -145,6 +150,15 @@ func cmdView(args []string) error {
 		fmt.Println(strings.Repeat("─", 60))
 		for _, c := range draft {
 			fmt.Printf("  ○ %s%s\n", c.Name, formatTimestamps(c))
+		}
+	}
+
+	if len(patch) > 0 {
+		fmt.Println()
+		fmt.Println("Patch Changes")
+		fmt.Println(strings.Repeat("─", 60))
+		for _, c := range patch {
+			fmt.Printf("  ◆ %s%s\n", c.Name, formatTimestamps(c))
 		}
 	}
 
@@ -368,6 +382,7 @@ type viewSummaryJSON struct {
 	Requirements       int                 `json:"requirements"`
 	DraftChanges       int                 `json:"draftChanges"`
 	ActiveChanges      int                 `json:"activeChanges"`
+	PatchChanges       int                 `json:"patchChanges,omitempty"`
 	ReadyToArchive     int                 `json:"readyToArchive"`
 	TaskProgress       *viewProgressJSON   `json:"taskProgress,omitempty"`
 	Decisions          *viewDecisionCountJSON `json:"decisions,omitempty"`
@@ -420,12 +435,13 @@ type viewGraphJSON struct {
 	Unrelated  []string                   `json:"unrelated,omitempty"`
 }
 
-func renderViewJSON(root string, specs []internal.SpecInfo, draft, active, completed []internal.ChangeInfo, totalReqs, totalCompletedTasks, totalTasks int, decisions []*internal.Decision, decErr error) error {
+func renderViewJSON(root string, specs []internal.SpecInfo, draft, active, completed, patch []internal.ChangeInfo, totalReqs, totalCompletedTasks, totalTasks int, decisions []*internal.Decision, decErr error) error {
 	summary := viewSummaryJSON{
 		Specs:          len(specs),
 		Requirements:   totalReqs,
 		DraftChanges:   len(draft),
 		ActiveChanges:  len(active),
+		PatchChanges:   len(patch),
 		ReadyToArchive: len(completed),
 	}
 
@@ -464,6 +480,13 @@ func renderViewJSON(root string, specs []internal.SpecInfo, draft, active, compl
 		changes = append(changes, viewChangeJSON{
 			Name:   c.Name,
 			Status: "draft",
+			Born:   bornStr(c), LastModified: modifiedStr(c),
+		})
+	}
+	for _, c := range patch {
+		changes = append(changes, viewChangeJSON{
+			Name:   c.Name,
+			Status: "patch",
 			Born:   bornStr(c), LastModified: modifiedStr(c),
 		})
 	}

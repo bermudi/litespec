@@ -2669,3 +2669,92 @@ func TestCLIPatchStatusJSON(t *testing.T) {
 		t.Errorf("expected artifact id=specs, got %v", art["id"])
 	}
 }
+
+func TestCLIViewPatchSection(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	createSpec(t, root, "auth")
+
+	// Create a patch-mode change
+	changeDir := filepath.Join(root, "specs", "changes", "fix-flag")
+	specSubdir := filepath.Join(changeDir, "specs", "cli")
+	os.MkdirAll(specSubdir, 0o755)
+	os.WriteFile(filepath.Join(specSubdir, "spec.md"), []byte("# cli\n"), 0o644)
+	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-04-25T00:00:00Z\nmode: patch\n"), 0o644)
+
+	out, code := runCLI(t, bin, root, "view")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	if !strings.Contains(out, "Patch Changes") {
+		t.Errorf("expected 'Patch Changes' section, got:\n%s", out)
+	}
+	if !strings.Contains(out, "◆ fix-flag") {
+		t.Errorf("expected '◆ fix-flag' in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Patch Changes: 1") {
+		t.Errorf("expected 'Patch Changes: 1' in summary, got:\n%s", out)
+	}
+	// Should not appear in active or draft
+	if strings.Contains(out, "◉ fix-flag") {
+		t.Errorf("patch change should not appear as active (◉)")
+	}
+	if strings.Contains(out, "○ fix-flag") {
+		t.Errorf("patch change should not appear as draft (○)")
+	}
+}
+
+func TestCLIViewNoPatchSectionWhenNoPatches(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	createChangeWithArtifacts(t, root, "add-auth")
+	changeDir := filepath.Join(root, "specs", "changes", "add-auth")
+	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1: Test\n- [x] Task one\n- [ ] Task two"), 0o644)
+
+	out, code := runCLI(t, bin, root, "view")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	if strings.Contains(out, "Patch Changes") {
+		t.Errorf("expected no 'Patch Changes' section when no patch changes exist, got:\n%s", out)
+	}
+}
+
+func TestCLIViewPatchJSON(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	changeDir := filepath.Join(root, "specs", "changes", "fix-flag")
+	specSubdir := filepath.Join(changeDir, "specs", "cli")
+	os.MkdirAll(specSubdir, 0o755)
+	os.WriteFile(filepath.Join(specSubdir, "spec.md"), []byte("# cli\n"), 0o644)
+	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-04-25T00:00:00Z\nmode: patch\n"), 0o644)
+
+	out, code := runCLI(t, bin, root, "view", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+
+	summary := result["summary"].(map[string]interface{})
+	if summary["patchChanges"] != float64(1) {
+		t.Errorf("expected patchChanges=1, got %v", summary["patchChanges"])
+	}
+
+	changes := result["changes"].([]interface{})
+	found := false
+	for _, c := range changes {
+		cm := c.(map[string]interface{})
+		if cm["name"] == "fix-flag" && cm["status"] == "patch" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected fix-flag with status=patch in changes, got: %v", changes)
+	}
+}
