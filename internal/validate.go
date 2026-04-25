@@ -458,6 +458,10 @@ func validateDesign(content string) []ValidationIssue {
 		}
 		if strings.HasPrefix(trimmed, "## ") {
 			hasH2 = true
+			continue
+		}
+		if strings.HasPrefix(trimmed, "# ") {
+			continue
 		}
 		if trimmed != "" {
 			nonBlankLines++

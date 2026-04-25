@@ -2758,3 +2758,85 @@ func TestCLIViewPatchJSON(t *testing.T) {
 		t.Errorf("expected fix-flag with status=patch in changes, got: %v", changes)
 	}
 }
+
+func TestCLIArchiveStripsSpecsSubtree(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	createChangeWithArtifacts(t, root, "my-change")
+	changeDir := filepath.Join(root, "specs", "changes", "my-change")
+	tasksPath := filepath.Join(changeDir, "tasks.md")
+	os.WriteFile(tasksPath, []byte("## Phase 1\n- [x] Done"), 0o644)
+
+	out, code := runCLI(t, bin, root, "archive", "my-change")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	archiveDir := filepath.Join(root, "specs", "changes", "archive")
+	entries, err := os.ReadDir(archiveDir)
+	if err != nil {
+		t.Fatalf("read archive: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("expected archived directory to exist")
+	}
+
+	archivedPath := filepath.Join(archiveDir, entries[0].Name())
+	specsPath := filepath.Join(archivedPath, "specs")
+	if _, err := os.Stat(specsPath); err == nil {
+		t.Errorf("expected specs/ subtree to be stripped from archived directory, but it exists at %s", specsPath)
+	}
+}
+
+func TestCLIPatchStatusBulkJSON(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	// Create a patch change
+	changeDir := filepath.Join(root, "specs", "changes", "fix-flag")
+	specSubdir := filepath.Join(changeDir, "specs", "cli")
+	os.MkdirAll(specSubdir, 0o755)
+	os.WriteFile(filepath.Join(specSubdir, "spec.md"), []byte("# cli\n"), 0o644)
+	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-04-25T00:00:00Z\nmode: patch\n"), 0o644)
+
+	// Create a full-proposal change
+	createChange(t, root, "full-change")
+
+	out, code := runCLI(t, bin, root, "status", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+
+	changes := result["changes"].([]interface{})
+	if len(changes) != 2 {
+		t.Fatalf("expected 2 changes, got %d", len(changes))
+	}
+
+	patchFound := false
+	fullFound := false
+	for _, c := range changes {
+		cm := c.(map[string]interface{})
+		if cm["changeName"] == "fix-flag" {
+			if cm["mode"] != "patch" {
+				t.Errorf("expected fix-flag mode=patch, got %v", cm["mode"])
+			}
+			patchFound = true
+		}
+		if cm["changeName"] == "full-change" {
+			if _, hasMode := cm["mode"]; hasMode {
+				t.Errorf("expected full-change to have no mode field, got mode=%v", cm["mode"])
+			}
+			fullFound = true
+		}
+	}
+	if !patchFound {
+		t.Error("expected fix-flag in bulk status")
+	}
+	if !fullFound {
+		t.Error("expected full-change in bulk status")
+	}
+}

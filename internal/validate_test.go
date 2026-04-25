@@ -2071,3 +2071,16 @@ func TestValidateDesignValid(t *testing.T) {
 		t.Fatalf("expected 0 issues, got %d: %v", len(issues), issues)
 	}
 }
+
+func TestValidateDesignOnlyHeadings(t *testing.T) {
+	issues := validateDesign("# Design\n\n## Architecture\n## Decisions\n## File Changes")
+	found := false
+	for _, iss := range issues {
+		if strings.Contains(iss.Message, "3 non-blank lines") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected non-blank lines error for heading-only content, got: %v", issues)
+	}
+}

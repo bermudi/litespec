@@ -108,6 +108,12 @@ func cmdArchive(args []string) error {
 		fmt.Printf("Updated spec: %s\n", w.Capability)
 	}
 
+	// Strip specs/ subtree from archived directory
+	archivedSpecsDir := filepath.Join(archiveDest, internal.ChangeSpecsDirName)
+	if err := os.RemoveAll(archivedSpecsDir); err != nil {
+		fmt.Fprintf(os.Stderr, "WARN  could not remove specs/ from archived directory: %v\n", err)
+	}
+
 	archiveEntries, archiveErr := os.ReadDir(internal.ArchivePath(root))
 	if archiveErr != nil {
 		return fmt.Errorf("post-archive verification failed: %w", archiveErr)
