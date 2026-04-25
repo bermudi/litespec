@@ -2,7 +2,7 @@
 
 ## Architecture
 
-The patch lane is a parallel entry point into the existing change machinery. The merge engine, validation rules for deltas, and archive flow are unchanged — they already operate on deltas and treat planning artifacts as separate concerns.
+The patch lane is a parallel entry point into the existing change machinery. The merge engine and validation rules for deltas are unchanged — they already operate on deltas and treat planning artifacts as separate concerns. The archive flow gains one new behavior: stripping the `specs/` subtree from the archived directory after merging deltas to canon (previously, the subtree was retained).
 
 The change introduces one new classification (`IsPatchMode`) and threads it through three consumers: status output, view dashboard categorization, and (passively) the validate flow once the trio becomes optional. The `litespec patch` command itself is a thin scaffolding command that mirrors the structure of `litespec new` but writes only a delta stub.
 

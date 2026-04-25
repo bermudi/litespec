@@ -344,6 +344,7 @@ func RestoreChange(root, archiveDest, name string) error {
 func IsPatchMode(root, name string) bool {
 	meta, err := ReadChangeMeta(root, name)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "WARN  could not read metadata for %q: %v\n", name, err)
 		return false
 	}
 	return meta.Mode == "patch"
