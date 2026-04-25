@@ -37,6 +37,7 @@ type Change struct {
 	Name      string
 	Schema    string
 	Created   time.Time
+	Mode      string
 	Artifacts map[string]ArtifactState
 }
 

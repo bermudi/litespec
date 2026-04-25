@@ -30,11 +30,11 @@
 
 ## Phase 4: Status command patch-mode rendering
 
-- [ ] In `cmd/litespec/status.go`, branch on `IsPatchMode` when rendering a single change: emit only the `specs` artifact line followed by `(patch mode)` indicator, suppress proposal/design/tasks lines
-- [ ] Apply the same branching in the bulk listing path of `status.go`
-- [ ] Add `Mode string` field (json tag `mode,omitempty`) to the JSON status struct in `internal/json.go` (or wherever `BuildChangeStatusJSON` lives); set to `"patch"` for patch-mode changes; ensure non-applicable artifacts are either omitted from the array or marked `status: "n/a"`
-- [ ] Update `cmd/litespec/status_test.go` (or `main_test.go`) to verify text output for patch mode (no trio lines, indicator present) and JSON output (`mode: "patch"` present, artifacts handled correctly)
-- [ ] Run `go build ./...`, `go vet ./...`, `go test ./...` — all green
+- [x] In `cmd/litespec/status.go`, branch on `IsPatchMode` when rendering a single change: emit only the `specs` artifact line followed by `(patch mode)` indicator, suppress proposal/design/tasks lines
+- [x] Apply the same branching in the bulk listing path of `status.go`
+- [x] Add `Mode string` field (json tag `mode,omitempty`) to the JSON status struct in `internal/json.go` (or wherever `BuildChangeStatusJSON` lives); set to `"patch"` for patch-mode changes; ensure non-applicable artifacts are either omitted from the array or marked `status: "n/a"`
+- [x] Update `cmd/litespec/status_test.go` (or `main_test.go`) to verify text output for patch mode (no trio lines, indicator present) and JSON output (`mode: "patch"` present, artifacts handled correctly)
+- [x] Run `go build ./...`, `go vet ./...`, `go test ./...` — all green
 
 ## Phase 5: View dashboard patch-mode category
 

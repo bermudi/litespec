@@ -10,6 +10,7 @@ type ChangeStatusJSON struct {
 	ChangeName string               `json:"changeName"`
 	SchemaName string               `json:"schemaName"`
 	IsComplete bool                 `json:"isComplete"`
+	Mode       string               `json:"mode,omitempty"`
 	Artifacts  []ArtifactStatusJSON `json:"artifacts"`
 }
 
@@ -179,10 +180,13 @@ func BuildArtifactInstructionsStandaloneJSON(artifactID string) (*ArtifactInstru
 
 func BuildChangeStatusJSON(change *Change) ChangeStatusJSON {
 	var artifacts []ArtifactStatusJSON
-	allDone := true
+	allDone := len(change.Artifacts) > 0
 
 	for _, info := range Artifacts {
-		state := change.Artifacts[info.ID]
+		state, exists := change.Artifacts[info.ID]
+		if !exists {
+			continue
+		}
 		if state != ArtifactDone {
 			allDone = false
 		}
@@ -206,6 +210,7 @@ func BuildChangeStatusJSON(change *Change) ChangeStatusJSON {
 		ChangeName: change.Name,
 		SchemaName: change.Schema,
 		IsComplete: allDone,
+		Mode:       change.Mode,
 		Artifacts:  artifacts,
 	}
 }

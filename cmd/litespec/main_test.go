@@ -2607,3 +2607,65 @@ func TestValidateDecisionsMutualExclusion(t *testing.T) {
 		t.Fatal("expected error for --decisions + --changes")
 	}
 }
+
+func TestCLIPatchStatusText(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	_, code := runCLI(t, bin, root, "patch", "fix-flag", "cli")
+	if code != 0 {
+		t.Fatal("patch failed")
+	}
+
+	out, code := runCLI(t, bin, root, "status", "fix-flag")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "(patch mode)") {
+		t.Errorf("expected '(patch mode)' in output, got:\n%s", out)
+	}
+	if strings.Contains(out, "proposal") {
+		t.Errorf("expected no 'proposal' line in patch status, got:\n%s", out)
+	}
+	if strings.Contains(out, "design") {
+		t.Errorf("expected no 'design' line in patch status, got:\n%s", out)
+	}
+	if strings.Contains(out, "tasks") {
+		t.Errorf("expected no 'tasks' line in patch status, got:\n%s", out)
+	}
+	if !strings.Contains(out, "specs") {
+		t.Errorf("expected 'specs' line in patch status, got:\n%s", out)
+	}
+}
+
+func TestCLIPatchStatusJSON(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	_, code := runCLI(t, bin, root, "patch", "fix-flag", "cli")
+	if code != 0 {
+		t.Fatal("patch failed")
+	}
+
+	out, code := runCLI(t, bin, root, "status", "fix-flag", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if result["mode"] != "patch" {
+		t.Errorf("expected mode=patch, got %v", result["mode"])
+	}
+	artifacts, ok := result["artifacts"].([]interface{})
+	if !ok {
+		t.Fatalf("expected artifacts array, got %T", result["artifacts"])
+	}
+	if len(artifacts) != 1 {
+		t.Fatalf("expected 1 artifact, got %d", len(artifacts))
+	}
+	art := artifacts[0].(map[string]interface{})
+	if art["id"] != "specs" {
+		t.Errorf("expected artifact id=specs, got %v", art["id"])
+	}
+}

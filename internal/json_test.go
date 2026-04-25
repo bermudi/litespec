@@ -222,3 +222,28 @@ func TestBuildChangeStatusJSON_SpecsReadyHasNoMissingDeps(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildChangeStatusJSON_PatchMode(t *testing.T) {
+	c := &Change{
+		Name:    "my-patch",
+		Schema:  "spec-driven",
+		Created: time.Now(),
+		Mode:    "patch",
+		Artifacts: map[string]ArtifactState{
+			"specs": ArtifactDone,
+		},
+	}
+	got := BuildChangeStatusJSON(c)
+	if !got.IsComplete {
+		t.Error("expected IsComplete=true for patch with specs done")
+	}
+	if got.Mode != "patch" {
+		t.Errorf("expected Mode=patch, got %q", got.Mode)
+	}
+	if len(got.Artifacts) != 1 {
+		t.Fatalf("expected 1 artifact, got %d", len(got.Artifacts))
+	}
+	if got.Artifacts[0].ID != "specs" {
+		t.Errorf("expected specs artifact, got %q", got.Artifacts[0].ID)
+	}
+}

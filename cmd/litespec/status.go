@@ -64,9 +64,14 @@ func cmdStatus(args []string) error {
 		if !ctx.Created.IsZero() {
 			fmt.Printf("Created: %s\n", ctx.Created.Format("2006-01-02 15:04:05"))
 		}
-		fmt.Println()
-		for _, art := range internal.Artifacts {
-			fmt.Printf("  %-12s %-10s %s\n", art.ID, ctx.Artifacts[art.ID], art.Description)
+		if ctx.Mode == "patch" {
+			fmt.Println()
+			fmt.Printf("  %-12s %-10s %s\n", "specs", ctx.Artifacts["specs"], "(patch mode)")
+		} else {
+			fmt.Println()
+			for _, art := range internal.Artifacts {
+				fmt.Printf("  %-12s %-10s %s\n", art.ID, ctx.Artifacts[art.ID], art.Description)
+			}
 		}
 		return nil
 	}
@@ -109,9 +114,14 @@ func cmdStatus(args []string) error {
 			fmt.Fprintf(os.Stderr, "error loading change %q: %v\n", n.Name, err)
 			continue
 		}
-		fmt.Printf("%s\n", n.Name)
-		for _, art := range internal.Artifacts {
-			fmt.Printf("  %-12s %s\n", art.ID+":", ctx.Artifacts[art.ID])
+		if ctx.Mode == "patch" {
+			fmt.Printf("%s (patch mode)\n", n.Name)
+			fmt.Printf("  %-12s %s\n", "specs:", ctx.Artifacts["specs"])
+		} else {
+			fmt.Printf("%s\n", n.Name)
+			for _, art := range internal.Artifacts {
+				fmt.Printf("  %-12s %s\n", art.ID+":", ctx.Artifacts[art.ID])
+			}
 		}
 	}
 	return nil
