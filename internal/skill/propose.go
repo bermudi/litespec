@@ -62,45 +62,22 @@ litespec instructions <artifact-id> --json
 
 ## Context and Rules Are Constraints, Not Content
 
-Each artifact comes with ` + "`instruction`" + `, ` + "`template`" + `, and ` + "`dependencies`" + `. Use these to guide your thinking and structure — **do not paste them into artifact files**.
-
-- ` + "`instruction`" + ` and ` + "`template`" + ` tell you *what to produce and how to shape it*. They are your brief.
-- ` + "`dependencies`" + ` provide *source material to reference and build on*, not text to copy.
-- The artifact file should contain original, purposeful content — not a regurgitation of the instructions.
+Instructions and templates tell you what to produce and how to shape it — they are your brief, not your output. Dependencies provide source material to build on, not text to copy. Write original content informed by them.
 
 ---
 
 ## Spec Format
 
-Write delta specs in this exact structure:
-
-    # <capability>                    (optional heading)
-    ## ADDED Requirements
-    ### Requirement: <name>
-    <body text — must contain SHALL or MUST>
-
-    #### Scenario: <short name>
-    - **WHEN** <condition>
-    - **THEN** <expected outcome>
-
-    ## MODIFIED Requirements
-    ### Requirement: <name>
-    <full replacement including scenarios>
-
-    ## REMOVED Requirements
-    ### Requirement: <name>            (name only, no body or scenarios)
-
-    ## RENAMED Requirements
-    ### Requirement: <old> → <new>     (preserves body and scenarios)
-
 Before writing a delta for capability X, read ` + "`specs/canon/X/spec.md`" + ` if it exists. ADDED vs MODIFIED vs RENAMED is a function of what already exists.
 
-Rules:
+Delta spec structure — ` + "`litespec instructions specs --json`" + ` returns this at runtime, summarized here for convenience:
 
-- Every ADDED and MODIFIED requirement must include at least one ` + "`#### Scenario:`" + ` block
-- Scenario text describes expected behavior — WHEN/THEN is the recommended format
-- REMOVED requirements are name-only
-- RENAMED requirements change the heading only; content and scenarios carry over
+    ## ADDED Requirements          ### Requirement: <name>   body (SHALL/MUST) + ` + "`#### Scenario:`" + ` blocks
+    ## MODIFIED Requirements       ### Requirement: <name>   full replacement including scenarios
+    ## REMOVED Requirements        ### Requirement: <name>   name only, no body
+    ## RENAMED Requirements        ### Requirement: <old> → <new>   heading change only, content carries over
+
+Rules: ADDED/MODIFIED must have ≥1 scenario. Scenarios use WHEN/THEN format. REMOVED is name-only. RENAMED changes the heading only.
 
 ---
 

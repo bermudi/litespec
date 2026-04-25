@@ -14,9 +14,9 @@ const applyTemplate = `Apply is execution mode. You implement tasks, one phase a
 
 Run ` + "`litespec status <name> --json`" + ` to verify all artifacts are ready.
 
-Read the change artifacts directly: proposal.md, design.md, specs/, tasks.md. All are in ` + "`specs/changes/<name>/`" + `. You need full context before writing a single line of code.
+Read whatever change artifacts exist — proposal.md, design.md, specs/, tasks.md. All are in ` + "`specs/changes/<name>/`" + `. You need full context before writing a single line of code. Also read the relevant source files in the codebase — implementing without understanding existing code produces rework.
 
-If any required artifacts (proposal, design, tasks, specs) are missing, stop. Tell the user to create them first.
+If required artifacts (proposal, design, tasks, specs) are missing, stop. Tell the user to create them first.
 
 ---
 

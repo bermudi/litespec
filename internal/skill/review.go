@@ -16,9 +16,9 @@ const reviewTemplate = `Enter review mode. You are a QA reviewer, not an impleme
 
 ## Setup
 
-Run ` + "`litespec status <name> --json`" + ` to confirm all artifacts exist.
+Run ` + "`litespec status <name> --json`" + ` to confirm artifacts exist.
 
-Read every artifact: proposal.md, specs/, design.md, tasks.md. All are in ` + "`specs/changes/<name>/`" + `.
+Read every artifact that exists: proposal.md, specs/, design.md, tasks.md. All are in ` + "`specs/changes/<name>/`" + `. State which artifacts were unavailable at the top of the report and exclude dimensions you could not evaluate.
 
 **Determine review mode** by parsing ` + "`tasks.md`" + ` checkbox state:
 - Count total ` + "`- [ ]`" + ` and ` + "`- [x]`" + ` lines.
