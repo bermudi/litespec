@@ -86,8 +86,8 @@ The system SHALL limit API requests.
 
 func TestArchiveKeepsSpecsSubtree(t *testing.T) {
 	root := setupTestProject(t)
-	writeChangeFile(t, root, "keep-specs", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "keep-specs", "design.md", "# Design")
+	writeChangeFile(t, root, "keep-specs", "proposal.md", validProposal)
+	writeChangeFile(t, root, "keep-specs", "design.md", validDesign)
 	writeChangeFile(t, root, "keep-specs", "tasks.md", "## Phase 1\n- [x] Done")
 
 	writeDeltaSpecFile(t, root, "keep-specs", "auth", "spec.md", `## ADDED Requirements
@@ -137,8 +137,8 @@ The system SHALL authenticate.
 - **WHEN** valid creds
 `)
 
-	writeChangeFile(t, root, "mod-auth", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "mod-auth", "design.md", "# Design")
+	writeChangeFile(t, root, "mod-auth", "proposal.md", validProposal)
+	writeChangeFile(t, root, "mod-auth", "design.md", validDesign)
 	writeChangeFile(t, root, "mod-auth", "tasks.md", "## Phase 1\n- [x] Done")
 
 	writeDeltaSpecFile(t, root, "mod-auth", "auth", "spec.md", `## MODIFIED Requirements
@@ -189,8 +189,8 @@ The system SHALL authenticate.
 - **WHEN** valid creds
 `)
 
-	writeChangeFile(t, root, "rename-mod", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "rename-mod", "design.md", "# Design")
+	writeChangeFile(t, root, "rename-mod", "proposal.md", validProposal)
+	writeChangeFile(t, root, "rename-mod", "design.md", validDesign)
 	writeChangeFile(t, root, "rename-mod", "tasks.md", "## Phase 1\n- [x] Done")
 
 	writeDeltaSpecFile(t, root, "rename-mod", "auth", "spec.md", `## RENAMED Requirements
@@ -233,8 +233,8 @@ The system SHALL authenticate via SSO.
 
 func TestArchiveDanglingDeltaRejected(t *testing.T) {
 	root := setupTestProject(t)
-	writeChangeFile(t, root, "bad-change", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "bad-change", "design.md", "# Design")
+	writeChangeFile(t, root, "bad-change", "proposal.md", validProposal)
+	writeChangeFile(t, root, "bad-change", "design.md", validDesign)
 	writeChangeFile(t, root, "bad-change", "tasks.md", "## Phase 1\n- [ ] Task")
 
 	writeDeltaSpecFile(t, root, "bad-change", "auth", "spec.md", `## MODIFIED Requirements
@@ -260,8 +260,8 @@ The system SHALL do something.
 
 func TestArchiveNewCapabilityUsesDirNameAsFallback(t *testing.T) {
 	root := setupTestProject(t)
-	writeChangeFile(t, root, "add-cap", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "add-cap", "design.md", "# Design")
+	writeChangeFile(t, root, "add-cap", "proposal.md", validProposal)
+	writeChangeFile(t, root, "add-cap", "design.md", validDesign)
 	writeChangeFile(t, root, "add-cap", "tasks.md", "## Phase 1\n- [x] Done")
 
 	writeDeltaSpecFile(t, root, "add-cap", "my-feature", "spec.md", `## ADDED Requirements
@@ -300,8 +300,8 @@ The system SHALL authenticate.
 #### Scenario: Valid
 - **WHEN** valid creds
 `)
-	writeChangeFile(t, root, "bad-rename", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "bad-rename", "design.md", "# Design")
+	writeChangeFile(t, root, "bad-rename", "proposal.md", validProposal)
+	writeChangeFile(t, root, "bad-rename", "design.md", validDesign)
 	writeChangeFile(t, root, "bad-rename", "tasks.md", "## Phase 1\n- [ ] Task")
 
 	writeDeltaSpecFile(t, root, "bad-rename", "auth", "spec.md", `## RENAMED Requirements
@@ -339,8 +339,8 @@ The system SHALL authenticate.
 #### Scenario: Valid
 - **WHEN** valid creds
 `)
-	writeChangeFile(t, root, "conflict", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "conflict", "design.md", "# Design")
+	writeChangeFile(t, root, "conflict", "proposal.md", validProposal)
+	writeChangeFile(t, root, "conflict", "design.md", validDesign)
 	writeChangeFile(t, root, "conflict", "tasks.md", "## Phase 1\n- [ ] Task")
 
 	writeDeltaSpecFile(t, root, "conflict", "auth", "part1.md", `## MODIFIED Requirements
@@ -419,8 +419,8 @@ The system SHALL authenticate.
 #### Scenario: Valid
 - **WHEN** valid creds
 `)
-	writeChangeFile(t, root, "dup-add", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "dup-add", "design.md", "# Design")
+	writeChangeFile(t, root, "dup-add", "proposal.md", validProposal)
+	writeChangeFile(t, root, "dup-add", "design.md", validDesign)
 	writeChangeFile(t, root, "dup-add", "tasks.md", "## Phase 1\n- [ ] Task")
 
 	writeDeltaSpecFile(t, root, "dup-add", "auth", "spec.md", `## ADDED Requirements
@@ -475,8 +475,8 @@ The system SHALL limit requests.
 - **WHEN** limit exceeded
 `)
 
-	writeChangeFile(t, root, "multi", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "multi", "design.md", "# Design")
+	writeChangeFile(t, root, "multi", "proposal.md", validProposal)
+	writeChangeFile(t, root, "multi", "design.md", validDesign)
 	writeChangeFile(t, root, "multi", "tasks.md", "## Phase 1\n- [x] Done")
 
 	writeDeltaSpecFile(t, root, "multi", "auth", "spec.md", `## MODIFIED Requirements
@@ -556,8 +556,8 @@ The system SHALL authenticate.
 - **WHEN** valid creds
 `)
 
-	writeChangeFile(t, root, "multi-ok", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "multi-ok", "design.md", "# Design")
+	writeChangeFile(t, root, "multi-ok", "proposal.md", validProposal)
+	writeChangeFile(t, root, "multi-ok", "design.md", validDesign)
 	writeChangeFile(t, root, "multi-ok", "tasks.md", "## Phase 1\n- [x] Done")
 
 	writeDeltaSpecFile(t, root, "multi-ok", "auth", "spec.md", `## MODIFIED Requirements
@@ -630,8 +630,8 @@ The system SHALL throttle requests.
 func TestPrepareArchiveWritesNoDeltas(t *testing.T) {
 	root := setupTestProject(t)
 
-	writeChangeFile(t, root, "no-deltas", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "no-deltas", "design.md", "# Design")
+	writeChangeFile(t, root, "no-deltas", "proposal.md", validProposal)
+	writeChangeFile(t, root, "no-deltas", "design.md", validDesign)
 	writeChangeFile(t, root, "no-deltas", "tasks.md", "## Phase 1\n- [x] Done")
 
 	if err := os.MkdirAll(ChangeSpecsPath(root, "no-deltas"), 0o755); err != nil {
@@ -811,8 +811,8 @@ func TestAtomicWriteRollbackOnWriteFailure(t *testing.T) {
 
 func TestArchiveAutoCreatesArchiveDirectory(t *testing.T) {
 	root := setupTestProject(t)
-	writeChangeFile(t, root, "auto-dir", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "auto-dir", "design.md", "# Design")
+	writeChangeFile(t, root, "auto-dir", "proposal.md", validProposal)
+	writeChangeFile(t, root, "auto-dir", "design.md", validDesign)
 	writeChangeFile(t, root, "auto-dir", "tasks.md", "## Phase 1\n- [x] Done")
 
 	deltaContent := `# rate-limit
@@ -863,8 +863,8 @@ func TestDeterministicDeltaOrdering(t *testing.T) {
 The system SHALL authenticate.
 `)
 
-	writeChangeFile(t, root, "ordering-test", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "ordering-test", "design.md", "# Design")
+	writeChangeFile(t, root, "ordering-test", "proposal.md", validProposal)
+	writeChangeFile(t, root, "ordering-test", "design.md", validDesign)
 	writeChangeFile(t, root, "ordering-test", "tasks.md", "## Phase 1\n- [x] Done")
 
 	writeDeltaSpecFile(t, root, "ordering-test", "auth", "zzz-last.md", `## ADDED Requirements
@@ -930,8 +930,8 @@ The system SHALL authenticate.
 - **WHEN** valid creds
 `)
 
-	writeChangeFile(t, root, "rollback-test", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "rollback-test", "design.md", "# Design")
+	writeChangeFile(t, root, "rollback-test", "proposal.md", validProposal)
+	writeChangeFile(t, root, "rollback-test", "design.md", validDesign)
 	writeChangeFile(t, root, "rollback-test", "tasks.md", "## Phase 1\n- [x] Done")
 
 	writeDeltaSpecFile(t, root, "rollback-test", "auth", "spec.md", `## MODIFIED Requirements

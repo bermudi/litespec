@@ -7,6 +7,12 @@ import (
 	"testing"
 )
 
+const (
+	validProposal = "# Proposal\n\n## Motivation\nSome motivation.\n\n## Scope\nSome scope."
+	validDesign   = "# Design\n\n## Architecture\nLine one.\nLine two.\nLine three."
+	validTasks    = "## Phase 1\n\n- [ ] Task"
+)
+
 func setupTestProject(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -58,9 +64,9 @@ func writeMainSpecFile(t *testing.T, root, capability, content string) {
 
 func makeValidChange(t *testing.T, root, name string, deltaContent string) {
 	t.Helper()
-	writeChangeFile(t, root, name, "proposal.md", "# Proposal\nMotivation.")
-	writeChangeFile(t, root, name, "design.md", "# Design\nApproach.")
-	writeChangeFile(t, root, name, "tasks.md", "## Phase 1: Do stuff\n- [ ] Task one")
+	writeChangeFile(t, root, name, "proposal.md", validProposal)
+	writeChangeFile(t, root, name, "design.md", validDesign)
+	writeChangeFile(t, root, name, "tasks.md", "## Phase 1: Do stuff\n\n- [ ] Task one")
 	writeDeltaSpecFile(t, root, name, "cap", "spec.md", deltaContent)
 }
 
@@ -91,8 +97,8 @@ The system SHALL authenticate.
 
 func TestValidateChangeMissingProposal(t *testing.T) {
 	root := setupTestProject(t)
-	writeChangeFile(t, root, "bad", "design.md", "# Design")
-	writeChangeFile(t, root, "bad", "tasks.md", "## Phase 1\n- [ ] Task")
+	writeChangeFile(t, root, "bad", "design.md", "# Design\n\n## Architecture\nLine one.\nLine two.\nLine three.")
+	writeChangeFile(t, root, "bad", "tasks.md", "## Phase 1\n\n- [ ] Task")
 	writeDeltaSpecFile(t, root, "bad", "cap", "spec.md", `## ADDED Requirements
 
 ### Requirement: R1
@@ -107,24 +113,18 @@ The system SHALL work.
 	if err != nil {
 		t.Fatalf("ValidateChange: %v", err)
 	}
-	if result.Valid {
-		t.Fatal("expected invalid (missing proposal)")
-	}
-	found := false
-	for _, e := range result.Errors {
-		if e.Message == "missing required artifact: proposal" {
-			found = true
+	if !result.Valid {
+		for _, e := range result.Errors {
+			t.Errorf("Unexpected error: %s: %s", e.File, e.Message)
 		}
-	}
-	if !found {
-		t.Error("expected 'missing required artifact: proposal' error")
+		t.Fatal("expected valid (proposal is optional)")
 	}
 }
 
 func TestValidateChangeMissingSpecsDir(t *testing.T) {
 	root := setupTestProject(t)
-	writeChangeFile(t, root, "no-specs", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "no-specs", "design.md", "# Design")
+	writeChangeFile(t, root, "no-specs", "proposal.md", validProposal)
+	writeChangeFile(t, root, "no-specs", "design.md", validDesign)
 	writeChangeFile(t, root, "no-specs", "tasks.md", "## Phase 1\n- [ ] Task")
 
 	result, err := ValidateChange(root, "no-specs")
@@ -188,8 +188,8 @@ The system SHALL work.
 - **WHEN** triggered
 - **THEN** result
 `)
-	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "proposal.md", validProposal)
+	writeChangeFile(t, root, "change", "design.md", validDesign)
 	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
 	writeDeltaSpecFile(t, root, "change", "cap", "spec.md", `## MODIFIED Requirements
 
@@ -249,8 +249,8 @@ The system SHALL work.
 - **WHEN** triggered
 - **THEN** result
 `)
-	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "proposal.md", validProposal)
+	writeChangeFile(t, root, "change", "design.md", validDesign)
 	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
 	writeDeltaSpecFile(t, root, "change", "cap", "spec.md", `## MODIFIED Requirements
 
@@ -310,8 +310,8 @@ The system SHALL authenticate.
 	- **WHEN** valid creds
 - **THEN** result
 `)
-	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "proposal.md", validProposal)
+	writeChangeFile(t, root, "change", "design.md", validDesign)
 	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
 	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## MODIFIED Requirements
 
@@ -354,8 +354,8 @@ The system SHALL authenticate.
 	- **WHEN** valid creds
 - **THEN** result
 `)
-	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "proposal.md", validProposal)
+	writeChangeFile(t, root, "change", "design.md", validDesign)
 	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
 	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## REMOVED Requirements
 
@@ -503,8 +503,8 @@ The system SHALL do legacy thing.
 - **WHEN** old thing
 - **THEN** expected result
 `)
-	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "proposal.md", validProposal)
+	writeChangeFile(t, root, "change", "design.md", validDesign)
 	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
 	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## REMOVED Requirements
 
@@ -560,8 +560,8 @@ The system SHALL authenticate.
 	- **WHEN** valid creds
 - **THEN** result
 `)
-	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "proposal.md", validProposal)
+	writeChangeFile(t, root, "change", "design.md", validDesign)
 	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
 	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## RENAMED Requirements
 
@@ -606,8 +606,8 @@ The system SHALL invalidate.
 - **WHEN** logged out
 - **THEN** expected result
 `)
-	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "proposal.md", validProposal)
+	writeChangeFile(t, root, "change", "design.md", validDesign)
 	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
 	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## RENAMED Requirements
 
@@ -645,8 +645,8 @@ The system SHALL authenticate.
 	- **WHEN** valid creds
 - **THEN** result
 `)
-	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "proposal.md", validProposal)
+	writeChangeFile(t, root, "change", "design.md", validDesign)
 	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
 	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## ADDED Requirements
 
@@ -689,8 +689,8 @@ The system SHALL do legacy thing.
 - **WHEN** old thing
 - **THEN** expected result
 `)
-	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "proposal.md", validProposal)
+	writeChangeFile(t, root, "change", "design.md", validDesign)
 	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
 	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## REMOVED Requirements
 
@@ -729,8 +729,8 @@ The system SHALL do legacy thing.
 - **WHEN** old thing
 - **THEN** expected result
 `)
-	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "proposal.md", validProposal)
+	writeChangeFile(t, root, "change", "design.md", validDesign)
 	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
 	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## REMOVED Requirements
 
@@ -772,8 +772,8 @@ The system SHALL authenticate.
 	- **WHEN** valid creds
 - **THEN** result
 `)
-	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "proposal.md", validProposal)
+	writeChangeFile(t, root, "change", "design.md", validDesign)
 	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
 	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## RENAMED Requirements
 
@@ -812,8 +812,8 @@ The system SHALL authenticate.
 	- **WHEN** valid creds
 - **THEN** result
 `)
-	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "proposal.md", validProposal)
+	writeChangeFile(t, root, "change", "design.md", validDesign)
 	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
 	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## RENAMED Requirements
 
@@ -855,8 +855,8 @@ The system SHALL authenticate.
 	- **WHEN** valid creds
 - **THEN** result
 `)
-	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "proposal.md", validProposal)
+	writeChangeFile(t, root, "change", "design.md", validDesign)
 	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
 	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## RENAMED Requirements
 
@@ -1511,8 +1511,8 @@ The system SHALL authenticate.
 	- **WHEN** valid creds
 - **THEN** result
 `)
-	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "proposal.md", validProposal)
+	writeChangeFile(t, root, "change", "design.md", validDesign)
 	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
 	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## MODIFIED Requirements
 
@@ -1556,8 +1556,8 @@ The system SHALL authenticate.
 	- **WHEN** valid creds
 - **THEN** result
 `)
-	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "proposal.md", validProposal)
+	writeChangeFile(t, root, "change", "design.md", validDesign)
 	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
 	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## RENAMED Requirements
 
@@ -1601,8 +1601,8 @@ The system SHALL authenticate.
 	- **WHEN** valid creds
 - **THEN** result
 `)
-	writeChangeFile(t, root, "change", "proposal.md", "# Proposal")
-	writeChangeFile(t, root, "change", "design.md", "# Design")
+	writeChangeFile(t, root, "change", "proposal.md", validProposal)
+	writeChangeFile(t, root, "change", "design.md", validDesign)
 	writeChangeFile(t, root, "change", "tasks.md", "## Phase 1\n- [ ] Task")
 	writeDeltaSpecFile(t, root, "change", "auth", "spec.md", `## RENAMED Requirements
 
@@ -1984,5 +1984,90 @@ func TestValidateTasksChecklist_CRLFLineEndings(t *testing.T) {
 	problems := validateTasksChecklist(content)
 	if len(problems) != 0 {
 		t.Errorf("expected no problems with CRLF tasks, got %v", problems)
+	}
+}
+
+func TestValidateChangePatchModeNoTrio(t *testing.T) {
+	root := setupTestProject(t)
+	writeDeltaSpecFile(t, root, "patch-only", "cap", "spec.md", `## ADDED Requirements
+
+### Requirement: R1
+The system SHALL work.
+
+#### Scenario: S1
+- **WHEN** triggered
+- **THEN** result
+`)
+
+	result, err := ValidateChange(root, "patch-only")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if !result.Valid {
+		for _, e := range result.Errors {
+			t.Errorf("Unexpected error: %s: %s", e.File, e.Message)
+		}
+		t.Fatal("expected valid (no trio is OK)")
+	}
+}
+
+func TestValidateProposalEmptyMotivation(t *testing.T) {
+	issues := validateProposal("# Proposal\n\n## Motivation\n\n## Scope\nSome scope.")
+	if len(issues) != 1 {
+		t.Fatalf("expected 1 issue, got %d: %v", len(issues), issues)
+	}
+	if !strings.Contains(issues[0].Message, "Motivation") {
+		t.Errorf("expected Motivation error, got: %s", issues[0].Message)
+	}
+}
+
+func TestValidateProposalEmptyScope(t *testing.T) {
+	issues := validateProposal("# Proposal\n\n## Motivation\nSome motivation.\n\n## Scope")
+	if len(issues) != 1 {
+		t.Fatalf("expected 1 issue, got %d: %v", len(issues), issues)
+	}
+	if !strings.Contains(issues[0].Message, "Scope") {
+		t.Errorf("expected Scope error, got: %s", issues[0].Message)
+	}
+}
+
+func TestValidateProposalMissingBoth(t *testing.T) {
+	issues := validateProposal("# Proposal\nJust a title.")
+	if len(issues) != 2 {
+		t.Fatalf("expected 2 issues, got %d: %v", len(issues), issues)
+	}
+}
+
+func TestValidateProposalLegacyWhyAlias(t *testing.T) {
+	issues := validateProposal("# Proposal\n\n## Why\nBecause.\n\n## What Changes\nEverything.")
+	if len(issues) != 0 {
+		t.Fatalf("expected 0 issues with legacy aliases, got %d: %v", len(issues), issues)
+	}
+}
+
+func TestValidateDesignEmpty(t *testing.T) {
+	issues := validateDesign("")
+	if len(issues) != 2 {
+		t.Fatalf("expected 2 issues, got %d: %v", len(issues), issues)
+	}
+}
+
+func TestValidateDesignCodeFenceOnly(t *testing.T) {
+	issues := validateDesign("# Design\n\n## Architecture\n```\nline one\nline two\nline three\n```")
+	found := false
+	for _, iss := range issues {
+		if strings.Contains(iss.Message, "3 non-blank lines") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected non-blank lines error for code-fence-only content, got: %v", issues)
+	}
+}
+
+func TestValidateDesignValid(t *testing.T) {
+	issues := validateDesign("# Design\n\n## Architecture\nLine one.\nLine two.\nLine three.")
+	if len(issues) != 0 {
+		t.Fatalf("expected 0 issues, got %d: %v", len(issues), issues)
 	}
 }

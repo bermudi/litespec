@@ -18,7 +18,7 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 		return nil, fmt.Errorf("change %q not found", name)
 	}
 
-	requiredFiles := []struct {
+	optionalFiles := []struct {
 		id       string
 		filename string
 	}{
@@ -26,14 +26,23 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 		{"design", "design.md"},
 		{"tasks", "tasks.md"},
 	}
-	for _, rf := range requiredFiles {
-		p := filepath.Join(changeDir, rf.filename)
-		if _, err := os.Stat(p); err != nil {
-			result.Errors = append(result.Errors, ValidationIssue{
-				Severity: SeverityError,
-				Message:  fmt.Sprintf("missing required artifact: %s", rf.id),
-				File:     p,
-			})
+	for _, of := range optionalFiles {
+		p := filepath.Join(changeDir, of.filename)
+		data, readErr := os.ReadFile(p)
+		if readErr != nil {
+			continue
+		}
+		switch of.id {
+		case "proposal":
+			for _, issue := range validateProposal(string(data)) {
+				issue.File = p
+				result.Errors = append(result.Errors, issue)
+			}
+		case "design":
+			for _, issue := range validateDesign(string(data)) {
+				issue.File = p
+				result.Errors = append(result.Errors, issue)
+			}
 		}
 	}
 
@@ -377,6 +386,97 @@ func validateTasksChecklist(content string) []string {
 		problems = append(problems, fmt.Sprintf("phase %q has no checklist items (- [ ])", phaseName))
 	}
 	return problems
+}
+
+func validateProposal(content string) []ValidationIssue {
+	var issues []ValidationIssue
+
+	hasMotivation := false
+	hasScope := false
+	var currentHeading string
+	var bodyLines []string
+
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(strings.TrimSuffix(line, "\r"))
+		if strings.HasPrefix(trimmed, "## ") {
+			if currentHeading != "" && len(bodyLines) > 0 {
+				switch currentHeading {
+				case "Motivation", "Why":
+					hasMotivation = true
+				case "Scope", "What Changes":
+					hasScope = true
+				}
+			}
+			headingName := strings.TrimPrefix(trimmed, "## ")
+			currentHeading = headingName
+			bodyLines = nil
+			continue
+		}
+		if currentHeading != "" && trimmed != "" {
+			bodyLines = append(bodyLines, trimmed)
+		}
+	}
+	if currentHeading != "" && len(bodyLines) > 0 {
+		switch currentHeading {
+		case "Motivation", "Why":
+			hasMotivation = true
+		case "Scope", "What Changes":
+			hasScope = true
+		}
+	}
+
+	if !hasMotivation {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  "proposal.md must contain ## Motivation (or ## Why) heading with non-blank body",
+		})
+	}
+	if !hasScope {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  "proposal.md must contain ## Scope (or ## What Changes) heading with non-blank body",
+		})
+	}
+	return issues
+}
+
+func validateDesign(content string) []ValidationIssue {
+	var issues []ValidationIssue
+
+	hasH2 := false
+	nonBlankLines := 0
+	inFence := false
+
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(strings.TrimSuffix(line, "\r"))
+		if strings.HasPrefix(trimmed, "```") {
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "## ") {
+			hasH2 = true
+		}
+		if trimmed != "" {
+			nonBlankLines++
+		}
+	}
+
+	if !hasH2 {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  "design.md must contain at least one ## heading",
+		})
+	}
+	if nonBlankLines < 3 {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  "design.md must have at least 3 non-blank lines outside fenced code blocks",
+		})
+	}
+	return issues
 }
 
 var keywordRe = regexp.MustCompile(`\b(SHALL|MUST)\b`)

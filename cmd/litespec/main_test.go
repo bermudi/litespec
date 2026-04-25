@@ -80,9 +80,9 @@ func createChangeWithArtifacts(t *testing.T, root, name string) {
 	t.Helper()
 	createChange(t, root, name)
 	changeDir := filepath.Join(root, "specs", "changes", name)
-	os.WriteFile(filepath.Join(changeDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
-	os.WriteFile(filepath.Join(changeDir, "design.md"), []byte("# Design\nTest."), 0o644)
-	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1: Test\n- [ ] Task"), 0o644)
+	os.WriteFile(filepath.Join(changeDir, "proposal.md"), []byte("# Proposal\n\n## Motivation\nSome motivation.\n\n## Scope\nSome scope."), 0o644)
+	os.WriteFile(filepath.Join(changeDir, "design.md"), []byte("# Design\n\n## Architecture\nLine one.\nLine two.\nLine three."), 0o644)
+	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1: Test\n\n- [ ] Task"), 0o644)
 	specsSubdir := filepath.Join(changeDir, "specs", "cap")
 	os.MkdirAll(specsSubdir, 0o755)
 	os.WriteFile(filepath.Join(specsSubdir, "spec.md"), []byte(`## ADDED Requirements
@@ -625,8 +625,8 @@ func TestCLIArchiveBlocksOnUnarchivedDependency(t *testing.T) {
 		t.Fatal(err)
 	}
 	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - parent\n"), 0o644)
-	os.WriteFile(filepath.Join(changeDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
-	os.WriteFile(filepath.Join(changeDir, "design.md"), []byte("# Design\nTest."), 0o644)
+	os.WriteFile(filepath.Join(changeDir, "proposal.md"), []byte("# Proposal\n\n## Motivation\nSome motivation.\n\n## Scope\nSome scope."), 0o644)
+	os.WriteFile(filepath.Join(changeDir, "design.md"), []byte("# Design\n\n## Architecture\nLine one.\nLine two.\nLine three."), 0o644)
 	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1: Test\n- [x] Task one"), 0o644)
 	specsDir := filepath.Join(changeDir, "specs", "cap")
 	os.MkdirAll(specsDir, 0o755)
@@ -645,8 +645,8 @@ The system SHALL work.
 		t.Fatal(err)
 	}
 	os.WriteFile(filepath.Join(parentDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
-	os.WriteFile(filepath.Join(parentDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
-	os.WriteFile(filepath.Join(parentDir, "design.md"), []byte("# Design\nTest."), 0o644)
+	os.WriteFile(filepath.Join(parentDir, "proposal.md"), []byte("# Proposal\n\n## Motivation\nSome motivation.\n\n## Scope\nSome scope."), 0o644)
+	os.WriteFile(filepath.Join(parentDir, "design.md"), []byte("# Design\n\n## Architecture\nLine one.\nLine two.\nLine three."), 0o644)
 	os.WriteFile(filepath.Join(parentDir, "tasks.md"), []byte("## Phase 1: Test\n- [ ] Task one"), 0o644)
 
 	out, code := runCLI(t, bin, root, "archive", "child")
@@ -666,8 +666,8 @@ func TestCLIArchiveAllowsIncompleteWithUnarchivedDeps(t *testing.T) {
 		t.Fatal(err)
 	}
 	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - parent\n"), 0o644)
-	os.WriteFile(filepath.Join(changeDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
-	os.WriteFile(filepath.Join(changeDir, "design.md"), []byte("# Design\nTest."), 0o644)
+	os.WriteFile(filepath.Join(changeDir, "proposal.md"), []byte("# Proposal\n\n## Motivation\nSome motivation.\n\n## Scope\nSome scope."), 0o644)
+	os.WriteFile(filepath.Join(changeDir, "design.md"), []byte("# Design\n\n## Architecture\nLine one.\nLine two.\nLine three."), 0o644)
 	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1: Test\n- [x] Task one"), 0o644)
 	specsDir := filepath.Join(changeDir, "specs", "cap")
 	os.MkdirAll(specsDir, 0o755)
@@ -686,8 +686,8 @@ The system SHALL work.
 		t.Fatal(err)
 	}
 	os.WriteFile(filepath.Join(parentDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
-	os.WriteFile(filepath.Join(parentDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
-	os.WriteFile(filepath.Join(parentDir, "design.md"), []byte("# Design\nTest."), 0o644)
+	os.WriteFile(filepath.Join(parentDir, "proposal.md"), []byte("# Proposal\n\n## Motivation\nSome motivation.\n\n## Scope\nSome scope."), 0o644)
+	os.WriteFile(filepath.Join(parentDir, "design.md"), []byte("# Design\n\n## Architecture\nLine one.\nLine two.\nLine three."), 0o644)
 	os.WriteFile(filepath.Join(parentDir, "tasks.md"), []byte("## Phase 1: Test\n- [ ] Task one"), 0o644)
 
 	out, code := runCLI(t, bin, root, "archive", "child", "--allow-incomplete")
@@ -710,8 +710,8 @@ func TestCLIArchiveParentWithActiveDependent(t *testing.T) {
 		t.Fatal(err)
 	}
 	os.WriteFile(filepath.Join(parentDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
-	os.WriteFile(filepath.Join(parentDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
-	os.WriteFile(filepath.Join(parentDir, "design.md"), []byte("# Design\nTest."), 0o644)
+	os.WriteFile(filepath.Join(parentDir, "proposal.md"), []byte("# Proposal\n\n## Motivation\nSome motivation.\n\n## Scope\nSome scope."), 0o644)
+	os.WriteFile(filepath.Join(parentDir, "design.md"), []byte("# Design\n\n## Architecture\nLine one.\nLine two.\nLine three."), 0o644)
 	os.WriteFile(filepath.Join(parentDir, "tasks.md"), []byte("## Phase 1: Test\n- [x] Task one"), 0o644)
 	specsDir := filepath.Join(parentDir, "specs", "cap")
 	os.MkdirAll(specsDir, 0o755)
@@ -730,8 +730,8 @@ The system SHALL work.
 		t.Fatal(err)
 	}
 	os.WriteFile(filepath.Join(childDir, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - parent\n"), 0o644)
-	os.WriteFile(filepath.Join(childDir, "proposal.md"), []byte("# Proposal\nTest."), 0o644)
-	os.WriteFile(filepath.Join(childDir, "design.md"), []byte("# Design\nTest."), 0o644)
+	os.WriteFile(filepath.Join(childDir, "proposal.md"), []byte("# Proposal\n\n## Motivation\nSome motivation.\n\n## Scope\nSome scope."), 0o644)
+	os.WriteFile(filepath.Join(childDir, "design.md"), []byte("# Design\n\n## Architecture\nLine one.\nLine two.\nLine three."), 0o644)
 	os.WriteFile(filepath.Join(childDir, "tasks.md"), []byte("## Phase 1: Test\n- [ ] Task one"), 0o644)
 
 	out, code := runCLI(t, bin, root, "archive", "parent")
