@@ -4,12 +4,12 @@
 
 ### Requirement: Patch Command Scaffold
 
-The `litespec patch <name> <capability>` command MUST scaffold a delta-only change. It SHALL create the change directory at `specs/changes/<name>/` and a delta spec stub at `specs/changes/<name>/specs/<capability>/spec.md`. The stub SHALL contain a top-level `# <capability>` heading and an `## ADDED Requirements` section as a starting point. The command MUST NOT create `proposal.md`, `design.md`, `tasks.md`, or `.litespec.yaml`. The command SHALL print the path of the created stub and a brief next-step hint pointing at archive.
+The `litespec patch <name> <capability>` command MUST scaffold a delta-only change. It SHALL create the change directory at `specs/changes/<name>/` and a delta spec stub at `specs/changes/<name>/specs/<capability>/spec.md`. The stub SHALL contain a top-level `# <capability>` heading and an `## ADDED Requirements` section as a starting point. The command MUST NOT create `proposal.md`, `design.md`, or `tasks.md`. The command SHALL write a `.litespec.yaml` with `mode: patch` to declare the change's lane. The command SHALL print the path of the created stub and a brief next-step hint pointing at archive.
 
 #### Scenario: Patch creates change with delta stub only
 
 - **WHEN** `litespec patch add-foo-flag bar` is run in a litespec project where `add-foo-flag` does not exist
-- **THEN** the directory `specs/changes/add-foo-flag/specs/bar/` is created with a `spec.md` file containing `# bar` and `## ADDED Requirements`, and no `proposal.md`, `design.md`, `tasks.md`, or `.litespec.yaml` exists in `specs/changes/add-foo-flag/`
+- **THEN** the directory `specs/changes/add-foo-flag/specs/bar/` is created with a `spec.md` file containing `# bar` and `## ADDED Requirements`, and `.litespec.yaml` contains `mode: patch`, and no `proposal.md`, `design.md`, or `tasks.md` exists in `specs/changes/add-foo-flag/`
 
 #### Scenario: Patch refuses existing change
 
@@ -28,21 +28,21 @@ The `litespec patch <name> <capability>` command MUST scaffold a delta-only chan
 
 ### Requirement: Patch-Mode Change Detection
 
-The internal change-loading logic MUST recognize a patch-mode change as one whose change directory contains at least one delta file under `specs/<capability>/` AND does not contain `proposal.md`. Patch-mode detection SHALL be exposed via an `IsPatchMode(root, name) bool` function in the internal package. This function is the single source of truth for patch-mode classification across status, view, and other consumers.
+The internal change-loading logic MUST recognize a patch-mode change via the `mode` field in `.litespec.yaml`. When `mode` is set to `patch`, the change is in patch mode. When the field is absent or any other value, the change is in full-proposal mode. Patch-mode detection SHALL be exposed via an `IsPatchMode(root, name string) bool` function in the internal package. This function is the single source of truth for patch-mode classification across status, view, and other consumers.
 
 #### Scenario: Detect patch-mode change
 
-- **WHEN** `IsPatchMode(root, "add-foo-flag")` is called and the change has `specs/bar/spec.md` but no `proposal.md`
+- **WHEN** `IsPatchMode(root, "add-foo-flag")` is called and the change's `.litespec.yaml` contains `mode: patch`
 - **THEN** the function returns true
 
 #### Scenario: Full proposal change is not patch-mode
 
-- **WHEN** `IsPatchMode(root, "big-feature")` is called and the change has `proposal.md`
+- **WHEN** `IsPatchMode(root, "big-feature")` is called and the change's `.litespec.yaml` has no `mode` field
 - **THEN** the function returns false
 
 #### Scenario: Empty change is not patch-mode
 
-- **WHEN** `IsPatchMode(root, "stub")` is called and the change has no specs and no proposal
+- **WHEN** `IsPatchMode(root, "stub")` is called and the change has no `.litespec.yaml`
 - **THEN** the function returns false
 
 ### Requirement: Patch Lane Skill

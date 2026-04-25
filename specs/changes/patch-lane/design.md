@@ -35,15 +35,15 @@ Data flow stays the same: deltas live in `specs/changes/<name>/specs/`, archive 
 
 ## Decisions
 
-### Patch mode is inferred, not declared
+### Patch mode is declared in metadata, not inferred
 
-**Chosen:** patch mode is detected by inspecting the change directory — if `proposal.md` is absent and at least one delta file exists under `specs/<cap>/`, the change is patch-mode.
+**Chosen:** patch mode is stored as `mode: patch` in `.litespec.yaml`. Set by `litespec patch` at creation time. `IsPatchMode` reads the metadata file. When the field is absent (changes created by `litespec new`), the change is full-proposal mode.
 
 **Over alternatives:**
-- A `kind: patch` field in `.litespec.yaml` would be more explicit but introduces a new metadata surface and conflicts with the convention-over-configuration principle in `AGENTS.md`.
-- A marker file like `.patch` would be even uglier.
+- Inferring from filesystem (absent `proposal.md` + present delta) fails to distinguish "mid-creation full change" from "intentional patch." A full-proposal change that has specs written but no proposal yet looks identical to a patch. Metadata is unambiguous.
+- A marker file like `.patch` would be even uglier and is less queryable than YAML.
 
-**Constraints:** if a user manually adds `proposal.md` to a patch-mode change, it transitions to full-proposal mode. This is intentional — the user is opting in to more ceremony, which is a reasonable progression.
+**Constraints:** if a user manually adds `proposal.md` to a patch-mode change, it remains a patch — the mode is a property of the change, not the current file state. If they want to upgrade to a full change, they remove the `mode` field from `.litespec.yaml`.
 
 ### `IsPatchMode` is a single function, not a method on a struct
 
@@ -89,7 +89,7 @@ Data flow stays the same: deltas live in `specs/changes/<name>/specs/`, archive 
 
 ### New files
 
-- **`cmd/litespec/patch.go`** — implements `cmdPatch(args []string) error`. Parses two positional args (name, capability), validates them, refuses if `specs/changes/<name>/` exists, creates the directory tree, writes the stub `spec.md`. Exit-free per `project-structure` requirements. Implements **Patch Command Scaffold** requirement.
+- **`cmd/litespec/patch.go`** — implements `cmdPatch(args []string) error`. Parses two positional args (name, capability), validates them, refuses if `specs/changes/<name>/` exists, creates the directory tree, writes the stub `spec.md`, and writes `.litespec.yaml` with `mode: patch`. Exit-free per `project-structure` requirements. Implements **Patch Command Scaffold** requirement.
 
 - **`cmd/litespec/patch_test.go`** — happy path + error cases (missing args, existing change, invalid names). Implements the test-coverage requirement from `project-structure`.
 
@@ -109,7 +109,7 @@ Data flow stays the same: deltas live in `specs/changes/<name>/specs/`, archive 
 
 - **`internal/artifact.go`** — `LoadArtifactStates` checks `IsPatchMode` and returns only `{specs: DONE}` for patch-mode changes. Implements **Patch-Mode Artifact States** requirement.
 
-- **`internal/change.go`** — add `IsPatchMode(root, name string) bool` helper. `LoadChangeContext` already calls `LoadArtifactStates`, so it inherits the patch-mode behavior. Add a `Mode` field (or keep absent and infer at render time) to the context as needed. Implements **Patch-Mode Change Detection** requirement.
+- **`internal/change.go`** — add `IsPatchMode(root, name string) bool` helper that reads `.litespec.yaml` and returns true when `mode` field is `"patch"`. `LoadChangeContext` already calls `LoadArtifactStates`, so it inherits the patch-mode behavior. Implements **Patch-Mode Change Detection** requirement.
 
 - **`cmd/litespec/status.go`** — when rendering a change, check `IsPatchMode` and emit only the `specs` line plus a `(patch mode)` indicator. JSON output adds `"mode": "patch"` and either omits non-applicable artifacts or marks them `status: "n/a"`. Implements **Patch-Mode Status Display** requirement.
 

@@ -19,7 +19,7 @@ Introduce a **patch lane** for delta-only changes, alongside the existing full p
 
 ### CLI changes
 
-- New command: `litespec patch <name> <capability>` — scaffolds a delta-only change. Creates `specs/changes/<name>/specs/<capability>/spec.md` with a delta stub. No `proposal.md`, no `design.md`, no `tasks.md`, no `.litespec.yaml`.
+- New command: `litespec patch <name> <capability>` — scaffolds a delta-only change. Creates `specs/changes/<name>/specs/<capability>/spec.md` with a delta stub. Writes `.litespec.yaml` with `mode: patch`. No `proposal.md`, no `design.md`, no `tasks.md`.
 - `litespec validate` — demote `proposal.md`, `design.md`, `tasks.md` from required to optional. Validate them only when they exist.
 - `litespec validate` — add lightweight content validation when planning artifacts exist:
   - `proposal.md`: must contain `## Motivation` (or `## Why`) and `## Scope` (or `## What Changes`) headings, each with at least one non-blank body line. Errors if missing or empty.
@@ -28,7 +28,7 @@ Introduce a **patch lane** for delta-only changes, alongside the existing full p
 
 ### Artifact state machine changes
 
-- `LoadArtifactStates` and `LoadChangeContext` — recognize patch-mode changes (inferred from absence of `proposal.md` and presence of at least one delta in `specs/`). In patch mode, planning artifacts report `N/A` instead of `BLOCKED` or `READY`. The change's lifecycle is just `specs DONE`.
+- `LoadArtifactStates` and `LoadChangeContext` — recognize patch-mode changes (declared via `mode: patch` in `.litespec.yaml`). In patch mode, planning artifacts are omitted entirely. The change's lifecycle is just `specs DONE`.
 - `litespec status` — patch-mode changes display only the `specs` artifact line plus a one-line note indicating patch mode.
 - `litespec view` — patch-mode changes display in a distinct category (or with a `[patch]` marker), separate from draft/active/ready-to-archive.
 
@@ -46,7 +46,7 @@ Introduce a **patch lane** for delta-only changes, alongside the existing full p
 ## Non-Goals
 
 - **No size or complexity policing on patch.** No heuristics that flag "this delta is too big for patch." Trust the user. Same as today's `propose` accepting any size.
-- **No new metadata field for patch mode.** Mode is inferred from artifact presence, not declared in `.litespec.yaml`. Convention over configuration.
+- **No retroactive migration of existing changes.** The `mode` field in `.litespec.yaml` defaults to full-proposal when absent, so existing changes work without changes.
 - **No changes to the `propose` skill** beyond a passing reference to the patch lane. Real changes still get the full treatment.
 - **No `research` integration with patch.** If a change needs research, it is not a patch.
 - **No changes to `review`.** Review already adapts to whatever artifacts exist; it will read what is present and skip what is not.

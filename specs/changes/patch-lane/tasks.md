@@ -9,18 +9,19 @@
 - [x] Add tests in `internal/validate_test.go` covering: missing trio passes, empty proposal/design/tasks fails with expected messages, full proposal still passes, legacy `## Why`/`## What Changes` aliases accepted, code-fence-only design content fails
 - [x] Run `go build ./...`, `go vet ./...`, `go test ./...` — all green
 
-## Phase 2: Patch-mode detection and artifact state handling
+## Phase 2: Patch-mode detection via metadata and artifact state handling
 
-- [ ] Add `IsPatchMode(root, name string) bool` in `internal/change.go` — true when `proposal.md` is absent AND at least one `specs/<cap>/spec.md` exists with `.md` extension
+- [ ] Add `Mode string` field (yaml tag `"mode,omitempty"`) to `ChangeMeta` in `internal/types.go`
+- [ ] Add `IsPatchMode(root, name string) bool` in `internal/change.go` — reads `ChangeMeta` via `ReadChangeMeta`, returns true when `Mode == "patch"`; returns false on read error (graceful degradation)
 - [ ] Modify `LoadArtifactStates` in `internal/artifact.go` to return only `{specs: ArtifactDone}` for patch-mode changes (omit `proposal`, `design`, `tasks` keys entirely)
 - [ ] Verify `LoadChangeContext` in `internal/change.go` still works correctly since it wraps `LoadArtifactStates` — no change needed unless tests reveal otherwise
-- [ ] Add tests in `internal/change_test.go` (or appropriate file) for `IsPatchMode`: true for delta-only change, false for change with proposal.md, false for empty change, false for change with proposal but no specs
+- [ ] Add tests in `internal/change_test.go` for `IsPatchMode`: true for change with `mode: patch` in metadata, false for change without mode field, false for change with no `.litespec.yaml`, false for change with `mode: ""` (empty string)
 - [ ] Add tests in `internal/artifact_test.go` verifying `LoadArtifactStates` returns single-key map for patch mode and full four-key map for full proposal
 - [ ] Run `go build ./...`, `go vet ./...`, `go test ./...` — all green
 
 ## Phase 3: `litespec patch` command
 
-- [ ] Create `cmd/litespec/patch.go` implementing `cmdPatch(args []string) error` — parses `<name> <capability>` positional args, validates them with the same rules as `litespec new`, refuses if `specs/changes/<name>/` exists, creates `specs/changes/<name>/specs/<capability>/spec.md` with stub content (`# <capability>\n\n## ADDED Requirements\n`)
+- [ ] Create `cmd/litespec/patch.go` implementing `cmdPatch(args []string) error` — parses `<name> <capability>` positional args, validates them with the same rules as `litespec new`, refuses if `specs/changes/<name>/` exists, creates `specs/changes/<name>/specs/<capability>/spec.md` with stub content (`# <capability>\n\n## ADDED Requirements\n`), writes `.litespec.yaml` with `mode: patch`
 - [ ] Wire `patch` into the command dispatcher in `cmd/litespec/main.go` and add to `printUsage()`
 - [ ] Add `printPatchHelp()` following the pattern of other commands
 - [ ] Create `cmd/litespec/patch_test.go` covering: happy path (creates expected files, no proposal/design/tasks), missing args error, existing change error, invalid name error
