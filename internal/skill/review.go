@@ -57,6 +57,15 @@ If Phase 1 was skipped, state ` + "`Phase 1 skipped: no stateful code paths dete
 #### CRITICAL / WARNING / SUGGESTION
 Tag each issue with the scenario number it relates to (e.g., "S2: Missing state guard on...").
 
+#### Pattern Annotations
+Group findings that share a common structural root. For each pattern:
+- **Pattern**: one-line description of the abstract issue (e.g., "unguarded state transition on cancellation", "stale closure over loop variable")
+- **Confirmed locations**: ` + "`" + `file:line` + "`" + ` references already flagged as CRITICAL or WARNING above
+- **Likely locations**: ` + "`" + `file:line` + "`" + ` references that share the same pattern but were not directly triggered by the scenarios you enumerated — the fixer should verify and guard these too
+- **Fix guidance**: a single recommendation that addresses all confirmed and likely locations at once (e.g., "Add a unified state-guard check at the top of every method that transitions SubagentInstance status")
+
+Omit this section if no findings share a common pattern.
+
 ### Phase 2: Compliance Findings
 
 #### CRITICAL
@@ -191,7 +200,23 @@ A test that only exercises the happy path does not count. Flag cases where:
 - A spec requirement has no corresponding negative test (invalid input, rejected transition, expired state)
 - A spec scenario is tested in isolation but never in combination with other scenarios that affect the same entity
 - A spec describes a cascade or multi-step interaction but tests only cover single-step cases
-- A state transition has no test for what happens when the entity is already in a terminal state`
+- A state transition has no test for what happens when the entity is already in a terminal state
+
+## Step 5: Extract patterns
+
+After completing Steps 1–4, step back and look for shared structure across your findings.
+
+When multiple findings stem from the same root cause (e.g., several methods that transition the same state machine without a shared guard, multiple loops that close over the same mutable variable, several event handlers that assume an entity is alive), group them into a **Pattern Annotation**.
+
+A pattern annotation serves the fixer — the agent that will consume this report and apply changes. The fixer may not have the reviewer's full context. By shipping the pattern, you give the fixer permission and direction to fix *all* instances rather than cherry-picking the one reported finding.
+
+For each pattern:
+1. Name the pattern (concise, descriptive)
+2. List all confirmed locations (findings already reported above)
+3. List all likely locations (same pattern, not yet triggered by your scenarios but structurally identical)
+4. Give a single unified fix recommendation
+
+Patterns are optional — only emit them when findings genuinely share a root cause. Do not force unrelated findings into patterns. One finding with no structural kin needs no pattern annotation.`
 
 const complianceReviewTemplate = `Compliance review checks implementation for spec compliance, design adherence, and pattern coherence. It applies conservative heuristics — prefer false negatives, flag only what you can prove.
 
