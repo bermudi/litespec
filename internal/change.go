@@ -108,6 +108,10 @@ func ListChanges(root string) ([]ChangeInfo, error) {
 		if metaErr == nil {
 			created = meta.Created
 			dependsOn = meta.DependsOn
+		} else {
+			if fi, fiErr := entry.Info(); fiErr == nil {
+				created = fi.ModTime()
+			}
 		}
 
 		result = append(result, ChangeInfo{

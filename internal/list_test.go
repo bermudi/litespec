@@ -342,8 +342,8 @@ func TestListChangesCreatedMissingMeta(t *testing.T) {
 	if len(changes) != 1 {
 		t.Fatalf("changes count = %d, want 1", len(changes))
 	}
-	if !changes[0].Created.IsZero() {
-		t.Error("Created should be zero when no .litespec.yaml exists")
+	if changes[0].Created.IsZero() {
+		t.Error("Created should fall back to directory mtime when no .litespec.yaml exists")
 	}
 }
 

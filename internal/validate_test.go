@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 const (
@@ -35,6 +36,10 @@ func writeChangeFile(t *testing.T, root, changeName, filename, content string) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
+	metaPath := filepath.Join(dir, MetaFileName)
+	if _, err := os.Stat(metaPath); err != nil {
+		writeChangeMeta(t, root, changeName, ChangeMeta{Schema: "spec-driven", Created: time.Now().UTC().Truncate(time.Second)})
+	}
 	if err := os.WriteFile(filepath.Join(dir, filename), []byte(content), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
@@ -45,6 +50,10 @@ func writeDeltaSpecFile(t *testing.T, root, changeName, capability, filename, co
 	dir := filepath.Join(ChangeSpecsPath(root, changeName), capability)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
+	}
+	metaPath := filepath.Join(ChangePath(root, changeName), MetaFileName)
+	if _, err := os.Stat(metaPath); err != nil {
+		writeChangeMeta(t, root, changeName, ChangeMeta{Schema: "spec-driven", Created: time.Now().UTC().Truncate(time.Second)})
 	}
 	if err := os.WriteFile(filepath.Join(dir, filename), []byte(content), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
@@ -982,10 +991,6 @@ The system SHALL authenticate.
 
 func writeChangeMeta(t *testing.T, root, changeName string, meta ChangeMeta) {
 	t.Helper()
-	existing, err := ReadChangeMeta(root, changeName)
-	if err == nil && !existing.Created.IsZero() {
-		meta.Created = existing.Created
-	}
 	if err := WriteChangeMeta(root, changeName, &meta); err != nil {
 		t.Fatalf("write meta: %v", err)
 	}

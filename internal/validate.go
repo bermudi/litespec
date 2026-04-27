@@ -18,6 +18,15 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 		return nil, fmt.Errorf("change %q not found", name)
 	}
 
+	metaPath := filepath.Join(changeDir, MetaFileName)
+	if _, err := os.Stat(metaPath); err != nil {
+		result.Errors = append(result.Errors, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("missing %s — run 'litespec new <name>' or create it manually", MetaFileName),
+			File:     changeDir,
+		})
+	}
+
 	optionalFiles := []struct {
 		id       string
 		filename string
