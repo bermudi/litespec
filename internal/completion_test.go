@@ -3,6 +3,9 @@ package internal
 import (
 	"os"
 	"path/filepath"
+	"regexp"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -17,7 +20,7 @@ func TestCompleteCommandNames(t *testing.T) {
 		names[c.Candidate] = true
 	}
 
-	for _, cmd := range []string{"init", "new", "patch", "list", "status", "validate", "instructions", "archive", "view", "decide", "import", "update", "upgrade", "completion"} {
+	for _, cmd := range []string{"init", "new", "patch", "list", "status", "validate", "instructions", "archive", "preview", "view", "decide", "import", "update", "upgrade", "completion"} {
 		if !names[cmd] {
 			t.Errorf("missing command %q in completions", cmd)
 		}
@@ -286,6 +289,123 @@ func TestCommandSpecsEveryFlagHasDescription(t *testing.T) {
 		for _, f := range c.Flags {
 			if f.Description == "" {
 				t.Errorf("command %q flag %q has no description", c.Name, f.Name)
+			}
+		}
+	}
+}
+
+func TestCompleteStatusValues(t *testing.T) {
+	result := Complete("", []string{"list", "--status", ""})
+	if len(result) != 3 {
+		t.Fatalf("expected 3 status values, got %d", len(result))
+	}
+	names := make(map[string]bool)
+	for _, c := range result {
+		names[c.Candidate] = true
+	}
+	for _, v := range []string{"proposed", "accepted", "superseded"} {
+		if !names[v] {
+			t.Errorf("expected %q in status completions", v)
+		}
+	}
+}
+
+func TestCompleteJsonFlags(t *testing.T) {
+	tests := []struct{ cmd string }{
+		{"new"},
+		{"patch"},
+		{"view"},
+		{"preview"},
+		{"instructions"},
+		{"status"},
+		{"list"},
+		{"validate"},
+	}
+	for _, tt := range tests {
+		result := Complete("", []string{tt.cmd, "--"})
+		found := false
+		for _, c := range result {
+			if c.Candidate == "--json" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("command %q missing --json in completions", tt.cmd)
+		}
+	}
+}
+
+func TestCommandSpecsMatchCheckUnknownFlags(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	cmdDir := filepath.Join(filepath.Dir(thisFile), "..", "cmd", "litespec")
+	entries, err := os.ReadDir(cmdDir)
+	if err != nil {
+		t.Fatalf("cannot read cmd directory: %v", err)
+	}
+
+	flagRE := regexp.MustCompile(`"--([a-z][a-z-]*)"`)
+	handlerFlags := make(map[string]map[string]bool)
+
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") {
+			continue
+		}
+		stem := strings.TrimSuffix(e.Name(), ".go")
+		cmdName := stem
+		if strings.HasSuffix(stem, "_test") {
+			continue
+		}
+
+		data, err := os.ReadFile(filepath.Join(cmdDir, e.Name()))
+		if err != nil {
+			t.Fatalf("cannot read %s: %v", e.Name(), err)
+		}
+
+		content := string(data)
+		if !strings.Contains(content, "checkUnknownFlags") {
+			continue
+		}
+
+		for _, line := range strings.Split(content, "\n") {
+			if !strings.Contains(line, "checkUnknownFlags") {
+				continue
+			}
+			if strings.Contains(line, "func checkUnknownFlags") {
+				continue
+			}
+			flags := make(map[string]bool)
+			for _, m := range flagRE.FindAllStringSubmatch(line, -1) {
+				flags["--"+m[1]] = true
+			}
+			if len(flags) > 0 {
+				handlerFlags[cmdName] = flags
+			}
+		}
+	}
+
+	for _, spec := range CommandSpecs {
+		if spec.Hidden {
+			continue
+		}
+		expected := make(map[string]bool)
+		for _, f := range spec.Flags {
+			expected[f.Name] = true
+		}
+
+		handler := handlerFlags[spec.Name]
+		if handler == nil {
+			handler = make(map[string]bool)
+		}
+
+		for name := range expected {
+			if !handler[name] {
+				t.Errorf("command %q: flag %q in CommandSpecs but missing from checkUnknownFlags", spec.Name, name)
+			}
+		}
+		for name := range handler {
+			if !expected[name] {
+				t.Errorf("command %q: flag %q in checkUnknownFlags but missing from CommandSpecs", spec.Name, name)
 			}
 		}
 	}
