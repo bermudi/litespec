@@ -25,9 +25,9 @@ func Complete(root string, words []string) []Completion {
 	if len(words) == 1 {
 		w := words[0]
 		if strings.HasPrefix(w, "-") {
-			return completeFlags(root, "")
+			return completeFlags("")
 		}
-		if _, ok := commandFlagDefs[w]; ok {
+		if spec := findCommandSpec(w); spec != nil {
 			return completeCommandArgs(root, w, []string{""})
 		}
 		return filterCompletions(completeCommands(), w)
@@ -81,21 +81,24 @@ func (invalidShellError) Error() string {
 	return "invalid shell (valid: bash, zsh, fish)"
 }
 
-func completeCommands() []Completion {
-	return []Completion{
-		{"init", "Initialize project structure"},
-		{"new", "Create a new change"},
-		{"list", "List specs or changes"},
-		{"status", "Show artifact states"},
-		{"validate", "Validate changes and specs"},
-		{"instructions", "Get artifact instructions"},
-		{"archive", "Apply deltas and archive change"},
-		{"preview", "Preview what archive would do to canon specs"},
-		{"view", "Dashboard overview with dependency graph"},
-		{"decide", "Create a new architectural decision record"},
-		{"update", "Regenerate skills and adapters"},
-		{"completion", "Generate shell completion script"},
+func findCommandSpec(name string) *CommandSpec {
+	for i := range CommandSpecs {
+		if CommandSpecs[i].Name == name {
+			return &CommandSpecs[i]
+		}
 	}
+	return nil
+}
+
+func completeCommands() []Completion {
+	var result []Completion
+	for _, c := range CommandSpecs {
+		if c.Hidden {
+			continue
+		}
+		result = append(result, Completion{c.Name, c.Description})
+	}
+	return result
 }
 
 func completeArtifactIDs() []Completion {
@@ -147,98 +150,19 @@ func completeSpecNames(root string) []Completion {
 	return result
 }
 
-type commandFlags struct {
-	flags         map[string]string
-	hasPositional bool
-	posResolver   func(root string) []Completion
-}
-
-var commandFlagDefs = map[string]commandFlags{
-	"init": {
-		flags: map[string]string{
-			"--tools": "Tool IDs (comma-separated)",
-		},
-	},
-	"new": {
-		hasPositional: true,
-	},
-	"list": {
-		flags: map[string]string{
-			"--specs":     "List specs instead of changes",
-			"--changes":   "List changes (default)",
-			"--decisions": "List architectural decision records",
-			"--sort":      "Sort by 'recent', 'name', 'deps', or 'number'",
-			"--status":    "Filter decisions by status (requires --decisions)",
-			"--json":      "Output as JSON",
-		},
-	},
-	"status": {
-		flags: map[string]string{
-			"--json": "Output as JSON",
-		},
-		hasPositional: true,
-		posResolver:   completeChangeNames,
-	},
-	"validate": {
-		flags: map[string]string{
-			"--all":       "Validate all changes, specs, and decisions",
-			"--changes":   "Validate all changes only",
-			"--specs":     "Validate all specs only",
-			"--decisions": "Validate all decisions only",
-			"--strict":    "Treat warnings as errors",
-			"--json":      "Output as JSON",
-			"--type":      "Disambiguate name: change|spec|decision",
-		},
-	},
-	"instructions": {
-		flags: map[string]string{
-			"--json": "Output as JSON",
-		},
-		hasPositional: true,
-		posResolver:   func(root string) []Completion { return completeArtifactIDs() },
-	},
-	"archive": {
-		flags: map[string]string{
-			"--allow-incomplete": "Archive even with incomplete tasks or unarchived dependencies",
-		},
-		hasPositional: true,
-		posResolver:   completeChangeNames,
-	},
-	"preview": {
-		flags: map[string]string{
-			"--json": "Output as JSON",
-		},
-		hasPositional: true,
-		posResolver:   completeChangeNames,
-	},
-	"decide": {
-		hasPositional: true,
-	},
-	"update": {
-		flags: map[string]string{
-			"--tools": "Tool IDs (comma-separated)",
-		},
-	},
-	"view": {},
-	"completion": {
-		hasPositional: true,
-		posResolver:   func(root string) []Completion { return completeShells() },
-	},
-}
-
-func completeFlags(root string, cmd string) []Completion {
+func completeFlags(cmd string) []Completion {
 	if cmd == "" {
 		return completeGlobalFlags()
 	}
 
-	def, ok := commandFlagDefs[cmd]
-	if !ok {
+	spec := findCommandSpec(cmd)
+	if spec == nil {
 		return completeGlobalFlags()
 	}
 
 	var result []Completion
-	for f, desc := range def.flags {
-		result = append(result, Completion{Candidate: f, Description: desc})
+	for _, f := range spec.Flags {
+		result = append(result, Completion{f.Name, f.Description})
 	}
 	return result
 }
@@ -251,8 +175,8 @@ func completeGlobalFlags() []Completion {
 }
 
 func completeCommandArgs(root string, cmd string, rest []string) []Completion {
-	def, ok := commandFlagDefs[cmd]
-	if !ok {
+	spec := findCommandSpec(cmd)
+	if spec == nil {
 		return nil
 	}
 
@@ -260,13 +184,13 @@ func completeCommandArgs(root string, cmd string, rest []string) []Completion {
 	last := rest[lastIdx]
 
 	if strings.HasPrefix(last, "-") {
-		if _, hasFlagArg := def.flags[last]; hasFlagArg && flagTakesValue(cmd, last) {
-			return completeFlagValue(root, cmd, last)
+		if flag := findFlagSpec(spec, last); flag != nil && flag.TakesValue {
+			return resolveFlagValues(root, flag)
 		}
 		var result []Completion
-		for f, desc := range def.flags {
-			if strings.HasPrefix(f, last) {
-				result = append(result, Completion{Candidate: f, Description: desc})
+		for _, f := range spec.Flags {
+			if strings.HasPrefix(f.Name, last) {
+				result = append(result, Completion{f.Name, f.Description})
 			}
 		}
 		return result
@@ -277,62 +201,39 @@ func completeCommandArgs(root string, cmd string, rest []string) []Completion {
 		prevWord = rest[lastIdx-1]
 	}
 
-	if prevWord != "" && flagTakesValue(cmd, prevWord) {
-		return filterCompletions(completeFlagValue(root, cmd, prevWord), last)
+	if prevWord != "" {
+		if flag := findFlagSpec(spec, prevWord); flag != nil && flag.TakesValue {
+			return filterCompletions(resolveFlagValues(root, flag), last)
+		}
 	}
 
-	if def.hasPositional && def.posResolver != nil {
-		completedPositionals := countPositionalArgs(rest[:lastIdx], cmd)
+	if spec.Positional != nil && spec.Positional.Resolver != nil {
+		completedPositionals := countPositionalArgs(rest[:lastIdx], spec)
 		if completedPositionals == 0 {
-			return filterCompletions(def.posResolver(root), last)
+			return filterCompletions(spec.Positional.Resolver(root), last)
 		}
 	}
 
 	return nil
 }
 
-func flagTakesValue(cmd string, flag string) bool {
-	switch flag {
-	case "--tools":
-		return true
-	case "--sort":
-		return true
-	case "--type":
-		return true
-	case "--status":
-		return true
-	}
-	return false
-}
-
-func completeFlagValue(root string, cmd string, flag string) []Completion {
-	switch flag {
-	case "--tools":
-		return completeToolIDs()
-	case "--sort":
-		return []Completion{
-			{"recent", "Sort by last modified"},
-			{"name", "Sort alphabetically"},
-			{"deps", "Sort by dependency order"},
-			{"number", "Sort by decision number"},
-		}
-	case "--type":
-		return []Completion{
-			{"change", "Disambiguate as change"},
-			{"spec", "Disambiguate as spec"},
-			{"decision", "Disambiguate as decision"},
-		}
-	case "--status":
-		return []Completion{
-			{"proposed", "Proposed decisions"},
-			{"accepted", "Accepted decisions"},
-			{"superseded", "Superseded decisions"},
+func findFlagSpec(spec *CommandSpec, name string) *FlagSpec {
+	for i := range spec.Flags {
+		if spec.Flags[i].Name == name {
+			return &spec.Flags[i]
 		}
 	}
 	return nil
 }
 
-func countPositionalArgs(rest []string, cmd string) int {
+func resolveFlagValues(root string, flag *FlagSpec) []Completion {
+	if flag.ValuesFunc != nil {
+		return flag.ValuesFunc(root)
+	}
+	return flag.Values
+}
+
+func countPositionalArgs(rest []string, spec *CommandSpec) int {
 	count := 0
 	for i, w := range rest {
 		if w == "" || strings.HasPrefix(w, "-") {
@@ -340,7 +241,7 @@ func countPositionalArgs(rest []string, cmd string) int {
 		}
 		if i > 0 {
 			prev := rest[i-1]
-			if flagTakesValue(cmd, prev) {
+			if flag := findFlagSpec(spec, prev); flag != nil && flag.TakesValue {
 				continue
 			}
 		}

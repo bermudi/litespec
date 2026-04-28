@@ -80,6 +80,7 @@ These came from deliberate debate. Respect the reasoning:
 - No `any` equivalents — explicit types everywhere
 - No comments unless absolutely necessary for non-obvious logic
 - When changes affect workflow, skills, or core concepts, update `AGENTS.md` and `DESIGN.md` to match. These are living documents — if the system changes, they change too.
+- When adding or modifying CLI commands/flags, update `internal/commandspec.go` — the completion system is auto-generated from the `CommandSpecs` registry. The registry is the single source of truth; `internal/completion.go` derives all completions from it.
 
 ### Skill Generation
 

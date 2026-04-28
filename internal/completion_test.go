@@ -17,7 +17,7 @@ func TestCompleteCommandNames(t *testing.T) {
 		names[c.Candidate] = true
 	}
 
-	for _, cmd := range []string{"init", "new", "list", "status", "validate", "instructions", "archive", "view", "update", "completion", "decide"} {
+	for _, cmd := range []string{"init", "new", "patch", "list", "status", "validate", "instructions", "archive", "view", "decide", "import", "update", "upgrade", "completion"} {
 		if !names[cmd] {
 			t.Errorf("missing command %q in completions", cmd)
 		}
@@ -138,7 +138,7 @@ func TestCompleteValidateFlags(t *testing.T) {
 	for _, c := range result {
 		names[c.Candidate] = true
 	}
-	for _, flag := range []string{"--all", "--changes", "--specs", "--strict", "--json", "--type"} {
+	for _, flag := range []string{"--all", "--changes", "--specs", "--decisions", "--strict", "--json", "--type"} {
 		if !names[flag] {
 			t.Errorf("missing flag %q in validate completions", flag)
 		}
@@ -258,3 +258,37 @@ func searchString(s, sub string) bool {
 	}
 	return false
 }
+
+func TestCommandSpecsNoDuplicates(t *testing.T) {
+	seen := make(map[string]bool)
+	for _, c := range CommandSpecs {
+		if seen[c.Name] {
+			t.Errorf("duplicate command spec: %q", c.Name)
+		}
+		seen[c.Name] = true
+	}
+}
+
+func TestCommandSpecsNoDuplicateFlags(t *testing.T) {
+	for _, c := range CommandSpecs {
+		seen := make(map[string]bool)
+		for _, f := range c.Flags {
+			if seen[f.Name] {
+				t.Errorf("command %q has duplicate flag: %q", c.Name, f.Name)
+			}
+			seen[f.Name] = true
+		}
+	}
+}
+
+func TestCommandSpecsEveryFlagHasDescription(t *testing.T) {
+	for _, c := range CommandSpecs {
+		for _, f := range c.Flags {
+			if f.Description == "" {
+				t.Errorf("command %q flag %q has no description", c.Name, f.Name)
+			}
+		}
+	}
+}
+
+
