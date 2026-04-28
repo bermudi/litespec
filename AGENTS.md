@@ -69,6 +69,7 @@ These came from deliberate debate. Respect the reasoning:
 - **CLI is a read-only context provider** — the AI never writes through the CLI. It writes artifact files directly. The CLI exists to give the AI structured data (status, instructions, validation).
 - **Artifact-specific instructions** — each artifact (proposal, specs, design, tasks) gets its own instruction template via `litespec instructions <artifact>`, not a single generic template. The propose skill template is kept as a `template` field for workflow context.
 - **Research skills** — produced into `.agents/skills/research-<topic>/SKILL.md` during the research phase. They are project-level agent skills containing reference documentation (API schemas, library docs, auth flows). They persist after archive as accumulated project knowledge. The apply agent discovers them naturally through skill descriptions. No CLI command needed — the research skill itself is the instructions.
+- **Validate structure, not semantics** — the CLI validates structural contracts (syntax, references, merge rules). Do not encode heuristic checks that compensate for model limitations (e.g., keyword overlap between requirements and tasks, non-goal vs spec contradiction detection). Those are fragile approximations of semantic understanding that better models will make obsolete. If a model gap bites repeatedly, fix the prompt in the relevant skill — that scales with model capability.
 
 ## Working Conventions
 
