@@ -99,7 +99,7 @@ func cmdView(args []string) error {
 	if len(patch) > 0 {
 		fmt.Printf("  ● Patch Changes: %d\n", len(patch))
 	}
-	fmt.Printf("  ● Ready to Archive: %d (all tasks done — archive to canonical specs)\n", len(completed))
+	fmt.Printf("  ● Ready to Archive: %d\n", len(completed))
 	if totalTasks > 0 {
 		pct := int(math.Round(float64(totalCompletedTasks) / float64(totalTasks) * 100))
 		fmt.Printf("  ● Task Progress: %d/%d (%d%% complete)\n", totalCompletedTasks, totalTasks, pct)
@@ -164,7 +164,7 @@ func cmdView(args []string) error {
 
 	if len(completed) > 0 {
 		fmt.Println()
-		fmt.Println("Ready to Archive (run `litespec archive <name>` to commit to canonical specs)")
+		fmt.Println("Ready to Archive")
 		fmt.Println(strings.Repeat("─", 60))
 		for _, c := range completed {
 			fmt.Printf("  ✓ %s%s\n", c.Name, formatTimestamps(c))
