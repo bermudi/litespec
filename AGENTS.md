@@ -54,7 +54,7 @@ Unidirectional. No backward flow.
 - **apply** works on one phase at a time. Each phase = one agent session = one commit. Re-invoke for the next phase. Consumes research skills via natural agent discovery.
 - **adopt** is a separate path — reverse-engineers specs from existing code given a file/directory path.
 - **review** is context-aware AI review that adapts to change lifecycle: artifact review when no tasks are checked (evaluates planning artifacts), implementation review when some tasks are checked (runs adversarial review first, then compliance review), pre-archive review when all tasks are checked (adversarial + compliance + archive readiness + build verification). Adversarial review runs first to avoid anchoring bias — it enumerates failure scenarios from specs before reading code. No test/lint running (except build verification in pre-archive mode).
-- **archive** is the commit to implemented — applying deltas to canonical specs and moving the change to the archive. Until archived, a change's deltas are tentative. Use `litespec preview <name>` to see what archive would do without making changes.
+- **archive** is the commit to implemented — applying deltas to canonical specs and moving the change to the archive. Until archived, a change's deltas are tentative. Use `litespec preview <name>` to see what archive would do without making changes. **Archive is a human decision** — the agent never runs `litespec archive`. After review, the agent hands off to the user. The human runs it when they're satisfied. It's the final stamp of approval, not an agent step. The only exception is `the-drill`, which runs archive as part of an explicit "ship it" ritual triggered by the human.
 
 ## Key Design Decisions
 
