@@ -50,7 +50,7 @@ project/
 Unidirectional flow:
 
 ```
-explore → grill → propose → [research →] apply → review → archive
+explore → grill → propose → [research →] apply → review → fix → review(verify) → archive
                                           │
                                       adopt (separate path)
 
@@ -71,6 +71,7 @@ No backward flow. If something is wrong after propose, start over from explore/g
 | `research` | Knowledge-gathering | Reads artifacts, identifies knowledge gaps, gathers docs/APIs/schemas, produces research skills into `.agents/skills/research-<topic>/`. Uses skill-creator conventions for formatting. |
 | `apply` | Phase-based | Implements tasks per phase in `tasks.md`. One phase per invocation. AI focuses on one area without doing the whole implementation at once. Consumes research skills via natural discovery. |
 | `review` | AI review | Context-aware review that adapts to change lifecycle: artifact review (0 tasks checked — evaluates planning artifacts), implementation review (some tasks checked — runs adversarial review then compliance review), pre-archive review (all tasks checked — adversarial + compliance + archive readiness + build verification). Adversarial review runs first to avoid anchoring bias. Pure AI review — no test/lint running (except build verification in pre-archive mode). |
+| `fix` | Correction | Ingests review findings, addresses them systematically, verifies each fix, commits when resolved. |
 | `adopt` | Reverse-engineer | Takes a file/directory path. Generates a change proposal with specs from existing code. For code that has no spec yet. |
 | `patch` | Lightweight | Creates a delta-only change via `litespec patch <name> <capability>`. No planning artifacts. The delta is the contract. For small, single-capability changes. |
 

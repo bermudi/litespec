@@ -9,8 +9,8 @@
 
 ## Phase 2: Update review handoff and workflow
 
-- [ ] Update review template ending in `internal/skill/review.go` to reference fix skill instead of apply
-- [ ] Update workflow diagram and Skills table in `DESIGN.md`
-- [ ] Run `litespec update` to regenerate all skills
-- [ ] Run `litespec validate fix-skill` to confirm no structural regressions
-- [ ] Run `go test ./...` and `go vet ./...` to verify build health
+- [x] Update review template ending in `internal/skill/review.go` to reference fix skill instead of apply
+- [x] Update workflow diagram and Skills table in `DESIGN.md`
+- [x] Run `litespec update` to regenerate all skills
+- [x] Run `litespec validate fix-skill` to confirm no structural regressions
+- [x] Run `go test ./...` and `go vet ./...` to verify build health
