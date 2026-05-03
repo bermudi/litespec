@@ -61,6 +61,7 @@ var CommandSpecs = []CommandSpec{
 			{Name: "--specs", Description: "List specs instead of changes", TakesValue: false},
 			{Name: "--changes", Description: "List changes (default)", TakesValue: false},
 			{Name: "--decisions", Description: "List architectural decision records", TakesValue: false},
+			{Name: "--backlog", Description: "List backlog items by section", TakesValue: false},
 			{Name: "--sort", Description: "Sort by 'recent', 'name', 'deps', or 'number'", TakesValue: true, Values: []Completion{
 				{"recent", "Sort by last modified"},
 				{"name", "Sort alphabetically"},

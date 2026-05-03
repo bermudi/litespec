@@ -96,14 +96,15 @@ Examples:
 }
 
 func printListHelp() {
-	fmt.Print(`Usage: litespec list [--specs|--changes|--decisions] [--sort <mode>] [--status <state>] [--json]
+	fmt.Print(`Usage: litespec list [--specs|--changes|--decisions|--backlog] [--sort <mode>] [--status <state>] [--json]
 
-List active changes in the project (default) or specs with --specs or decisions with --decisions.
+List active changes in the project (default), specs with --specs, decisions with --decisions, or backlog items with --backlog.
 
 Flags:
   --specs           List specs instead of changes
   --changes         List changes (default)
   --decisions       List architectural decision records
+  --backlog         List backlog items by section
   --sort <field>    Sort by 'recent' (default), 'name', 'deps', or 'number' (decisions)
   --status <state>  Filter decisions by status: proposed, accepted, superseded (requires --decisions)
   --json            Output as JSON
@@ -115,6 +116,7 @@ Examples:
   litespec list --specs --json
   litespec list --decisions
   litespec list --decisions --status accepted --sort recent
+  litespec list --backlog
 `)
 }
 

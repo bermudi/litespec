@@ -356,3 +356,277 @@ func TestValidateBacklog_NoUnrecognizedSections(t *testing.T) {
 		t.Fatalf("expected 0 warnings, got %d: %v", len(result.Warnings), result.Warnings)
 	}
 }
+
+func TestParseBacklogItems_AllSections(t *testing.T) {
+	content := `## Deferred
+
+- **Item one** — description
+- **Item two** — more text
+
+## Open Questions
+
+- **Question A** — details
+
+## Future Versions
+
+- **Feature X** — desc
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "backlog.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := ParseBacklogItems(path)
+	if err != nil {
+		t.Fatalf("ParseBacklogItems: %v", err)
+	}
+	if len(items) != 4 {
+		t.Fatalf("expected 4 items, got %d", len(items))
+	}
+
+	checks := []struct {
+		section string
+		title   string
+	}{
+		{"deferred", "Item one"},
+		{"deferred", "Item two"},
+		{"open-questions", "Question A"},
+		{"future", "Feature X"},
+	}
+	for i, want := range checks {
+		if items[i].Section != want.section {
+			t.Errorf("items[%d].Section = %q, want %q", i, items[i].Section, want.section)
+		}
+		if items[i].Title != want.title {
+			t.Errorf("items[%d].Title = %q, want %q", i, items[i].Title, want.title)
+		}
+	}
+}
+
+func TestParseBacklogItems_NoBoldTitle(t *testing.T) {
+	content := `## Deferred
+
+- Plain text item
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "backlog.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := ParseBacklogItems(path)
+	if err != nil {
+		t.Fatalf("ParseBacklogItems: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	if items[0].Title != "Plain text item" {
+		t.Errorf("Title = %q, want %q", items[0].Title, "Plain text item")
+	}
+}
+
+func TestParseBacklogItems_MissingFileReturnsNil(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "backlog.md")
+	items, err := ParseBacklogItems(path)
+	if err != nil {
+		t.Fatalf("ParseBacklogItems: %v", err)
+	}
+	if items != nil {
+		t.Fatalf("expected nil, got %v", items)
+	}
+}
+
+func TestParseBacklogItems_SkipsUnrecognizedSections(t *testing.T) {
+	content := `## Deferred
+
+- **Real item** — desc
+
+## Nice-to-Have
+
+- **Wish** — desc
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "backlog.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := ParseBacklogItems(path)
+	if err != nil {
+		t.Fatalf("ParseBacklogItems: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	if items[0].Title != "Real item" {
+		t.Errorf("Title = %q, want %q", items[0].Title, "Real item")
+	}
+}
+
+func TestParseBacklogItems_IgnoresNestedBullets(t *testing.T) {
+	content := `## Deferred
+
+- **Top level** — desc
+  - nested sub-item
+  - another nested
+- **Another top** — desc
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "backlog.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := ParseBacklogItems(path)
+	if err != nil {
+		t.Fatalf("ParseBacklogItems: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(items))
+	}
+}
+
+func TestParseBacklogItems_CRLFLineEndings(t *testing.T) {
+	content := "## Deferred\r\n\r\n- **Item one** — desc\r\n- **Item two** — desc\r\n"
+	dir := t.TempDir()
+	path := filepath.Join(dir, "backlog.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := ParseBacklogItems(path)
+	if err != nil {
+		t.Fatalf("ParseBacklogItems: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(items))
+	}
+}
+
+func TestParseBacklogItems_OtherSection(t *testing.T) {
+	content := `## Deferred
+
+- **Item one** — desc
+
+## Other
+
+- **Wish A** — desc
+- **Wish B** — desc
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "backlog.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := ParseBacklogItems(path)
+	if err != nil {
+		t.Fatalf("ParseBacklogItems: %v", err)
+	}
+	if len(items) != 3 {
+		t.Fatalf("expected 3 items, got %d", len(items))
+	}
+	if items[1].Section != "other" {
+		t.Errorf("items[1].Section = %q, want %q", items[1].Section, "other")
+	}
+	if items[1].Title != "Wish A" {
+		t.Errorf("items[1].Title = %q, want %q", items[1].Title, "Wish A")
+	}
+}
+
+func TestParseBacklogItems_FutureShorthand(t *testing.T) {
+	content := `## Future
+
+- **Item one** — desc
+- **Item two** — desc
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "backlog.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := ParseBacklogItems(path)
+	if err != nil {
+		t.Fatalf("ParseBacklogItems: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(items))
+	}
+	if items[0].Section != "future" {
+		t.Errorf("items[0].Section = %q, want %q", items[0].Section, "future")
+	}
+}
+
+func TestParseBacklogItems_AsteriskBullets(t *testing.T) {
+	content := `## Deferred
+
+* **Item one** — desc
+* **Item two** — desc
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "backlog.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := ParseBacklogItems(path)
+	if err != nil {
+		t.Fatalf("ParseBacklogItems: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(items))
+	}
+}
+
+func TestParseBacklogItems_MixedBoldAndPlain(t *testing.T) {
+	content := `## Deferred
+
+- **Bold item** — desc
+- Plain text item
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "backlog.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := ParseBacklogItems(path)
+	if err != nil {
+		t.Fatalf("ParseBacklogItems: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(items))
+	}
+	if items[0].Title != "Bold item" {
+		t.Errorf("items[0].Title = %q, want %q", items[0].Title, "Bold item")
+	}
+	if items[1].Title != "Plain text item" {
+		t.Errorf("items[1].Title = %q, want %q", items[1].Title, "Plain text item")
+	}
+}
+
+func TestParseBacklogItems_UnclosedBoldMarker(t *testing.T) {
+	content := `## Deferred
+
+- **Title with no closing
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "backlog.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := ParseBacklogItems(path)
+	if err != nil {
+		t.Fatalf("ParseBacklogItems: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	if items[0].Title != "Title with no closing" {
+		t.Errorf("Title = %q, want %q", items[0].Title, "Title with no closing")
+	}
+}

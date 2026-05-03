@@ -6,6 +6,11 @@ import (
 	"strings"
 )
 
+type BacklogItem struct {
+	Section string
+	Title   string
+}
+
 type BacklogSummary struct {
 	Deferred      int
 	OpenQuestions int
@@ -18,6 +23,21 @@ func BacklogPath(root string) string {
 	return filepath.Join(root, ProjectDirName, BacklogFileName)
 }
 
+func normalizeBacklogSection(header string) (key string, ok bool) {
+	switch strings.ToLower(strings.TrimSpace(header)) {
+	case "deferred":
+		return "deferred", true
+	case "open questions":
+		return "open-questions", true
+	case "future versions", "future":
+		return "future", true
+	case "other":
+		return "other", true
+	default:
+		return "", false
+	}
+}
+
 func ParseBacklog(path string) (*BacklogSummary, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -27,27 +47,20 @@ func ParseBacklog(path string) (*BacklogSummary, error) {
 		return nil, err
 	}
 
-	content := string(data)
 	var currentSection string
 	var deferred, openQuestions, future, other int
 	var unrecognized []string
 
-	for _, line := range strings.Split(content, "\n") {
+	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSuffix(line, "\r")
 		if strings.HasPrefix(line, "## ") && !strings.HasPrefix(line, "### ") {
-			section := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(line, "## ")))
-			switch section {
-			case "deferred":
-				currentSection = "deferred"
-			case "open questions":
-				currentSection = "open-questions"
-			case "future versions", "future":
-				currentSection = "future"
-			case "other":
-				currentSection = "other"
-			default:
+			header := strings.TrimPrefix(line, "## ")
+			key, ok := normalizeBacklogSection(header)
+			if ok {
+				currentSection = key
+			} else {
 				currentSection = "unrecognized"
-				unrecognized = append(unrecognized, strings.TrimSpace(strings.TrimPrefix(line, "## ")))
+				unrecognized = append(unrecognized, strings.TrimSpace(header))
 			}
 			continue
 		}
@@ -82,4 +95,59 @@ func ParseBacklog(path string) (*BacklogSummary, error) {
 		Other:         other,
 		Unrecognized:  unrecognized,
 	}, nil
+}
+
+func ParseBacklogItems(path string) ([]BacklogItem, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var items []BacklogItem
+	var currentSection string
+
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSuffix(line, "\r")
+		if strings.HasPrefix(line, "## ") && !strings.HasPrefix(line, "### ") {
+			header := strings.TrimPrefix(line, "## ")
+			key, ok := normalizeBacklogSection(header)
+			if ok {
+				currentSection = key
+			} else {
+				currentSection = ""
+			}
+			continue
+		}
+
+		if currentSection == "" {
+			continue
+		}
+
+		if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* ") {
+			title := extractBacklogTitle(strings.TrimPrefix(strings.TrimPrefix(line, "- "), "* "))
+			items = append(items, BacklogItem{
+				Section: currentSection,
+				Title:   title,
+			})
+		}
+	}
+
+	return items, nil
+}
+
+func extractBacklogTitle(line string) string {
+	// Extract bold title: **Title** — rest
+	line = strings.TrimSpace(line)
+	if !strings.HasPrefix(line, "**") {
+		return line
+	}
+	line = strings.TrimPrefix(line, "**")
+	idx := strings.Index(line, "**")
+	if idx < 0 {
+		return line
+	}
+	return line[:idx]
 }

@@ -15,11 +15,11 @@ func cmdList(args []string) error {
 		printListHelp()
 		return nil
 	}
-	if err := checkUnknownFlags(args, map[string]bool{"--specs": true, "--changes": true, "--decisions": true, "--sort": true, "--json": true, "--status": true}); err != nil {
+	if err := checkUnknownFlags(args, map[string]bool{"--specs": true, "--changes": true, "--decisions": true, "--backlog": true, "--sort": true, "--json": true, "--status": true}); err != nil {
 		return err
 	}
 
-	var specsOnly, decisionsOnly, asJSON bool
+	var specsOnly, decisionsOnly, backlogOnly, asJSON bool
 	var sortBy, statusFilter string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -28,6 +28,8 @@ func cmdList(args []string) error {
 		case "--changes":
 		case "--decisions":
 			decisionsOnly = true
+		case "--backlog":
+			backlogOnly = true
 		case jsonFlag:
 			asJSON = true
 		case "--sort":
@@ -66,10 +68,16 @@ func cmdList(args []string) error {
 	if decisionsOnly && specsOnly {
 		return fmt.Errorf("--decisions and --specs are mutually exclusive")
 	}
+	if backlogOnly && (specsOnly || decisionsOnly) {
+		return fmt.Errorf("--backlog is mutually exclusive with --specs and --decisions")
+	}
 	// --changes and --decisions are also mutually exclusive
 	for _, arg := range args {
 		if arg == "--changes" && decisionsOnly {
 			return fmt.Errorf("--decisions and --changes are mutually exclusive")
+		}
+		if arg == "--changes" && backlogOnly {
+			return fmt.Errorf("--backlog and --changes are mutually exclusive")
 		}
 	}
 
@@ -87,6 +95,7 @@ func cmdList(args []string) error {
 			Changes   []internal.ChangeListItemJSON   `json:"changes,omitempty"`
 			Specs     []internal.SpecListItemJSON     `json:"specs,omitempty"`
 			Decisions []internal.DecisionListItemJSON `json:"decisions,omitempty"`
+			Backlog   []internal.BacklogItemJSON      `json:"backlog,omitempty"`
 			Warnings  []string                       `json:"warnings,omitempty"`
 		}
 
@@ -125,6 +134,17 @@ func cmdList(args []string) error {
 					item.LastModified = d.LastModified.Format(time.RFC3339)
 				}
 				out.Decisions = append(out.Decisions, item)
+			}
+		} else if backlogOnly {
+			items, listErr := internal.ParseBacklogItems(internal.BacklogPath(root))
+			if listErr != nil {
+				return listErr
+			}
+			for _, item := range items {
+				out.Backlog = append(out.Backlog, internal.BacklogItemJSON{
+					Section: item.Section,
+					Title:   item.Title,
+				})
 			}
 		} else {
 			changes, listErr := internal.ListChanges(root)
@@ -196,6 +216,38 @@ func cmdList(args []string) error {
 		fmt.Println()
 		for _, d := range decisions {
 			fmt.Printf("  %04d  %-30s  %-10s  %s\n", d.Number, d.Slug, d.Status, d.Title)
+		}
+		return nil
+	}
+
+	if backlogOnly {
+		items, listErr := internal.ParseBacklogItems(internal.BacklogPath(root))
+		if listErr != nil {
+			return listErr
+		}
+		fmt.Println("Backlog:")
+		if len(items) == 0 {
+			fmt.Println("  (none)")
+			return nil
+		}
+		fmt.Println()
+		var currentSection string
+		sectionLabels := map[string]string{
+			"deferred":       "Deferred",
+			"open-questions": "Open Questions",
+			"future":         "Future",
+			"other":          "Other",
+		}
+		for _, item := range items {
+			if item.Section != currentSection {
+				currentSection = item.Section
+				label := sectionLabels[item.Section]
+				if label == "" {
+					label = item.Section
+				}
+				fmt.Printf("  %s:\n", label)
+			}
+			fmt.Printf("    ▪ %s\n", item.Title)
 		}
 		return nil
 	}

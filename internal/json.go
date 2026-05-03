@@ -72,6 +72,11 @@ type DecisionListItemJSON struct {
 	LastModified string   `json:"lastModified,omitempty"`
 }
 
+type BacklogItemJSON struct {
+	Section string `json:"section"`
+	Title   string `json:"title"`
+}
+
 type ValidationResultJSON struct {
 	Valid    bool                  `json:"valid"`
 	Errors   []ValidationIssueJSON `json:"errors"`

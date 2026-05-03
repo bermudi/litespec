@@ -100,7 +100,7 @@ Commands:
   init [--tools <ids>]                                        Initialize project structure
   new <name>                                                  Create a new change
   patch <name> <capability>                                   Create a patch-mode change (delta-only)
-  list [--specs|--changes|--decisions] [--sort recent|name|deps|number] [--status <state>]   List specs, changes, or decisions
+  list [--specs|--changes|--decisions|--backlog] [--sort recent|name|deps|number] [--status <state>]   List specs, changes, decisions, or backlog
   status [<name>]                                             Show artifact states
   validate [<name>] [--all|--changes|--specs|--decisions] [--type T]      Validate changes, specs, and decisions
   instructions <artifact>                                     Get artifact instructions
