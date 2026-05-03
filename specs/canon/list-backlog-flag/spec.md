@@ -1,6 +1,6 @@
 # list-backlog-flag
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: --backlog flag
 

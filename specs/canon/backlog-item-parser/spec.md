@@ -1,6 +1,6 @@
 # backlog-item-parser
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: section normalization
 
