@@ -2,10 +2,10 @@
 
 ## Phase 1: Add fix skill registration and template
 
-- [ ] Add `SkillInfo` entry for `fix` to `Skills` slice in `internal/paths.go` (ID "fix", name "litespec-fix")
-- [ ] Create `internal/skill/fix.go` with `init()` registering the fix template
-- [ ] Run `go test ./internal/skill/` to verify template registration
-- [ ] Run `litespec update` to regenerate skills and verify `.agents/skills/litespec-fix/SKILL.md` is created
+- [x] Add `SkillInfo` entry for `fix` to `Skills` slice in `internal/paths.go` (ID "fix", name "litespec-fix")
+- [x] Create `internal/skill/fix.go` with `init()` registering the fix template
+- [x] Run `go test ./internal/skill/` to verify template registration
+- [x] Run `litespec update` to regenerate skills and verify `.agents/skills/litespec-fix/SKILL.md` is created
 
 ## Phase 2: Update review handoff and workflow
 

@@ -68,6 +68,11 @@ var Skills = []SkillInfo{
 		Name:        "litespec-patch",
 		Description: "Create a patch-mode change for small, single-capability deltas. Use when the user wants a quick fix, minor flag addition, or small behavioral tweak, or says \"patch\".",
 	},
+	{
+		ID:          "fix",
+		Name:        "litespec-fix",
+		Description: "Address review findings systematically — fix one finding at a time, verify each fix, and commit. Use when the user wants to resolve review findings, address review feedback, or says \"fix\".",
+	},
 }
 
 var Adapters = []ToolAdapter{
