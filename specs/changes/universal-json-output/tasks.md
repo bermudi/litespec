@@ -21,7 +21,7 @@
 
 Deferrable — this phase is additive and orthogonal to Phases 1-2. Can be a separate patch if desired.
 
-- [ ] Add `--minimal` parsing to `cmdStatus`, `cmdList`, `cmdValidate`, `cmdInstructions`, `cmdView`, `cmdPreview`, `cmdNew`, `cmdPatch`
-- [ ] Implement minimal output paths for each: terse text for `--minimal`, field-filtered JSON for `--minimal --json`
-- [ ] Add CLI tests for `validate --minimal --json` and `list --minimal`
-- [ ] Run `go build`, `go vet`, `go test ./...`
+- [x] Add `--minimal` parsing to `cmdStatus`, `cmdList`, `cmdValidate`, `cmdInstructions`, `cmdView`, `cmdPreview`, `cmdNew`, `cmdPatch`
+- [x] Implement minimal output paths for each: terse text for `--minimal`, field-filtered JSON for `--minimal --json`
+- [x] Add CLI tests for `validate --minimal --json` and `list --minimal`
+- [x] Run `go build`, `go vet`, `go test ./...`

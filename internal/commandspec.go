@@ -41,6 +41,7 @@ var CommandSpecs = []CommandSpec{
 		Description: "Create a new change",
 		Flags: []FlagSpec{
 			{Name: "--json", Description: "Output as JSON", TakesValue: false},
+			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
 		},
 		Positional: &PositionalSpec{
 			Description: "change name",
@@ -51,6 +52,7 @@ var CommandSpecs = []CommandSpec{
 		Description: "Create a patch-mode change (delta-only)",
 		Flags: []FlagSpec{
 			{Name: "--json", Description: "Output as JSON", TakesValue: false},
+			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
 		},
 		Positional: &PositionalSpec{
 			Description: "change name and capability",
@@ -76,6 +78,7 @@ var CommandSpecs = []CommandSpec{
 				{"superseded", "Superseded decisions"},
 			}},
 			{Name: "--json", Description: "Output as JSON", TakesValue: false},
+			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
 		},
 	},
 	{
@@ -83,6 +86,7 @@ var CommandSpecs = []CommandSpec{
 		Description: "Show artifact states",
 		Flags: []FlagSpec{
 			{Name: "--json", Description: "Output as JSON", TakesValue: false},
+			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
 		},
 		Positional: &PositionalSpec{
 			Description: "change name",
@@ -99,6 +103,7 @@ var CommandSpecs = []CommandSpec{
 			{Name: "--decisions", Description: "Validate all decisions only", TakesValue: false},
 			{Name: "--strict", Description: "Treat warnings as errors", TakesValue: false},
 			{Name: "--json", Description: "Output as JSON", TakesValue: false},
+			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
 			{Name: "--type", Description: "Disambiguate name: change|spec|decision", TakesValue: true, Values: []Completion{
 				{"change", "Disambiguate as change"},
 				{"spec", "Disambiguate as spec"},
@@ -111,6 +116,7 @@ var CommandSpecs = []CommandSpec{
 		Description: "Get artifact instructions",
 		Flags: []FlagSpec{
 			{Name: "--json", Description: "Output as JSON", TakesValue: false},
+			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
 		},
 		Positional: &PositionalSpec{
 			Description: "artifact ID",
@@ -135,6 +141,7 @@ var CommandSpecs = []CommandSpec{
 		Description: "Preview what archive would do to canon specs",
 		Flags: []FlagSpec{
 			{Name: "--json", Description: "Output as JSON", TakesValue: false},
+			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
 		},
 		Positional: &PositionalSpec{
 			Description: "change name",
@@ -146,6 +153,7 @@ var CommandSpecs = []CommandSpec{
 		Description: "Dashboard overview with dependency graph",
 		Flags: []FlagSpec{
 			{Name: "--json", Description: "Output as JSON", TakesValue: false},
+			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
 		},
 	},
 	{

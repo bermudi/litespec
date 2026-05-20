@@ -14,12 +14,12 @@ func cmdValidate(args []string) error {
 		printValidateHelp()
 		return nil
 	}
-	if err := checkUnknownFlags(args, map[string]bool{"--all": true, "--changes": true, "--specs": true, "--decisions": true, "--strict": true, "--json": true, "--type": true}); err != nil {
+	if err := checkUnknownFlags(args, map[string]bool{"--all": true, "--changes": true, "--specs": true, "--decisions": true, "--strict": true, "--json": true, "--minimal": true, "--type": true}); err != nil {
 		return err
 	}
 
 	var positional string
-	var flagAll, flagChanges, flagSpecs, flagDecisions, strict, asJSON bool
+	var flagAll, flagChanges, flagSpecs, flagDecisions, strict, asJSON, asMinimal bool
 	var typeFilter string
 
 	for i := 0; i < len(args); i++ {
@@ -36,6 +36,8 @@ func cmdValidate(args []string) error {
 			strict = true
 		case jsonFlag:
 			asJSON = true
+		case minimalFlag:
+			asMinimal = true
 		case "--type":
 			if i+1 >= len(args) {
 				return fmt.Errorf("--type requires a value (change or spec)")
@@ -204,14 +206,50 @@ func cmdValidate(args []string) error {
 
 	if asJSON {
 		out := internal.BuildValidationResultJSON(result)
-		data, err := internal.MarshalJSON(out)
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
+		if asMinimal {
+			type validateMinimalJSON struct {
+				Valid  bool     `json:"valid"`
+				Errors []string `json:"errors,omitempty"`
+			}
+			min := validateMinimalJSON{Valid: out.Valid}
+			for _, e := range out.Errors {
+				min.Errors = append(min.Errors, e.Message)
+			}
+			data, err := internal.MarshalJSON(min)
+			if err != nil {
+				return fmt.Errorf("failed to marshal JSON: %w", err)
+			}
+			fmt.Println(string(data))
+		} else {
+			data, err := internal.MarshalJSON(out)
+			if err != nil {
+				return fmt.Errorf("failed to marshal JSON: %w", err)
+			}
+			fmt.Println(string(data))
 		}
-		fmt.Println(string(data))
 		if !result.Valid || (strict && len(result.Warnings) > 0) {
 			return fmt.Errorf("validation failed")
 		}
+		return nil
+	}
+
+	if asMinimal {
+		if !result.Valid {
+			fmt.Printf("invalid\t%d errors\n", len(result.Errors))
+			for _, issue := range result.Errors {
+				fmt.Printf("error\t%s\t%s\n", issue.File, issue.Message)
+			}
+			return fmt.Errorf("validation failed")
+		}
+		if strict && len(result.Warnings) > 0 {
+			fmt.Printf("invalid\t%d warnings (strict)\n", len(result.Warnings))
+			return fmt.Errorf("validation failed")
+		}
+		fmt.Printf("ok\t%d %s, %d %s, %d %s, %d %s\n",
+			result.ChangesCount, pluralize("change", result.ChangesCount),
+			result.CapabilitiesCount, pluralize("capability", result.CapabilitiesCount),
+			result.RequirementsCount, pluralize("requirement", result.RequirementsCount),
+			result.ScenariosCount, pluralize("scenario", result.ScenariosCount))
 		return nil
 	}
 

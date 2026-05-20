@@ -14,16 +14,18 @@ func cmdStatus(args []string) error {
 		printStatusHelp()
 		return nil
 	}
-	if err := checkUnknownFlags(args, map[string]bool{"--json": true}); err != nil {
+	if err := checkUnknownFlags(args, map[string]bool{"--json": true, "--minimal": true}); err != nil {
 		return err
 	}
 
 	var name string
-	var asJSON bool
+	var asJSON, asMinimal bool
 	for _, arg := range args {
 		switch arg {
 		case jsonFlag:
 			asJSON = true
+		case minimalFlag:
+			asMinimal = true
 		default:
 			if !strings.HasPrefix(arg, "-") && name == "" {
 				name = arg
@@ -52,11 +54,41 @@ func cmdStatus(args []string) error {
 
 		if asJSON {
 			status := internal.BuildChangeStatusJSON(ctx)
-			data, err := internal.MarshalJSON(status)
+			var data []byte
+			var err error
+			if asMinimal {
+				type statusMinimalJSON struct {
+					ChangeName string `json:"changeName"`
+					IsComplete  bool   `json:"isComplete"`
+					Artifacts   []struct {
+						ID     string `json:"id"`
+						Status string `json:"status"`
+					} `json:"artifacts"`
+				}
+				min := statusMinimalJSON{
+					ChangeName: status.ChangeName,
+					IsComplete:  status.IsComplete,
+				}
+				for _, a := range status.Artifacts {
+					min.Artifacts = append(min.Artifacts, struct {
+						ID     string `json:"id"`
+						Status string `json:"status"`
+					}{ID: a.ID, Status: a.Status})
+				}
+				data, err = internal.MarshalJSON(min)
+			} else {
+				data, err = internal.MarshalJSON(status)
+			}
 			if err != nil {
 				return fmt.Errorf("failed to marshal JSON: %w", err)
 			}
 			fmt.Println(string(data))
+			return nil
+		}
+
+		if asMinimal {
+			status := internal.BuildChangeStatusJSON(ctx)
+			fmt.Printf("%s\tcomplete=%v\n", name, status.IsComplete)
 			return nil
 		}
 
@@ -96,11 +128,42 @@ func cmdStatus(args []string) error {
 			}
 			statuses = append(statuses, internal.BuildChangeStatusJSON(ctx))
 		}
-		data, err := internal.MarshalJSON(statusAllOutput{Changes: statuses, Warnings: warnings})
+
+		var out any = statusAllOutput{Changes: statuses, Warnings: warnings}
+		if asMinimal {
+			type statusAllMinimal struct {
+				Changes []struct {
+					ChangeName string `json:"changeName"`
+					IsComplete  bool   `json:"isComplete"`
+				} `json:"changes"`
+			}
+			min := statusAllMinimal{}
+			for _, s := range statuses {
+				min.Changes = append(min.Changes, struct {
+					ChangeName string `json:"changeName"`
+					IsComplete  bool   `json:"isComplete"`
+				}{ChangeName: s.ChangeName, IsComplete: s.IsComplete})
+			}
+			out = min
+		}
+
+		data, err := internal.MarshalJSON(out)
 		if err != nil {
 			return fmt.Errorf("failed to marshal JSON: %w", err)
 		}
 		fmt.Println(string(data))
+		return nil
+	}
+
+	if asMinimal {
+		for _, n := range changes {
+			ctx, err := internal.LoadChangeContext(root, n.Name)
+			if err != nil {
+				continue
+			}
+			status := internal.BuildChangeStatusJSON(ctx)
+			fmt.Printf("%s\tcomplete=%v\n", n.Name, status.IsComplete)
+		}
 		return nil
 	}
 

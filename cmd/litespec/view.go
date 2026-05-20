@@ -16,14 +16,17 @@ func cmdView(args []string) error {
 		printViewHelp()
 		return nil
 	}
-	if err := checkUnknownFlags(args, map[string]bool{"--json": true}); err != nil {
+	if err := checkUnknownFlags(args, map[string]bool{"--json": true, "--minimal": true}); err != nil {
 		return err
 	}
 
-	var asJSON bool
+	var asJSON, asMinimal bool
 	for _, a := range args {
 		if a == jsonFlag {
 			asJSON = true
+		}
+		if a == minimalFlag {
+			asMinimal = true
 		}
 	}
 
@@ -83,7 +86,13 @@ func cmdView(args []string) error {
 	decisions, decErr := internal.ListDecisions(root)
 
 	if asJSON {
-		return renderViewJSON(root, specs, draft, active, completed, patch, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr)
+		return renderViewJSON(root, specs, draft, active, completed, patch, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr, asMinimal)
+	}
+
+	if asMinimal {
+		fmt.Printf("%d specs\t%d reqs\t%d draft\t%d active\t%d ready\t%d/%d tasks\n",
+			len(specs), totalReqs, len(draft), len(active), len(completed), totalCompletedTasks, totalTasks)
+		return nil
 	}
 
 	fmt.Println()
@@ -435,7 +444,7 @@ type viewGraphJSON struct {
 	Unrelated  []string                   `json:"unrelated,omitempty"`
 }
 
-func renderViewJSON(root string, specs []internal.SpecInfo, draft, active, completed, patch []internal.ChangeInfo, totalReqs, totalCompletedTasks, totalTasks int, decisions []*internal.Decision, decErr error) error {
+func renderViewJSON(root string, specs []internal.SpecInfo, draft, active, completed, patch []internal.ChangeInfo, totalReqs, totalCompletedTasks, totalTasks int, decisions []*internal.Decision, decErr error, asMinimal bool) error {
 	summary := viewSummaryJSON{
 		Specs:          len(specs),
 		Requirements:   totalReqs,
@@ -582,6 +591,15 @@ func renderViewJSON(root string, specs []internal.SpecInfo, draft, active, compl
 
 			graph = &viewGraphJSON{Roots: roots, Unrelated: unrelated}
 		}
+	}
+
+	if asMinimal {
+		data, err := internal.MarshalJSON(viewJSON{Summary: summary})
+		if err != nil {
+			return fmt.Errorf("failed to marshal JSON: %w", err)
+		}
+		fmt.Println(string(data))
+		return nil
 	}
 
 	out := viewJSON{

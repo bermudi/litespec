@@ -15,16 +15,18 @@ func cmdPatch(args []string) error {
 		printPatchHelp()
 		return nil
 	}
-	if err := checkUnknownFlags(args, map[string]bool{"--json": true}); err != nil {
+	if err := checkUnknownFlags(args, map[string]bool{"--json": true, "--minimal": true}); err != nil {
 		return err
 	}
 
-	var asJSON bool
+	var asJSON, asMinimal bool
 	var positional []string
 	for _, arg := range args {
 		switch arg {
 		case jsonFlag:
 			asJSON = true
+		case minimalFlag:
+			asMinimal = true
 		default:
 			if !strings.HasPrefix(arg, "-") {
 				positional = append(positional, arg)
@@ -92,6 +94,11 @@ func cmdPatch(args []string) error {
 			return fmt.Errorf("failed to marshal JSON: %w", err)
 		}
 		fmt.Println(string(data))
+		return nil
+	}
+
+	if asMinimal {
+		fmt.Println(changeDir)
 		return nil
 	}
 

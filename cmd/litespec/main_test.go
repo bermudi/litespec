@@ -3113,3 +3113,244 @@ func TestCLIImportDryRunJSON(t *testing.T) {
 		t.Errorf("expected dryRun=true, got %v", result["dryRun"])
 	}
 }
+
+func TestCLIValidateMinimalJSON(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	out, code := runCLI(t, bin, root, "validate", "--minimal", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if result["valid"] != true {
+		t.Errorf("expected valid=true, got %v", result["valid"])
+	}
+	if _, hasSummary := result["summary"]; hasSummary {
+		t.Error("minimal JSON should not contain summary")
+	}
+	if _, hasWarnings := result["warnings"]; hasWarnings {
+		t.Error("minimal JSON should not contain warnings")
+	}
+}
+
+func TestCLIValidateMinimalText(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	out, code := runCLI(t, bin, root, "validate", "--minimal")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.HasPrefix(out, "ok\t") {
+		t.Errorf("expected minimal text starting with 'ok\\t', got: %s", out)
+	}
+}
+
+func TestCLIListMinimalText(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	out, code := runCLI(t, bin, root, "list", "--minimal")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if strings.Contains(out, "Changes:") {
+		t.Error("minimal text should not contain headers")
+	}
+}
+
+func TestCLIListMinimalJSON(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	// Create a change so we can test field filtering
+	runCLI(t, bin, root, "new", "test-change")
+
+	out, code := runCLI(t, bin, root, "list", "--minimal", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	changes, ok := result["changes"].([]interface{})
+	if !ok {
+		t.Fatalf("expected changes array, got %T", result["changes"])
+	}
+	if len(changes) == 0 {
+		t.Fatal("expected at least one change")
+	}
+	first := changes[0].(map[string]interface{})
+	if first["name"] == nil {
+		t.Error("minimal JSON should contain name")
+	}
+	if first["status"] == nil {
+		t.Error("minimal JSON should contain status")
+	}
+	if _, hasBorn := first["born"]; hasBorn {
+		t.Error("minimal JSON should not contain born field")
+	}
+	if _, hasCompleted := first["completedTasks"]; hasCompleted {
+		t.Error("minimal JSON should not contain completedTasks field")
+	}
+}
+
+func TestCLIViewMinimalText(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	out, code := runCLI(t, bin, root, "view", "--minimal")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "specs\t") {
+		t.Errorf("expected minimal summary line, got: %s", out)
+	}
+}
+
+func TestCLIViewMinimalJSON(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	out, code := runCLI(t, bin, root, "view", "--minimal", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if _, hasChanges := result["changes"]; hasChanges {
+		t.Error("minimal JSON should not contain changes")
+	}
+	if _, hasSpecs := result["specs"]; hasSpecs {
+		t.Error("minimal JSON should not contain specs")
+	}
+	if result["summary"] == nil {
+		t.Error("minimal JSON should contain summary")
+	}
+}
+
+func TestCLIStatusMinimalJSON(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	out, code := runCLI(t, bin, root, "status", "--minimal", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if _, hasWarnings := result["warnings"]; hasWarnings {
+		t.Error("minimal JSON should not contain warnings")
+	}
+}
+
+func TestCLIStatusMinimalText(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	out, code := runCLI(t, bin, root, "status", "--minimal")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+}
+
+func TestCLIInstructionsMinimalJSON(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	out, code := runCLI(t, bin, root, "instructions", "proposal", "--minimal", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if result["artifactId"] == nil {
+		t.Error("minimal JSON should contain artifactId")
+	}
+	if result["instruction"] == nil {
+		t.Error("minimal JSON should contain instruction")
+	}
+	if _, hasDesc := result["description"]; hasDesc {
+		t.Error("minimal JSON should not contain description")
+	}
+}
+
+func TestCLINewMinimalText(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	out, code := runCLI(t, bin, root, "new", "test-change", "--minimal")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "test-change") {
+		t.Errorf("expected change path, got: %s", out)
+	}
+	if strings.Contains(out, "Artifacts:") {
+		t.Error("minimal text should not contain headers")
+	}
+}
+
+func TestCLIPatchMinimalText(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	out, code := runCLI(t, bin, root, "patch", "test-patch", "some-cap", "--minimal")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "test-patch") {
+		t.Errorf("expected change path, got: %s", out)
+	}
+	if strings.Contains(out, "Artifacts:") {
+		t.Error("minimal text should not contain headers")
+	}
+}
+
+func TestCLIPreviewMinimalText(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	// Create a change with a delta spec
+	changeDir := filepath.Join(root, "specs", "changes", "test-preview")
+	specDir := filepath.Join(changeDir, "specs", "my-cap")
+	os.MkdirAll(specDir, 0o755)
+	os.WriteFile(filepath.Join(specDir, "spec.md"), []byte("# My Cap\n\n## ADDED Requirements\n\n### REQ-1\nSomething SHALL work.\n\n#### Scenario: basic\nWHEN x\nTHEN y\n"), 0o644)
+
+	out, code := runCLI(t, bin, root, "preview", "test-preview", "--minimal")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "capabilities") {
+		t.Errorf("expected minimal totals, got: %s", out)
+	}
+}
+
+func TestCLIPreviewMinimalJSON(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	changeDir := filepath.Join(root, "specs", "changes", "test-preview2")
+	specDir := filepath.Join(changeDir, "specs", "my-cap")
+	os.MkdirAll(specDir, 0o755)
+	os.WriteFile(filepath.Join(specDir, "spec.md"), []byte("# My Cap\n\n## ADDED Requirements\n\n### REQ-1\nSomething SHALL work.\n\n#### Scenario: basic\nWHEN x\nTHEN y\n"), 0o644)
+
+	out, code := runCLI(t, bin, root, "preview", "test-preview2", "--minimal", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if result["totals"] == nil {
+		t.Error("minimal JSON should contain totals")
+	}
+	if _, hasCaps := result["capabilities"]; hasCaps {
+		t.Error("minimal JSON should not contain capabilities")
+	}
+}

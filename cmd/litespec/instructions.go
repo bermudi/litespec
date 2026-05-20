@@ -11,7 +11,7 @@ func cmdInstructions(args []string) error {
 		printInstructionsHelp()
 		return nil
 	}
-	if err := checkUnknownFlags(args, map[string]bool{"--json": true}); err != nil {
+	if err := checkUnknownFlags(args, map[string]bool{"--json": true, "--minimal": true}); err != nil {
 		return err
 	}
 
@@ -20,10 +20,13 @@ func cmdInstructions(args []string) error {
 	}
 
 	artifactID := args[0]
-	var asJSON bool
+	var asJSON, asMinimal bool
 	for _, arg := range args[1:] {
-		if arg == jsonFlag {
+		switch arg {
+		case jsonFlag:
 			asJSON = true
+		case minimalFlag:
+			asMinimal = true
 		}
 	}
 
@@ -37,11 +40,27 @@ func cmdInstructions(args []string) error {
 		if err != nil {
 			return err
 		}
-		data, err := internal.MarshalJSON(instr)
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
+		if asMinimal {
+			type instrMinimalJSON struct {
+				ArtifactID  string `json:"artifactId"`
+				Instruction string `json:"instruction"`
+			}
+			min := instrMinimalJSON{
+				ArtifactID:  instr.ArtifactID,
+				Instruction: instr.Instruction,
+			}
+			data, err := internal.MarshalJSON(min)
+			if err != nil {
+				return fmt.Errorf("failed to marshal JSON: %w", err)
+			}
+			fmt.Println(string(data))
+		} else {
+			data, err := internal.MarshalJSON(instr)
+			if err != nil {
+				return fmt.Errorf("failed to marshal JSON: %w", err)
+			}
+			fmt.Println(string(data))
 		}
-		fmt.Println(string(data))
 		return nil
 	}
 

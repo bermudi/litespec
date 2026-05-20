@@ -14,7 +14,7 @@ func cmdPreview(args []string) error {
 		printPreviewHelp()
 		return nil
 	}
-	if err := checkUnknownFlags(args, map[string]bool{"--json": true}); err != nil {
+	if err := checkUnknownFlags(args, map[string]bool{"--json": true, "--minimal": true}); err != nil {
 		return err
 	}
 
@@ -23,10 +23,15 @@ func cmdPreview(args []string) error {
 	}
 
 	useJSON := false
+	asMinimal := false
 	name := ""
 	for _, a := range args {
 		if a == jsonFlag {
 			useJSON = true
+			continue
+		}
+		if a == minimalFlag {
+			asMinimal = true
 			continue
 		}
 		if strings.HasPrefix(a, "--") {
@@ -75,11 +80,37 @@ func cmdPreview(args []string) error {
 	}
 
 	if useJSON {
-		data, err := internal.FormatPreviewJSON(result)
-		if err != nil {
-			return fmt.Errorf("formatting JSON: %w", err)
+		if asMinimal {
+			type previewMinimalJSON struct {
+				Totals struct {
+					Capabilities      int `json:"capabilities"`
+					Added             int `json:"added"`
+					Modified          int `json:"modified"`
+					Removed           int `json:"removed"`
+					Renamed           int `json:"renamed"`
+				} `json:"totals"`
+			}
+			min := previewMinimalJSON{}
+			min.Totals.Capabilities = result.Totals.Capabilities
+			min.Totals.Added = result.Totals.Added
+			min.Totals.Modified = result.Totals.Modified
+			min.Totals.Removed = result.Totals.Removed
+			min.Totals.Renamed = result.Totals.Renamed
+			data, err := internal.MarshalJSON(min)
+			if err != nil {
+				return fmt.Errorf("formatting JSON: %w", err)
+			}
+			fmt.Println(string(data))
+		} else {
+			data, err := internal.FormatPreviewJSON(result)
+			if err != nil {
+				return fmt.Errorf("formatting JSON: %w", err)
+			}
+			fmt.Println(string(data))
 		}
-		fmt.Println(string(data))
+	} else if asMinimal {
+		fmt.Printf("%d capabilities\t%d added\t%d modified\t%d removed\t%d renamed\n",
+			result.Totals.Capabilities, result.Totals.Added, result.Totals.Modified, result.Totals.Removed, result.Totals.Renamed)
 	} else {
 		fmt.Print(internal.FormatPreviewText(result))
 	}
