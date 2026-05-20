@@ -135,6 +135,8 @@ A `ValidateSpec(root, name)` function MUST exist in the internal package that va
 
 The `ValidateChange` function SHALL validate `dependsOn` references when present in a change's `.litespec.yaml`. Each dependency name SHALL be resolved against active changes first, then archived changes. Unresolvable references SHALL produce an error that includes the source file path. When validating multiple changes via `ValidateAll`, cycle detection SHALL run across all active changes' dependency graphs and report cycle paths as errors.
 
+When an active change declares `dependsOn` references, the dangling-delta check SHALL virtually merge each active dependency's deltas into the canonical spec before validating the current change's operations. This means MODIFIED/REMOVED/RENAMED operations SHALL resolve against the "effective canon" (canonical spec + all active dependency deltas), not just the bare canonical spec. After all dependencies are archived, the effective canon equals the real canon, so validation results remain stable.
+
 #### Scenario: Valid dependency on active change
 
 - **WHEN** change A declares `dependsOn: [B]` and B is an active change
@@ -154,6 +156,26 @@ The `ValidateChange` function SHALL validate `dependsOn` references when present
 
 - **WHEN** `validate --all` is run and a dependency cycle exists among active changes
 - **THEN** an error is reported identifying the cycle path
+
+#### Scenario: MODIFIED requirement resolves via active dependency delta
+
+- **WHEN** change A ADDS requirement "Login" to capability "auth" and change B declares `dependsOn: [A]` and MODIFIES "Login" in capability "auth"
+- **THEN** validation of B passes because "Login" exists in the effective canon (canon + A's ADDED delta)
+
+#### Scenario: ADDED requirement conflicts with dependency's ADDED delta
+
+- **WHEN** change A ADDS requirement "Login" to capability "auth" and change B declares `dependsOn: [A]` and also ADDS "Login" to capability "auth"
+- **THEN** validation of B reports an error because "Login" already exists in the effective canon
+
+#### Scenario: No dependency means no virtual merge
+
+- **WHEN** change B MODIFIES "Login" in capability "auth" without depending on any change, and "Login" does not exist in canon
+- **THEN** validation of B reports a dangling-delta error as before
+
+#### Scenario: Virtual merge applies RENAMED before checking
+
+- **WHEN** change A RENAMES "Login" to "SignIn" in capability "auth" and change B declares `dependsOn: [A]` and MODIFIES "SignIn" in capability "auth"
+- **THEN** validation of B passes because the effective canon has "SignIn" after applying A's rename
 
 ### Requirement: Empty Name Rejection
 

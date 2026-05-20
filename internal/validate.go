@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/bermudi/litespec/internal/skill"
@@ -237,9 +238,8 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 
 				var existingNames map[string]bool
 				if needsMainSpec {
-					mainSpecPath := filepath.Join(CanonPath(root), entry.Name(), "spec.md")
-					mainData, readErr := os.ReadFile(mainSpecPath)
-					if readErr != nil {
+					existingNames = buildEffectiveNames(root, entry.Name(), name)
+					if existingNames == nil {
 						hasModOrRenameOrRemove := false
 						for _, req := range delta.Requirements {
 							if req.Operation == DeltaModified || req.Operation == DeltaRemoved || req.Operation == DeltaRenamed {
@@ -254,21 +254,6 @@ func ValidateChange(root, name string) (*ValidationResult, error) {
 								File:     specPath,
 							})
 							continue
-						}
-					} else {
-						mainSpec, parseErr := ParseMainSpec(string(mainData))
-						if parseErr != nil {
-							result.Errors = append(result.Errors, ValidationIssue{
-								Severity: SeverityError,
-								Message:  fmt.Sprintf("invalid main spec for capability %q: %s", entry.Name(), parseErr),
-								File:     mainSpecPath,
-							})
-							continue
-						}
-
-						existingNames = make(map[string]bool)
-						for _, r := range mainSpec.Requirements {
-							existingNames[r.Name] = true
 						}
 					}
 				}
@@ -912,4 +897,114 @@ func ValidateBacklog(root string) *ValidationResult {
 	}
 
 	return result
+}
+
+func buildEffectiveNames(root, capability, changeName string) map[string]bool {
+	meta, metaErr := ReadChangeMeta(root, changeName)
+	hasDeps := metaErr == nil && len(meta.DependsOn) > 0
+
+	mainSpecPath := filepath.Join(CanonPath(root), capability, "spec.md")
+	mainData, canonErr := os.ReadFile(mainSpecPath)
+
+	if canonErr != nil && !hasDeps {
+		return nil
+	}
+
+	var existingNames map[string]bool
+	if canonErr == nil {
+		mainSpec, parseErr := ParseMainSpec(string(mainData))
+		if parseErr != nil {
+			return nil
+		}
+		existingNames = make(map[string]bool)
+		for _, r := range mainSpec.Requirements {
+			existingNames[r.Name] = true
+		}
+	} else {
+		existingNames = make(map[string]bool)
+	}
+
+	if !hasDeps {
+		if len(existingNames) == 0 {
+			return nil
+		}
+		return existingNames
+	}
+
+	var deltas []DeltaRequirement
+	visited := make(map[string]bool)
+	collectTransitiveDepDeltas(root, capability, meta.DependsOn, visited, &deltas)
+
+	var renamed, removed, added []DeltaRequirement
+	for _, r := range deltas {
+		switch r.Operation {
+		case DeltaRenamed:
+			renamed = append(renamed, r)
+		case DeltaRemoved:
+			removed = append(removed, r)
+		case DeltaAdded:
+			added = append(added, r)
+		}
+	}
+
+	for _, r := range renamed {
+		if r.OldName != r.Name && existingNames[r.OldName] {
+			delete(existingNames, r.OldName)
+			existingNames[r.Name] = true
+		}
+	}
+	for _, r := range removed {
+		delete(existingNames, r.Name)
+	}
+	for _, r := range added {
+		existingNames[r.Name] = true
+	}
+
+	if len(existingNames) == 0 {
+		return nil
+	}
+	return existingNames
+}
+
+func collectTransitiveDepDeltas(root, capability string, deps []string, visited map[string]bool, out *[]DeltaRequirement) {
+	for _, dep := range deps {
+		if visited[dep] || !ChangeExists(root, dep) {
+			continue
+		}
+		visited[dep] = true
+
+		depMeta, err := ReadChangeMeta(root, dep)
+		if err == nil && len(depMeta.DependsOn) > 0 {
+			collectTransitiveDepDeltas(root, capability, depMeta.DependsOn, visited, out)
+		}
+
+		loadDepDeltas(root, dep, capability, out)
+	}
+}
+
+func loadDepDeltas(root, dep, capability string, out *[]DeltaRequirement) {
+	depSpecsDir := filepath.Join(ChangeSpecsPath(root, dep), capability)
+	entries, err := os.ReadDir(depSpecsDir)
+	if err != nil {
+		return
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name() < entries[j].Name()
+	})
+
+	for _, f := range entries {
+		if filepath.Ext(f.Name()) != ".md" {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(depSpecsDir, f.Name()))
+		if err != nil {
+			continue
+		}
+		delta, parseErr := ParseDeltaSpec(string(data))
+		if parseErr != nil {
+			continue
+		}
+		*out = append(*out, delta.Requirements...)
+	}
 }

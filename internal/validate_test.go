@@ -2089,3 +2089,303 @@ func TestValidateDesignOnlyHeadings(t *testing.T) {
 		t.Errorf("expected non-blank lines error for heading-only content, got: %v", issues)
 	}
 }
+
+func TestValidateChangeVirtualMergeMODIFIEDViaDep(t *testing.T) {
+	root := setupTestProject(t)
+
+	// Change A adds requirement to a capability that doesn't exist in canon
+	makeValidChange(t, root, "change-a", `## ADDED Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+- **WHEN** valid creds
+- **THEN** result
+`)
+
+	// Change B depends on A and modifies that requirement
+	writeDeltaSpecFile(t, root, "change-b", "cap", "spec.md", `## MODIFIED Requirements
+
+### Requirement: Login
+The system SHALL authenticate via SSO.
+
+#### Scenario: SSO
+- **WHEN** SSO token
+- **THEN** result
+`)
+	writeChangeMeta(t, root, "change-b", ChangeMeta{
+		Schema:    "spec-driven",
+		Created:   time.Now().UTC().Truncate(time.Second),
+		DependsOn: []string{"change-a"},
+	})
+
+	result, err := ValidateChange(root, "change-b")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	for _, e := range result.Errors {
+		t.Errorf("unexpected error: %s: %s", e.File, e.Message)
+	}
+	if !result.Valid {
+		t.Fatal("expected change-b to validate via virtual merge")
+	}
+}
+
+func TestValidateChangeVirtualMergeADDEDConflictWithDep(t *testing.T) {
+	root := setupTestProject(t)
+
+	// Change A adds "Login" to capability "cap"
+	makeValidChange(t, root, "change-a", `## ADDED Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+- **WHEN** valid creds
+- **THEN** result
+`)
+
+	// Change B depends on A and tries to ADD "Login" again
+	writeDeltaSpecFile(t, root, "change-b", "cap", "spec.md", `## ADDED Requirements
+
+### Requirement: Login
+The system SHALL do something else.
+
+#### Scenario: S1
+- **WHEN** triggered
+- **THEN** result
+`)
+	writeChangeMeta(t, root, "change-b", ChangeMeta{
+		Schema:    "spec-driven",
+		Created:   time.Now().UTC().Truncate(time.Second),
+		DependsOn: []string{"change-a"},
+	})
+
+	result, err := ValidateChange(root, "change-b")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected validation to fail — duplicate ADDED from dependency")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if strings.Contains(e.Message, "already exists") && strings.Contains(e.Message, "Login") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected 'already exists' error for Login, got: %v", result.Errors)
+	}
+}
+
+func TestValidateChangeNoVirtualMergeWithoutDep(t *testing.T) {
+	root := setupTestProject(t)
+
+	// Change A adds "Login" to capability "cap"
+	makeValidChange(t, root, "change-a", `## ADDED Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+- **WHEN** valid creds
+- **THEN** result
+`)
+
+	// Change B does NOT depend on A and tries to MODIFY "Login"
+	writeDeltaSpecFile(t, root, "change-b", "cap", "spec.md", `## MODIFIED Requirements
+
+### Requirement: Login
+The system SHALL authenticate via SSO.
+
+#### Scenario: SSO
+- **WHEN** SSO token
+- **THEN** result
+`)
+	writeChangeMeta(t, root, "change-b", ChangeMeta{
+		Schema:  "spec-driven",
+		Created: time.Now().UTC().Truncate(time.Second),
+	})
+
+	result, err := ValidateChange(root, "change-b")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected dangling-delta error without dependsOn")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if strings.Contains(e.Message, "main spec") || (strings.Contains(e.Message, "not found") && strings.Contains(e.Message, "Login")) {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected 'not found' error for Login, got: %v", result.Errors)
+	}
+}
+
+func TestValidateChangeVirtualMergeRENAMEDFromDep(t *testing.T) {
+	root := setupTestProject(t)
+
+	// Canon has "Login"
+	writeMainSpecFile(t, root, "cap", `# cap
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+- **WHEN** valid creds
+- **THEN** result
+`)
+
+	// Change A renames "Login" → "SignIn"
+	makeValidChange(t, root, "change-a", `## RENAMED Requirements
+
+### Requirement: Login → SignIn
+`)
+
+	// Change B depends on A and modifies "SignIn"
+	writeDeltaSpecFile(t, root, "change-b", "cap", "spec.md", `## MODIFIED Requirements
+
+### Requirement: SignIn
+The system SHALL authenticate via SSO.
+
+#### Scenario: SSO
+- **WHEN** SSO token
+- **THEN** result
+`)
+	writeChangeMeta(t, root, "change-b", ChangeMeta{
+		Schema:    "spec-driven",
+		Created:   time.Now().UTC().Truncate(time.Second),
+		DependsOn: []string{"change-a"},
+	})
+
+	result, err := ValidateChange(root, "change-b")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	for _, e := range result.Errors {
+		t.Errorf("unexpected error: %s: %s", e.File, e.Message)
+	}
+	if !result.Valid {
+		t.Fatal("expected change-b to validate — SignIn exists via virtual rename from dep")
+	}
+}
+
+func TestValidateChangeVirtualMergeOrderingMatchesMergeDelta(t *testing.T) {
+	root := setupTestProject(t)
+
+	writeMainSpecFile(t, root, "cap", `# cap
+
+## Requirements
+
+### Requirement: Foo
+The system SHALL foo.
+
+#### Scenario: S1
+- **WHEN** triggered
+- **THEN** result
+`)
+
+	// Dep renames Foo → Bar in one file
+	writeDeltaSpecFile(t, root, "dep-a", "cap", "a1.md", `# cap
+
+## RENAMED Requirements
+
+### Requirement: Foo → Bar
+`)
+	writeChangeMeta(t, root, "dep-a", ChangeMeta{
+		Schema:  "spec-driven",
+		Created: time.Now().UTC().Truncate(time.Second),
+	})
+
+	// Change B depends on dep-a and modifies Bar
+	writeDeltaSpecFile(t, root, "change-b", "cap", "spec.md", `## MODIFIED Requirements
+
+### Requirement: Bar
+The system SHALL bar.
+
+#### Scenario: S1
+- **WHEN** triggered
+- **THEN** result
+`)
+	writeChangeMeta(t, root, "change-b", ChangeMeta{
+		Schema:    "spec-driven",
+		Created:   time.Now().UTC().Truncate(time.Second),
+		DependsOn: []string{"dep-a"},
+	})
+
+	result, err := ValidateChange(root, "change-b")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	for _, e := range result.Errors {
+		t.Errorf("unexpected error: %s: %s", e.File, e.Message)
+	}
+	if !result.Valid {
+		t.Fatal("expected change-b to validate — Bar exists via RENAMED in dep (ordering must match MergeDelta)")
+	}
+}
+
+func TestValidateChangeVirtualMergeTransitiveDep(t *testing.T) {
+	root := setupTestProject(t)
+
+	// A adds Login to cap (no canon for cap)
+	makeValidChange(t, root, "change-a", `## ADDED Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+- **WHEN** valid creds
+- **THEN** result
+`)
+
+	// B depends on A and modifies Login
+	writeDeltaSpecFile(t, root, "change-b", "cap", "spec.md", `## MODIFIED Requirements
+
+### Requirement: Login
+The system SHALL authenticate via SSO.
+
+#### Scenario: SSO
+- **WHEN** SSO token
+- **THEN** result
+`)
+	writeChangeMeta(t, root, "change-b", ChangeMeta{
+		Schema:    "spec-driven",
+		Created:   time.Now().UTC().Truncate(time.Second),
+		DependsOn: []string{"change-a"},
+	})
+
+	// C depends on B (transitively on A) and modifies Login
+	writeDeltaSpecFile(t, root, "change-c", "cap", "spec.md", `## MODIFIED Requirements
+
+### Requirement: Login
+The system SHALL authenticate via OAuth.
+
+#### Scenario: OAuth
+- **WHEN** OAuth token
+- **THEN** result
+`)
+	writeChangeMeta(t, root, "change-c", ChangeMeta{
+		Schema:    "spec-driven",
+		Created:   time.Now().UTC().Truncate(time.Second),
+		DependsOn: []string{"change-b"},
+	})
+
+	result, err := ValidateChange(root, "change-c")
+	if err != nil {
+		t.Fatalf("ValidateChange: %v", err)
+	}
+	for _, e := range result.Errors {
+		t.Errorf("unexpected error: %s: %s", e.File, e.Message)
+	}
+	if !result.Valid {
+		t.Fatal("expected change-c to validate — Login exists via transitive dep through B→A")
+	}
+}
