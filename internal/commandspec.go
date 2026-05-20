@@ -32,6 +32,8 @@ var CommandSpecs = []CommandSpec{
 				TakesValue:  true,
 				ValuesFunc:  func(root string) []Completion { return completeToolIDs() },
 			},
+			{Name: "--json", Description: "Output as JSON", TakesValue: false},
+			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
 		},
 	},
 	{
@@ -120,6 +122,8 @@ var CommandSpecs = []CommandSpec{
 		Description: "Apply deltas and archive change",
 		Flags: []FlagSpec{
 			{Name: "--allow-incomplete", Description: "Archive even with incomplete tasks or unarchived dependencies", TakesValue: false},
+			{Name: "--json", Description: "Output as JSON", TakesValue: false},
+			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
 		},
 		Positional: &PositionalSpec{
 			Description: "change name",
@@ -147,6 +151,10 @@ var CommandSpecs = []CommandSpec{
 	{
 		Name:        "decide",
 		Description: "Create a new architectural decision record",
+		Flags: []FlagSpec{
+			{Name: "--json", Description: "Output as JSON", TakesValue: false},
+			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
+		},
 		Positional: &PositionalSpec{
 			Description: "decision slug",
 		},
@@ -158,6 +166,8 @@ var CommandSpecs = []CommandSpec{
 			{Name: "--source", Description: "Source OpenSpec project directory", TakesValue: true},
 			{Name: "--dry-run", Description: "Preview import without making changes", TakesValue: false},
 			{Name: "--force", Description: "Overwrite existing files in target", TakesValue: false},
+			{Name: "--json", Description: "Output as JSON", TakesValue: false},
+			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
 		},
 	},
 	{
@@ -170,11 +180,17 @@ var CommandSpecs = []CommandSpec{
 				TakesValue:  true,
 				ValuesFunc:  func(root string) []Completion { return completeToolIDs() },
 			},
+			{Name: "--json", Description: "Output as JSON", TakesValue: false},
+			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
 		},
 	},
 	{
 		Name:        "upgrade",
 		Description: "Check for and install the latest version",
+		Flags: []FlagSpec{
+			{Name: "--json", Description: "Output as JSON", TakesValue: false},
+			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
+		},
 	},
 	{
 		Name:        "completion",

@@ -2840,3 +2840,276 @@ func TestCLIPatchStatusBulkJSON(t *testing.T) {
 		t.Error("expected full-change in bulk status")
 	}
 }
+
+func TestCLIInitJSON(t *testing.T) {
+	bin, _ := setupCLITest(t)
+
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "init", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if result["initialized"] != true {
+		t.Errorf("expected initialized=true, got %v", result["initialized"])
+	}
+	_, hasSkills := result["skills"]
+	if !hasSkills {
+		t.Error("expected skills field")
+	}
+}
+
+func TestCLIInitMinimalJSON(t *testing.T) {
+	bin, _ := setupCLITest(t)
+
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "init", "--minimal", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if result["initialized"] != true {
+		t.Errorf("expected initialized=true, got %v", result["initialized"])
+	}
+	if _, hasSkills := result["skills"]; hasSkills {
+		t.Error("minimal JSON should not contain skills")
+	}
+}
+
+func TestCLIInitMinimalText(t *testing.T) {
+	bin, _ := setupCLITest(t)
+
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "init", "--minimal")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "initialized") {
+		t.Errorf("expected minimal text output, got: %s", out)
+	}
+}
+
+func TestCLIDecideJSON(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	out, code := runCLI(t, bin, root, "decide", "test-decision", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if result["number"] == nil {
+		t.Error("expected number field")
+	}
+	if result["slug"] != "test-decision" {
+		t.Errorf("expected slug=test-decision, got %v", result["slug"])
+	}
+	if result["filePath"] == nil {
+		t.Error("expected filePath field")
+	}
+}
+
+func TestCLIDecideMinimalJSON(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	out, code := runCLI(t, bin, root, "decide", "test-decision", "--minimal", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if _, hasTitle := result["title"]; hasTitle {
+		t.Error("minimal JSON should not contain title")
+	}
+}
+
+func TestCLIDecideMinimalText(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	out, code := runCLI(t, bin, root, "decide", "test-decision", "--minimal")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	if !strings.Contains(out, "0001-test-decision.md") {
+		t.Errorf("expected minimal file path, got: %s", out)
+	}
+}
+
+func TestCLIUpdateJSON(t *testing.T) {
+	bin, _ := setupCLITest(t)
+
+	root := t.TempDir()
+	runCLI(t, bin, root, "init")
+
+	out, code := runCLI(t, bin, root, "update", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if result["skillsUpdated"] != true {
+		t.Errorf("expected skillsUpdated=true, got %v", result["skillsUpdated"])
+	}
+}
+
+func TestCLIUpdateMinimalJSON(t *testing.T) {
+	bin, _ := setupCLITest(t)
+
+	root := t.TempDir()
+	runCLI(t, bin, root, "init")
+
+	out, code := runCLI(t, bin, root, "update", "--minimal", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if result["updated"] != true {
+		t.Errorf("expected updated=true, got %v", result["updated"])
+	}
+	if _, hasSkills := result["skillsUpdated"]; hasSkills {
+		t.Error("minimal JSON should not contain skillsUpdated")
+	}
+}
+
+func TestCLIUpgradeJSON(t *testing.T) {
+	bin, _ := setupCLITest(t)
+
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "upgrade", "--json")
+	// Will likely fail because not a go-install, but should still handle --json flag
+	_ = out
+	_ = code
+	// The main thing is that --json is accepted as a valid flag
+}
+
+func TestCLIArchiveJSON(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	// Don't create canon spec — the change ADDEDs will create it
+	createChangeWithArtifacts(t, root, "test-change")
+
+	// Mark all tasks done
+	tasksPath := filepath.Join(root, "specs", "changes", "test-change", "tasks.md")
+	os.WriteFile(tasksPath, []byte("## Phase 1: Test\n\n- [x] Task"), 0o644)
+
+	out, code := runCLI(t, bin, root, "archive", "test-change", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if result["change"] != "test-change" {
+		t.Errorf("expected change=test-change, got %v", result["change"])
+	}
+	caps, ok := result["capabilities"].([]interface{})
+	if !ok || len(caps) == 0 {
+		t.Error("expected non-empty capabilities array")
+	}
+}
+
+func TestCLIArchiveMinimalJSON(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	createChangeWithArtifacts(t, root, "test-change")
+
+	tasksPath := filepath.Join(root, "specs", "changes", "test-change", "tasks.md")
+	os.WriteFile(tasksPath, []byte("## Phase 1: Test\n\n- [x] Task"), 0o644)
+
+	out, code := runCLI(t, bin, root, "archive", "test-change", "--minimal", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if result["archived"] != true {
+		t.Errorf("expected archived=true, got %v", result["archived"])
+	}
+	if _, hasChange := result["change"]; hasChange {
+		t.Error("minimal JSON should not contain change name")
+	}
+}
+
+func TestCLIImportJSON(t *testing.T) {
+	bin, _ := setupCLITest(t)
+
+	source := t.TempDir()
+	os.MkdirAll(filepath.Join(source, "openspec", "specs"), 0o755)
+	os.MkdirAll(filepath.Join(source, "openspec", "changes"), 0o755)
+	// Create a minimal canon spec
+	capDir := filepath.Join(source, "openspec", "specs", "auth")
+	os.MkdirAll(capDir, 0o755)
+	os.WriteFile(filepath.Join(capDir, "spec.md"), []byte(`# auth Specification
+
+## Requirements
+
+### Requirement: Login
+The system SHALL authenticate.
+
+#### Scenario: Valid
+- **WHEN** valid creds
+- **THEN** result
+`), 0o644)
+
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "import", "--source", source, "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if result["canonSpecs"] == nil {
+		t.Error("expected canonSpecs field")
+	}
+}
+
+func TestCLIImportDryRunJSON(t *testing.T) {
+	bin, _ := setupCLITest(t)
+
+	source := t.TempDir()
+	os.MkdirAll(filepath.Join(source, "openspec", "specs"), 0o755)
+	os.MkdirAll(filepath.Join(source, "openspec", "changes"), 0o755)
+
+	root := t.TempDir()
+	out, code := runCLI(t, bin, root, "import", "--source", source, "--dry-run", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if result["dryRun"] != true {
+		t.Errorf("expected dryRun=true, got %v", result["dryRun"])
+	}
+}

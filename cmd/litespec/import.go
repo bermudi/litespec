@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/bermudi/litespec/internal"
 	"github.com/bermudi/litespec/internal/importer"
 )
 
@@ -12,13 +13,14 @@ func cmdImport(args []string) error {
 		printImportHelp()
 		return nil
 	}
-	if err := checkUnknownFlags(args, map[string]bool{"--dry-run": true, "--source": true, "--force": true}); err != nil {
+	if err := checkUnknownFlags(args, map[string]bool{"--dry-run": true, "--source": true, "--force": true, "--json": true, "--minimal": true}); err != nil {
 		return err
 	}
 
 	var dryRun bool
 	var source string
 	var force bool
+	asJSON, asMinimal := parseOutputFlags(args)
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -83,13 +85,55 @@ func cmdImport(args []string) error {
 	}
 
 	if dryRun {
-		fmt.Println("Dry run - would import from:", source)
-		fmt.Println("  Target:", target)
-		fmt.Println()
 		stats, err := importer.PreviewImport(source)
 		if err != nil {
 			return err
 		}
+		if asJSON {
+			type importPreviewJSON struct {
+				DryRun         bool     `json:"dryRun"`
+				CanonSpecs     int      `json:"canonSpecs"`
+				ActiveChanges  int      `json:"activeChanges"`
+				Archives       int      `json:"archives"`
+				Warnings       []string `json:"warnings"`
+				SkippedFiles   []string `json:"skippedFiles"`
+			}
+			out := importPreviewJSON{
+				DryRun:         true,
+				CanonSpecs:     stats.CanonSpecs,
+				ActiveChanges:  stats.ActiveChanges,
+				Archives:       stats.Archives,
+				Warnings:       stats.Warnings,
+				SkippedFiles:   stats.SkippedFiles,
+			}
+			if asMinimal {
+				type importMinimalJSON struct {
+					DryRun        bool `json:"dryRun"`
+					CanonSpecs    int  `json:"canonSpecs"`
+					ActiveChanges int  `json:"activeChanges"`
+					Archives      int  `json:"archives"`
+				}
+				data, err := internal.MarshalJSON(importMinimalJSON{DryRun: true, CanonSpecs: stats.CanonSpecs, ActiveChanges: stats.ActiveChanges, Archives: stats.Archives})
+				if err != nil {
+					return fmt.Errorf("failed to marshal JSON: %w", err)
+				}
+				fmt.Println(string(data))
+				return nil
+			}
+			data, err := internal.MarshalJSON(out)
+			if err != nil {
+				return fmt.Errorf("failed to marshal JSON: %w", err)
+			}
+			fmt.Println(string(data))
+			return nil
+		}
+		if asMinimal {
+			fmt.Printf("preview\t%d specs\t%d changes\t%d archives\n", stats.CanonSpecs, stats.ActiveChanges, stats.Archives)
+			return nil
+		}
+		fmt.Println("Dry run - would import from:", source)
+		fmt.Println("  Target:", target)
+		fmt.Println()
 		printNameList := func(label string, count int, names []string) {
 			if count == 0 {
 				fmt.Printf("  %s: 0\n", label)
@@ -116,13 +160,56 @@ func cmdImport(args []string) error {
 		return nil
 	}
 
-	fmt.Println("Importing from:", source)
-	fmt.Println("  Target:", target)
-	fmt.Println()
+	if !asJSON && !asMinimal {
+		fmt.Println("Importing from:", source)
+		fmt.Println("  Target:", target)
+		fmt.Println()
+	}
 
 	stats, err := importer.ImportOpenSpecProject(source, target)
 	if err != nil {
 		return fmt.Errorf("import failed: %w", err)
+	}
+
+	if asJSON {
+		type importResultJSON struct {
+			CanonSpecs     int      `json:"canonSpecs"`
+			ActiveChanges  int      `json:"activeChanges"`
+			Archives       int      `json:"archives"`
+			Warnings       []string `json:"warnings"`
+			SkippedFiles   []string `json:"skippedFiles"`
+		}
+		if asMinimal {
+			type importMinimalJSON struct {
+				Imported      bool `json:"imported"`
+				CanonSpecs    int  `json:"canonSpecs"`
+				ActiveChanges int  `json:"activeChanges"`
+				Archives      int  `json:"archives"`
+			}
+			data, err := internal.MarshalJSON(importMinimalJSON{Imported: true, CanonSpecs: stats.CanonSpecs, ActiveChanges: stats.ActiveChanges, Archives: stats.Archives})
+			if err != nil {
+				return fmt.Errorf("failed to marshal JSON: %w", err)
+			}
+			fmt.Println(string(data))
+			return nil
+		}
+		data, err := internal.MarshalJSON(importResultJSON{
+			CanonSpecs:     stats.CanonSpecs,
+			ActiveChanges:  stats.ActiveChanges,
+			Archives:       stats.Archives,
+			Warnings:       stats.Warnings,
+			SkippedFiles:   stats.SkippedFiles,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to marshal JSON: %w", err)
+		}
+		fmt.Println(string(data))
+		return nil
+	}
+
+	if asMinimal {
+		fmt.Printf("imported\t%d specs\t%d changes\t%d archives\n", stats.CanonSpecs, stats.ActiveChanges, stats.Archives)
+		return nil
 	}
 
 	fmt.Printf("✓ Imported %d canon specs\n", stats.CanonSpecs)
@@ -154,6 +241,8 @@ Options:
   --source <dir>   Source OpenSpec project directory (default: current directory)
   --dry-run        Preview import without making changes
   --force          Overwrite existing files in target
+  --json           Output as JSON
+  --minimal        Minimal output
 
 The command:
   - Detects OpenSpec project structure (openspec/specs/ or openspec/changes/)
@@ -169,5 +258,6 @@ Examples:
   litespec import --source /path/to/openspec   Import from specific directory
   litespec import --dry-run                    Preview import without changes
   litespec import --force                      Overwrite existing files
+  litespec import --json                       Output as JSON
 `)
 }

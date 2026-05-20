@@ -14,9 +14,11 @@ func cmdArchive(args []string) error {
 		printArchiveHelp()
 		return nil
 	}
-	if err := checkUnknownFlags(args, map[string]bool{"--allow-incomplete": true}); err != nil {
+	if err := checkUnknownFlags(args, map[string]bool{"--allow-incomplete": true, "--json": true, "--minimal": true}); err != nil {
 		return err
 	}
+
+	asJSON, asMinimal := parseOutputFlags(args)
 
 	if len(args) == 0 {
 		return fmt.Errorf("usage: litespec archive <change-name> [--allow-incomplete]")
@@ -27,6 +29,9 @@ func cmdArchive(args []string) error {
 	for _, a := range args {
 		if a == "--allow-incomplete" {
 			allowIncomplete = true
+			continue
+		}
+		if a == jsonFlag || a == minimalFlag {
 			continue
 		}
 		filtered = append(filtered, a)
@@ -105,7 +110,9 @@ func cmdArchive(args []string) error {
 	}
 
 	for _, w := range writes {
-		fmt.Printf("Updated spec: %s\n", w.Capability)
+		if !asJSON && !asMinimal {
+			fmt.Printf("Updated spec: %s\n", w.Capability)
+		}
 	}
 
 	// Strip specs/ subtree from archived directory
@@ -137,6 +144,41 @@ func cmdArchive(args []string) error {
 		if _, parseErr := internal.ParseMainSpec(string(data)); parseErr != nil {
 			return fmt.Errorf("post-archive verification failed: spec %s failed to parse: %w", w.Capability, parseErr)
 		}
+	}
+
+	if asJSON {
+		type archiveResultJSON struct {
+			Change       string   `json:"change"`
+			Capabilities []string `json:"capabilities"`
+			ArchivedPath string   `json:"archivedPath"`
+		}
+		caps := make([]string, len(writes))
+		for i, w := range writes {
+			caps[i] = w.Capability
+		}
+		if asMinimal {
+			type archiveMinimalJSON struct {
+				Archived     bool     `json:"archived"`
+				Capabilities []string `json:"capabilities"`
+			}
+			data, err := internal.MarshalJSON(archiveMinimalJSON{Archived: true, Capabilities: caps})
+			if err != nil {
+				return fmt.Errorf("failed to marshal JSON: %w", err)
+			}
+			fmt.Println(string(data))
+			return nil
+		}
+		data, err := internal.MarshalJSON(archiveResultJSON{Change: name, Capabilities: caps, ArchivedPath: archiveDest})
+		if err != nil {
+			return fmt.Errorf("failed to marshal JSON: %w", err)
+		}
+		fmt.Println(string(data))
+		return nil
+	}
+
+	if asMinimal {
+		fmt.Println("archived")
+		return nil
 	}
 
 	fmt.Printf("Change %q archived — deltas applied, change marked as implemented.\n", name)

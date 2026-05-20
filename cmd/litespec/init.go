@@ -12,9 +12,11 @@ func cmdInit(args []string) error {
 		printInitHelp()
 		return nil
 	}
-	if err := checkUnknownFlags(args, map[string]bool{"--tools": true}); err != nil {
+	if err := checkUnknownFlags(args, map[string]bool{"--tools": true, "--json": true, "--minimal": true}); err != nil {
 		return err
 	}
+
+	asJSON, asMinimal := parseOutputFlags(args)
 
 	var tools string
 	for i := 0; i < len(args); i++ {
@@ -32,12 +34,16 @@ func cmdInit(args []string) error {
 	if err := internal.InitProject(root); err != nil {
 		return err
 	}
-	fmt.Println("Created specs/ directory structure")
+	if !asJSON && !asMinimal {
+		fmt.Println("Created specs/ directory structure")
+	}
 
 	if err := internal.GenerateSkills(root); err != nil {
 		return err
 	}
-	fmt.Println("Generated .agents/skills/")
+	if !asJSON && !asMinimal {
+		fmt.Println("Generated .agents/skills/")
+	}
 
 	var toolIDs []string
 	if tools != "" {
@@ -53,7 +59,50 @@ func cmdInit(args []string) error {
 		if err := internal.GenerateAdapterCommands(root, toolIDs); err != nil {
 			return err
 		}
-		fmt.Printf("Generated adapter commands for: %s\n", strings.Join(toolIDs, ","))
+		if !asJSON && !asMinimal {
+			fmt.Printf("Generated adapter commands for: %s\n", strings.Join(toolIDs, ","))
+		}
+	}
+
+	if asJSON {
+		type initResultJSON struct {
+			Initialized bool     `json:"initialized"`
+			Directories []string `json:"directories"`
+			Skills      []string `json:"skills"`
+			Adapters    []string `json:"adapters"`
+		}
+		out := initResultJSON{
+			Initialized: true,
+			Directories: []string{"specs/canon/", "specs/changes/"},
+		}
+		skillNames := make([]string, len(internal.Skills))
+		for i, s := range internal.Skills {
+			skillNames[i] = s.ID
+		}
+		out.Skills = skillNames
+		out.Adapters = toolIDs
+		if asMinimal {
+			type initMinimalJSON struct {
+				Initialized bool `json:"initialized"`
+			}
+			data, err := internal.MarshalJSON(initMinimalJSON{Initialized: true})
+			if err != nil {
+				return fmt.Errorf("failed to marshal JSON: %w", err)
+			}
+			fmt.Println(string(data))
+			return nil
+		}
+		data, err := internal.MarshalJSON(out)
+		if err != nil {
+			return fmt.Errorf("failed to marshal JSON: %w", err)
+		}
+		fmt.Println(string(data))
+		return nil
+	}
+
+	if asMinimal {
+		fmt.Println("initialized")
+		return nil
 	}
 
 	fmt.Println("Project initialized.")

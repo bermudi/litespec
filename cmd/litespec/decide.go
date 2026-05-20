@@ -14,9 +14,11 @@ func cmdDecide(args []string) error {
 		printDecideHelp()
 		return nil
 	}
-	if err := checkUnknownFlags(args, map[string]bool{}); err != nil {
+	if err := checkUnknownFlags(args, map[string]bool{"--json": true, "--minimal": true}); err != nil {
 		return err
 	}
+
+	asJSON, asMinimal := parseOutputFlags(args)
 
 	if len(args) == 0 {
 		return fmt.Errorf("usage: litespec decide <slug>")
@@ -81,6 +83,45 @@ proposed
 		return fmt.Errorf("write decision file: %w", err)
 	}
 
+	if asJSON {
+		type decideResultJSON struct {
+			Number   int    `json:"number"`
+			Slug     string `json:"slug"`
+			Title    string `json:"title"`
+			FilePath string `json:"filePath"`
+		}
+		out := decideResultJSON{
+			Number:   nextNum,
+			Slug:     slug,
+			Title:    slugToTitle(slug),
+			FilePath: filePath,
+		}
+		if asMinimal {
+			type decideMinimalJSON struct {
+				Number   int    `json:"number"`
+				Slug     string `json:"slug"`
+				FilePath string `json:"filePath"`
+			}
+			data, err := internal.MarshalJSON(decideMinimalJSON{Number: nextNum, Slug: slug, FilePath: filePath})
+			if err != nil {
+				return fmt.Errorf("failed to marshal JSON: %w", err)
+			}
+			fmt.Println(string(data))
+			return nil
+		}
+		data, err := internal.MarshalJSON(out)
+		if err != nil {
+			return fmt.Errorf("failed to marshal JSON: %w", err)
+		}
+		fmt.Println(string(data))
+		return nil
+	}
+
+	if asMinimal {
+		fmt.Println(filePath)
+		return nil
+	}
+
 	fmt.Printf("Created: %s\n", filePath)
 	return nil
 }
@@ -117,7 +158,7 @@ func slugToTitle(slug string) string {
 }
 
 func printDecideHelp() {
-	fmt.Print(`Usage: litespec decide <slug>
+	fmt.Print(`Usage: litespec decide <slug> [--json] [--minimal]
 
 Create a new architectural decision record.
 
@@ -127,8 +168,12 @@ Status starts as "proposed". Edit the file to change status and fill in sections
 Arguments:
   <slug>            Decision slug (lowercase, hyphens, no spaces)
 
+Flags:
+  --json            Output as JSON
+  --minimal         Minimal output
+
 Examples:
   litespec decide single-shared-workspace
-  litespec decide beta-tool-binding
+  litespec decide beta-tool-binding --json
 `)
 }

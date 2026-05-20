@@ -10,6 +10,8 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+
+	"github.com/bermudi/litespec/internal"
 )
 
 func cmdUpgrade(args []string) error {
@@ -17,6 +19,11 @@ func cmdUpgrade(args []string) error {
 		printUpgradeHelp()
 		return nil
 	}
+	if err := checkUnknownFlags(args, map[string]bool{"--json": true, "--minimal": true}); err != nil {
+		return err
+	}
+
+	asJSON, asMinimal := parseOutputFlags(args)
 
 	if !isGoInstall() {
 		return fmt.Errorf("auto-upgrade only supports installations via 'go install'")
@@ -41,7 +48,37 @@ func cmdUpgrade(args []string) error {
 	if err != nil {
 		return fmt.Errorf("cannot determine current version (%q): %w", version, err)
 	}
+
 	if cmp >= 0 {
+		if asJSON {
+			if asMinimal {
+				type upgradeMinimalJSON struct {
+					Upgraded       bool   `json:"upgraded"`
+					CurrentVersion string `json:"currentVersion"`
+				}
+				data, err := internal.MarshalJSON(upgradeMinimalJSON{Upgraded: false, CurrentVersion: localVersion})
+				if err != nil {
+					return fmt.Errorf("failed to marshal JSON: %w", err)
+				}
+				fmt.Println(string(data))
+				return nil
+			}
+			type upgradeResultJSON struct {
+				Upgraded       bool   `json:"upgraded"`
+				CurrentVersion string `json:"currentVersion"`
+				Message        string `json:"message"`
+			}
+			data, err := internal.MarshalJSON(upgradeResultJSON{Upgraded: false, CurrentVersion: localVersion, Message: "Already up to date"})
+			if err != nil {
+				return fmt.Errorf("failed to marshal JSON: %w", err)
+			}
+			fmt.Println(string(data))
+			return nil
+		}
+		if asMinimal {
+			fmt.Printf("up-to-date\tv%s\n", localVersion)
+			return nil
+		}
 		fmt.Printf("Already up to date (v%s)\n", localVersion)
 		return nil
 	}
@@ -52,6 +89,44 @@ func cmdUpgrade(args []string) error {
 	cmd.Env = append(os.Environ(), "GOPROXY=https://proxy.golang.org,direct")
 	if err := cmd.Run(); err != nil {
 		return err
+	}
+
+	if asJSON {
+		if asMinimal {
+			type upgradeMinimalJSON struct {
+				Upgraded        bool   `json:"upgraded"`
+				PreviousVersion string `json:"previousVersion"`
+				NewVersion      string `json:"newVersion"`
+			}
+			data, err := internal.MarshalJSON(upgradeMinimalJSON{Upgraded: true, PreviousVersion: localVersion, NewVersion: latestTag})
+			if err != nil {
+				return fmt.Errorf("failed to marshal JSON: %w", err)
+			}
+			fmt.Println(string(data))
+			return nil
+		}
+		type upgradeResultJSON struct {
+			Upgraded        bool   `json:"upgraded"`
+			PreviousVersion string `json:"previousVersion"`
+			NewVersion      string `json:"newVersion"`
+			Hint            string `json:"hint"`
+		}
+		data, err := internal.MarshalJSON(upgradeResultJSON{
+			Upgraded:        true,
+			PreviousVersion: localVersion,
+			NewVersion:      latestTag,
+			Hint:            "Run 'litespec update' in your projects to refresh generated artifacts",
+		})
+		if err != nil {
+			return fmt.Errorf("failed to marshal JSON: %w", err)
+		}
+		fmt.Println(string(data))
+		return nil
+	}
+
+	if asMinimal {
+		fmt.Printf("upgraded\tv%s\n", latestTag)
+		return nil
 	}
 
 	fmt.Printf("\nUpgraded to %s\n", latestTag)

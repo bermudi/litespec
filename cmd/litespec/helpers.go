@@ -9,6 +9,18 @@ import (
 	"github.com/bermudi/litespec/internal"
 )
 
+func parseOutputFlags(args []string) (asJSON, asMinimal bool) {
+	for _, arg := range args {
+		switch arg {
+		case jsonFlag:
+			asJSON = true
+		case minimalFlag:
+			asMinimal = true
+		}
+	}
+	return
+}
+
 func hasHelpFlag(args []string) bool {
 	for _, arg := range args {
 		if arg == "--help" || arg == "-h" {
@@ -28,7 +40,7 @@ func checkUnknownFlags(args []string, validFlags map[string]bool) error {
 }
 
 func printInitHelp() {
-	fmt.Print(`Usage: litespec init [--tools <ids>]
+	fmt.Print(`Usage: litespec init [--tools <ids>] [--json] [--minimal]
 
 Initialize a new litespec project in the current directory.
 
@@ -39,24 +51,30 @@ Creates:
 
 Flags:
   --tools <ids>     Comma-separated tool IDs (e.g., claude)
+  --json            Output as JSON
+  --minimal         Minimal output
 
 Examples:
   litespec init
   litespec init --tools claude
+  litespec init --json
 `)
 }
 
 func printUpdateHelp() {
-	fmt.Print(`Usage: litespec update [--tools <ids>]
+	fmt.Print(`Usage: litespec update [--tools <ids>] [--json] [--minimal]
 
 Regenerate skills and adapter commands from current specs.
 
 Flags:
   --tools <ids>     Comma-separated tool IDs (e.g., claude)
+  --json            Output as JSON
+  --minimal         Minimal output
 
 Examples:
   litespec update
   litespec update --tools claude
+  litespec update --json
 `)
 }
 
@@ -182,7 +200,7 @@ Examples:
 }
 
 func printArchiveHelp() {
-	fmt.Print(`Usage: litespec archive <name> [--allow-incomplete]
+	fmt.Print(`Usage: litespec archive <name> [--allow-incomplete] [--json] [--minimal]
 
 Apply deltas to canonical specs and archive a change (marks it as implemented).
 
@@ -191,10 +209,13 @@ Arguments:
 
 Flags:
   --allow-incomplete    Archive even with incomplete tasks or unarchived dependencies
+  --json                Output as JSON
+  --minimal             Minimal output
 
 Examples:
   litespec archive my-change
   litespec archive my-change --allow-incomplete
+  litespec archive my-change --json
 `)
 }
 
@@ -213,15 +234,19 @@ Examples:
 }
 
 func printUpgradeHelp() {
-	fmt.Print(`Usage: litespec upgrade
+	fmt.Print(`Usage: litespec upgrade [--json] [--minimal]
 
 Check for the latest version and upgrade via go install.
 
 Only available for binaries installed via 'go install'.
 
+Flags:
+  --json            Output as JSON
+  --minimal         Minimal output
+
 Examples:
   litespec upgrade
-  litespec upgrade --help
+  litespec upgrade --json
 `)
 }
 
