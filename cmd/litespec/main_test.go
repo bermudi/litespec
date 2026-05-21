@@ -3354,3 +3354,80 @@ func TestCLIPreviewMinimalJSON(t *testing.T) {
 		t.Error("minimal JSON should not contain capabilities")
 	}
 }
+
+func TestCLINewMinimalJSON(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	out, code := runCLI(t, bin, root, "new", "test-change", "--minimal", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if result["changeName"] == nil {
+		t.Error("minimal JSON should contain changeName")
+	}
+	if result["isComplete"] == nil {
+		t.Error("minimal JSON should contain isComplete")
+	}
+	if _, hasSchema := result["schemaName"]; hasSchema {
+		t.Error("minimal JSON should not contain schemaName")
+	}
+	if _, hasArtifacts := result["artifacts"]; hasArtifacts {
+		t.Error("minimal JSON should not contain artifacts")
+	}
+}
+
+func TestCLIPatchMinimalJSON(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	out, code := runCLI(t, bin, root, "patch", "test-patch", "some-cap", "--minimal", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if result["changeName"] == nil {
+		t.Error("minimal JSON should contain changeName")
+	}
+	if result["isComplete"] == nil {
+		t.Error("minimal JSON should contain isComplete")
+	}
+	if _, hasArtifacts := result["artifacts"]; hasArtifacts {
+		t.Error("minimal JSON should not contain artifacts")
+	}
+}
+
+func TestCLIArchiveJSONNoWarningCorruption(t *testing.T) {
+	bin, root := setupCLITest(t)
+
+	createChangeWithArtifacts(t, root, "test-archive-warn")
+
+	// Mark all tasks done
+	tasksPath := filepath.Join(root, "specs", "changes", "test-archive-warn", "tasks.md")
+	os.WriteFile(tasksPath, []byte("## Phase 1: Test\n\n- [x] Task"), 0o644)
+
+	out, code := runCLI(t, bin, root, "archive", "test-archive-warn", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+
+	// Verify stdout is pure JSON (no WARN lines prepended)
+	if strings.Contains(out, "WARN") {
+		t.Errorf("WARN leaked into JSON output: %s", out)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if result["change"] == nil {
+		t.Error("expected change field")
+	}
+}

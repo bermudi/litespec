@@ -60,8 +60,10 @@ func cmdArchive(args []string) error {
 		}
 		return fmt.Errorf("validation failed. Fix errors before archiving")
 	}
-	for _, issue := range result.Warnings {
-		fmt.Printf("WARN   %s: %s\n", issue.File, issue.Message)
+	if !asJSON && !asMinimal {
+		for _, issue := range result.Warnings {
+			fmt.Printf("WARN   %s: %s\n", issue.File, issue.Message)
+		}
 	}
 
 	if !allowIncomplete {

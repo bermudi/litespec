@@ -89,6 +89,18 @@ func cmdPatch(args []string) error {
 
 	if asJSON {
 		status := internal.BuildChangeStatusJSON(ctx)
+		if asMinimal {
+			type patchMinimalJSON struct {
+				ChangeName string `json:"changeName"`
+				IsComplete  bool   `json:"isComplete"`
+			}
+			data, err := internal.MarshalJSON(patchMinimalJSON{ChangeName: status.ChangeName, IsComplete: status.IsComplete})
+			if err != nil {
+				return fmt.Errorf("failed to marshal JSON: %w", err)
+			}
+			fmt.Println(string(data))
+			return nil
+		}
 		data, err := internal.MarshalJSON(status)
 		if err != nil {
 			return fmt.Errorf("failed to marshal JSON: %w", err)

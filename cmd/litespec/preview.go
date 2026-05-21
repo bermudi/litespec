@@ -119,7 +119,7 @@ func cmdPreview(args []string) error {
 }
 
 func printPreviewHelp() {
-	fmt.Print(`Usage: litespec preview <change-name> [--json]
+	fmt.Print(`Usage: litespec preview <change-name> [--json] [--minimal]
 
 Preview what archive would do to canonical specs without making changes.
 
@@ -131,6 +131,7 @@ Shows a structural summary of operations per capability:
 
 Flags:
   --json    Output structured JSON instead of text
+  --minimal Minimal output
 
 Examples:
   litespec preview add-auth

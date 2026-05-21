@@ -79,7 +79,7 @@ Examples:
 }
 
 func printPatchHelp() {
-	fmt.Print(`Usage: litespec patch <name> <capability>
+	fmt.Print(`Usage: litespec patch <name> <capability> [--json] [--minimal]
 
 Create a patch-mode change with only a delta spec. No proposal, design, or tasks.
 
@@ -90,6 +90,10 @@ Arguments:
   <name>            Change name (e.g., add-verbose-flag)
   <capability>     Capability to patch (e.g., cli)
 
+Flags:
+  --json            Output artifact states as JSON
+  --minimal         Minimal output
+
 Examples:
   litespec patch add-verbose-flag cli
   litespec patch fix-output-format status
@@ -97,7 +101,7 @@ Examples:
 }
 
 func printNewHelp() {
-	fmt.Print(`Usage: litespec new <name> [--json]
+	fmt.Print(`Usage: litespec new <name> [--json] [--minimal]
 
 Create a new change directory under specs/changes/ and show the artifact shape.
 
@@ -106,6 +110,7 @@ Arguments:
 
 Flags:
   --json            Output artifact states as JSON
+  --minimal         Minimal output
 
 Examples:
   litespec new add-auth
@@ -114,7 +119,7 @@ Examples:
 }
 
 func printListHelp() {
-	fmt.Print(`Usage: litespec list [--specs|--changes|--decisions|--backlog] [--sort <mode>] [--status <state>] [--json]
+	fmt.Print(`Usage: litespec list [--specs|--changes|--decisions|--backlog] [--sort <mode>] [--status <state>] [--json] [--minimal]
 
 List active changes in the project (default), specs with --specs, decisions with --decisions, or backlog items with --backlog.
 
@@ -126,6 +131,7 @@ Flags:
   --sort <field>    Sort by 'recent' (default), 'name', 'deps', or 'number' (decisions)
   --status <state>  Filter decisions by status: proposed, accepted, superseded (requires --decisions)
   --json            Output as JSON
+  --minimal         Minimal output
 
 Examples:
   litespec list
@@ -139,7 +145,7 @@ Examples:
 }
 
 func printStatusHelp() {
-	fmt.Print(`Usage: litespec status [<name>] [--json]
+	fmt.Print(`Usage: litespec status [<name>] [--json] [--minimal]
 
 Show artifact states for a change or all changes.
 
@@ -148,6 +154,7 @@ Arguments:
 
 Flags:
   --json            Output as JSON
+  --minimal         Minimal output
 
 Examples:
   litespec status
@@ -157,7 +164,7 @@ Examples:
 }
 
 func printValidateHelp() {
-	fmt.Print(`Usage: litespec validate [<name>] [--all|--changes|--specs|--decisions] [--type T] [--strict] [--json]
+	fmt.Print(`Usage: litespec validate [<name>] [--all|--changes|--specs|--decisions] [--type T] [--strict] [--json] [--minimal]
 
 Validate changes, specs, and decisions.
 
@@ -172,6 +179,7 @@ Flags:
   --type <T>        Disambiguate name: change|spec|decision
   --strict          Treat warnings as errors
   --json            Output as JSON
+  --minimal         Minimal output
 
 Examples:
   litespec validate
@@ -183,7 +191,7 @@ Examples:
 }
 
 func printInstructionsHelp() {
-	fmt.Print(`Usage: litespec instructions <artifact> [--json]
+	fmt.Print(`Usage: litespec instructions <artifact> [--json] [--minimal]
 
 Get artifact-specific instructions for writing proposals, specs, designs, or tasks.
 
@@ -192,6 +200,7 @@ Arguments:
 
 Flags:
   --json            Output as JSON
+  --minimal         Minimal output
 
 Examples:
   litespec instructions proposal
@@ -220,12 +229,13 @@ Examples:
 }
 
 func printViewHelp() {
-	fmt.Print(`Usage: litespec view [--json]
+	fmt.Print(`Usage: litespec view [--json] [--minimal]
 
 Display a dashboard overview of specs, changes, and their dependency relationships.
 
 Flags:
-  --json  Output as JSON
+  --json            Output as JSON
+  --minimal         Minimal output
 
 Examples:
   litespec view
