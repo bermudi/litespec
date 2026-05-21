@@ -11,6 +11,7 @@ type ChangeStatusJSON struct {
 	SchemaName string               `json:"schemaName"`
 	IsComplete bool                 `json:"isComplete"`
 	Mode       string               `json:"mode,omitempty"`
+	DependsOn  []string             `json:"dependsOn,omitempty"`
 	Artifacts  []ArtifactStatusJSON `json:"artifacts"`
 }
 
@@ -217,6 +218,7 @@ func BuildChangeStatusJSON(change *Change) ChangeStatusJSON {
 		SchemaName: change.Schema,
 		IsComplete: allDone,
 		Mode:       change.Mode,
+		DependsOn:  change.DependsOn,
 		Artifacts:  artifacts,
 	}
 }

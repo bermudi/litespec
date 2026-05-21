@@ -20,6 +20,15 @@ Before writing anything, identify which existing capabilities and code paths the
 
 If your proposal touches more than 3 capabilities or mixes unrelated concerns, pause and ask the user whether this should be split into multiple changes.
 
+**Inter-change dependencies:** Run ` + "`litespec list --json`" + ` to check for active changes. If this proposal builds on or must follow another active change, set ` + "`dependsOn`" + ` in ` + "`.litespec.yaml`" + ` after creating the change. Example YAML:
+
+    schema: spec-driven
+    created: <timestamp>
+    dependsOn:
+      - other-change-name
+
+If another active change touches the same capabilities, declare the dependency — it suppresses overlap warnings during validation and ensures correct ordering for ` + "`list --sort deps`" + `. If no relationship exists, leave ` + "`dependsOn`" + ` commented out.
+
 Then check if it already exists:
 ` + "```bash" + `
 litespec status <name> --json

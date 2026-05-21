@@ -38,6 +38,7 @@ type Change struct {
 	Schema    string
 	Created   time.Time
 	Mode      string
+	DependsOn []string
 	Artifacts map[string]ArtifactState
 }
 

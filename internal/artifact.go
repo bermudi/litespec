@@ -130,6 +130,7 @@ func LoadChangeContext(root, changeName string) (*Change, error) {
 		Schema:    meta.Schema,
 		Created:   meta.Created,
 		Mode:      meta.Mode,
+		DependsOn: meta.DependsOn,
 		Artifacts: states,
 	}, nil
 }

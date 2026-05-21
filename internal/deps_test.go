@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -71,6 +72,33 @@ func TestChangeMetaReadFromDisk(t *testing.T) {
 	}
 	if meta.DependsOn != nil {
 		t.Errorf("DependsOn = %v, want nil for new change", meta.DependsOn)
+	}
+}
+
+func TestCreateChangeIncludesDependsOnHint(t *testing.T) {
+	root := setupTestProject(t)
+
+	if err := CreateChange(root, "hint-test"); err != nil {
+		t.Fatalf("CreateChange: %v", err)
+	}
+
+	metaPath := filepath.Join(ChangePath(root, "hint-test"), MetaFileName)
+	content, err := os.ReadFile(metaPath)
+	if err != nil {
+		t.Fatalf("read metadata: %v", err)
+	}
+
+	if !bytes.Contains(content, []byte("# dependsOn: []")) {
+		t.Errorf("generated .litespec.yaml missing # dependsOn: [] comment, got:\n%s", content)
+	}
+
+	// Verify the comment doesn't produce a non-nil DependsOn
+	meta, err := ReadChangeMeta(root, "hint-test")
+	if err != nil {
+		t.Fatalf("ReadChangeMeta: %v", err)
+	}
+	if meta.DependsOn != nil {
+		t.Errorf("DependsOn = %v, want nil (comment should not parse as YAML)", meta.DependsOn)
 	}
 }
 

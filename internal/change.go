@@ -65,6 +65,8 @@ func CreateChange(root, name string) error {
 		return fmt.Errorf("marshal change metadata: %w", err)
 	}
 
+	data = append(data, []byte("# dependsOn: []\n")...)
+
 	metaPath := filepath.Join(changeDir, MetaFileName)
 	if err := os.WriteFile(metaPath, data, 0o644); err != nil {
 		return fmt.Errorf("write change metadata: %w", err)
