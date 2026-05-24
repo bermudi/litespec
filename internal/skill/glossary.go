@@ -24,13 +24,14 @@ Every glossary entry follows this pattern:
 ` + "```markdown" + `
 - **Term**: Concise definition. What it IS, not what it isn't.
 - **AmbiguousTerm**: What it means in THIS project. Not to be confused with [common alternative meaning].
+- **StandaloneVideo**: A video not connected to a lesson (lessonId === null).
 ` + "```" + `
 
 Rules:
-- One line per term, starting with ` + "`- **`" + `
-- Bold the term, follow with a colon and a space, then the definition
+- Start each entry with ` + "`- **`" + ` followed by the bolded term, a colon, and a space
+- Keep entries concise — one or two lines. The goal is shared vocabulary, not documentation
+- Brief code references (field names, file paths) as parentheticals are welcome when they anchor the term to reality
 - No headers within the term list — the file has one ` + "`# Glossary`" + ` header
-- Keep definitions concise — the goal is shared vocabulary, not documentation
 - Order terms alphabetically
 
 ---

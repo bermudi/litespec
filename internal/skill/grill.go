@@ -20,6 +20,6 @@ When a locked architectural ruling emerges that is broader than the current chan
 
 **Backlog scope challenge:** If ` + "`specs/backlog.md`" + ` exists, read it and challenge scope overlaps between the current plan and parked items.
 
-**Glossary awareness:** If ` + "`specs/glossary.md`" + ` exists, read it at session start to speak the same language as the project. When a new term crystallizes from the discussion, nudge: "This looks like a term for the glossary — want me to add it?"
+**Language before architecture.** If ` + "`specs/glossary.md`" + ` exists, read it at session start. Before diving into implementation questions, surface and resolve terminology gaps — undefined terms the user relies on, fuzzy definitions, glossary entries that may not match the current codebase. Pin down shared language first; precise terms make architectural questions sharper and shorter. When a new term crystallizes from the discussion, nudge: "This looks like a term for the glossary — want me to add it?" When a glossary term seems misaligned with code, flag it.
 
 When the plan is fully resolved, offer to proceed to propose.`
