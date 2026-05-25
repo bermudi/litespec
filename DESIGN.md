@@ -47,14 +47,14 @@ project/
 Unidirectional flow:
 
 ```
-explore → grill → propose → apply → review → fix → review(verify) → archive
+explore → grill → propose → apply → review → archive
                                     │
                                 adopt (separate path)
 
 patch → archive  (lightweight lane for small, single-capability changes)
 ```
 
-No backward flow. If something is wrong after propose, start over from explore/grill. Research happens inline during apply — when the agent hits a knowledge gap, it pauses to gather docs and optionally produces a research skill file.
+No backward flow. If something is wrong after propose, start over from explore/grill. Research happens inline during apply — when the agent hits a knowledge gap, it pauses to gather docs and optionally produces a research skill file. Fix happens inline during build — addressing review findings is a workflow within the build skill, not a separate phase.
 
 **Patch lane:** `litespec patch <name> <capability>` creates a delta-only change with `mode: patch` in `.litespec.yaml`. No planning artifacts (proposal, design, tasks). The delta is the contract. `IsPatchMode(root, name)` reads the metadata and returns true when `mode == "patch"`. Patch-mode changes are reflected in `LoadArtifactStates` (returns only `{specs: DONE}`), `status` (shows only specs line + "(patch mode)"), `view` (separate "Patch Changes" section with ◆ bullet), and JSON output (`mode: "patch"` field).
 
