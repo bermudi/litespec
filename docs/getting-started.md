@@ -146,6 +146,7 @@ Now that litespec is installed and initialized:
 - Read the [Tutorial](tutorial.md) for a complete walkthrough from init to archive
 - Learn about the [Workflow](workflow.md) for spec-driven development
 - Explore the [CLI Reference](cli-reference.md) for all commands and flags
+- Upgrading from v0.18.x? Read the [Migration Guide](migrating-to-v0.19.md)
 
 ## Troubleshooting
 
