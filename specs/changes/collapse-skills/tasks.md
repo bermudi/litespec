@@ -12,8 +12,8 @@
 
 ## Phase 2: Update canonical spec
 
-- [ ] Update `specs/canon/skill-generation/spec.md`: apply the delta from this change (MODIFIED requirements updated, ADDED requirements included, REMOVED requirements deleted)
-- [ ] Run `litespec validate --specs` — verify canonical spec validates clean
+- [x] Update `specs/canon/skill-generation/spec.md`: apply the delta from this change (MODIFIED requirements updated, ADDED requirements included, REMOVED requirements deleted)
+- [x] Run `litespec validate --specs` — verify canonical spec validates clean
 
 ## Phase 3: Update documentation
 
