@@ -35,14 +35,11 @@ project/
 ├── decisions/                    # architectural decision records (optional)
 │   └── NNNN-<slug>.md
 └── .agents/skills/               # generated skills (canonical)
-    ├── litespec-explore/
-    ├── litespec-grill/
-    ├── litespec-propose/
-    ├── litespec-research/
+    ├── litespec-think/
+    ├── litespec-plan/
+    ├── litespec-build/
     ├── litespec-review/
-    ├── litespec-apply/
-    ├── litespec-adopt/
-    └── research-<topic>/         # research skills (optional, produced by research phase)
+    └── research-<topic>/         # research skills (optional, produced during build)
 ```
 
 ## Workflow
@@ -50,30 +47,25 @@ project/
 Unidirectional flow:
 
 ```
-explore → grill → propose → [research →] apply → review → fix → review(verify) → archive
-                                          │
-                                      adopt (separate path)
+explore → grill → propose → apply → review → fix → review(verify) → archive
+                                    │
+                                adopt (separate path)
 
 patch → archive  (lightweight lane for small, single-capability changes)
 ```
 
-No backward flow. If something is wrong after propose, start over from explore/grill. Research is optional — skip it when the change doesn't involve external dependencies.
+No backward flow. If something is wrong after propose, start over from explore/grill. Research happens inline during apply — when the agent hits a knowledge gap, it pauses to gather docs and optionally produces a research skill file.
 
 **Patch lane:** `litespec patch <name> <capability>` creates a delta-only change with `mode: patch` in `.litespec.yaml`. No planning artifacts (proposal, design, tasks). The delta is the contract. `IsPatchMode(root, name)` reads the metadata and returns true when `mode == "patch"`. Patch-mode changes are reflected in `LoadArtifactStates` (returns only `{specs: DONE}`), `status` (shows only specs line + "(patch mode)"), `view` (separate "Patch Changes" section with ◆ bullet), and JSON output (`mode: "patch"` field).
 
 ## Skills
 
-| Skill | Type | Behavior |
-|-------|------|----------|
-| `explore` | Ephemeral | Thinking mode. No artifacts, no change dir. Conversational. |
-| `grill` | Ephemeral | Relentless Q&A on the explored idea. No artifacts. Resolves every branch of the design tree before proceeding. |
-| `propose` | Materializes | Creates change dir + proposal + specs + design + tasks (all at once). This is the commit point. |
-| `research` | Knowledge-gathering | Reads artifacts, identifies knowledge gaps, gathers docs/APIs/schemas, produces research skills into `.agents/skills/research-<topic>/`. Uses skill-creator conventions for formatting. |
-| `apply` | Phase-based | Implements tasks per phase in `tasks.md`. One phase per invocation. AI focuses on one area without doing the whole implementation at once. Consumes research skills via natural discovery. |
-| `review` | AI review | Context-aware review that adapts to change lifecycle: artifact review (0 tasks checked — evaluates planning artifacts), implementation review (some tasks checked — runs adversarial review then compliance review), pre-archive review (all tasks checked — adversarial + compliance + archive readiness + build verification). Adversarial review runs first to avoid anchoring bias. Pure AI review — no test/lint running (except build verification in pre-archive mode). |
-| `fix` | Correction | Ingests review findings, addresses them systematically, verifies each fix, commits when resolved. |
-| `adopt` | Reverse-engineer | Takes a file/directory path. Generates a change proposal with specs from existing code. For code that has no spec yet. |
-| `patch` | Lightweight | Creates a delta-only change via `litespec patch <name> <capability>`. No planning artifacts. The delta is the contract. For small, single-capability changes. |
+| Skill | Stance | Behavior |
+|-------|--------|----------|
+| `think` | No artifacts, freeform conversation | Explores ideas, stress-tests plans, detects workflow phase and suggests next steps. Merges former explore, grill, and workflow skills. |
+| `plan` | Materializes artifacts to disk | Creates or updates change proposals, specs, designs, tasks. Detects patch mode (skips planning artifacts) and adopt mode (reverse-engineers specs from code). Includes glossary management. Merges former propose, patch, adopt, and glossary skills. |
+| `build` | Implements code | Implements tasks per phase in `tasks.md`. One phase per invocation. Handles fix workflow for review findings (CRITICAL → WARNING → SUGGESTION). Pauses on knowledge gaps to gather docs and optionally produce research skills. Merges former apply and fix skills. |
+| `review` | Adversarial outsider | Context-aware review that adapts to change lifecycle: artifact review (0 tasks checked — evaluates planning artifacts), implementation review (some tasks checked — runs adversarial review then compliance review), pre-archive review (all tasks checked — adversarial + compliance + archive readiness + build verification). Adversarial review runs first to avoid anchoring bias. Pure AI review — no test/lint running (except build verification in pre-archive mode). |
 
 ## Tasks (Phased)
 
@@ -239,10 +231,9 @@ Resolution checks active changes first, then archived changes. Active takes prio
 The project's ubiquitous language lives in `specs/glossary.md` — a single, version-controlled markdown file containing term definitions. Curated by humans (with AI proposals), not auto-generated.
 
 Skills that read the glossary:
-- **explore/grill** — read at session start, nudge when undefined terms surface
-- **propose** — checks for new terms after writing specs, offers to update
-- **apply** — passive reference, no enforcement
+- **think** — read at session start, nudge when undefined terms surface
+- **plan** — checks for new terms after writing specs, offers to update; manages the glossary file
+- **build** — passive reference, no enforcement
 - **review** — supplementary context during cross-change review, no enforcement
-- **glossary** — dedicated skill for maintaining the file
 
-If the glossary doesn't exist, all skills degrade gracefully. Conversation skills may suggest creating one when stable terms emerge.
+If the glossary doesn't exist, all skills degrade gracefully. The think skill may suggest creating one when stable terms emerge.

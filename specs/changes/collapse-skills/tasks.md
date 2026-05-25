@@ -17,6 +17,6 @@
 
 ## Phase 3: Update documentation
 
-- [ ] Update `AGENTS.md`: remove research phase from workflow, update Core Concepts to reference 4 skills, update Key Design Decisions, update Skill Generation conventions
-- [ ] Update `DESIGN.md`: replace 7-directory skill tree with 4, update skill-related sections
-- [ ] Run `go build ./...` — verify no breakage
+- [x] Update `AGENTS.md`: remove research phase from workflow, update Core Concepts to reference 4 skills, update Key Design Decisions, update Skill Generation conventions
+- [x] Update `DESIGN.md`: replace 7-directory skill tree with 4, update skill-related sections
+- [x] Run `go build ./...` — verify no breakage

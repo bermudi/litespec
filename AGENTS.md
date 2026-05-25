@@ -33,14 +33,14 @@ The design emerged from a structured grilling session — question by question, 
 - **Artifact-specific instructions** — `litespec instructions <artifact>` returns distinct guidance per artifact (proposal: motivation/scope/non-goals; specs: delta format + capabilities; design: architecture/decisions/file changes; tasks: phased checklist). The `template` field retains the propose workflow for context.
 - **Phased tasks** — `tasks.md` organizes work into phases, applied one phase at a time
 - **`view` command** — displays a dashboard with progress bars `[████░░░]`, change categories (draft/active/ready to archive), specs sorted by requirement count, and an optional dependency graph section when any change has `dependsOn`
-- **Glossary** — the project's ubiquitous language lives in `specs/glossary.md`. A single, curated file defining shared terms. Read by explore, grill, and propose at session start (active — nudges when undefined terms surface). Apply references it passively. Review may consult it during cross-change review. The glossary skill manages the file. Graceful degradation if absent.
+- **Glossary** — the project's ubiquitous language lives in `specs/glossary.md`. A single, curated file defining shared terms. Read by think and plan at session start (active — nudges when undefined terms surface). Build references it passively. Review may consult it during cross-change review. Managed as a section within the plan skill. Graceful degradation if absent.
 
 ## Workflow
 
 ```
-explore → grill → propose → [research →] apply → review → archive
-                                          │
-                                      adopt (separate path)
+explore → grill → propose → apply → review → archive
+                                    │
+                                adopt (separate path)
 
 patch → archive  (lightweight lane for small, single-capability changes)
 ```
@@ -50,8 +50,7 @@ Unidirectional. No backward flow.
 - **explore** and **grill** are ephemeral — no artifacts, no change directory. The AI keeps context in its window. `propose` is what materializes everything to disk.
 - **propose** is the commit point. If something is wrong after proposing, start over from explore/grill.
 - **patch** is a lightweight lane — `litespec patch <name> <capability>` creates a delta-only change with no planning artifacts. The delta is the contract; planning artifacts are optional scaffolding. Use for small, single-capability changes that need no design discussion.
-- **research** is optional — runs after propose when external knowledge is needed. Reads artifacts from disk, identifies knowledge gaps (APIs, schemas, libraries), gathers docs, and produces research skills into `.agents/skills/research-<topic>/`. Uses skill-creator conventions for formatting. Stance is risk-scoped: skip what LLMs know cold, go deep on novel APIs/libraries. Research skills persist after archive — they accumulate as project knowledge.
-- **apply** works on one phase at a time. Each phase = one agent session = one commit. Re-invoke for the next phase. Consumes research skills via natural agent discovery.
+- **apply** works on one phase at a time. Each phase = one agent session = one commit. Re-invoke for the next phase. When the agent hits a knowledge gap (novel APIs, unfamiliar libraries), it pauses to gather docs and may produce a research skill file at `.agents/skills/research-<topic>/SKILL.md` for future reference. Research skills persist after archive — they accumulate as project knowledge.
 - **adopt** is a separate path — reverse-engineers specs from existing code given a file/directory path.
 - **review** is context-aware AI review that adapts to change lifecycle: artifact review when no tasks are checked (evaluates planning artifacts), implementation review when some tasks are checked (runs adversarial review first, then compliance review), pre-archive review when all tasks are checked (adversarial + compliance + archive readiness + build verification). Adversarial review runs first to avoid anchoring bias — it enumerates failure scenarios from specs before reading code. No test/lint running (except build verification in pre-archive mode).
 - **archive** is the commit to implemented — applying deltas to canonical specs and moving the change to the archive. Until archived, a change's deltas are tentative. Use `litespec preview <name>` to see what archive would do without making changes. **Archive is a human decision** — the agent never runs `litespec archive`. After review, the agent hands off to the user. The human runs it when they're satisfied. It's the final stamp of approval, not an agent step. The only exception is `the-drill`, which runs archive as part of an explicit "ship it" ritual triggered by the human.
@@ -68,7 +67,7 @@ These came from deliberate debate. Respect the reasoning:
 - **Git-native workflow** — litespec manages specs. A separate harness (future work) will handle branch creation (`change/<name>`), per-phase commits, and PR creation. For now, the skills offer prompts: "Would you like a new branch?" and "Would you like a PR?"
 - **CLI is a read-only context provider** — the AI never writes through the CLI. It writes artifact files directly. The CLI exists to give the AI structured data (status, instructions, validation).
 - **Artifact-specific instructions** — each artifact (proposal, specs, design, tasks) gets its own instruction template via `litespec instructions <artifact>`, not a single generic template. The propose skill template is kept as a `template` field for workflow context.
-- **Research skills** — produced into `.agents/skills/research-<topic>/SKILL.md` during the research phase. They are project-level agent skills containing reference documentation (API schemas, library docs, auth flows). They persist after archive as accumulated project knowledge. The apply agent discovers them naturally through skill descriptions. No CLI command needed — the research skill itself is the instructions.
+- **Research skills** — produced into `.agents/skills/research-<topic>/SKILL.md` as an inline step during implementation when the agent hits a knowledge gap. They are project-level agent skills containing reference documentation (API schemas, library docs, auth flows). They persist after archive as accumulated project knowledge. No separate research phase, no CLI command — the build skill handles this as a pause condition.
 - **Validate structure, not semantics** — the CLI validates structural contracts (syntax, references, merge rules). Do not encode heuristic checks that compensate for model limitations (e.g., keyword overlap between requirements and tasks, non-goal vs spec contradiction detection). Those are fragile approximations of semantic understanding that better models will make obsolete. If a model gap bites repeatedly, fix the prompt in the relevant skill — that scales with model capability.
 
 ## Working Conventions
