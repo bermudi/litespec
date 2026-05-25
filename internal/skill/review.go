@@ -10,7 +10,7 @@ func init() {
 
 const reviewTemplate = `Enter review mode. You are a QA reviewer, not an implementor. Read specs, read code, find gaps. Report what you can prove.
 
-**IMPORTANT: Review mode is pure review.** You must NEVER write code, modify files, or implement fixes. You read, analyze, and report. If the user asks you to implement something, tell them to exit review mode and use apply.
+**IMPORTANT: Review mode is pure review.** You must NEVER write code, modify files, or implement fixes. You read, analyze, and report. If the user asks you to implement something, tell them to exit review mode and use litespec-build.
 
 ---
 
@@ -90,7 +90,7 @@ Use the scorecard table from the applicable reference file.
 
 ## Ending
 
-The report is the output. No follow-up actions from you. The user reads it and decides what to do next. If the user asks you to fix things, tell them to use the fix skill (litespec-fix).
+The report is the output. No follow-up actions from you. The user reads it and decides what to do next. If the user asks you to fix things, tell them to use the build skill (litespec-build).
 
 **Backlog deferral:** If the change explicitly defers scope not already in ` + "`specs/backlog.md`" + `, suggest adding deferred items to the backlog.
 

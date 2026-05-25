@@ -19,59 +19,24 @@ const (
 
 var Skills = []SkillInfo{
 	{
-		ID:          "explore",
-		Name:        "litespec-explore",
-		Description: "Enter explore mode - a thinking partner for exploring ideas, investigating problems, and clarifying requirements. Use when the user wants to think through something before or during a change.",
+		ID:          "think",
+		Name:        "litespec-think",
+		Description: "Explore ideas and stress-test plans for litespec changes.",
 	},
 	{
-		ID:          "grill",
-		Name:        "litespec-grill",
-		Description: "Interview the user relentlessly about a plan or design until reaching shared understanding. Use when the user wants to stress-test a plan, get grilled on their design, or mentions \"grill me\".",
+		ID:          "plan",
+		Name:        "litespec-plan",
+		Description: "Create or update litespec change proposals and patches.",
 	},
 	{
-		ID:          "propose",
-		Name:        "litespec-propose",
-		Description: "Materialize a complete change proposal with all planning artifacts (proposal, specs, design, tasks). Use when the user wants to create a new change, start a feature, or says \"propose\".",
-	},
-	{
-		ID:          "research",
-		Name:        "litespec-research",
-		Description: "Gather knowledge for a proposed change — APIs, schemas, library docs, auth flows. Use after proposing when the change involves external dependencies, unfamiliar libraries, or novel APIs. Produces research skills into .agents/skills/research-<topic>/. Triggers on \"research this change\", \"gather docs for\", \"look up the API\", \"research phase\", or when preparing to implement a change that references external systems.",
+		ID:          "build",
+		Name:        "litespec-build",
+		Description: "Implement litespec changes, fix review findings, and research knowledge gaps.",
 	},
 	{
 		ID:          "review",
 		Name:        "litespec-review",
-		Description: "Context-aware review that adapts to change lifecycle: artifact review (pre-implementation), implementation review (adversarial + compliance phases), and pre-archive review (adversarial + compliance + build verification). Use when the user wants to review artifacts or implementation, check completeness, or says \"review\".",
-	},
-	{
-		ID:          "apply",
-		Name:        "litespec-apply",
-		Description: "Implement the next phase of tasks from a change proposal, one phase per session. Use when the user is ready to start coding, wants to execute tasks, or says \"apply\".",
-	},
-	{
-		ID:          "adopt",
-		Name:        "litespec-adopt",
-		Description: "Reverse-engineer specs from existing code. Use when the user provides a file or directory path to document, wants to spec existing code, or says \"adopt\".",
-	},
-	{
-		ID:          "workflow",
-		Name:        "litespec-workflow",
-		Description: "Explain the litespec workflow and determine the user's current phase. Use when the user asks how litespec works, what the workflow is, what to do next, or says \"workflow\".",
-	},
-	{
-		ID:          "glossary",
-		Name:        "litespec-glossary",
-		Description: "Manage the project's ubiquitous language in specs/glossary.md. Use when the user wants to review, update, or seed the project glossary, or says \"glossary\".",
-	},
-	{
-		ID:          "patch",
-		Name:        "litespec-patch",
-		Description: "Create a patch-mode change for small, single-capability deltas. Use when the user wants a quick fix, minor flag addition, or small behavioral tweak, or says \"patch\".",
-	},
-	{
-		ID:          "fix",
-		Name:        "litespec-fix",
-		Description: "Address review findings systematically — fix one finding at a time, verify each fix, and commit. Use when the user wants to resolve review findings, address review feedback, or says \"fix\".",
+		Description: "Adversarial review of litespec artifacts or implementation.",
 	},
 }
 

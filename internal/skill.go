@@ -25,6 +25,17 @@ func GenerateSkills(root string) error {
 		return fmt.Errorf("create skills directory: %w", err)
 	}
 
+	// Build set of current skill directory names
+	activeSkillNames := make(map[string]bool, len(Skills))
+	for _, s := range Skills {
+		activeSkillNames[s.Name] = true
+	}
+
+	// Remove legacy litespec skill directories
+	if err := cleanLegacySkillDirs(skillsDir, activeSkillNames); err != nil {
+		return fmt.Errorf("clean legacy skill dirs: %w", err)
+	}
+
 	for _, s := range Skills {
 		template := skill.Get(s.ID)
 		if template == "" {
@@ -96,4 +107,30 @@ func cleanSkillDir(skillDir string, keep map[string]bool) {
 		}
 		return nil
 	})
+}
+
+// cleanLegacySkillDirs removes directories under skillsDir that start with
+// the skill name prefix but are not in the active set.
+const skillNamePrefix = "litespec-"
+
+func cleanLegacySkillDirs(skillsDir string, active map[string]bool) error {
+	entries, err := os.ReadDir(skillsDir)
+	if err != nil {
+		return fmt.Errorf("read skills dir: %w", err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		if !strings.HasPrefix(entry.Name(), skillNamePrefix) {
+			continue
+		}
+		if active[entry.Name()] {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(skillsDir, entry.Name())); err != nil {
+			return fmt.Errorf("remove legacy skill dir %s: %w", entry.Name(), err)
+		}
+	}
+	return nil
 }
