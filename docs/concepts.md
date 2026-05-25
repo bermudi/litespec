@@ -44,7 +44,7 @@ Writing specs before code forces you to think about **what** you're building bef
 
 If you skip specs and jump straight to code, you might build something beautifully that solves the wrong problem. Specs surface these mismatches before you've committed to an implementation.
 
-A grilling session in litespec's workflow exists specifically for this — relentless Q&A that resolves every branch of the design tree before a single artifact is written to disk.
+The grilling mode in litespec's think skill exists specifically for this — relentless Q&A that resolves every branch of the design tree before a single artifact is written to disk.
 
 ### 2. You have a clear test for completion
 
@@ -135,11 +135,11 @@ Now each requirement can be implemented, tested, and tracked independently.
 
 litespec's workflow acknowledges that not every change needs the same level of planning upfront. That's why we have patterns:
 
-**Quick Feature**: You know exactly what you need. Small scope. Run through explore, grill briefly, propose, apply, done.
+**Quick Feature**: You know exactly what you need. Small scope. Run through think (grilling briefly), plan, build, done.
 
-**Exploratory**: You're investigating a problem space. The first few iterations might be vague. Use explore and grill heavily to figure out the shape before proposing.
+**Exploratory**: You're investigating a problem space. The first few iterations might be vague. Use think (exploration and grilling modes) heavily to figure out the shape before planning.
 
-**Adopt**: You have existing code with no spec. Work backward — reverse-engineer specs from the implementation, then use those as baseline for future changes.
+**Adopt**: You have existing code with no spec. Work backward — reverse-engineer specs from the implementation (plan's adopt mode), then use those as baseline for future changes.
 
 The key is that **rigor scales with uncertainty**. If you're adding a simple flag to an existing command, you don't need a week of grilling. If you're designing a new capability from scratch, you might need multiple explore sessions before you're ready to propose.
 

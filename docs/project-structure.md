@@ -192,11 +192,10 @@ specs/changes/archive/
     ├── .litespec.yaml
     ├── proposal.md
     ├── design.md
-    ├── tasks.md
-    └── specs/                  # Kept for auditability
+    └── tasks.md
 ```
 
-Archived changes preserve the `specs/` subtree for auditability. The deltas have been merged into `specs/canon/`, but the original change specs remain available for reference.
+Archived changes contain only planning artifacts. The `specs/` subtree is merged into `specs/canon/` and removed from the change directory during archive.
 
 ## The `.agents/skills/` Directory
 
@@ -204,19 +203,17 @@ AI skills are generated into `.agents/skills/` — this is the canonical locatio
 
 ```
 .agents/skills/
-├── litespec-explore/           # Thinking mode
-├── litespec-grill/             # Relentless Q&A
-├── litespec-propose/           # Create change + artifacts
-├── litespec-review/            # Adversarial + compliance review
-├── litespec-apply/             # Implement one phase
-└── litespec-adopt/             # Reverse-engineer from code
+├── litespec-think/             # Explore ideas and stress-test plans
+├── litespec-plan/              # Create or update change proposals and patches
+├── litespec-build/             # Implement changes, fix findings, research gaps
+└── litespec-review/            # Adversarial review of artifacts or implementation
 ```
 
 Each skill is a single `SKILL.md` file with YAML frontmatter:
 
 ```markdown
 ---
-name: litespec-propose
+name: litespec-plan
 description: Materialize a complete change proposal...
 ---
 
@@ -251,9 +248,9 @@ Active work is isolated:
 ### Progressive Rigor
 
 The structure supports different workflows:
-- **Quick Feature:** propose → apply → archive
-- **Exploratory:** explore → grill (no artifacts if it doesn't pan out)
-- **Adopt:** reverse-engineer specs from existing code
+- **Quick Feature:** plan → build → archive
+- **Exploratory:** think (exploration/grilling modes) → plan → build → review → archive
+- **Adopt:** plan (adopt mode) → archive
 
 ## File System Summary
 

@@ -14,16 +14,14 @@ The glossary lives in [`specs/glossary.md`](https://github.com/bermudi/litespec/
 
 | Skill | Behavior |
 |-------|----------|
-| **explore** | Reads the glossary at session start. Nudges when a concept seems foundational but isn't defined. Suggests creating one if it doesn't exist. |
-| **grill** | Reads the glossary at session start. Nudges when new terms crystallize from the discussion. |
-| **propose** | After writing specs, checks whether new terms were introduced that aren't in the glossary. Offers to update. Offers to seed if no glossary exists. |
-| **apply** | Passive — mentioned as optional context. No enforcement. |
+| **think** | Reads the glossary at session start. Nudges when a concept seems foundational but isn't defined. Suggests creating one if it doesn't exist. |
+| **plan** | After writing specs, checks whether new terms were introduced that aren't in the glossary. Offers to update. Offers to seed if no glossary exists. |
+| **build** | May consult the glossary as optional terminology context after completing a phase. No enforcement. |
 | **review** | May consult the glossary as supplementary terminology context during cross-change review. No enforcement. |
-| **glossary** | The dedicated skill for reading, proposing additions to, and maintaining the glossary file. |
 
 ### Graceful degradation
 
-Not every project starts with a glossary. All skills degrade gracefully — if `specs/glossary.md` doesn't exist, no error, no block. The conversation skills (explore, grill, propose) may suggest creating one when stable terms emerge.
+Not every project starts with a glossary. All skills degrade gracefully — if `specs/glossary.md` doesn't exist, no error, no block. The conversation skills (think, plan) may suggest creating one when stable terms emerge.
 
 ## How to maintain it
 
@@ -31,7 +29,7 @@ The glossary is **curated**, not auto-generated. The AI proposes terms; the user
 
 To add or update terms:
 
-1. Invoke the **glossary skill** (say "glossary" to your AI agent)
+1. Ask your AI agent to update the glossary (the think and plan skills manage it as part of their workflow)
 2. Or edit `specs/glossary.md` directly — entries use `- **Term**: definition` format
 
 Each entry is one line: bold the term, follow with a colon and a space, then the definition. Keep definitions concise. Where disambiguation matters, include what a term explicitly does *not* mean.

@@ -8,7 +8,8 @@ Complete command-line interface reference for litespec.
 |------|-------------|
 | `--version`, `-v` | Print version information |
 | `--help`, `-h` | Print help message |
-| `--json` | Output structured JSON (supported by: `status`, `validate`, `list`, `instructions`) |
+| `--json` | Output structured JSON (supported by all commands) |
+| `--minimal` | Output minimal/terse output (supported by all commands) |
 
 ## Commands
 
@@ -25,6 +26,8 @@ litespec init [--tools <ids>]
 | Flag | Description |
 |------|-------------|
 | `--tools <ids>` | Comma-separated tool IDs (e.g., `claude`) |
+| `--json` | Output as JSON |
+| `--minimal` | Minimal output |
 
 **Behavior:**
 - Creates `specs/canon/` — canonical spec directory
@@ -62,6 +65,13 @@ litespec new <name>
 **Arguments:**
 - `<name>` — Change name (e.g., `add-auth`, `fix-login-bug`)
 
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output as JSON |
+| `--minimal` | Minimal output |
+
 **Behavior:**
 - Creates `specs/changes/<name>/` directory
 - Creates `specs/changes/<name>/specs/` directory for delta specs
@@ -84,12 +94,43 @@ litespec new fix-rate-limit
 
 ---
 
+### `patch`
+
+Create a patch-mode change (delta-only, no planning artifacts).
+
+```
+litespec patch <name> <capability> [--json] [--minimal]
+```
+
+**Arguments:**
+- `<name>` — Change name
+- `<capability>` — Capability to create delta spec for
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output as JSON |
+| `--minimal` | Minimal output |
+
+**Behavior:**
+- Creates `specs/changes/<name>/` with `mode: patch` in `.litespec.yaml`
+- Creates `specs/changes/<name>/specs/<capability>/spec.md`
+- No proposal, design, or tasks files — the delta is the contract
+- Use for small, single-capability changes that need no design discussion
+
+**Exit Codes:**
+- `0` — Success
+- `1` — Error
+
+---
+
 ### `list`
 
 List active changes or canonical specs with metadata.
 
 ```
-litespec list [--specs|--changes] [--sort recent|name|deps] [--json]
+litespec list [--specs|--changes|--decisions|--backlog] [--sort recent|name|deps|number] [--status <state>] [--json]
 ```
 
 **Flags:**
@@ -98,8 +139,12 @@ litespec list [--specs|--changes] [--sort recent|name|deps] [--json]
 |------|-------------|
 | `--specs` | List specs instead of changes |
 | `--changes` | List changes (default) |
-| `--sort <field>` | Sort by `recent` (default), `name`, or `deps` (topological) |
+| `--decisions` | List architectural decision records |
+| `--backlog` | List backlog items by section |
+| `--sort <field>` | Sort by `recent` (default), `name`, `deps` (topological), or `number` |
+| `--status <state>` | Filter decisions by status (requires --decisions) |
 | `--json` | Output as JSON |
+| `--minimal` | Minimal output |
 
 **Default output (changes):**
 - Shows task progress (`✓ Complete`, `X/Y tasks`, `No tasks`)
@@ -158,7 +203,7 @@ Specs:
 ```
 
 **Tips:**
-- `--sort` only applies to changes — specs are always alphabetical
+- `--sort recent`, `--sort name`, and `--sort deps` apply to changes; `--sort number` applies to decisions; specs are always alphabetical
 - Relative time shows locale date for items older than 30 days
 - Use `--json` for integration with other tools
 
@@ -169,7 +214,7 @@ Specs:
 Show artifact states for a change or all changes.
 
 ```
-litespec status [<name>] [--json]
+litespec status [<name>] [--json] [--minimal]
 ```
 
 **Arguments:**
@@ -180,6 +225,7 @@ litespec status [<name>] [--json]
 | Flag | Description |
 |------|-------------|
 | `--json` | Output as JSON |
+| `--minimal` | Minimal output |
 
 **Artifact States:**
 - `BLOCKED` — Dependencies not satisfied
@@ -254,7 +300,7 @@ All changes:
 Validate changes and specs for structure, delta syntax, and dangling deltas.
 
 ```
-litespec validate [<name>] [--all|--changes|--specs] [--type change|spec] [--strict] [--json]
+litespec validate [<name>] [--all|--changes|--specs|--decisions] [--type change|spec|decision] [--strict] [--json]
 ```
 
 **Arguments:**
@@ -267,9 +313,11 @@ litespec validate [<name>] [--all|--changes|--specs] [--type change|spec] [--str
 | `--all` | Validate all changes and specs |
 | `--changes` | Validate all changes only |
 | `--specs` | Validate all specs only |
-| `--type <T>` | Disambiguate name: `change` or `spec` |
+| `--decisions` | Validate all decisions only |
+| `--type <T>` | Disambiguate name: `change`, `spec`, or `decision` |
 | `--strict` | Treat warnings as errors |
 | `--json` | Output as JSON |
+| `--minimal` | Minimal output |
 
 **Validation Checks:**
 - Artifact structure and existence
@@ -287,6 +335,7 @@ litespec validate [<name>] [--all|--changes|--specs] [--type change|spec] [--str
 - Skill template validation (warning for missing templates)
 - Tasks.md phase heading requirement
 - Dependency resolution (declared deps must exist as active or archived changes)
+- Decision format and structure validation
 
 **Default behavior (no arguments):**
 - Validates all changes and all specs (equivalent to `--all`)
@@ -367,6 +416,7 @@ litespec instructions <artifact> [--json]
 | Flag | Description |
 |------|-------------|
 | `--json` | Output as JSON |
+| `--minimal` | Minimal output |
 
 **Behavior:**
 - Returns static artifact creation guidance
@@ -407,6 +457,36 @@ litespec instructions tasks
 
 ---
 
+### `preview`
+
+Preview what archive would do to canonical specs without making changes.
+
+```
+litespec preview <name> [--json] [--minimal]
+```
+
+**Arguments:**
+- `<name>` — Change name to preview
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output as JSON |
+| `--minimal` | Minimal output |
+
+**Behavior:**
+- Reads the change's delta specs
+- Simulates the RENAMED→REMOVED→MODIFIED→ADDED merge against current canonical specs
+- Shows diff of what would change (which requirements added/modified/removed)
+- No files are modified — this is a dry run
+
+**Exit Codes:**
+- `0` — Success
+- `1` — Error
+
+---
+
 ### `archive`
 
 Apply deltas and archive a completed change.
@@ -423,13 +503,15 @@ litespec archive <name> [--allow-incomplete]
 | Flag | Description |
 |------|-------------|
 | `--allow-incomplete` | Archive even with incomplete tasks or unarchived dependencies |
+| `--json` | Output as JSON |
+| `--minimal` | Minimal output |
 
 **Archive Process:**
 1. **Validate** — Run full validation on the change
 2. **Check dependencies** — Verify all declared `dependsOn` are archived (unless `--allow-incomplete`). Errors if unarchived dependencies exist.
 3. **Check tasks** — Verify all tasks complete (unless `--allow-incomplete`)
 4. **Merge deltas** — Apply RENAMED→REMOVED→MODIFIED→ADDED to `specs/canon/`
-5. **Move** — Relocate to `specs/changes/archive/<YYYY-MM-DD>-<name>/`
+5. **Move and strip** — Relocate to `specs/changes/archive/<YYYY-MM-DD>-<name>/` and remove specs/ subtree
 
 The archive operation is transactional: the change is moved to the archive first, then canonical specs are written atomically. If the write fails, the change is restored from archive.
 
@@ -453,7 +535,7 @@ litespec archive add-auth --allow-incomplete
 - `1` — Validation failed, tasks incomplete, or error
 
 **Tips:**
-- Archived directory contains planning artifacts plus `specs/` subtree for auditability
+- Archived directory contains only planning artifacts (proposal, design, tasks) — the specs/ subtree is merged into canon and removed from the change directory
 - Canon creates new directories if capability doesn't exist
 - Date prefix in archive path prevents conflicts
 
@@ -472,6 +554,8 @@ litespec update [--tools <ids>]
 | Flag | Description |
 |------|-------------|
 | `--tools <ids>` | Comma-separated tool IDs (e.g., `claude`) |
+| `--json` | Output as JSON |
+| `--minimal` | Minimal output |
 
 **Behavior:**
 - Regenerates all skills in `.agents/skills/`
@@ -508,6 +592,13 @@ Display a dashboard overview with progress bars, change categories, and dependen
 ```
 litespec view
 ```
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output as JSON |
+| `--minimal` | Minimal output |
 
 **Behavior:**
 - Shows summary section (spec count, draft/active/completed changes, task progress)
@@ -564,6 +655,13 @@ Check for the latest version and upgrade the binary.
 litespec upgrade
 ```
 
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output as JSON |
+| `--minimal` | Minimal output |
+
 **Behavior:**
 - Queries GitHub Releases for the latest version tag
 - Compares with current installed version
@@ -599,6 +697,8 @@ litespec import --source <directory> [--dry-run] [--force]
 |------|-------------|
 | `--dry-run` | Show what would be imported without making changes |
 | `--force` | Overwrite existing files without prompting |
+| `--json` | Output as JSON |
+| `--minimal` | Minimal output |
 
 **Behavior:**
 - Detects OpenSpec project structure (canonical specs and changes)
@@ -623,6 +723,36 @@ litespec import --source /path/to/openspec-project --force
 - Use `--dry-run` first to see the plan before committing to changes
 - The source directory is not modified — import is always a one-way migration
 - Archived changes retain their original date prefix in the archive name
+
+---
+
+### `decide`
+
+Create a new architectural decision record.
+
+```
+litespec decide <slug> [--json] [--minimal]
+```
+
+**Arguments:**
+- `<slug>` — Decision slug (e.g., `use-bcrypt-for-hashing`)
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output as JSON |
+| `--minimal` | Minimal output |
+
+**Behavior:**
+- Creates `specs/decisions/` directory if it doesn't exist
+- Generates `NNNN-<slug>.md` with numbered prefix (auto-incremented)
+- Template includes Status, Context, Decision, and Consequences sections
+- Decisions are persistent architectural rulings that span changes
+
+**Exit Codes:**
+- `0` — Success
+- `1` — Error
 
 ---
 
@@ -765,12 +895,10 @@ project/
 │       └── archive/              # Completed changes
 │           └── <date>-<name>/
 └── .agents/skills/               # Generated skills
-    ├── litespec-explore/
-    ├── litespec-grill/
-    ├── litespec-propose/
-    ├── litespec-review/
-    ├── litespec-apply/
-    └── litespec-adopt/
+    ├── litespec-think/
+    ├── litespec-plan/
+    ├── litespec-build/
+    └── litespec-review/
 ```
 
 ---

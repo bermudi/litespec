@@ -12,7 +12,7 @@ The CLI is a read-only context provider. The AI writes artifacts directly. lites
 
 **Convention over configuration** — zero config files. All defaults, all the time. No stub `config.yaml` to fill in — it works out of the box.
 
-**Unidirectional workflow** — `explore → grill → propose → [research →] apply → review → archive`. No going backward. If something's wrong after propose, start over. This prevents partial states and confusion.
+**Unidirectional workflow** — `think → plan → build → review → archive`. No going backward. If something's wrong after plan, start over. This prevents partial states and confusion.
 
 **Lean skills** — minimal tokens, zero boilerplate. Each skill is focused instructions, not pages of boilerplate that waste your AI context.
 
@@ -38,20 +38,20 @@ The CLI is a read-only context provider. The AI writes artifacts directly. lites
 ## The workflow
 
 ```
-explore → grill → propose → [research →] apply → review → archive
-                                          │
-                                      adopt (separate path)
+think (explore/grill) → plan → build → review → archive
+                            │
+                        plan (adopt mode)
 ```
 
-| Step | What happens |
-|------|-------------|
-| `explore` | Ephemeral thinking. No artifacts. Conversational. |
-| `grill` | Relentless Q&A. Resolves every branch of the design tree before moving on. |
-| `propose` | Materializes everything: change dir, proposal, specs, design, tasks. This is the commit point. |
-| `review` | Context-aware AI review. Adapts to change lifecycle — adversarial review first (interaction bugs, missing guards, wiring gaps, test adequacy), then compliance review (spec mapping, design adherence). |
-| `apply` | Implements tasks per phase. One phase per invocation. |
-| `adopt` | Reverse-engineers specs from existing code. Separate path. |
-| `archive` | Applies delta operations, moves change to archive. |
+| Phase | Skill | What happens |
+|-------|-------|-------------|
+| explore | think | Ephemeral thinking. No artifacts. Conversational. |
+| grill | think | Relentless Q&A. Resolves every branch of the design tree. |
+| propose | plan | Materializes everything: change dir, proposal, specs, design, tasks. This is the commit point. |
+| apply | build | Implements tasks per phase. One phase per invocation. |
+| review | review | Context-aware AI review. Adversarial first, then compliance. |
+| adopt | plan | Reverse-engineers specs from existing code. Separate path. |
+| archive | CLI | Applies delta operations, moves change to archive. |
 
 ---
 
@@ -73,6 +73,8 @@ litespec validate
 # When done, merge and archive
 litespec archive add-user-auth
 ```
+
+There's also a **patch lane** for small, single-capability changes: `patch → plan (patch mode) → build → review → archive` — no planning artifacts needed, the delta is the contract.
 
 Then use the skills in `.agents/skills/` with your AI agent. The skills tell the AI what to do — litespec tells the AI what exists.
 

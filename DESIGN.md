@@ -14,9 +14,12 @@ AI-native spec-driven development tool. A leaner, opinionated reimagining of [Op
 project/
 ├── specs/
 │   ├── glossary.md              # ubiquitous language (optional)
+│   ├── backlog.md               # parked items and future ideas (optional)
 │   ├── canon/                    # source of truth (accepted capabilities)
 │   │   └── <capability>/
 │   │       └── spec.md
+│   ├── decisions/               # architectural decision records (optional)
+│   │   └── NNNN-<slug>.md
 │   └── changes/                  # active changes
 │       ├── <name>/
 │       │   ├── .litespec.yaml    # metadata (schema + timestamp)
@@ -32,8 +35,6 @@ project/
 │               ├── proposal.md
 │               ├── design.md
 │               └── tasks.md      # planning artifacts
-├── decisions/                    # architectural decision records (optional)
-│   └── NNNN-<slug>.md
 └── .agents/skills/               # generated skills (canonical)
     ├── litespec-think/
     ├── litespec-plan/
@@ -174,10 +175,12 @@ Tool adapters are auto-detected by scanning for symlinks in adapter skill direct
 |---------|---------|
 | `litespec init [--tools ...]` | Scaffold `specs/` dir + generate skills (+ optional tool-specific commands) |
 | `litespec new <name>` | Create a new change directory with `.litespec.yaml` metadata |
-| `litespec validate [<name>] [--all|--changes|--specs] [--type change|spec] [--strict]` | Validate artifact structure, delta syntax, dangling deltas, dependency cycles/overlaps |
+| `litespec patch <name> <capability>` | Create a patch-mode change (delta-only) |
+| `litespec decide <slug>` | Create architectural decision record |
+| `litespec validate [<name>] [--all|--changes|--specs|--decisions] [--type change|spec|decision] [--strict]` | Validate artifact structure, delta syntax, dangling deltas, dependency cycles/overlaps, and decision records |
 | `litespec status [<name>]` | Show artifact graph state (BLOCKED/READY/DONE) |
 | `litespec instructions <artifact>` | Return artifact-specific instructions for AI to create an artifact |
-| `litespec list [--specs|--changes] [--sort name|recent|deps]` | List specs or changes (deps sort uses topological order) |
+| `litespec list [--specs|--changes|--decisions|--backlog] [--sort name|recent|deps|number] [--status <state>]` | List specs, changes, decisions, or backlog items (deps sort uses topological order, number sort is for decisions) |
 | `litespec view` | Display dashboard overview with progress bars, specs, changes (draft/active/ready-to-archive), and dependency graph |
 | `litespec update [--tools ...]` | Regenerate skills and adapter symlinks |
 | `litespec archive <change> [--allow-incomplete]` | Apply deltas to canon + move to archive (marks change as implemented; errors if unarchived dependencies exist) |
@@ -185,7 +188,7 @@ Tool adapters are auto-detected by scanning for symlinks in adapter skill direct
 | `litespec completion <shell>` | Print shell completion script (bash, zsh, fish) |
 | `litespec __complete <words...>` | Hidden backend for dynamic shell completions |
 | `litespec upgrade` | Check for latest version and upgrade via `go install` |
-| `litespec import --source <dir>` | Import an OpenSpec project to litespec format |
+| `litespec import --source <dir> [--dry-run] [--force]` | Import an OpenSpec project to litespec format |
 
 ## Archive Behavior
 
@@ -237,3 +240,7 @@ Skills that read the glossary:
 - **review** — supplementary context during cross-change review, no enforcement
 
 If the glossary doesn't exist, all skills degrade gracefully. The think skill may suggest creating one when stable terms emerge.
+
+## Backlog
+
+The project's parking lot lives in `specs/backlog.md` — a single file with sections for deferred items, open questions, and future ideas. Items graduate from backlog to changes via the plan skill. Surfaced by `list --backlog` and visible in `view` output. Optional; graceful degradation if absent.

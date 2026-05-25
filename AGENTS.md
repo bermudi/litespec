@@ -34,6 +34,7 @@ The design emerged from a structured grilling session — question by question, 
 - **Phased tasks** — `tasks.md` organizes work into phases, applied one phase at a time
 - **`view` command** — displays a dashboard with progress bars `[████░░░]`, change categories (draft/active/ready to archive), specs sorted by requirement count, and an optional dependency graph section when any change has `dependsOn`
 - **Glossary** — the project's ubiquitous language lives in `specs/glossary.md`. A single, curated file defining shared terms. Read by think and plan at session start (active — nudges when undefined terms surface). Build references it passively. Review may consult it during cross-change review. Managed as a section within the plan skill. Graceful degradation if absent.
+- **Backlog** — parked items and future ideas live in `specs/backlog.md`. A single file with sections (Deferred, Open Questions, Future) for items not yet ready to become changes. Surfaced by `list --backlog`, visible in `view` output. Managed as a section within the plan skill. Graceful degradation if absent.
 
 ## Workflow
 
@@ -87,6 +88,6 @@ Skills are **not written directly** to `.agents/skills/`. The pipeline is:
 
 1. Add a `SkillInfo` entry to `internal/paths.go` (`Skills` slice) — defines ID, name, and description
 2. Create a template file in `internal/skill/<name>.go` — registers the template body via `init()`
-3. Run `litespec update` — generates `.agents/skills/<name>/SKILL.md` from the `SkillInfo` metadata + registered template
+3. Run `litespec update` — generates `.agents/skills/<name>/SKILL.md` from the `SkillInfo` metadata + registered template. Skills can also include resource files registered via `RegisterResource()`, which are generated into `.agents/skills/<name>/references/`.
 
 Never write to `.agents/skills/` directly. Always edit the Go templates and regenerate.

@@ -23,7 +23,7 @@ This creates foundational structure:
 Start a new change for our feature:
 
 ```bash
-$ litespec new add-rate-limiting
+$ litespec new add-rate-limiting --minimal
 /home/your/project/specs/changes/add-rate-limiting
 ```
 
@@ -44,7 +44,7 @@ Created: 2026-04-02 21:21:14
 
   proposal     READY      Why and what — the motivation, scope, and approach for this change
   specs        BLOCKED    Delta specifications — ADDED/MODIFIED/REMOVED/RENAMED requirements
-  design       BLOCKED    How — the technical approach, architecture decisions, data flow, file changes
+  design       BLOCKED    How — technical approach, architecture decisions, data flow, file changes
   tasks        BLOCKED    What to do — the phased implementation checklist
 ```
 
@@ -52,7 +52,7 @@ The proposal is READY (has no dependencies). Everything else is BLOCKED waiting 
 
 ## The Propose Workflow
 
-Now you invoke your AI agent with the `litespec-propose` skill. The conversation might go like this:
+Now you invoke your AI agent with the `litespec-plan` skill. The conversation might go like this:
 
 > **You:** I want to add rate limiting to the API. We should limit requests to 100 per minute per IP address.
 >
@@ -281,7 +281,7 @@ Created: 2026-04-02 21:21:14
 
   proposal     DONE       Why and what — the motivation, scope, and approach for this change
   specs        DONE       Delta specifications — ADDED/MODIFIED/REMOVED/RENAMED requirements
-  design       DONE       How — the technical approach, architecture decisions, data flow, file changes
+  design       DONE       How — technical approach, architecture decisions, data flow, file changes
   tasks        DONE       What to do — the phased implementation checklist
 ```
 
@@ -289,7 +289,7 @@ All artifacts are DONE. The change is ready for implementation.
 
 ## Applying (Implementation)
 
-Invoke your AI agent with the `litespec-apply` skill. The AI reads all artifacts and implements Phase 1:
+Invoke your AI agent with the `litespec-build` skill. The AI reads all artifacts and implements Phase 1:
 
 ```bash
 # AI applies Phase 1 tasks
@@ -316,13 +316,7 @@ It commits with message `phase 1: Core Rate Limiting Logic` and stops. One phase
 
 ## Review
 
-After implementation, run review to check code against specs:
-
-```bash
-$ litespec review add-rate-limiting
-```
-
-The AI reads all artifacts and the implemented code, running two phases:
+After implementation, invoke your AI agent with the `litespec-review` skill to check code against specs. The AI reads all artifacts and the implemented code, running two phases:
 
 **Phase 1 (Adversarial):** Enumerates failure scenarios from the specs (state transitions, concurrent access, cascading failures), then traces each against the code. Checks for interaction bugs, missing guards, unwired declarations, and test adequacy.
 
@@ -410,7 +404,7 @@ The spec is now the single source of truth for the rate limiting capability. Fut
 
 ## What's Next
 
-- Try `litespec explore` to brainstorm your next feature
-- Use `litespec adopt` to spec existing code that lacks documentation
+- Use the think skill to brainstorm your next feature
+- Use the plan skill (adopt mode) to spec existing code that lacks documentation
 - Check `litespec list --specs` to see all capabilities
 - Read `concepts.md` for the philosophy behind spec-driven development
