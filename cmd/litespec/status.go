@@ -90,14 +90,24 @@ func cmdStatus(args []string) error {
 		return err
 	}
 
+	// Check if this is a new project (no active or archived changes)
+	isNew := len(changes) == 0
+	if isNew {
+		archived, _ := internal.ListArchivedChanges(root)
+		if len(archived) > 0 {
+			isNew = false
+		}
+	}
+
 	// Load all contexts in one pass — keep contexts alongside statuses
 	type loadedChange struct {
 		ctx    *internal.Change
 		status internal.ChangeStatusJSON
 	}
 	type statusAllOutput struct {
-		Changes  []internal.ChangeStatusJSON `json:"changes"`
-		Warnings []string                    `json:"warnings,omitempty"`
+		Changes        []internal.ChangeStatusJSON `json:"changes"`
+		IsNewProject   bool                        `json:"isNewProject"`
+		Warnings       []string                    `json:"warnings,omitempty"`
 	}
 	var loaded []loadedChange
 	var warnings []string
@@ -118,14 +128,15 @@ func cmdStatus(args []string) error {
 	for _, l := range loaded {
 		statuses = append(statuses, l.status)
 	}
-	allOut := statusAllOutput{Changes: statuses, Warnings: warnings}
+	allOut := statusAllOutput{Changes: statuses, IsNewProject: isNew, Warnings: warnings}
 
 	// Build minimal all output
 	type statusAllMinimal struct {
-		Changes []struct {
+		Changes      []struct {
 			ChangeName string `json:"changeName"`
 			IsComplete bool   `json:"isComplete"`
 		} `json:"changes"`
+		IsNewProject bool `json:"isNewProject"`
 	}
 	allMin := statusAllMinimal{}
 	for _, s := range statuses {
@@ -134,6 +145,7 @@ func cmdStatus(args []string) error {
 			IsComplete bool   `json:"isComplete"`
 		}{ChangeName: s.ChangeName, IsComplete: s.IsComplete})
 	}
+	allMin.IsNewProject = isNew
 
 	// Build text and minimal-text from loaded data
 	var sb strings.Builder

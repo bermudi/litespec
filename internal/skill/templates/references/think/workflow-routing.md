@@ -13,22 +13,25 @@ patch → archive  (lightweight lane for small, single-capability changes)
 Detect the user's current state:
 
 ```bash
-litespec list --json
+litespec status --json
 ```
 
-**Interpreting litespec list --json:**
-- changes[].status: "in-progress" = active, "complete" = ready to archive
-- changes[].completedTasks / totalTasks: 0/0 = draft, N/M = active, M/M = ready
-- changes[].lastModified: use to find the most recently touched change
+The JSON includes `suggestedNextStep` ("plan", "build", or "review") and per-change `reviewMode`. Use these directly instead of deriving them.
+
+**Interpreting litespec status --json:**
+- `isNewProject`: true = user needs `litespec init` or has just initialized
+- `changes[].suggestedNextStep`: what to do next for each change
+- `changes[].reviewMode`: "artifact" / "implementation" / "pre-archive"
+- `changes[].isComplete`: true = ready to archive
 
 **No project exists** — the user needs `litespec init`.
 
-**Project exists but no changes** — read `references/onboarding.md` to distinguish first-time users from experienced users.
+**`isNewProject` is true** — read `references/onboarding.md` to distinguish first-time users from experienced users.
 
-**Changes exist** — find the most relevant change and explain its current phase:
-- **No tasks yet (draft)**: totalTasks == 0. Next: write tasks.md or use litespec-plan.
-- **Tasks exist, not all done (active)**: Next: litespec-build for the current phase.
-- **All tasks done (ready to archive)**: Next: litespec-review, then the user runs `litespec archive <name>`.
+**Changes exist** — find the most relevant change and use its `suggestedNextStep`:
+- **plan**: write planning artifacts
+- **build**: implement the current phase
+- **review**: run review, then the user runs `litespec archive <name>`
 
 **Key gotchas:**
 - explore and grill are ephemeral — no artifacts. To save thinking, move to propose.

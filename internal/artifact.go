@@ -125,12 +125,20 @@ func LoadChangeContext(root, changeName string) (*Change, error) {
 		return nil, err
 	}
 
+	var completed, total int
+	tasksData, tasksErr := os.ReadFile(filepath.Join(changeDir, "tasks.md"))
+	if tasksErr == nil {
+		completed, total = TaskCompletion(string(tasksData))
+	}
+
 	return &Change{
-		Name:      changeName,
-		Schema:    meta.Schema,
-		Created:   meta.Created,
-		Mode:      meta.Mode,
-		DependsOn: meta.DependsOn,
-		Artifacts: states,
+		Name:           changeName,
+		Schema:         meta.Schema,
+		Created:        meta.Created,
+		Mode:           meta.Mode,
+		DependsOn:      meta.DependsOn,
+		Artifacts:      states,
+		CompletedTasks: completed,
+		TotalTasks:     total,
 	}, nil
 }

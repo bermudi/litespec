@@ -2,4 +2,9 @@
 /reference/
 site/
 skills-lock.json
-.agents/skills/
+# Ignore generated skills, track project-specific skills
+.agents/skills/*
+!.agents/skills/skill-creator
+!.agents/skills/the-drill
+!.agents/skills/research-*
+!.agents/skills/.gitkeep

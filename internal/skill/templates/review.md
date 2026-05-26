@@ -6,15 +6,14 @@ Enter review mode. You are a QA reviewer, not an implementor. Read specs, read c
 
 ## Setup
 
-Run `litespec status <name> --json` to confirm artifacts exist.
+Run `litespec status <name> --json` to confirm artifacts exist. The JSON includes `reviewMode` ("artifact", "implementation", or "pre-archive") and `suggestedNextStep` fields.
 
 Read every artifact that exists: proposal.md, specs/, design.md, tasks.md. All are in `specs/changes/<name>/`. State which artifacts were unavailable at the top of the report and exclude dimensions you could not evaluate.
 
-**Determine review mode** by parsing `tasks.md` checkbox state:
-- Count total `- [ ]` and `- [x]` lines.
-- **Zero checked** (including zero total) → **Artifact Review** — Read `references/artifact-review.md`
-- **Some but not all checked** → **Implementation Review** — Read `references/adversarial-review.md` then `references/compliance-review.md` (adversarial first to avoid anchoring)
-- **All checked** → **Pre-Archive Review** — Read `references/adversarial-review.md`, then `references/compliance-review.md`, then `references/pre-archive-review.md`
+**Determine review mode** from `litespec status <name> --json` field `reviewMode`:
+- **artifact** → **Artifact Review** — Read `references/artifact-review.md`
+- **implementation** → **Implementation Review** — Read `references/adversarial-review.md` then `references/compliance-review.md` (adversarial first to avoid anchoring)
+- **pre-archive** → **Pre-Archive Review** — Read `references/adversarial-review.md`, then `references/compliance-review.md`, then `references/pre-archive-review.md`
 
 **Cross-change dependencies:** Check `.litespec.yaml` for a `dependsOn` field. If present, for each dependency:
 1. If the dependency is an active change, read its specs/ and design.md from `specs/changes/<dep-name>/`

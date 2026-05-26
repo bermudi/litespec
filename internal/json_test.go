@@ -74,11 +74,158 @@ func TestBuildValidationResultJSON_NilSlicesProduceEmpty(t *testing.T) {
 	}
 }
 
+func TestComputeReviewMode(t *testing.T) {
+	tests := []struct {
+		mode      string
+		completed int
+		total     int
+		want      string
+	}{
+		{"", 0, 0, "artifact"},
+		{"", 0, 5, "artifact"},
+		{"", 3, 6, "implementation"},
+		{"", 6, 6, "pre-archive"},
+		{"", 1, 1, "pre-archive"},
+		{"patch", 0, 0, "pre-archive"},
+	}
+	for _, tt := range tests {
+		got := computeReviewMode(tt.mode, tt.completed, tt.total)
+		if got != tt.want {
+			t.Errorf("computeReviewMode(%q, %d, %d) = %q, want %q", tt.mode, tt.completed, tt.total, got, tt.want)
+		}
+	}
+}
+
+func TestComputeSuggestedNextStep(t *testing.T) {
+	tests := []struct {
+		name      string
+		mode      string
+		states    map[string]ArtifactState
+		completed int
+		total     int
+		want      string
+	}{
+		{
+			name:      "patch mode with specs done",
+			mode:      "patch",
+			states:    map[string]ArtifactState{"specs": ArtifactDone},
+			completed: 0, total: 0,
+			want: "review",
+		},
+		{
+			name:      "patch mode without specs",
+			mode:      "patch",
+			states:    map[string]ArtifactState{"specs": ArtifactReady},
+			completed: 0, total: 0,
+			want: "plan",
+		},
+		{
+			name:   "proposal not done",
+			mode:   "",
+			states: map[string]ArtifactState{"proposal": ArtifactReady, "specs": ArtifactBlocked, "design": ArtifactBlocked, "tasks": ArtifactBlocked},
+			completed: 0, total: 0,
+			want: "plan",
+		},
+		{
+			name:   "all artifacts done no tasks",
+			mode:   "",
+			states: map[string]ArtifactState{"proposal": ArtifactDone, "specs": ArtifactDone, "design": ArtifactDone, "tasks": ArtifactDone},
+			completed: 0, total: 0,
+			want: "plan",
+		},
+		{
+			name:   "all artifacts done tasks in progress",
+			mode:   "",
+			states: map[string]ArtifactState{"proposal": ArtifactDone, "specs": ArtifactDone, "design": ArtifactDone, "tasks": ArtifactDone},
+			completed: 2, total: 5,
+			want: "build",
+		},
+		{
+			name:   "all artifacts done all tasks done",
+			mode:   "",
+			states: map[string]ArtifactState{"proposal": ArtifactDone, "specs": ArtifactDone, "design": ArtifactDone, "tasks": ArtifactDone},
+			completed: 5, total: 5,
+			want: "review",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := computeSuggestedNextStep(tt.mode, tt.states, tt.completed, tt.total)
+			if got != tt.want {
+				t.Errorf("computeSuggestedNextStep() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildChangeStatusJSON_ReviewModeAndNextStep(t *testing.T) {
+	c := &Change{
+		Name:           "test-change",
+		Schema:         "spec-driven",
+		CompletedTasks: 3,
+		TotalTasks:     6,
+		Artifacts: map[string]ArtifactState{
+			"proposal": ArtifactDone,
+			"specs":    ArtifactDone,
+			"design":   ArtifactDone,
+			"tasks":    ArtifactDone,
+		},
+	}
+	got := BuildChangeStatusJSON(c)
+	if got.ReviewMode != "implementation" {
+		t.Errorf("expected ReviewMode=implementation, got %q", got.ReviewMode)
+	}
+	if got.SuggestedNextStep != "build" {
+		t.Errorf("expected SuggestedNextStep=build, got %q", got.SuggestedNextStep)
+	}
+}
+
+func TestBuildChangeStatusJSON_ArtifactReviewMode(t *testing.T) {
+	c := &Change{
+		Name:           "draft-change",
+		Schema:         "spec-driven",
+		CompletedTasks: 0,
+		TotalTasks:     4,
+		Artifacts: map[string]ArtifactState{
+			"proposal": ArtifactDone,
+			"specs":    ArtifactDone,
+			"design":   ArtifactDone,
+			"tasks":    ArtifactDone,
+		},
+	}
+	got := BuildChangeStatusJSON(c)
+	if got.ReviewMode != "artifact" {
+		t.Errorf("expected ReviewMode=artifact, got %q", got.ReviewMode)
+	}
+}
+
+func TestBuildChangeStatusJSON_PatchModeReview(t *testing.T) {
+	c := &Change{
+		Name:           "my-patch",
+		Schema:         "spec-driven",
+		Mode:           "patch",
+		CompletedTasks: 0,
+		TotalTasks:     0,
+		Artifacts: map[string]ArtifactState{
+			"specs": ArtifactDone,
+		},
+	}
+	got := BuildChangeStatusJSON(c)
+	if got.ReviewMode != "pre-archive" {
+		t.Errorf("expected ReviewMode=pre-archive, got %q", got.ReviewMode)
+	}
+	if got.SuggestedNextStep != "review" {
+		t.Errorf("expected SuggestedNextStep=review, got %q", got.SuggestedNextStep)
+	}
+}
+
 func TestBuildChangeStatusJSON_AllDone(t *testing.T) {
 	c := &Change{
-		Name:    "my-change",
-		Schema:  "spec-driven",
-		Created: time.Now(),
+		Name:           "my-change",
+		Schema:         "spec-driven",
+		Created:        time.Now(),
+		CompletedTasks: 6,
+		TotalTasks:     6,
 		Artifacts: map[string]ArtifactState{
 			"proposal": ArtifactDone,
 			"specs":    ArtifactDone,
@@ -89,6 +236,12 @@ func TestBuildChangeStatusJSON_AllDone(t *testing.T) {
 	got := BuildChangeStatusJSON(c)
 	if !got.IsComplete {
 		t.Error("expected IsComplete=true")
+	}
+	if got.ReviewMode != "pre-archive" {
+		t.Errorf("expected ReviewMode=pre-archive, got %q", got.ReviewMode)
+	}
+	if got.SuggestedNextStep != "review" {
+		t.Errorf("expected SuggestedNextStep=review, got %q", got.SuggestedNextStep)
 	}
 	if got.ChangeName != "my-change" {
 		t.Errorf("expected ChangeName=my-change, got %q", got.ChangeName)

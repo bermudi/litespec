@@ -7,12 +7,14 @@ import (
 )
 
 type ChangeStatusJSON struct {
-	ChangeName string               `json:"changeName"`
-	SchemaName string               `json:"schemaName"`
-	IsComplete bool                 `json:"isComplete"`
-	Mode       string               `json:"mode,omitempty"`
-	DependsOn  []string             `json:"dependsOn,omitempty"`
-	Artifacts  []ArtifactStatusJSON `json:"artifacts"`
+	ChangeName       string               `json:"changeName"`
+	SchemaName       string               `json:"schemaName"`
+	IsComplete       bool                 `json:"isComplete"`
+	Mode             string               `json:"mode,omitempty"`
+	DependsOn        []string             `json:"dependsOn,omitempty"`
+	ReviewMode       string               `json:"reviewMode"`
+	SuggestedNextStep string              `json:"suggestedNextStep"`
+	Artifacts        []ArtifactStatusJSON `json:"artifacts"`
 }
 
 type ArtifactStatusJSON struct {
@@ -214,12 +216,14 @@ func BuildChangeStatusJSON(change *Change) ChangeStatusJSON {
 	}
 
 	return ChangeStatusJSON{
-		ChangeName: change.Name,
-		SchemaName: change.Schema,
-		IsComplete: allDone,
-		Mode:       change.Mode,
-		DependsOn:  change.DependsOn,
-		Artifacts:  artifacts,
+		ChangeName:        change.Name,
+		SchemaName:        change.Schema,
+		IsComplete:        allDone,
+		Mode:              change.Mode,
+		DependsOn:         change.DependsOn,
+		ReviewMode:        computeReviewMode(change.Mode, change.CompletedTasks, change.TotalTasks),
+		SuggestedNextStep: computeSuggestedNextStep(change.Mode, change.Artifacts, change.CompletedTasks, change.TotalTasks),
+		Artifacts:         artifacts,
 	}
 }
 
@@ -283,6 +287,47 @@ func computeProgress(phases []PhaseJSON) ProgressJSON {
 		Complete:  complete,
 		Remaining: total - complete,
 	}
+}
+
+func computeReviewMode(mode string, completed, total int) string {
+	if mode == "patch" {
+		return "pre-archive"
+	}
+	if completed == 0 {
+		return "artifact"
+	}
+	if completed < total {
+		return "implementation"
+	}
+	return "pre-archive"
+}
+
+func computeSuggestedNextStep(mode string, states map[string]ArtifactState, completed, total int) string {
+	if mode == "patch" {
+		if states["specs"] == ArtifactDone {
+			return "review"
+		}
+		return "plan"
+	}
+
+	allArtifactsDone := true
+	for _, art := range Artifacts {
+		if states[art.ID] != ArtifactDone {
+			allArtifactsDone = false
+			break
+		}
+	}
+
+	if !allArtifactsDone {
+		return "plan"
+	}
+	if total == 0 {
+		return "plan"
+	}
+	if completed < total {
+		return "build"
+	}
+	return "review"
 }
 
 func findCurrentPhase(phases []PhaseJSON) int {

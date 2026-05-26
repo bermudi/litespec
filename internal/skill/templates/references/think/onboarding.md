@@ -1,6 +1,6 @@
 Distinguish between first-time users and experienced users between changes.
 
-**Detect which:** Run `litespec list --json` and check if changes array is empty. Then check whether `specs/changes/archive/` has any subdirectories. If both are empty, this is a first-time user.
+**Detect which:** Run `litespec status --json` and check the `isNewProject` field. If `true`, this is a first-time user.
 
 ---
 
@@ -27,7 +27,7 @@ Keep narration light — one sentence per step. The goal is momentum, not a lect
 
 ---
 
-## Experienced user between changes (archive is non-empty)
+## Experienced user between changes (isNewProject is false, no active changes)
 
 The user knows the workflow. Be concise:
 

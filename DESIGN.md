@@ -178,7 +178,7 @@ Tool adapters are auto-detected by scanning for symlinks in adapter skill direct
 | `litespec patch <name> <capability>` | Create a patch-mode change (delta-only) |
 | `litespec decide <slug>` | Create architectural decision record |
 | `litespec validate [<name>] [--all|--changes|--specs|--decisions] [--type change|spec|decision] [--strict]` | Validate artifact structure, delta syntax, dangling deltas, dependency cycles/overlaps, and decision records |
-| `litespec status [<name>]` | Show artifact graph state (BLOCKED/READY/DONE) |
+| `litespec status [<name>]` | Show artifact graph state (BLOCKED/READY/DONE), review mode, and suggested next step. JSON output includes `reviewMode` (artifact/implementation/pre-archive), `suggestedNextStep` (plan/build/review), and `isNewProject` (for all-changes view). |
 | `litespec instructions <artifact>` | Return artifact-specific instructions for AI to create an artifact |
 | `litespec list [--specs|--changes|--decisions|--backlog] [--sort name|recent|deps|number] [--status <state>]` | List specs, changes, decisions, or backlog items (deps sort uses topological order, number sort is for decisions) |
 | `litespec view` | Display dashboard overview with progress bars, specs, changes (draft/active/ready-to-archive), and dependency graph |

@@ -34,12 +34,14 @@ type ChangeMeta struct {
 }
 
 type Change struct {
-	Name      string
-	Schema    string
-	Created   time.Time
-	Mode      string
-	DependsOn []string
-	Artifacts map[string]ArtifactState
+	Name           string
+	Schema         string
+	Created        time.Time
+	Mode           string
+	DependsOn      []string
+	Artifacts      map[string]ArtifactState
+	CompletedTasks int
+	TotalTasks     int
 }
 
 type ArtifactInfo struct {
