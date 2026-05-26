@@ -55,74 +55,11 @@ If the user mentions a change or you detect one is relevant:
 
 ### Grilling
 
-The user wants to stress-test a plan or design through relentless questioning.
-
-If this follows exploration in the current session, build on what was already discussed. Do not re-explore from scratch.
-
-Think hard about the implications of each question before asking and use your expertise to guide.
-
-Resolve each branch of the decision tree, one question at a time.
-
-Provide your recommended answer for each question.
-
-**Read code, do not speculate.** If a question can be answered by reading the codebase, read the code instead of asking.
-
-When a locked architectural ruling emerges that is broader than the current change, suggest creating a decision via `litespec decide <slug>`.
-
-**Language before architecture.** If `specs/glossary.md` exists, surface and resolve terminology gaps before diving into implementation questions. When a new term crystallizes, nudge: "This looks like a term for the glossary — want me to add it?"
-
-**Backlog scope challenge:** If `specs/backlog.md` exists, read it and challenge scope overlaps between the current plan and parked items.
-
-When the plan is fully resolved, offer to proceed to litespec-plan.
+Read `references/grilling.md` for the full grilling procedure.
 
 ### Workflow Routing
 
-The user wants to know where they are in the litespec workflow and what to do next.
-
-**The workflow is unidirectional:**
-
-```
-explore → grill → propose → apply → review → archive
-                                    │
-                                adopt (separate path)
-
-patch → archive  (lightweight lane for small, single-capability changes)
-```
-
-Detect the user's current state:
-
-```bash
-litespec list --json
-```
-
-**Interpreting litespec list --json:**
-- changes[].status: "in-progress" = active, "complete" = ready to archive
-- changes[].completedTasks / totalTasks: 0/0 = draft, N/M = active, M/M = ready
-- changes[].lastModified: use to find the most recently touched change
-
-**No project exists** — the user needs `litespec init`.
-
-**Project exists but no changes** — read `references/onboarding.md` to distinguish first-time users from experienced users.
-
-**Changes exist** — find the most relevant change and explain its current phase:
-- **No tasks yet (draft)**: totalTasks == 0. Next: write tasks.md or use litespec-plan.
-- **Tasks exist, not all done (active)**: Next: litespec-build for the current phase.
-- **All tasks done (ready to archive)**: Next: litespec-review, then the user runs `litespec archive <name>`.
-
-**Key gotchas:**
-- explore and grill are ephemeral — no artifacts. To save thinking, move to propose.
-- propose is the commit point — once artifacts exist, the plan is committed.
-- Phase tracking comes from tasks.md checkboxes — the first unchecked block is the current phase.
-- Archive is a human decision — the agent never runs `litespec archive`.
-
-When the user asks "what do I do next?", use this response template:
-
-> **Current state:** [X active changes, Y ready to archive]
-> **Most relevant:** [change-name] at [N/M tasks]
-> **Next step:** [specific skill]
-> **Why:** [brief reason]
-
-Common questions — read `references/faq.md` when the user asks workflow questions.
+Read `references/workflow-routing.md` when the user asks "what do I do next?" or wants to understand where they are in the litespec workflow.
 
 ---
 

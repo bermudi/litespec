@@ -14,45 +14,11 @@ The standard workflow for changes that need full planning artifacts. If the user
 
 ### Patch Mode
 
-Detect patch mode from `.litespec.yaml` in the change directory. When `mode: patch` is set, skip proposal, design, and tasks — proceed directly to delta spec creation and validation.
-
-Use patch when:
-- The change touches **one capability** with a small, clear delta
-- No design discussion is needed
-- Examples: adding a CLI flag, tweaking output format, fixing a small behavioral bug
-
-Do NOT use patch when:
-- The change touches multiple capabilities
-- You need to REMOVE requirements (use propose instead)
-- The change needs design discussion or phased tasks
-
-```
-patch → implement → archive
-```
-
-1. **Create the change:** `litespec patch <name> <capability>`
-2. **Write the delta:** Edit the spec.md with ADDED or MODIFIED requirements and scenarios
-3. **Validate:** `litespec validate <name>`
-4. **Hand off:** Tell the user the patch is ready. They implement and run `litespec archive <name>` when satisfied
+Read `references/patch-mode.md` for the full patch workflow.
 
 ### Adopt Mode
 
-The user wants to reverse-engineer specs from existing code. Read code, understand what it does, and produce artifacts that document the discovered architecture and behavior.
-
-**You are reading code, not changing it.** Never modify the source code you are analyzing.
-
-1. Read the provided file or directory thoroughly — every file, every exported symbol, every meaningful behavior
-2. `litespec new <name>` to create the change directory
-3. Generate specs that describe what the code does — use ADDED Requirements markers (everything is new)
-4. Each capability discovered gets its own spec. Each requirement should be specific and verifiable
-5. Create proposal explaining what was adopted and why
-6. Create design documenting the existing architecture discovered
-7. Verify with `litespec status <name> --json`
-
-Guardrails for adopt:
-- Document what the code actually does, not what it should do
-- Do not skip edge cases — if the code handles an error, that is a requirement
-- Focus on observable behavior, not implementation details
+Read `references/adopt-mode.md` for the full adopt workflow.
 
 ---
 
@@ -122,38 +88,13 @@ Instructions and templates tell you what to produce and how to shape it — they
 
 Before writing a delta for capability X, read `specs/canon/X/spec.md` if it exists.
 
-Delta spec structure:
-
-    ## ADDED Requirements          ### Requirement: <name>   body (SHALL/MUST) + `#### Scenario:` blocks
-    ## MODIFIED Requirements       ### Requirement: <name>   full updated requirement + scenarios
-    ## REMOVED Requirements        ### Requirement: <name>   name only, no body
-    ## RENAMED Requirements        ### Requirement: <old> → <new>   heading change only
-
-Rules: ADDED/MODIFIED must have ≥1 scenario. Scenarios use WHEN/THEN format. REMOVED is name-only. RENAMED changes the heading only.
+Read `references/delta-spec-format.md` for the full delta spec syntax and rules.
 
 ---
 
 ## Glossary Management
 
-The project's ubiquitous language lives in `specs/glossary.md`. Manage it as part of planning:
-
-1. **Read `specs/glossary.md`** to understand the current shared vocabulary
-2. **Propose additions** when you encounter undefined concepts
-3. **Maintain consistent formatting** — every entry uses the `- **Term**: definition` format
-4. **Check specs for new terms** — after writing specs, check whether they introduce terms not in the glossary. Offer to update it.
-5. **Seed if missing** — if no glossary exists and the proposal introduces stable shared terms, offer to create one
-
-Glossary format rules:
-- Start each entry with `- **` followed by the bolded term, a colon, and a space
-- Keep entries concise — one or two lines
-- Brief code references (field names, file paths) as parentheticals are welcome
-- No headers within the term list — one `# Glossary` header
-- Order terms alphabetically
-
-Only add terms that:
-- Have a specific meaning in this project (different from common usage)
-- Are frequently used across conversations or artifacts
-- Could be confused with something else
+Read `references/glossary-management.md` for glossary workflow.
 
 ---
 
