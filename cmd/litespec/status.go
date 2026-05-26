@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/bermudi/litespec/internal"
@@ -33,13 +31,9 @@ func cmdStatus(args []string) error {
 		}
 	}
 
-	root, err := internal.FindProjectRoot()
+	root, err := requireProjectRoot()
 	if err != nil {
 		return err
-	}
-
-	if _, err := os.Stat(filepath.Join(root, internal.ProjectDirName)); err != nil {
-		return fmt.Errorf("not a litespec project. Run 'litespec init' first")
 	}
 
 	if name != "" {
@@ -52,60 +46,50 @@ func cmdStatus(args []string) error {
 			return err
 		}
 
-		if asJSON {
-			status := internal.BuildChangeStatusJSON(ctx)
-			var data []byte
-			var err error
-			if asMinimal {
-				type statusMinimalJSON struct {
-					ChangeName string `json:"changeName"`
-					IsComplete  bool   `json:"isComplete"`
-					Artifacts   []struct {
-						ID     string `json:"id"`
-						Status string `json:"status"`
-					} `json:"artifacts"`
-				}
-				min := statusMinimalJSON{
-					ChangeName: status.ChangeName,
-					IsComplete:  status.IsComplete,
-				}
-				for _, a := range status.Artifacts {
-					min.Artifacts = append(min.Artifacts, struct {
-						ID     string `json:"id"`
-						Status string `json:"status"`
-					}{ID: a.ID, Status: a.Status})
-				}
-				data, err = internal.MarshalJSON(min)
-			} else {
-				data, err = internal.MarshalJSON(status)
-			}
-			if err != nil {
-				return fmt.Errorf("failed to marshal JSON: %w", err)
-			}
-			fmt.Println(string(data))
-			return nil
+		status := internal.BuildChangeStatusJSON(ctx)
+
+		// Build minimal representation
+		type statusMinimalJSON struct {
+			ChangeName string `json:"changeName"`
+			IsComplete bool   `json:"isComplete"`
+			Artifacts  []struct {
+				ID     string `json:"id"`
+				Status string `json:"status"`
+			} `json:"artifacts"`
+		}
+		min := statusMinimalJSON{
+			ChangeName: status.ChangeName,
+			IsComplete:  status.IsComplete,
+		}
+		for _, a := range status.Artifacts {
+			min.Artifacts = append(min.Artifacts, struct {
+				ID     string `json:"id"`
+				Status string `json:"status"`
+			}{ID: a.ID, Status: a.Status})
 		}
 
-		if asMinimal {
-			status := internal.BuildChangeStatusJSON(ctx)
-			fmt.Printf("%s\tcomplete=%v\n", name, status.IsComplete)
-			return nil
-		}
-
-		fmt.Printf("Change: %s\n", name)
+		// Build text output
+		var sb strings.Builder
+		sb.WriteString(fmt.Sprintf("Change: %s\n", name))
 		if !ctx.Created.IsZero() {
-			fmt.Printf("Created: %s\n", ctx.Created.Format("2006-01-02 15:04:05"))
+			sb.WriteString(fmt.Sprintf("Created: %s\n", ctx.Created.Format("2006-01-02 15:04:05")))
 		}
 		if ctx.Mode == "patch" {
-			fmt.Println()
-			fmt.Printf("  %-12s %-10s %s\n", "specs", ctx.Artifacts["specs"], "(patch mode)")
+			sb.WriteString("\n")
+			sb.WriteString(fmt.Sprintf("  %-12s %-10s %s\n", "specs", ctx.Artifacts["specs"], "(patch mode)"))
 		} else {
-			fmt.Println()
+			sb.WriteString("\n")
 			for _, art := range internal.Artifacts {
-				fmt.Printf("  %-12s %-10s %s\n", art.ID, ctx.Artifacts[art.ID], art.Description)
+				sb.WriteString(fmt.Sprintf("  %-12s %-10s %s\n", art.ID, ctx.Artifacts[art.ID], art.Description))
 			}
 		}
-		return nil
+
+		return Render(Response{
+			Full:        status,
+			Minimal:     min,
+			Text:        sb.String(),
+			MinimalText: fmt.Sprintf("%s\tcomplete=%v", name, status.IsComplete),
+		}, asJSON, asMinimal)
 	}
 
 	changes, err := internal.ListChanges(root)
@@ -113,79 +97,76 @@ func cmdStatus(args []string) error {
 		return err
 	}
 
-	if asJSON {
-		type statusAllOutput struct {
-			Changes  []internal.ChangeStatusJSON `json:"changes"`
-			Warnings []string                    `json:"warnings,omitempty"`
-		}
-		var statuses []internal.ChangeStatusJSON
-		var warnings []string
-		for _, n := range changes {
-			ctx, err := internal.LoadChangeContext(root, n.Name)
-			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("error loading change %q: %v", n.Name, err))
-				continue
-			}
-			statuses = append(statuses, internal.BuildChangeStatusJSON(ctx))
-		}
-
-		var out any = statusAllOutput{Changes: statuses, Warnings: warnings}
-		if asMinimal {
-			type statusAllMinimal struct {
-				Changes []struct {
-					ChangeName string `json:"changeName"`
-					IsComplete  bool   `json:"isComplete"`
-				} `json:"changes"`
-			}
-			min := statusAllMinimal{}
-			for _, s := range statuses {
-				min.Changes = append(min.Changes, struct {
-					ChangeName string `json:"changeName"`
-					IsComplete  bool   `json:"isComplete"`
-				}{ChangeName: s.ChangeName, IsComplete: s.IsComplete})
-			}
-			out = min
-		}
-
-		data, err := internal.MarshalJSON(out)
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
-		}
-		fmt.Println(string(data))
-		return nil
+	// Load all contexts in one pass — keep contexts alongside statuses
+	type loadedChange struct {
+		ctx    *internal.Change
+		status internal.ChangeStatusJSON
 	}
-
-	if asMinimal {
-		for _, n := range changes {
-			ctx, err := internal.LoadChangeContext(root, n.Name)
-			if err != nil {
-				continue
-			}
-			status := internal.BuildChangeStatusJSON(ctx)
-			fmt.Printf("%s\tcomplete=%v\n", n.Name, status.IsComplete)
-		}
-		return nil
+	type statusAllOutput struct {
+		Changes  []internal.ChangeStatusJSON `json:"changes"`
+		Warnings []string                    `json:"warnings,omitempty"`
 	}
-
-	if len(changes) == 0 {
-		fmt.Println("No active changes.")
-		return nil
-	}
+	var loaded []loadedChange
+	var warnings []string
 	for _, n := range changes {
 		ctx, err := internal.LoadChangeContext(root, n.Name)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error loading change %q: %v\n", n.Name, err)
+			warnings = append(warnings, fmt.Sprintf("error loading change %q: %v", n.Name, err))
 			continue
 		}
-		if ctx.Mode == "patch" {
-			fmt.Printf("%s (patch mode)\n", n.Name)
-			fmt.Printf("  %-12s %s\n", "specs:", ctx.Artifacts["specs"])
-		} else {
-			fmt.Printf("%s\n", n.Name)
-			for _, art := range internal.Artifacts {
-				fmt.Printf("  %-12s %s\n", art.ID+":", ctx.Artifacts[art.ID])
+		loaded = append(loaded, loadedChange{
+			ctx:    ctx,
+			status: internal.BuildChangeStatusJSON(ctx),
+		})
+	}
+
+	// Collect statuses for JSON output
+	var statuses []internal.ChangeStatusJSON
+	for _, l := range loaded {
+		statuses = append(statuses, l.status)
+	}
+	allOut := statusAllOutput{Changes: statuses, Warnings: warnings}
+
+	// Build minimal all output
+	type statusAllMinimal struct {
+		Changes []struct {
+			ChangeName string `json:"changeName"`
+			IsComplete bool   `json:"isComplete"`
+		} `json:"changes"`
+	}
+	allMin := statusAllMinimal{}
+	for _, s := range statuses {
+		allMin.Changes = append(allMin.Changes, struct {
+			ChangeName string `json:"changeName"`
+			IsComplete bool   `json:"isComplete"`
+		}{ChangeName: s.ChangeName, IsComplete: s.IsComplete})
+	}
+
+	// Build text and minimal-text from loaded data
+	var sb strings.Builder
+	var minTextSB strings.Builder
+	if len(loaded) == 0 && len(warnings) == 0 {
+		sb.WriteString("No active changes.\n")
+	} else {
+		for _, l := range loaded {
+			if l.ctx.Mode == "patch" {
+				sb.WriteString(fmt.Sprintf("%s (patch mode)\n", l.status.ChangeName))
+				sb.WriteString(fmt.Sprintf("  %-12s %s\n", "specs:", l.ctx.Artifacts["specs"]))
+			} else {
+				sb.WriteString(fmt.Sprintf("%s\n", l.status.ChangeName))
+				for _, art := range internal.Artifacts {
+					sb.WriteString(fmt.Sprintf("  %-12s %s\n", art.ID+":", l.ctx.Artifacts[art.ID]))
+				}
 			}
+			minTextSB.WriteString(fmt.Sprintf("%s\tcomplete=%v\n", l.status.ChangeName, l.status.IsComplete))
 		}
 	}
-	return nil
+	minText := strings.TrimRight(minTextSB.String(), "\n")
+
+	return Render(Response{
+		Full:        allOut,
+		Minimal:     allMin,
+		Text:        sb.String(),
+		MinimalText: minText,
+	}, asJSON, asMinimal)
 }
