@@ -1627,7 +1627,7 @@ func TestRenderDependencyGraph_SimpleTree(t *testing.T) {
 	}
 
 	output := captureStdout(func() {
-		renderDependencyGraph(depMap, changes)
+		renderDependencyGraph(os.Stdout, depMap, changes)
 	})
 
 	parentIdx := strings.Index(output, "parent")
@@ -1658,7 +1658,7 @@ func TestRenderDependencyGraph_MultipleChildren(t *testing.T) {
 	}
 
 	output := captureStdout(func() {
-		renderDependencyGraph(depMap, changes)
+		renderDependencyGraph(os.Stdout, depMap, changes)
 	})
 
 	if !strings.Contains(output, "child-a") {
@@ -1683,7 +1683,7 @@ func TestRenderDependencyGraph_UnrelatedChanges(t *testing.T) {
 	}
 
 	output := captureStdout(func() {
-		renderDependencyGraph(depMap, changes)
+		renderDependencyGraph(os.Stdout, depMap, changes)
 	})
 
 	if !strings.Contains(output, "Unrelated:") {
@@ -1706,7 +1706,7 @@ func TestRenderDependencyGraph_DeepChain(t *testing.T) {
 	}
 
 	output := captureStdout(func() {
-		renderDependencyGraph(depMap, changes)
+		renderDependencyGraph(os.Stdout, depMap, changes)
 	})
 
 	lines := strings.Split(strings.TrimSpace(output), "\n")

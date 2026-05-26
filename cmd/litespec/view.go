@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"sort"
 	"strings"
@@ -79,168 +80,15 @@ func cmdView(args []string) error {
 
 	decisions, decErr := internal.ListDecisions(root)
 
-	if asJSON {
-		return renderViewJSON(root, specs, draft, active, completed, patch, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr, asMinimal)
-	}
+	depMap, _ := internal.LoadDepMap(root)
 
-	if asMinimal {
-		fmt.Printf("%d specs\t%d reqs\t%d draft\t%d active\t%d ready\t%d/%d tasks\n",
-			len(specs), totalReqs, len(draft), len(active), len(completed), totalCompletedTasks, totalTasks)
-		return nil
-	}
-
-	fmt.Println()
-	fmt.Println("Litespec Dashboard")
-	fmt.Println()
-	sep := strings.Repeat("═", 60)
-	fmt.Println(sep)
-
-	fmt.Println("Summary:")
-	fmt.Printf("  ● Specifications: %d specs, %d requirements\n", len(specs), totalReqs)
-	fmt.Printf("  ● Draft Changes: %d\n", len(draft))
-	fmt.Printf("  ● Active Changes: %d in progress\n", len(active))
-	if len(patch) > 0 {
-		fmt.Printf("  ● Patch Changes: %d\n", len(patch))
-	}
-	fmt.Printf("  ● Ready to Archive: %d\n", len(completed))
-	if totalTasks > 0 {
-		pct := int(math.Round(float64(totalCompletedTasks) / float64(totalTasks) * 100))
-		fmt.Printf("  ● Task Progress: %d/%d (%d%% complete)\n", totalCompletedTasks, totalTasks, pct)
-	}
-	if decErr == nil && len(decisions) > 0 {
-		activeDec := 0
-		for _, d := range decisions {
-			if d.Status != internal.StatusSuperseded {
-				activeDec++
-			}
-		}
-		fmt.Printf("  ● Decisions: %d/%d\n", activeDec, len(decisions))
-	}
-
-	backlog, _ := internal.ParseBacklog(internal.BacklogPath(root))
-	if backlog != nil {
-		var parts []string
-		if backlog.Deferred > 0 {
-			parts = append(parts, formatCount(backlog.Deferred, "deferred"))
-		}
-		if backlog.OpenQuestions > 0 {
-			parts = append(parts, formatCount(backlog.OpenQuestions, "open questions"))
-		}
-		if backlog.Future > 0 {
-			parts = append(parts, formatCount(backlog.Future, "future"))
-		}
-		line := "  ● Backlog: " + strings.Join(parts, ", ")
-		if backlog.Other > 0 {
-			line += " — " + formatCount(backlog.Other, "other")
-		}
-		fmt.Println(line)
-	}
-
-	if len(active) > 0 {
-		fmt.Println()
-		fmt.Println("Active Changes")
-		fmt.Println(strings.Repeat("─", 60))
-		for _, c := range active {
-			bar := createProgressBar(c.CompletedTasks, c.TotalTasks, 20)
-			pct := int(math.Round(float64(c.CompletedTasks) / float64(c.TotalTasks) * 100))
-			fmt.Printf("  ◉ %-30s %s %d%%%s\n", c.Name, bar, pct, formatTimestamps(c))
-		}
-	}
-
-	if len(draft) > 0 {
-		fmt.Println()
-		fmt.Println("Draft Changes")
-		fmt.Println(strings.Repeat("─", 60))
-		for _, c := range draft {
-			fmt.Printf("  ○ %s%s\n", c.Name, formatTimestamps(c))
-		}
-	}
-
-	if len(patch) > 0 {
-		fmt.Println()
-		fmt.Println("Patch Changes")
-		fmt.Println(strings.Repeat("─", 60))
-		for _, c := range patch {
-			fmt.Printf("  ◆ %s%s\n", c.Name, formatTimestamps(c))
-		}
-	}
-
-	if len(completed) > 0 {
-		fmt.Println()
-		fmt.Println("Ready to Archive")
-		fmt.Println(strings.Repeat("─", 60))
-		for _, c := range completed {
-			fmt.Printf("  ✓ %s%s\n", c.Name, formatTimestamps(c))
-		}
-	}
-
-	if len(specs) > 0 {
-		fmt.Println()
-		fmt.Println("Specifications")
-		fmt.Println(strings.Repeat("─", 60))
-		sort.Slice(specs, func(i, j int) bool {
-			return specs[i].RequirementCount > specs[j].RequirementCount
-		})
-		for _, s := range specs {
-			label := "requirement"
-			if s.RequirementCount != 1 {
-				label = "requirements"
-			}
-			fmt.Printf("  ▪ %-30s %d %s\n", s.Name, s.RequirementCount, label)
-		}
-	}
-
-	// Decisions section
-	if decErr == nil && len(decisions) > 0 {
-		var activeDecs []*internal.Decision
-		supersededCount := 0
-		for _, d := range decisions {
-			if d.Status != internal.StatusSuperseded {
-				activeDecs = append(activeDecs, d)
-			} else {
-				supersededCount++
-			}
-		}
-		sort.Slice(activeDecs, func(i, j int) bool {
-			return activeDecs[i].Number < activeDecs[j].Number
-		})
-		fmt.Println()
-		fmt.Println("Decisions")
-		fmt.Println(strings.Repeat("─", 60))
-		for _, d := range activeDecs {
-			fmt.Printf("  %04d  %-30s  %s\n", d.Number, d.Slug, d.Status)
-		}
-		if supersededCount > 0 {
-			fmt.Printf("  superseded: %d\n", supersededCount)
-		}
-	}
-
-	depMap, err := internal.LoadDepMap(root)
-	if err != nil {
-		fmt.Println()
-		fmt.Println(sep)
-		return nil
-	}
-
-	hasDeps := false
-	for _, deps := range depMap {
-		if len(deps) > 0 {
-			hasDeps = true
-			break
-		}
-	}
-
-	if hasDeps {
-		fmt.Println()
-		fmt.Println("Dependency Graph")
-		fmt.Println(strings.Repeat("─", 60))
-		renderDependencyGraph(depMap, changes)
-	}
-
-	fmt.Println()
-	fmt.Println(sep)
-	fmt.Printf("\nUse litespec list --changes or litespec list --specs for detailed views\n")
-	return nil
+	return Render(Response{
+		Full:        buildViewFullJSON(root, specs, draft, active, completed, patch, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr, depMap),
+		Minimal:     buildViewMinimalJSON(root, specs, draft, active, completed, patch, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr),
+		Text:        buildViewText(specs, draft, active, completed, patch, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr, changes, depMap),
+		MinimalText: fmt.Sprintf("%d specs\t%d reqs\t%d draft\t%d active\t%d ready\t%d/%d tasks",
+			len(specs), totalReqs, len(draft), len(active), len(completed), totalCompletedTasks, totalTasks),
+	}, asJSON, asMinimal)
 }
 
 func formatCount(n int, label string) string {
@@ -274,7 +122,7 @@ func createProgressBar(completed, total, width int) string {
 	return "[" + strings.Repeat("█", filled) + strings.Repeat("░", empty) + "]"
 }
 
-func renderDependencyGraph(depMap map[string][]string, changes []internal.ChangeInfo) {
+func renderDependencyGraph(w io.Writer, depMap map[string][]string, changes []internal.ChangeInfo) {
 	changeMap := make(map[string]internal.ChangeInfo)
 	for _, c := range changes {
 		changeMap[c.Name] = c
@@ -284,6 +132,8 @@ func renderDependencyGraph(depMap map[string][]string, changes []internal.Change
 	for _, c := range changes {
 		activeNames[c.Name] = true
 	}
+
+	var sb strings.Builder
 
 	reverseMap := make(map[string][]string)
 	for name, deps := range depMap {
@@ -314,11 +164,12 @@ func renderDependencyGraph(depMap map[string][]string, changes []internal.Change
 	if len(related) == 0 {
 		if len(unrelated) > 0 {
 			sort.Strings(unrelated)
-			fmt.Println("\nUnrelated:")
+			sb.WriteString("\nUnrelated:\n")
 			for _, name := range unrelated {
-				fmt.Printf("  - %s%s\n", name, formatTimestamps(changeMap[name]))
+				fmt.Fprintf(&sb, "  - %s%s\n", name, formatTimestamps(changeMap[name]))
 			}
 		}
+		fmt.Fprint(w, sb.String())
 		return
 	}
 
@@ -344,7 +195,7 @@ func renderDependencyGraph(depMap map[string][]string, changes []internal.Change
 		if isLast {
 			connector = "└── "
 		}
-		fmt.Printf("%s%s%s%s\n", prefix, connector, name, formatTimestamps(changeMap[name]))
+		fmt.Fprintf(&sb, "%s%s%s%s\n", prefix, connector, name, formatTimestamps(changeMap[name]))
 
 		children := reverseMap[name]
 		sort.Strings(children)
@@ -365,11 +216,13 @@ func renderDependencyGraph(depMap map[string][]string, changes []internal.Change
 
 	if len(unrelated) > 0 {
 		sort.Strings(unrelated)
-		fmt.Println("\nUnrelated:")
+		sb.WriteString("\nUnrelated:\n")
 		for _, name := range unrelated {
-			fmt.Printf("  - %s%s\n", name, formatTimestamps(changeMap[name]))
+			fmt.Fprintf(&sb, "  - %s%s\n", name, formatTimestamps(changeMap[name]))
 		}
 	}
+
+	fmt.Fprint(w, sb.String())
 }
 
 type viewJSON struct {
@@ -438,7 +291,167 @@ type viewGraphJSON struct {
 	Unrelated  []string                   `json:"unrelated,omitempty"`
 }
 
-func renderViewJSON(root string, specs []internal.SpecInfo, draft, active, completed, patch []internal.ChangeInfo, totalReqs, totalCompletedTasks, totalTasks int, decisions []*internal.Decision, decErr error, asMinimal bool) error {
+func buildViewText(specs []internal.SpecInfo, draft, active, completed, patch []internal.ChangeInfo, totalReqs, totalCompletedTasks, totalTasks int, decisions []*internal.Decision, decErr error, changes []internal.ChangeInfo, depMap map[string][]string) string {
+	var sb strings.Builder
+	sep := strings.Repeat("═", 60)
+
+	fmt.Fprintln(&sb)
+	fmt.Fprintln(&sb, "Litespec Dashboard")
+	fmt.Fprintln(&sb)
+	fmt.Fprintln(&sb, sep)
+
+	fmt.Fprintln(&sb, "Summary:")
+	fmt.Fprintf(&sb, "  ● Specifications: %d specs, %d requirements\n", len(specs), totalReqs)
+	fmt.Fprintf(&sb, "  ● Draft Changes: %d\n", len(draft))
+	fmt.Fprintf(&sb, "  ● Active Changes: %d in progress\n", len(active))
+	if len(patch) > 0 {
+		fmt.Fprintf(&sb, "  ● Patch Changes: %d\n", len(patch))
+	}
+	fmt.Fprintf(&sb, "  ● Ready to Archive: %d\n", len(completed))
+	if totalTasks > 0 {
+		pct := int(math.Round(float64(totalCompletedTasks) / float64(totalTasks) * 100))
+		fmt.Fprintf(&sb, "  ● Task Progress: %d/%d (%d%% complete)\n", totalCompletedTasks, totalTasks, pct)
+	}
+	if decErr == nil && len(decisions) > 0 {
+		activeDec := 0
+		for _, d := range decisions {
+			if d.Status != internal.StatusSuperseded {
+				activeDec++
+			}
+		}
+		fmt.Fprintf(&sb, "  ● Decisions: %d/%d\n", activeDec, len(decisions))
+	}
+
+	root := ""
+	if r, err := requireProjectRoot(); err == nil {
+		root = r
+	}
+	backlog, _ := internal.ParseBacklog(internal.BacklogPath(root))
+	if backlog != nil {
+		var parts []string
+		if backlog.Deferred > 0 {
+			parts = append(parts, formatCount(backlog.Deferred, "deferred"))
+		}
+		if backlog.OpenQuestions > 0 {
+			parts = append(parts, formatCount(backlog.OpenQuestions, "open questions"))
+		}
+		if backlog.Future > 0 {
+			parts = append(parts, formatCount(backlog.Future, "future"))
+		}
+		line := "  ● Backlog: " + strings.Join(parts, ", ")
+		if backlog.Other > 0 {
+			line += " — " + formatCount(backlog.Other, "other")
+		}
+		fmt.Fprintln(&sb, line)
+	}
+
+	if len(active) > 0 {
+		fmt.Fprintln(&sb)
+		fmt.Fprintln(&sb, "Active Changes")
+		fmt.Fprintln(&sb, strings.Repeat("─", 60))
+		for _, c := range active {
+			bar := createProgressBar(c.CompletedTasks, c.TotalTasks, 20)
+			pct := int(math.Round(float64(c.CompletedTasks) / float64(c.TotalTasks) * 100))
+			fmt.Fprintf(&sb, "  ◉ %-30s %s %d%%%s\n", c.Name, bar, pct, formatTimestamps(c))
+		}
+	}
+
+	if len(draft) > 0 {
+		fmt.Fprintln(&sb)
+		fmt.Fprintln(&sb, "Draft Changes")
+		fmt.Fprintln(&sb, strings.Repeat("─", 60))
+		for _, c := range draft {
+			fmt.Fprintf(&sb, "  ○ %s%s\n", c.Name, formatTimestamps(c))
+		}
+	}
+
+	if len(patch) > 0 {
+		fmt.Fprintln(&sb)
+		fmt.Fprintln(&sb, "Patch Changes")
+		fmt.Fprintln(&sb, strings.Repeat("─", 60))
+		for _, c := range patch {
+			fmt.Fprintf(&sb, "  ◆ %s%s\n", c.Name, formatTimestamps(c))
+		}
+	}
+
+	if len(completed) > 0 {
+		fmt.Fprintln(&sb)
+		fmt.Fprintln(&sb, "Ready to Archive")
+		fmt.Fprintln(&sb, strings.Repeat("─", 60))
+		for _, c := range completed {
+			fmt.Fprintf(&sb, "  ✓ %s%s\n", c.Name, formatTimestamps(c))
+		}
+	}
+
+	if len(specs) > 0 {
+		fmt.Fprintln(&sb)
+		fmt.Fprintln(&sb, "Specifications")
+		fmt.Fprintln(&sb, strings.Repeat("─", 60))
+		sort.Slice(specs, func(i, j int) bool {
+			return specs[i].RequirementCount > specs[j].RequirementCount
+		})
+		for _, s := range specs {
+			label := "requirement"
+			if s.RequirementCount != 1 {
+				label = "requirements"
+			}
+			fmt.Fprintf(&sb, "  ▪ %-30s %d %s\n", s.Name, s.RequirementCount, label)
+		}
+	}
+
+	// Decisions section
+	if decErr == nil && len(decisions) > 0 {
+		var activeDecs []*internal.Decision
+		supersededCount := 0
+		for _, d := range decisions {
+			if d.Status != internal.StatusSuperseded {
+				activeDecs = append(activeDecs, d)
+			} else {
+				supersededCount++
+			}
+		}
+		sort.Slice(activeDecs, func(i, j int) bool {
+			return activeDecs[i].Number < activeDecs[j].Number
+		})
+		fmt.Fprintln(&sb)
+		fmt.Fprintln(&sb, "Decisions")
+		fmt.Fprintln(&sb, strings.Repeat("─", 60))
+		for _, d := range activeDecs {
+			fmt.Fprintf(&sb, "  %04d  %-30s  %s\n", d.Number, d.Slug, d.Status)
+		}
+		if supersededCount > 0 {
+			fmt.Fprintf(&sb, "  superseded: %d\n", supersededCount)
+		}
+	}
+
+	if depMap == nil {
+		fmt.Fprintln(&sb)
+		fmt.Fprintln(&sb, sep)
+	} else {
+		hasDeps := false
+		for _, deps := range depMap {
+			if len(deps) > 0 {
+				hasDeps = true
+				break
+			}
+		}
+
+		if hasDeps {
+			fmt.Fprintln(&sb)
+			fmt.Fprintln(&sb, "Dependency Graph")
+			fmt.Fprintln(&sb, strings.Repeat("─", 60))
+			renderDependencyGraph(&sb, depMap, changes)
+		}
+
+		fmt.Fprintln(&sb)
+		fmt.Fprintln(&sb, sep)
+	}
+
+	fmt.Fprintf(&sb, "\nUse litespec list --changes or litespec list --specs for detailed views\n")
+	return sb.String()
+}
+
+func buildViewMinimalJSON(root string, specs []internal.SpecInfo, draft, active, completed, patch []internal.ChangeInfo, totalReqs, totalCompletedTasks, totalTasks int, decisions []*internal.Decision, decErr error) viewJSON {
 	summary := viewSummaryJSON{
 		Specs:          len(specs),
 		Requirements:   totalReqs,
@@ -477,6 +490,12 @@ func renderViewJSON(root string, specs []internal.SpecInfo, draft, active, compl
 			Unrecognized:  backlog.Unrecognized,
 		}
 	}
+
+	return viewJSON{Summary: summary}
+}
+
+func buildViewFullJSON(root string, specs []internal.SpecInfo, draft, active, completed, patch []internal.ChangeInfo, totalReqs, totalCompletedTasks, totalTasks int, decisions []*internal.Decision, decErr error, depMap map[string][]string) viewJSON {
+	out := buildViewMinimalJSON(root, specs, draft, active, completed, patch, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr)
 
 	var changes []viewChangeJSON
 	for _, c := range draft {
@@ -547,8 +566,7 @@ func renderViewJSON(root string, specs []internal.SpecInfo, draft, active, compl
 	}
 
 	var graph *viewGraphJSON
-	depMap, err := internal.LoadDepMap(root)
-	if err == nil {
+	if depMap != nil {
 		hasDeps := false
 		for _, deps := range depMap {
 			if len(deps) > 0 {
@@ -587,29 +605,11 @@ func renderViewJSON(root string, specs []internal.SpecInfo, draft, active, compl
 		}
 	}
 
-	if asMinimal {
-		data, err := internal.MarshalJSON(viewJSON{Summary: summary})
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
-		}
-		fmt.Println(string(data))
-		return nil
-	}
-
-	out := viewJSON{
-		Summary:   summary,
-		Changes:   changes,
-		Specs:     specEntries,
-		Decisions: decEntries,
-		Graph:     graph,
-	}
-
-	data, err := internal.MarshalJSON(out)
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
-	}
-	fmt.Println(string(data))
-	return nil
+	out.Changes = changes
+	out.Specs = specEntries
+	out.Decisions = decEntries
+	out.Graph = graph
+	return out
 }
 
 func bornStr(c internal.ChangeInfo) string {
