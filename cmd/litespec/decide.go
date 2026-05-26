@@ -79,47 +79,33 @@ proposed
 		return fmt.Errorf("write decision file: %w", err)
 	}
 
-	if asJSON {
-		type decideResultJSON struct {
-			Number   int    `json:"number"`
-			Slug     string `json:"slug"`
-			Title    string `json:"title"`
-			FilePath string `json:"filePath"`
-		}
-		out := decideResultJSON{
+	type decideResultJSON struct {
+		Number   int    `json:"number"`
+		Slug     string `json:"slug"`
+		Title    string `json:"title"`
+		FilePath string `json:"filePath"`
+	}
+	type decideMinimalJSON struct {
+		Number   int    `json:"number"`
+		Slug     string `json:"slug"`
+		FilePath string `json:"filePath"`
+	}
+
+	return Render(Response{
+		Full: decideResultJSON{
 			Number:   nextNum,
 			Slug:     slug,
 			Title:    slugToTitle(slug),
 			FilePath: filePath,
-		}
-		if asMinimal {
-			type decideMinimalJSON struct {
-				Number   int    `json:"number"`
-				Slug     string `json:"slug"`
-				FilePath string `json:"filePath"`
-			}
-			data, err := internal.MarshalJSON(decideMinimalJSON{Number: nextNum, Slug: slug, FilePath: filePath})
-			if err != nil {
-				return fmt.Errorf("failed to marshal JSON: %w", err)
-			}
-			fmt.Println(string(data))
-			return nil
-		}
-		data, err := internal.MarshalJSON(out)
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
-		}
-		fmt.Println(string(data))
-		return nil
-	}
-
-	if asMinimal {
-		fmt.Println(filePath)
-		return nil
-	}
-
-	fmt.Printf("Created: %s\n", filePath)
-	return nil
+		},
+		Minimal: decideMinimalJSON{
+			Number:   nextNum,
+			Slug:     slug,
+			FilePath: filePath,
+		},
+		Text:        fmt.Sprintf("Created: %s\n", filePath),
+		MinimalText: filePath,
+	}, asJSON, asMinimal)
 }
 
 func validateDecisionSlug(slug string) error {

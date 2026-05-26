@@ -34,6 +34,7 @@ func cmdInit(args []string) error {
 	if err := internal.InitProject(root); err != nil {
 		return err
 	}
+	// Suppress text output during side-effect operations when JSON/minimal mode is active
 	if !asJSON && !asMinimal {
 		fmt.Println("Created specs/ directory structure")
 	}
@@ -55,6 +56,7 @@ func cmdInit(args []string) error {
 		toolIDs = internal.DetectActiveAdapters(root)
 	}
 
+	// Suppress adapter text output during side-effect operations when JSON/minimal mode is active
 	if len(toolIDs) > 0 {
 		if err := internal.GenerateAdapterCommands(root, toolIDs); err != nil {
 			return err
@@ -64,48 +66,30 @@ func cmdInit(args []string) error {
 		}
 	}
 
-	if asJSON {
-		type initResultJSON struct {
-			Initialized bool     `json:"initialized"`
-			Directories []string `json:"directories"`
-			Skills      []string `json:"skills"`
-			Adapters    []string `json:"adapters"`
-		}
-		out := initResultJSON{
+	type initResultJSON struct {
+		Initialized bool     `json:"initialized"`
+		Directories []string `json:"directories"`
+		Skills      []string `json:"skills"`
+		Adapters    []string `json:"adapters"`
+	}
+	type initMinimalJSON struct {
+		Initialized bool `json:"initialized"`
+	}
+
+	skillNames := make([]string, len(internal.Skills))
+	for i, s := range internal.Skills {
+		skillNames[i] = s.ID
+	}
+
+	return Render(Response{
+		Full: initResultJSON{
 			Initialized: true,
 			Directories: []string{"specs/canon/", "specs/changes/"},
-		}
-		skillNames := make([]string, len(internal.Skills))
-		for i, s := range internal.Skills {
-			skillNames[i] = s.ID
-		}
-		out.Skills = skillNames
-		out.Adapters = toolIDs
-		if asMinimal {
-			type initMinimalJSON struct {
-				Initialized bool `json:"initialized"`
-			}
-			data, err := internal.MarshalJSON(initMinimalJSON{Initialized: true})
-			if err != nil {
-				return fmt.Errorf("failed to marshal JSON: %w", err)
-			}
-			fmt.Println(string(data))
-			return nil
-		}
-		data, err := internal.MarshalJSON(out)
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
-		}
-		fmt.Println(string(data))
-		return nil
-	}
-
-	if asMinimal {
-		fmt.Println("initialized")
-		return nil
-	}
-
-	fmt.Println("Project initialized.")
-	fmt.Println("\nTip: Create specs/backlog.md with ## Deferred, ## Open Questions, and ## Future Versions sections to surface backlog counts in `litespec view`.")
-	return nil
+			Skills:      skillNames,
+			Adapters:    toolIDs,
+		},
+		Minimal:     initMinimalJSON{Initialized: true},
+		Text:        "Project initialized.\n\nTip: Create specs/backlog.md with ## Deferred, ## Open Questions, and ## Future Versions sections to surface backlog counts in `litespec view`.\n",
+		MinimalText: "initialized",
+	}, asJSON, asMinimal)
 }

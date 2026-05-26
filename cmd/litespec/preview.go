@@ -74,43 +74,32 @@ func cmdPreview(args []string) error {
 		return err
 	}
 
-	if useJSON {
-		if asMinimal {
-			type previewMinimalJSON struct {
-				Totals struct {
-					Capabilities      int `json:"capabilities"`
-					Added             int `json:"added"`
-					Modified          int `json:"modified"`
-					Removed           int `json:"removed"`
-					Renamed           int `json:"renamed"`
-				} `json:"totals"`
-			}
-			min := previewMinimalJSON{}
-			min.Totals.Capabilities = result.Totals.Capabilities
-			min.Totals.Added = result.Totals.Added
-			min.Totals.Modified = result.Totals.Modified
-			min.Totals.Removed = result.Totals.Removed
-			min.Totals.Renamed = result.Totals.Renamed
-			data, err := internal.MarshalJSON(min)
-			if err != nil {
-				return fmt.Errorf("formatting JSON: %w", err)
-			}
-			fmt.Println(string(data))
-		} else {
-			data, err := internal.FormatPreviewJSON(result)
-			if err != nil {
-				return fmt.Errorf("formatting JSON: %w", err)
-			}
-			fmt.Println(string(data))
-		}
-	} else if asMinimal {
-		fmt.Printf("%d capabilities\t%d added\t%d modified\t%d removed\t%d renamed\n",
-			result.Totals.Capabilities, result.Totals.Added, result.Totals.Modified, result.Totals.Removed, result.Totals.Renamed)
-	} else {
-		fmt.Print(internal.FormatPreviewText(result))
+	// Build JSON representations
+	type previewMinimalJSON struct {
+		Totals struct {
+			Capabilities      int `json:"capabilities"`
+			Added             int `json:"added"`
+			Modified          int `json:"modified"`
+			Removed           int `json:"removed"`
+			Renamed           int `json:"renamed"`
+		} `json:"totals"`
 	}
+	min := previewMinimalJSON{}
+	min.Totals.Capabilities = result.Totals.Capabilities
+	min.Totals.Added = result.Totals.Added
+	min.Totals.Modified = result.Totals.Modified
+	min.Totals.Removed = result.Totals.Removed
+	min.Totals.Renamed = result.Totals.Renamed
 
-	return nil
+	minimalText := fmt.Sprintf("%d capabilities\t%d added\t%d modified\t%d removed\t%d renamed",
+		result.Totals.Capabilities, result.Totals.Added, result.Totals.Modified, result.Totals.Removed, result.Totals.Renamed)
+
+	return Render(Response{
+		Full:        result,
+		Minimal:     min,
+		Text:        internal.FormatPreviewText(result),
+		MinimalText: minimalText,
+	}, useJSON, asMinimal)
 }
 
 func printPreviewHelp() {
