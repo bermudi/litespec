@@ -7,6 +7,7 @@ import (
 	"github.com/bermudi/litespec/internal"
 )
 
+
 func cmdUpdate(args []string) error {
 	if hasHelpFlag(args) {
 		printUpdateHelp()
@@ -34,9 +35,6 @@ func cmdUpdate(args []string) error {
 	if err := internal.GenerateSkills(root); err != nil {
 		return err
 	}
-	if !asJSON && !asMinimal {
-		fmt.Println("Updated .agents/skills/")
-	}
 
 	var toolIDs []string
 	if tools != "" {
@@ -52,39 +50,26 @@ func cmdUpdate(args []string) error {
 		if err := internal.GenerateAdapterCommands(root, toolIDs); err != nil {
 			return err
 		}
-		if !asJSON && !asMinimal {
-			fmt.Printf("Updated adapter symlinks for: %s\n", strings.Join(toolIDs, ","))
-		}
 	}
 
-	if asJSON {
-		type updateResultJSON struct {
-			SkillsUpdated bool     `json:"skillsUpdated"`
-			Adapters      []string `json:"adapters"`
-		}
-		if asMinimal {
-			type updateMinimalJSON struct {
-				Updated bool `json:"updated"`
-			}
-			data, err := internal.MarshalJSON(updateMinimalJSON{Updated: true})
-			if err != nil {
-				return fmt.Errorf("failed to marshal JSON: %w", err)
-			}
-			fmt.Println(string(data))
-			return nil
-		}
-		data, err := internal.MarshalJSON(updateResultJSON{SkillsUpdated: true, Adapters: toolIDs})
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
-		}
-		fmt.Println(string(data))
-		return nil
+	type updateResultJSON struct {
+		SkillsUpdated bool     `json:"skillsUpdated"`
+		Adapters      []string `json:"adapters"`
+	}
+	type updateMinimalJSON struct {
+		Updated bool `json:"updated"`
 	}
 
-	if asMinimal {
-		fmt.Println("updated")
-		return nil
+	var textSB strings.Builder
+	textSB.WriteString("Updated .agents/skills/\n")
+	if len(toolIDs) > 0 {
+		textSB.WriteString(fmt.Sprintf("Updated adapter symlinks for: %s\n", strings.Join(toolIDs, ",")))
 	}
 
-	return nil
+	return Render(Response{
+		Full:        updateResultJSON{SkillsUpdated: true, Adapters: toolIDs},
+		Minimal:     updateMinimalJSON{Updated: true},
+		Text:        textSB.String(),
+		MinimalText: "updated",
+	}, asJSON, asMinimal)
 }

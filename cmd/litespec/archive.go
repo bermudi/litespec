@@ -9,6 +9,7 @@ import (
 	"github.com/bermudi/litespec/internal"
 )
 
+
 func cmdArchive(args []string) error {
 	if hasHelpFlag(args) {
 		printArchiveHelp()
@@ -113,6 +114,28 @@ func cmdArchive(args []string) error {
 		}
 	}
 
+	// Build all representations for Render
+	type archiveResultJSON struct {
+		Change       string   `json:"change"`
+		Capabilities []string `json:"capabilities"`
+		ArchivedPath string   `json:"archivedPath"`
+	}
+	type archiveMinimalJSON struct {
+		Archived     bool     `json:"archived"`
+		Capabilities []string `json:"capabilities"`
+	}
+
+	caps := make([]string, len(writes))
+	for i, w := range writes {
+		caps[i] = w.Capability
+	}
+
+	var textSB strings.Builder
+	for _, w := range writes {
+		textSB.WriteString(fmt.Sprintf("Updated spec: %s\n", w.Capability))
+	}
+	textSB.WriteString(fmt.Sprintf("Change %q archived — deltas applied, change marked as implemented.\n", name))
+
 	// Strip specs/ subtree from archived directory
 	archivedSpecsDir := filepath.Join(archiveDest, internal.ChangeSpecsDirName)
 	if err := os.RemoveAll(archivedSpecsDir); err != nil {
@@ -144,41 +167,10 @@ func cmdArchive(args []string) error {
 		}
 	}
 
-	if asJSON {
-		type archiveResultJSON struct {
-			Change       string   `json:"change"`
-			Capabilities []string `json:"capabilities"`
-			ArchivedPath string   `json:"archivedPath"`
-		}
-		caps := make([]string, len(writes))
-		for i, w := range writes {
-			caps[i] = w.Capability
-		}
-		if asMinimal {
-			type archiveMinimalJSON struct {
-				Archived     bool     `json:"archived"`
-				Capabilities []string `json:"capabilities"`
-			}
-			data, err := internal.MarshalJSON(archiveMinimalJSON{Archived: true, Capabilities: caps})
-			if err != nil {
-				return fmt.Errorf("failed to marshal JSON: %w", err)
-			}
-			fmt.Println(string(data))
-			return nil
-		}
-		data, err := internal.MarshalJSON(archiveResultJSON{Change: name, Capabilities: caps, ArchivedPath: archiveDest})
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
-		}
-		fmt.Println(string(data))
-		return nil
-	}
-
-	if asMinimal {
-		fmt.Println("archived")
-		return nil
-	}
-
-	fmt.Printf("Change %q archived — deltas applied, change marked as implemented.\n", name)
-	return nil
+	return Render(Response{
+		Full:        archiveResultJSON{Change: name, Capabilities: caps, ArchivedPath: archiveDest},
+		Minimal:     archiveMinimalJSON{Archived: true, Capabilities: caps},
+		Text:        textSB.String(),
+		MinimalText: "archived",
+	}, asJSON, asMinimal)
 }

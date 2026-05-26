@@ -10,6 +10,7 @@ import (
 	"github.com/bermudi/litespec/internal"
 )
 
+
 func cmdPatch(args []string) error {
 	if hasHelpFlag(args) {
 		printPatchHelp()
@@ -83,37 +84,24 @@ func cmdPatch(args []string) error {
 		return err
 	}
 
-	if asJSON {
-		status := internal.BuildChangeStatusJSON(ctx)
-		if asMinimal {
-			type patchMinimalJSON struct {
-				ChangeName string `json:"changeName"`
-				IsComplete  bool   `json:"isComplete"`
-			}
-			data, err := internal.MarshalJSON(patchMinimalJSON{ChangeName: status.ChangeName, IsComplete: status.IsComplete})
-			if err != nil {
-				return fmt.Errorf("failed to marshal JSON: %w", err)
-			}
-			fmt.Println(string(data))
-			return nil
-		}
-		data, err := internal.MarshalJSON(status)
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
-		}
-		fmt.Println(string(data))
-		return nil
+	status := internal.BuildChangeStatusJSON(ctx)
+
+	type patchMinimalJSON struct {
+		ChangeName string `json:"changeName"`
+		IsComplete  bool   `json:"isComplete"`
 	}
 
-	if asMinimal {
-		fmt.Println(changeDir)
-		return nil
-	}
+	var textSB strings.Builder
+	textSB.WriteString(fmt.Sprintf("Created: %s (patch mode)\n\n", changeDir))
+	textSB.WriteString("Artifacts:\n")
+	textSB.WriteString(fmt.Sprintf("  %-12s DONE       specs/%s/spec.md\n", "specs", capability))
+	textSB.WriteString("\nWrite your delta spec, implement, then archive.\n")
+	textSB.WriteString("Use 'litespec validate' to check your delta, 'litespec archive' to commit to canon.\n")
 
-	fmt.Printf("Created: %s (patch mode)\n\n", changeDir)
-	fmt.Println("Artifacts:")
-	fmt.Printf("  %-12s DONE       specs/%s/spec.md\n", "specs", capability)
-	fmt.Println("\nWrite your delta spec, implement, then archive.")
-	fmt.Println("Use 'litespec validate' to check your delta, 'litespec archive' to commit to canon.")
-	return nil
+	return Render(Response{
+		Full:        status,
+		Minimal:     patchMinimalJSON{ChangeName: status.ChangeName, IsComplete: status.IsComplete},
+		Text:        textSB.String(),
+		MinimalText: changeDir,
+	}, asJSON, asMinimal)
 }
