@@ -3,48 +3,28 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/bermudi/litespec/internal"
 )
 
 func cmdPreview(args []string) error {
-	if hasHelpFlag(args) {
-		printPreviewHelp()
-		return nil
-	}
-	if err := checkUnknownFlags(args, map[string]bool{"--json": true, "--minimal": true}); err != nil {
+	fs := newFlagSet("preview", printPreviewHelp)
+	var asJSON, asMinimal bool
+	fs.BoolVar(&asJSON, "json", false, "output as JSON")
+	fs.BoolVar(&asMinimal, "minimal", false, "minimal output")
+
+	ok, err := parseFlagSet(fs, args)
+	if !ok {
 		return err
 	}
 
-	if len(args) == 0 {
+	positional := fs.Args()
+	if len(positional) == 0 {
 		return fmt.Errorf("change name is required. Usage: litespec preview <change-name> [--json]")
 	}
-
-	useJSON := false
-	asMinimal := false
-	name := ""
-	for _, a := range args {
-		if a == jsonFlag {
-			useJSON = true
-			continue
-		}
-		if a == minimalFlag {
-			asMinimal = true
-			continue
-		}
-		if strings.HasPrefix(a, "--") {
-			continue
-		}
-		if name == "" {
-			name = a
-		} else {
-			return fmt.Errorf("unexpected argument %q. Usage: litespec preview <change-name> [--json]", a)
-		}
-	}
-
-	if name == "" {
-		return fmt.Errorf("change name is required. Usage: litespec preview <change-name> [--json]")
+	name := positional[0]
+	if len(positional) > 1 {
+		return fmt.Errorf("unexpected argument %q. Usage: litespec preview <change-name> [--json]", positional[1])
 	}
 
 	root, err := requireProjectRoot()
@@ -99,7 +79,7 @@ func cmdPreview(args []string) error {
 		Minimal:     min,
 		Text:        internal.FormatPreviewText(result),
 		MinimalText: minimalText,
-	}, useJSON, asMinimal)
+	}, asJSON, asMinimal)
 }
 
 func printPreviewHelp() {

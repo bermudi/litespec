@@ -8,27 +8,20 @@ import (
 )
 
 func cmdStatus(args []string) error {
-	if hasHelpFlag(args) {
-		printStatusHelp()
-		return nil
-	}
-	if err := checkUnknownFlags(args, map[string]bool{"--json": true, "--minimal": true}); err != nil {
+	fs := newFlagSet("status", printStatusHelp)
+	var asJSON, asMinimal bool
+	fs.BoolVar(&asJSON, "json", false, "output as JSON")
+	fs.BoolVar(&asMinimal, "minimal", false, "minimal output")
+
+	ok, err := parseFlagSet(fs, args)
+	if !ok {
 		return err
 	}
 
+	positional := fs.Args()
 	var name string
-	var asJSON, asMinimal bool
-	for _, arg := range args {
-		switch arg {
-		case jsonFlag:
-			asJSON = true
-		case minimalFlag:
-			asMinimal = true
-		default:
-			if !strings.HasPrefix(arg, "-") && name == "" {
-				name = arg
-			}
-		}
+	if len(positional) > 0 {
+		name = positional[0]
 	}
 
 	root, err := requireProjectRoot()

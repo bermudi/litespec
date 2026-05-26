@@ -10,21 +10,21 @@ import (
 )
 
 func cmdDecide(args []string) error {
-	if hasHelpFlag(args) {
-		printDecideHelp()
-		return nil
-	}
-	if err := checkUnknownFlags(args, map[string]bool{"--json": true, "--minimal": true}); err != nil {
+	fs := newFlagSet("decide", printDecideHelp)
+	var asJSON, asMinimal bool
+	fs.BoolVar(&asJSON, "json", false, "output as JSON")
+	fs.BoolVar(&asMinimal, "minimal", false, "minimal output")
+
+	ok, err := parseFlagSet(fs, args)
+	if !ok {
 		return err
 	}
 
-	asJSON, asMinimal := parseOutputFlags(args)
-
-	if len(args) == 0 {
+	positional := fs.Args()
+	if len(positional) == 0 {
 		return fmt.Errorf("usage: litespec decide <slug>")
 	}
-
-	slug := args[0]
+	slug := positional[0]
 	if err := validateDecisionSlug(slug); err != nil {
 		return err
 	}

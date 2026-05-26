@@ -1,7 +1,9 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -9,34 +11,71 @@ import (
 	"github.com/bermudi/litespec/internal"
 )
 
-func parseOutputFlags(args []string) (asJSON, asMinimal bool) {
-	for _, arg := range args {
-		switch arg {
-		case jsonFlag:
-			asJSON = true
-		case minimalFlag:
-			asMinimal = true
-		}
-	}
-	return
+func newFlagSet(name string, usage func()) *flag.FlagSet {
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	// Silence fs.Usage — Go's flag.Parse calls it for both --help and
+	// unknown flags. We only want help for --help, not on typos.
+	fs.Usage = func() {}
+	helpRegistry[fs] = usage
+	return fs
 }
 
-func hasHelpFlag(args []string) bool {
-	for _, arg := range args {
-		if arg == "--help" || arg == "-h" {
-			return true
+// helpRegistry pairs FlagSets with their help printers.
+var helpRegistry = map[*flag.FlagSet]func(){}
+
+// parseFlagSet wraps fs.Parse to handle help and unknown-flag errors.
+// Returns (false, nil) if help was shown (caller should return nil).
+// Returns (false, err) for parse errors (caller should return err).
+// Returns (true, nil) for successful parse (caller should proceed).
+func parseFlagSet(fs *flag.FlagSet, args []string) (bool, error) {
+	args = reorderForFlagSet(fs, args)
+	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			if helpFn, ok := helpRegistry[fs]; ok {
+				helpFn()
+			}
+			return false, nil
 		}
+		return false, err
 	}
-	return false
+	return true, nil
 }
 
-func checkUnknownFlags(args []string, validFlags map[string]bool) error {
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "--") && !validFlags[arg] {
-			return fmt.Errorf("unknown flag %s", arg)
+// reorderForFlagSet moves flags before positional args so flag.Parse
+// doesn't stop at the first positional arg. String flags consume
+// their value arg; bool flags don't.
+func reorderForFlagSet(fs *flag.FlagSet, args []string) []string {
+	var flags, positional []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if !strings.HasPrefix(arg, "-") {
+			positional = append(positional, arg)
+			continue
+		}
+		if arg == "--" {
+			positional = append(positional, args[i+1:]...)
+			break
+		}
+		flags = append(flags, arg)
+		name := strings.TrimLeft(arg, "-")
+		if eqIdx := strings.IndexByte(name, '='); eqIdx >= 0 {
+			continue
+		}
+		if f := fs.Lookup(name); f != nil {
+			if !isBoolFlag(f) && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				i++
+				flags = append(flags, args[i])
+			}
 		}
 	}
-	return nil
+	return append(flags, positional...)
+}
+
+func isBoolFlag(f *flag.Flag) bool {
+	type boolFlag interface{ IsBoolFlag() bool }
+	bf, ok := f.Value.(boolFlag)
+	return ok && bf.IsBoolFlag()
 }
 
 func printInitHelp() {
@@ -266,15 +305,6 @@ func splitCSV(s string) []string {
 		parts[i] = strings.TrimSpace(parts[i])
 	}
 	return parts
-}
-
-func contains(slice []string, val string) bool {
-	for _, s := range slice {
-		if s == val {
-			return true
-		}
-	}
-	return false
 }
 
 func sortChanges(changes []internal.ChangeInfo, sortBy string, root string) {

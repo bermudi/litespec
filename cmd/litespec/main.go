@@ -10,9 +10,6 @@ import (
 	"time"
 )
 
-const jsonFlag = "--json"
-const minimalFlag = "--minimal"
-
 var version = "dev"
 
 func init() {

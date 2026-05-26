@@ -7,28 +7,21 @@ import (
 )
 
 func cmdInstructions(args []string) error {
-	if hasHelpFlag(args) {
-		printInstructionsHelp()
-		return nil
-	}
-	if err := checkUnknownFlags(args, map[string]bool{"--json": true, "--minimal": true}); err != nil {
+	fs := newFlagSet("instructions", printInstructionsHelp)
+	var asJSON, asMinimal bool
+	fs.BoolVar(&asJSON, "json", false, "output as JSON")
+	fs.BoolVar(&asMinimal, "minimal", false, "minimal output")
+
+	ok, err := parseFlagSet(fs, args)
+	if !ok {
 		return err
 	}
 
-	if len(args) == 0 {
+	positional := fs.Args()
+	if len(positional) == 0 {
 		return fmt.Errorf("usage: litespec instructions <artifact> [--json]")
 	}
-
-	artifactID := args[0]
-	var asJSON, asMinimal bool
-	for _, arg := range args[1:] {
-		switch arg {
-		case jsonFlag:
-			asJSON = true
-		case minimalFlag:
-			asMinimal = true
-		}
-	}
+	artifactID := positional[0]
 
 	artifactInfo := internal.GetArtifact(artifactID)
 	if artifactInfo == nil {

@@ -8,22 +8,16 @@ import (
 )
 
 func cmdInit(args []string) error {
-	if hasHelpFlag(args) {
-		printInitHelp()
-		return nil
-	}
-	if err := checkUnknownFlags(args, map[string]bool{"--tools": true, "--json": true, "--minimal": true}); err != nil {
-		return err
-	}
-
-	asJSON, asMinimal := parseOutputFlags(args)
-
+	fs := newFlagSet("init", printInitHelp)
+	var asJSON, asMinimal bool
 	var tools string
-	for i := 0; i < len(args); i++ {
-		if args[i] == "--tools" && i+1 < len(args) {
-			tools = args[i+1]
-			i++
-		}
+	fs.BoolVar(&asJSON, "json", false, "output as JSON")
+	fs.BoolVar(&asMinimal, "minimal", false, "minimal output")
+	fs.StringVar(&tools, "tools", "", "comma-separated tool IDs (e.g., claude)")
+
+	ok, err := parseFlagSet(fs, args)
+	if !ok {
+		return err
 	}
 
 	root, err := internal.FindProjectRoot()

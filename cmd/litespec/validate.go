@@ -2,51 +2,34 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/bermudi/litespec/internal"
 )
 
 func cmdValidate(args []string) error {
-	if hasHelpFlag(args) {
-		printValidateHelp()
-		return nil
-	}
-	if err := checkUnknownFlags(args, map[string]bool{"--all": true, "--changes": true, "--specs": true, "--decisions": true, "--strict": true, "--json": true, "--minimal": true, "--type": true}); err != nil {
+	fs := newFlagSet("validate", printValidateHelp)
+	var flagAll, flagChanges, flagSpecs, flagDecisions, strict, asJSON, asMinimal bool
+	var typeFilter string
+	fs.BoolVar(&flagAll, "all", false, "validate all changes, specs, and decisions")
+	fs.BoolVar(&flagChanges, "changes", false, "validate all changes only")
+	fs.BoolVar(&flagSpecs, "specs", false, "validate all specs only")
+	fs.BoolVar(&flagDecisions, "decisions", false, "validate all decisions only")
+	fs.BoolVar(&strict, "strict", false, "treat warnings as errors")
+	fs.StringVar(&typeFilter, "type", "", "disambiguate name: change|spec|decision")
+	fs.BoolVar(&asJSON, "json", false, "output as JSON")
+	fs.BoolVar(&asMinimal, "minimal", false, "minimal output")
+
+	ok, err := parseFlagSet(fs, args)
+	if !ok {
 		return err
 	}
 
+	fsArgs := fs.Args()
 	var positional string
-	var flagAll, flagChanges, flagSpecs, flagDecisions, strict, asJSON, asMinimal bool
-	var typeFilter string
-
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--all":
-			flagAll = true
-		case "--changes":
-			flagChanges = true
-		case "--specs":
-			flagSpecs = true
-		case "--decisions":
-			flagDecisions = true
-		case "--strict":
-			strict = true
-		case jsonFlag:
-			asJSON = true
-		case minimalFlag:
-			asMinimal = true
-		case "--type":
-			if i+1 >= len(args) {
-				return fmt.Errorf("--type requires a value (change or spec)")
-			}
-			typeFilter = args[i+1]
-			i++
-		default:
-			if !strings.HasPrefix(args[i], "-") && positional == "" {
-				positional = args[i]
-			}
-		}
+	if len(fsArgs) > 0 {
+		positional = fsArgs[0]
 	}
 
 	hasBulk := flagAll || flagChanges || flagSpecs || flagDecisions
@@ -85,8 +68,8 @@ func cmdValidate(args []string) error {
 		for i, s := range specList {
 			specNames[i] = s.Name
 		}
-		isChange := contains(changeNames, positional)
-		isSpec := contains(specNames, positional)
+		isChange := slices.Contains(changeNames, positional)
+		isSpec := slices.Contains(specNames, positional)
 		isDecision := false
 		decisionMatch, _ := internal.FindDecisionBySlug(root, positional)
 		if decisionMatch != nil {

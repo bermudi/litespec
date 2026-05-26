@@ -19,49 +19,25 @@ type listData struct {
 }
 
 func cmdList(args []string) error {
-	if hasHelpFlag(args) {
-		printListHelp()
-		return nil
-	}
-	if err := checkUnknownFlags(args, map[string]bool{"--specs": true, "--changes": true, "--decisions": true, "--backlog": true, "--sort": true, "--json": true, "--status": true, "--minimal": true}); err != nil {
+	fs := newFlagSet("list", printListHelp)
+	var specsOnly, decisionsOnly, backlogOnly, changesOnly, asJSON, asMinimal bool
+	var sortBy, statusFilter string
+	fs.BoolVar(&specsOnly, "specs", false, "list specs instead of changes")
+	fs.BoolVar(&changesOnly, "changes", false, "list changes (default)")
+	fs.BoolVar(&decisionsOnly, "decisions", false, "list architectural decision records")
+	fs.BoolVar(&backlogOnly, "backlog", false, "list backlog items by section")
+	fs.StringVar(&sortBy, "sort", "recent", "sort by 'recent' (default), 'name', 'deps', or 'number'")
+	fs.StringVar(&statusFilter, "status", "", "filter decisions by status (requires --decisions)")
+	fs.BoolVar(&asJSON, "json", false, "output as JSON")
+	fs.BoolVar(&asMinimal, "minimal", false, "minimal output")
+
+	ok, err := parseFlagSet(fs, args)
+	if !ok {
 		return err
 	}
 
-	var specsOnly, decisionsOnly, backlogOnly, asJSON, asMinimal bool
-	var sortBy, statusFilter string
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--specs":
-			specsOnly = true
-		case "--changes":
-		case "--decisions":
-			decisionsOnly = true
-		case "--backlog":
-			backlogOnly = true
-		case jsonFlag:
-			asJSON = true
-		case minimalFlag:
-			asMinimal = true
-		case "--sort":
-			if i+1 >= len(args) {
-				return fmt.Errorf("--sort requires a value (recent, name, or deps)")
-			}
-			sortBy = args[i+1]
-			i++
-		case "--status":
-			if i+1 >= len(args) {
-				return fmt.Errorf("--status requires a value (proposed, accepted, or superseded)")
-			}
-			statusFilter = args[i+1]
-			i++
-		}
-	}
-
-	if sortBy == "" {
-		sortBy = "recent"
-	}
 	if decisionsOnly {
-		if sortBy == "" || sortBy == "recent" {
+		if sortBy == "recent" {
 			sortBy = "number"
 		}
 	}
@@ -81,13 +57,11 @@ func cmdList(args []string) error {
 	if backlogOnly && (specsOnly || decisionsOnly) {
 		return fmt.Errorf("--backlog is mutually exclusive with --specs and --decisions")
 	}
-	for _, arg := range args {
-		if arg == "--changes" && decisionsOnly {
-			return fmt.Errorf("--decisions and --changes are mutually exclusive")
-		}
-		if arg == "--changes" && backlogOnly {
-			return fmt.Errorf("--backlog and --changes are mutually exclusive")
-		}
+	if changesOnly && decisionsOnly {
+		return fmt.Errorf("--decisions and --changes are mutually exclusive")
+	}
+	if changesOnly && backlogOnly {
+		return fmt.Errorf("--backlog and --changes are mutually exclusive")
 	}
 
 	root, err := requireProjectRoot()

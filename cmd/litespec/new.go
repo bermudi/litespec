@@ -9,39 +9,24 @@ import (
 
 
 func cmdNew(args []string) error {
-	if hasHelpFlag(args) {
-		printNewHelp()
-		return nil
-	}
-	if err := checkUnknownFlags(args, map[string]bool{"--json": true, "--minimal": true}); err != nil {
+	fs := newFlagSet("new", printNewHelp)
+	var asJSON, asMinimal bool
+	fs.BoolVar(&asJSON, "json", false, "output as JSON")
+	fs.BoolVar(&asMinimal, "minimal", false, "minimal output")
+
+	ok, err := parseFlagSet(fs, args)
+	if !ok {
 		return err
 	}
 
-	var name string
-	var asJSON, asMinimal bool
-	var positional int
-	for _, arg := range args {
-		switch arg {
-		case jsonFlag:
-			asJSON = true
-		case minimalFlag:
-			asMinimal = true
-		default:
-			if !strings.HasPrefix(arg, "-") {
-				positional++
-				if positional == 1 {
-					name = arg
-				}
-			}
-		}
-	}
-	if positional > 1 {
-		return fmt.Errorf("unexpected arguments. Usage: litespec new <name>")
-	}
-
-	if name == "" {
+	positional := fs.Args()
+	if len(positional) == 0 {
 		return fmt.Errorf("usage: litespec new <change-name>")
 	}
+	if len(positional) > 1 {
+		return fmt.Errorf("unexpected arguments. Usage: litespec new <name>")
+	}
+	name := positional[0]
 
 	if err := validateChangeName(name); err != nil {
 		return err

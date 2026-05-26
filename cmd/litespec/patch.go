@@ -12,33 +12,20 @@ import (
 
 
 func cmdPatch(args []string) error {
-	if hasHelpFlag(args) {
-		printPatchHelp()
-		return nil
-	}
-	if err := checkUnknownFlags(args, map[string]bool{"--json": true, "--minimal": true}); err != nil {
+	fs := newFlagSet("patch", printPatchHelp)
+	var asJSON, asMinimal bool
+	fs.BoolVar(&asJSON, "json", false, "output as JSON")
+	fs.BoolVar(&asMinimal, "minimal", false, "minimal output")
+
+	ok, err := parseFlagSet(fs, args)
+	if !ok {
 		return err
 	}
 
-	var asJSON, asMinimal bool
-	var positional []string
-	for _, arg := range args {
-		switch arg {
-		case jsonFlag:
-			asJSON = true
-		case minimalFlag:
-			asMinimal = true
-		default:
-			if !strings.HasPrefix(arg, "-") {
-				positional = append(positional, arg)
-			}
-		}
-	}
-
+	positional := fs.Args()
 	if len(positional) != 2 {
 		return fmt.Errorf("usage: litespec patch <name> <capability>")
 	}
-
 	name := positional[0]
 	capability := positional[1]
 

@@ -11,34 +11,23 @@ import (
 
 
 func cmdArchive(args []string) error {
-	if hasHelpFlag(args) {
-		printArchiveHelp()
-		return nil
-	}
-	if err := checkUnknownFlags(args, map[string]bool{"--allow-incomplete": true, "--json": true, "--minimal": true}); err != nil {
+	fs := newFlagSet("archive", printArchiveHelp)
+	var asJSON, asMinimal, allowIncomplete bool
+	fs.BoolVar(&asJSON, "json", false, "output as JSON")
+	fs.BoolVar(&asMinimal, "minimal", false, "minimal output")
+	fs.BoolVar(&allowIncomplete, "allow-incomplete", false, "archive even with incomplete tasks")
+
+	ok, err := parseFlagSet(fs, args)
+	if !ok {
 		return err
 	}
 
-	asJSON, asMinimal := parseOutputFlags(args)
-
-	if len(args) == 0 {
+	positional := fs.Args()
+	if len(positional) == 0 {
 		return fmt.Errorf("usage: litespec archive <change-name> [--allow-incomplete]")
 	}
-
-	allowIncomplete := false
-	filtered := args[:0]
-	for _, a := range args {
-		if a == "--allow-incomplete" {
-			allowIncomplete = true
-			continue
-		}
-		if a == jsonFlag || a == minimalFlag {
-			continue
-		}
-		filtered = append(filtered, a)
-	}
-	name := filtered[0]
-	if len(filtered) > 1 {
+	name := positional[0]
+	if len(positional) > 1 {
 		return fmt.Errorf("unexpected arguments. Usage: litespec archive <name> [--allow-incomplete]")
 	}
 

@@ -9,32 +9,18 @@ import (
 )
 
 func cmdImport(args []string) error {
-	if hasHelpFlag(args) {
-		printImportHelp()
-		return nil
-	}
-	if err := checkUnknownFlags(args, map[string]bool{"--dry-run": true, "--source": true, "--force": true, "--json": true, "--minimal": true}); err != nil {
-		return err
-	}
-
-	var dryRun bool
+	fs := newFlagSet("import", printImportHelp)
+	var asJSON, asMinimal, dryRun, force bool
 	var source string
-	var force bool
-	asJSON, asMinimal := parseOutputFlags(args)
+	fs.BoolVar(&asJSON, "json", false, "output as JSON")
+	fs.BoolVar(&asMinimal, "minimal", false, "minimal output")
+	fs.BoolVar(&dryRun, "dry-run", false, "preview import without making changes")
+	fs.StringVar(&source, "source", "", "source OpenSpec project directory (default: current directory)")
+	fs.BoolVar(&force, "force", false, "overwrite existing files in target")
 
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--dry-run":
-			dryRun = true
-		case "--source":
-			if i+1 >= len(args) {
-				return fmt.Errorf("--source requires a directory path")
-			}
-			source = args[i+1]
-			i++
-		case "--force":
-			force = true
-		}
+	ok, err := parseFlagSet(fs, args)
+	if !ok {
+		return err
 	}
 
 	if source == "" {

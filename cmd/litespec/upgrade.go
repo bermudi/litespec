@@ -15,15 +15,15 @@ import (
 )
 
 func cmdUpgrade(args []string) error {
-	if hasHelpFlag(args) {
-		printUpgradeHelp()
-		return nil
-	}
-	if err := checkUnknownFlags(args, map[string]bool{"--json": true, "--minimal": true}); err != nil {
+	fs := newFlagSet("upgrade", printUpgradeHelp)
+	var asJSON, asMinimal bool
+	fs.BoolVar(&asJSON, "json", false, "output as JSON")
+	fs.BoolVar(&asMinimal, "minimal", false, "minimal output")
+
+	ok, err := parseFlagSet(fs, args)
+	if !ok {
 		return err
 	}
-
-	asJSON, asMinimal := parseOutputFlags(args)
 
 	if !isGoInstall() {
 		return fmt.Errorf("auto-upgrade only supports installations via 'go install'")

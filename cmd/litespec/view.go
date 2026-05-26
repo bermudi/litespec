@@ -11,23 +11,16 @@ import (
 )
 
 func cmdView(args []string) error {
-	if hasHelpFlag(args) {
-		printViewHelp()
-		return nil
-	}
-	if err := checkUnknownFlags(args, map[string]bool{"--json": true, "--minimal": true}); err != nil {
+	fs := newFlagSet("view", printViewHelp)
+	var asJSON, asMinimal bool
+	fs.BoolVar(&asJSON, "json", false, "output as JSON")
+	fs.BoolVar(&asMinimal, "minimal", false, "minimal output")
+
+	ok, err := parseFlagSet(fs, args)
+	if !ok {
 		return err
 	}
 
-	var asJSON, asMinimal bool
-	for _, a := range args {
-		if a == jsonFlag {
-			asJSON = true
-		}
-		if a == minimalFlag {
-			asMinimal = true
-		}
-	}
 
 	root, err := requireProjectRoot()
 	if err != nil {

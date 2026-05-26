@@ -336,7 +336,7 @@ func TestCompleteJsonFlags(t *testing.T) {
 	}
 }
 
-func TestCommandSpecsMatchCheckUnknownFlags(t *testing.T) {
+func TestCommandSpecsMatchFlagSet(t *testing.T) {
 	_, thisFile, _, _ := runtime.Caller(0)
 	cmdDir := filepath.Join(filepath.Dir(thisFile), "..", "cmd", "litespec")
 	entries, err := os.ReadDir(cmdDir)
@@ -344,7 +344,7 @@ func TestCommandSpecsMatchCheckUnknownFlags(t *testing.T) {
 		t.Fatalf("cannot read cmd directory: %v", err)
 	}
 
-	flagRE := regexp.MustCompile(`"--([a-z][a-z-]*)"`)
+	flagNameRE := regexp.MustCompile(`fs\.(?:Bool|String)Var\([^,]+,\s*"([a-z][a-z-]*)"`)
 	handlerFlags := make(map[string]map[string]bool)
 
 	for _, e := range entries {
@@ -352,7 +352,6 @@ func TestCommandSpecsMatchCheckUnknownFlags(t *testing.T) {
 			continue
 		}
 		stem := strings.TrimSuffix(e.Name(), ".go")
-		cmdName := stem
 		if strings.HasSuffix(stem, "_test") {
 			continue
 		}
@@ -363,24 +362,16 @@ func TestCommandSpecsMatchCheckUnknownFlags(t *testing.T) {
 		}
 
 		content := string(data)
-		if !strings.Contains(content, "checkUnknownFlags") {
+		if !strings.Contains(content, "newFlagSet") {
 			continue
 		}
 
-		for _, line := range strings.Split(content, "\n") {
-			if !strings.Contains(line, "checkUnknownFlags") {
-				continue
-			}
-			if strings.Contains(line, "func checkUnknownFlags") {
-				continue
-			}
-			flags := make(map[string]bool)
-			for _, m := range flagRE.FindAllStringSubmatch(line, -1) {
-				flags["--"+m[1]] = true
-			}
-			if len(flags) > 0 {
-				handlerFlags[cmdName] = flags
-			}
+		flags := make(map[string]bool)
+		for _, m := range flagNameRE.FindAllStringSubmatch(content, -1) {
+			flags["--"+m[1]] = true
+		}
+		if len(flags) > 0 {
+			handlerFlags[stem] = flags
 		}
 	}
 
@@ -400,12 +391,12 @@ func TestCommandSpecsMatchCheckUnknownFlags(t *testing.T) {
 
 		for name := range expected {
 			if !handler[name] {
-				t.Errorf("command %q: flag %q in CommandSpecs but missing from checkUnknownFlags", spec.Name, name)
+				t.Errorf("command %q: flag %q in CommandSpecs but missing from FlagSet", spec.Name, name)
 			}
 		}
 		for name := range handler {
 			if !expected[name] {
-				t.Errorf("command %q: flag %q in checkUnknownFlags but missing from CommandSpecs", spec.Name, name)
+				t.Errorf("command %q: flag %q in FlagSet but missing from CommandSpecs", spec.Name, name)
 			}
 		}
 	}
