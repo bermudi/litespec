@@ -29,13 +29,9 @@ func cmdDecide(args []string) error {
 		return err
 	}
 
-	root, err := internal.FindProjectRoot()
+	root, err := requireProjectRoot()
 	if err != nil {
 		return err
-	}
-
-	if _, err := os.Stat(filepath.Join(root, internal.ProjectDirName)); err != nil {
-		return fmt.Errorf("not a litespec project. Run 'litespec init' first")
 	}
 
 	decisions, err := internal.ListDecisions(root)

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/bermudi/litespec/internal"
@@ -48,13 +47,9 @@ func cmdPreview(args []string) error {
 		return fmt.Errorf("change name is required. Usage: litespec preview <change-name> [--json]")
 	}
 
-	root, err := internal.FindProjectRoot()
+	root, err := requireProjectRoot()
 	if err != nil {
 		return err
-	}
-
-	if _, err := os.Stat(filepath.Join(root, internal.ProjectDirName)); err != nil {
-		return fmt.Errorf("not a litespec project. Run 'litespec init' first")
 	}
 
 	changeDir := internal.ChangePath(root, name)

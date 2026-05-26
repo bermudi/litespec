@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/bermudi/litespec/internal"
@@ -48,13 +46,9 @@ func cmdNew(args []string) error {
 		return err
 	}
 
-	root, err := internal.FindProjectRoot()
+	root, err := requireProjectRoot()
 	if err != nil {
 		return err
-	}
-
-	if _, err := os.Stat(filepath.Join(root, internal.ProjectDirName)); err != nil {
-		return fmt.Errorf("not a litespec project. Run 'litespec init' first")
 	}
 
 	if err := internal.CreateChange(root, name); err != nil {

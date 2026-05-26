@@ -41,13 +41,9 @@ func cmdArchive(args []string) error {
 		return fmt.Errorf("unexpected arguments. Usage: litespec archive <name> [--allow-incomplete]")
 	}
 
-	root, err := internal.FindProjectRoot()
+	root, err := requireProjectRoot()
 	if err != nil {
 		return err
-	}
-
-	if _, err := os.Stat(filepath.Join(root, internal.ProjectDirName)); err != nil {
-		return fmt.Errorf("not a litespec project. Run 'litespec init' first")
 	}
 
 	result, err := internal.ValidateChange(root, name)

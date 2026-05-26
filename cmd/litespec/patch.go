@@ -49,13 +49,9 @@ func cmdPatch(args []string) error {
 		return fmt.Errorf("invalid capability name: %w", err)
 	}
 
-	root, err := internal.FindProjectRoot()
+	root, err := requireProjectRoot()
 	if err != nil {
 		return err
-	}
-
-	if _, err := os.Stat(filepath.Join(root, internal.ProjectDirName)); err != nil {
-		return fmt.Errorf("not a litespec project. Run 'litespec init' first")
 	}
 
 	changeDir := internal.ChangePath(root, name)
