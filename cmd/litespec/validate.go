@@ -198,74 +198,62 @@ func cmdValidate(args []string) error {
 		return err
 	}
 
-	if asJSON {
-		out := internal.BuildValidationResultJSON(result)
-		if asMinimal {
-			type validateMinimalJSON struct {
-				Valid  bool     `json:"valid"`
-				Errors []string `json:"errors,omitempty"`
-			}
-			min := validateMinimalJSON{Valid: out.Valid}
-			for _, e := range out.Errors {
-				min.Errors = append(min.Errors, e.Message)
-			}
-			data, err := internal.MarshalJSON(min)
-			if err != nil {
-				return fmt.Errorf("failed to marshal JSON: %w", err)
-			}
-			fmt.Println(string(data))
-		} else {
-			data, err := internal.MarshalJSON(out)
-			if err != nil {
-				return fmt.Errorf("failed to marshal JSON: %w", err)
-			}
-			fmt.Println(string(data))
-		}
-		if !result.Valid || (strict && len(result.Warnings) > 0) {
-			return fmt.Errorf("validation failed")
-		}
-		return nil
+	out := internal.BuildValidationResultJSON(result)
+
+	// Build minimal JSON representation
+	type validateMinimalJSON struct {
+		Valid  bool     `json:"valid"`
+		Errors []string `json:"errors,omitempty"`
+	}
+	minJSON := validateMinimalJSON{Valid: out.Valid}
+	for _, e := range out.Errors {
+		minJSON.Errors = append(minJSON.Errors, e.Message)
 	}
 
-	if asMinimal {
-		if !result.Valid {
-			fmt.Printf("invalid\t%d errors\n", len(result.Errors))
-			for _, issue := range result.Errors {
-				fmt.Printf("error\t%s\t%s\n", issue.File, issue.Message)
-			}
-			return fmt.Errorf("validation failed")
+	// Build minimal text representation
+	var minimalText string
+	if !result.Valid {
+		minimalText = fmt.Sprintf("invalid\t%d errors\n", len(result.Errors))
+		for _, issue := range result.Errors {
+			minimalText += fmt.Sprintf("error\t%s\t%s\n", issue.File, issue.Message)
 		}
-		if strict && len(result.Warnings) > 0 {
-			fmt.Printf("invalid\t%d warnings (strict)\n", len(result.Warnings))
-			return fmt.Errorf("validation failed")
-		}
-		fmt.Printf("ok\t%d %s, %d %s, %d %s, %d %s\n",
+	} else if strict && len(result.Warnings) > 0 {
+		minimalText = fmt.Sprintf("invalid\t%d warnings (strict)\n", len(result.Warnings))
+	} else {
+		minimalText = fmt.Sprintf("ok\t%d %s, %d %s, %d %s, %d %s\n",
 			result.ChangesCount, pluralize("change", result.ChangesCount),
 			result.CapabilitiesCount, pluralize("capability", result.CapabilitiesCount),
 			result.RequirementsCount, pluralize("requirement", result.RequirementsCount),
 			result.ScenariosCount, pluralize("scenario", result.ScenariosCount))
-		return nil
 	}
 
+	// Build text representation
+	var text string
 	for _, issue := range result.Errors {
-		fmt.Printf("ERROR  %s: %s\n", issue.File, issue.Message)
+		text += fmt.Sprintf("ERROR  %s: %s\n", issue.File, issue.Message)
 	}
 	for _, issue := range result.Warnings {
-		fmt.Printf("WARN   %s: %s\n", issue.File, issue.Message)
+		text += fmt.Sprintf("WARN   %s: %s\n", issue.File, issue.Message)
+	}
+	if result.Valid {
+		text += fmt.Sprintf("ok: %d %s, %d %s, %d %s, %d %s\n",
+			result.ChangesCount, pluralize("change", result.ChangesCount),
+			result.CapabilitiesCount, pluralize("capability", result.CapabilitiesCount),
+			result.RequirementsCount, pluralize("requirement", result.RequirementsCount),
+			result.ScenariosCount, pluralize("scenario", result.ScenariosCount))
 	}
 
-	if strict && len(result.Warnings) > 0 {
+	if err := Render(Response{
+		Full:        out,
+		Minimal:     minJSON,
+		Text:        text,
+		MinimalText: minimalText,
+	}, asJSON, asMinimal); err != nil {
+		return err
+	}
+
+	if !result.Valid || (strict && len(result.Warnings) > 0) {
 		return fmt.Errorf("validation failed")
 	}
-
-	if !result.Valid {
-		return fmt.Errorf("validation failed")
-	}
-
-	fmt.Printf("ok: %d %s, %d %s, %d %s, %d %s\n",
-		result.ChangesCount, pluralize("change", result.ChangesCount),
-		result.CapabilitiesCount, pluralize("capability", result.CapabilitiesCount),
-		result.RequirementsCount, pluralize("requirement", result.RequirementsCount),
-		result.ScenariosCount, pluralize("scenario", result.ScenariosCount))
 	return nil
 }

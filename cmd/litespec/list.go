@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/bermudi/litespec/internal"
@@ -99,14 +100,7 @@ func cmdList(args []string) error {
 		return err
 	}
 
-	switch {
-	case asJSON:
-		return renderListJSON(data, asMinimal)
-	case asMinimal:
-		return renderListMinimalText(data)
-	default:
-		return renderListText(data)
-	}
+	return renderList(data, asJSON, asMinimal)
 }
 
 func fetchListData(root string, specsOnly, decisionsOnly, backlogOnly bool, sortBy, statusFilter string) (*listData, error) {
@@ -155,11 +149,16 @@ func fetchListData(root string, specsOnly, decisionsOnly, backlogOnly bool, sort
 	return d, nil
 }
 
-func renderListJSON(d *listData, asMinimal bool) error {
-	if asMinimal {
-		return renderListMinimalJSON(d)
-	}
+func renderList(d *listData, asJSON, asMinimal bool) error {
+	return Render(Response{
+		Full:        buildListFullJSON(d),
+		Minimal:     buildListMinimalJSON(d),
+		Text:        buildListText(d),
+		MinimalText: buildListMinimalText(d),
+	}, asJSON, asMinimal)
+}
 
+func buildListFullJSON(d *listData) any {
 	type listOutput struct {
 		Changes   []internal.ChangeListItemJSON   `json:"changes,omitempty"`
 		Specs     []internal.SpecListItemJSON     `json:"specs,omitempty"`
@@ -216,32 +215,23 @@ func renderListJSON(d *listData, asMinimal bool) error {
 			out.Changes = append(out.Changes, item)
 		}
 	}
-
-	data, err := internal.MarshalJSON(out)
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
-	}
-	fmt.Println(string(data))
-	return nil
+	return out
 }
 
-func renderListMinimalJSON(d *listData) error {
+func buildListMinimalJSON(d *listData) any {
 	switch d.kind {
 	case "specs":
 		type minimalSpecs struct {
-			Specs []struct {
-				Name             string `json:"name"`
-				RequirementCount int    `json:"requirementCount"`
-			} `json:"specs"`
+			Specs []internal.SpecListItemJSON `json:"specs"`
 		}
 		min := minimalSpecs{}
 		for _, s := range d.specs {
-			min.Specs = append(min.Specs, struct {
-				Name             string `json:"name"`
-				RequirementCount int    `json:"requirementCount"`
-			}{Name: s.Name, RequirementCount: s.RequirementCount})
+			min.Specs = append(min.Specs, internal.SpecListItemJSON{
+				Name:             s.Name,
+				RequirementCount: s.RequirementCount,
+			})
 		}
-		return printJSON(min)
+		return min
 
 	case "decisions":
 		type minimalDecisions struct {
@@ -257,23 +247,20 @@ func renderListMinimalJSON(d *listData) error {
 				Slug   string `json:"slug"`
 			}{Number: dec.Number, Slug: dec.Slug})
 		}
-		return printJSON(min)
+		return min
 
 	case "backlog":
 		type minimalBacklog struct {
-			Backlog []struct {
-				Section string `json:"section"`
-				Title   string `json:"title"`
-			} `json:"backlog"`
+			Backlog []internal.BacklogItemJSON `json:"backlog"`
 		}
 		min := minimalBacklog{}
 		for _, item := range d.backlog {
-			min.Backlog = append(min.Backlog, struct {
-				Section string `json:"section"`
-				Title   string `json:"title"`
-			}{Section: item.Section, Title: item.Title})
+			min.Backlog = append(min.Backlog, internal.BacklogItemJSON{
+				Section: item.Section,
+				Title:   item.Title,
+			})
 		}
-		return printJSON(min)
+		return min
 
 	default: // "changes"
 		type minimalChanges struct {
@@ -289,66 +276,68 @@ func renderListMinimalJSON(d *listData) error {
 				Status string `json:"status"`
 			}{Name: c.Name, Status: internal.ChangeListStatus(c.CompletedTasks, c.TotalTasks)})
 		}
-		return printJSON(min)
+		return min
 	}
 }
 
-func renderListMinimalText(d *listData) error {
+func buildListMinimalText(d *listData) string {
+	var b strings.Builder
 	switch d.kind {
 	case "specs":
 		for _, s := range d.specs {
-			fmt.Printf("%s\t%d\n", s.Name, s.RequirementCount)
+			b.WriteString(fmt.Sprintf("%s\t%d\n", s.Name, s.RequirementCount))
 		}
 	case "decisions":
 		for _, dec := range d.decisions {
-			fmt.Printf("%04d\t%s\n", dec.Number, dec.Slug)
+			b.WriteString(fmt.Sprintf("%04d\t%s\n", dec.Number, dec.Slug))
 		}
 	case "backlog":
 		for _, item := range d.backlog {
-			fmt.Printf("%s\t%s\n", item.Section, item.Title)
+			b.WriteString(fmt.Sprintf("%s\t%s\n", item.Section, item.Title))
 		}
 	case "changes":
 		for _, c := range d.changes {
-			fmt.Printf("%s\t%s\n", c.Name, internal.ChangeListStatus(c.CompletedTasks, c.TotalTasks))
+			b.WriteString(fmt.Sprintf("%s\t%s\n", c.Name, internal.ChangeListStatus(c.CompletedTasks, c.TotalTasks)))
 		}
 	}
-	return nil
+	return b.String()
 }
 
-func renderListText(d *listData) error {
+func buildListText(d *listData) string {
+	var b strings.Builder
 	switch d.kind {
 	case "specs":
-		fmt.Println("Specs:")
+		b.WriteString("Specs:\n")
 		if len(d.specs) == 0 {
-			fmt.Println("  (none)")
+			b.WriteString("  (none)\n")
 		} else {
-			fmt.Println()
+			b.WriteString("\n")
 			maxName := maxNameWidthSpecs(d.specs)
 			nameHeaderWidth := max(maxName, 4)
-			fmt.Printf("  %-*s  %s\n", nameHeaderWidth, "Name", "Requirements")
+			b.WriteString(fmt.Sprintf("  %-*s  %s\n", nameHeaderWidth, "Name", "Requirements"))
 			for _, s := range d.specs {
-				fmt.Printf("  %-*s  %d\n", nameHeaderWidth, s.Name, s.RequirementCount)
+				b.WriteString(fmt.Sprintf("  %-*s  %d\n", nameHeaderWidth, s.Name, s.RequirementCount))
 			}
 		}
 
 	case "decisions":
-		fmt.Println("Decisions:")
+		b.WriteString("Decisions:\n")
 		if len(d.decisions) == 0 {
-			fmt.Println("  (none)")
-			return nil
+			b.WriteString("  (none)\n")
+			break
 		}
-		fmt.Println()
+		b.WriteString("\n")
 		for _, dec := range d.decisions {
-			fmt.Printf("  %04d  %-30s  %-10s  %s\n", dec.Number, dec.Slug, dec.Status, dec.Title)
+			b.WriteString(fmt.Sprintf("  %04d  %-30s  %-10s  %s\n", dec.Number, dec.Slug, dec.Status, dec.Title))
 		}
 
 	case "backlog":
-		fmt.Println("Backlog:")
+		b.WriteString("Backlog:\n")
 		if len(d.backlog) == 0 {
-			fmt.Println("  (none)")
-			return nil
+			b.WriteString("  (none)\n")
+			break
 		}
-		fmt.Println()
+		b.WriteString("\n")
 		var currentSection string
 		sectionLabels := map[string]string{
 			"deferred":       "Deferred",
@@ -363,15 +352,15 @@ func renderListText(d *listData) error {
 				if label == "" {
 					label = item.Section
 				}
-				fmt.Printf("  %s:\n", label)
+				b.WriteString(fmt.Sprintf("  %s:\n", label))
 			}
-			fmt.Printf("    ▪ %s\n", item.Title)
+			b.WriteString(fmt.Sprintf("    ▪ %s\n", item.Title))
 		}
 
 	case "changes":
-		fmt.Println("Changes:")
+		b.WriteString("Changes:\n")
 		if len(d.changes) == 0 {
-			fmt.Println("  (none)")
+			b.WriteString("  (none)\n")
 		}
 		maxName := maxNameWidthChanges(d.changes)
 		for _, c := range d.changes {
@@ -384,19 +373,10 @@ func renderListText(d *listData) error {
 			if !c.LastModified.IsZero() {
 				relTime = internal.FormatRelativeTime(c.LastModified)
 			}
-			fmt.Printf("  %-*s  %-16s %-12s %s\n", maxName, c.Name, status, born, relTime)
+			b.WriteString(fmt.Sprintf("  %-*s  %-16s %-12s %s\n", maxName, c.Name, status, born, relTime))
 		}
 	}
-	return nil
-}
-
-func printJSON(v any) error {
-	data, err := internal.MarshalJSON(v)
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
-	}
-	fmt.Println(string(data))
-	return nil
+	return b.String()
 }
 
 func filterDecisionsByStatus(decisions []*internal.Decision, statusFilter string) []*internal.Decision {
