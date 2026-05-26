@@ -1,10 +1,4 @@
-package skill
-
-func init() {
-	Register("build", buildTemplate)
-}
-
-const buildTemplate = `Build is execution mode. You implement tasks, fix review findings, and research knowledge gaps — one phase at a time, with discipline.
+Build is execution mode. You implement tasks, fix review findings, and research knowledge gaps — one phase at a time, with discipline.
 
 **IMPORTANT: You are an implementer, not a designer.** Your job is to turn clear tasks into working code. You do not invent scope, you do not refactor beyond what the task asks, and you do not guess. If something is unclear — pause and ask.
 
@@ -12,9 +6,9 @@ const buildTemplate = `Build is execution mode. You implement tasks, fix review 
 
 ## Setup
 
-Run ` + "`litespec status <name> --json`" + ` to verify all artifacts are ready.
+Run `litespec status <name> --json` to verify all artifacts are ready.
 
-Read whatever change artifacts exist — proposal.md, design.md, specs/, tasks.md. All are in ` + "`specs/changes/<name>/`" + `. You need full context before writing a single line of code. Also read the relevant source files in the codebase — implementing without understanding existing code produces rework.
+Read whatever change artifacts exist — proposal.md, design.md, specs/, tasks.md. All are in `specs/changes/<name>/`. You need full context before writing a single line of code. Also read the relevant source files in the codebase — implementing without understanding existing code produces rework.
 
 If required artifacts (proposal, design, tasks, specs) are missing, stop. Tell the user to create them first.
 
@@ -24,11 +18,11 @@ If required artifacts (proposal, design, tasks, specs) are missing, stop. Tell t
 
 **One phase per session. This is non-negotiable.** Litespec's strength is controlled, incremental progress.
 
-1. **Identify the current phase** — ` + "`currentPhase`" + ` points to it in the phases array
+1. **Identify the current phase** — `currentPhase` points to it in the phases array
 2. **Read the phase tasks** — understand every task before starting any of them
 3. **Implement each task sequentially** — one at a time, in order
-4. **Mark tasks done immediately** — edit ` + "`tasks.md`" + ` and set ` + "`[x]`" + ` the moment a task is complete
-5. **Commit your work after the phase** — message: ` + "`phase N: <phase name>`" + `
+4. **Mark tasks done immediately** — edit `tasks.md` and set `[x]` the moment a task is complete
+5. **Commit your work after the phase** — message: `phase N: <phase name>`
 6. **Stop** — tell the user the phase is done and they can re-invoke build for the next one
 
 ---
@@ -37,7 +31,7 @@ If required artifacts (proposal, design, tasks, specs) are missing, stop. Tell t
 
 When you encounter a knowledge gap during implementation — novel APIs, unfamiliar libraries, non-obvious authentication flows — pause and gather the relevant documentation.
 
-You MAY produce a research skill file at ` + "`.agents/skills/research-<topic>/SKILL.md`" + ` for future reference. If produced, it SHALL use skill-creator format conventions and persist after archive as accumulated project knowledge.
+You MAY produce a research skill file at `.agents/skills/research-<topic>/SKILL.md` for future reference. If produced, it SHALL use skill-creator format conventions and persist after archive as accumulated project knowledge.
 
 This is not a separate phase. It is an inline step within the build workflow. Skip it when you already know the APIs/libraries cold; go deep when the knowledge is genuinely novel.
 
@@ -48,7 +42,7 @@ This is not a separate phase. It is an inline step within the build workflow. Sk
 When you are asked to fix, address, or resolve review findings (rather than implementing tasks from tasks.md), different rules apply. The review found symptoms; your job is to cure the disease.
 
 **Behavioral shift — scope expands, does not narrow:**
-- For each finding, identify the **abstract pattern** behind it. Do not fix just the reported ` + "`" + `file:line` + "`" + `
+- For each finding, identify the **abstract pattern** behind it. Do not fix just the reported `file:line`
 - Search the entire affected module (or modules) for the same pattern. Fix all instances, not just the reported one
 - If the review included **Pattern Annotations**, use them as your roadmap — confirmed locations must be fixed, likely locations must be verified and fixed if the pattern holds
 - After fixing, re-read the entire affected module end-to-end. Ask: "Did my changes introduce new surface area? What invariants might now be broken?"
@@ -71,7 +65,7 @@ For each finding (CRITICAL → WARNING → SUGGESTION), grouped by file:
 
 1. Run the project's build command
 2. Run the project's test suite
-3. Run ` + "`litespec validate <name>`" + `
+3. Run `litespec validate <name>`
 
 Fix any failures before proceeding.
 
@@ -79,19 +73,19 @@ Fix any failures before proceeding.
 After all fixes, verify:
 1. Every location in every Pattern Annotation is addressed
 2. No new unguarded paths were introduced by the fix
-3. Run ` + "`litespec validate <name>`" + ` to confirm no structural regressions
+3. Run `litespec validate <name>` to confirm no structural regressions
 4. The full test suite passes
 5. A re-read of the affected module reveals no remaining instances of the pattern
 
 **Escalation:**
 If a finding cannot be resolved:
-- State it explicitly: "Finding [X] in ` + "`file:line`" + ` could not be resolved because [reason]"
+- State it explicitly: "Finding [X] in `file:line` could not be resolved because [reason]"
 - Never silently skip a finding
 - Escalate unresolvable findings as an explicit warning rather than silently dropping them
 - Suggest next steps (update design.md, re-explore the problem)
 
 **What NOT to do:**
-- Do not fix only the specific ` + "`" + `file:line` + "`" + ` from the report while ignoring structurally identical code nearby
+- Do not fix only the specific `file:line` from the report while ignoring structurally identical code nearby
 - Do not declare done after tests pass without re-reading the changed module
 - Do not treat SUGGESTIONs as optional if they share a pattern with CRITICALs or WARNINGs — the pattern is the problem, not the severity tag
 - Do not modify specs, proposal, design, or tasks — fix implementation code only
@@ -104,7 +98,7 @@ If a finding cannot be resolved:
 - **Make minimal, scoped changes** — implement exactly what the task requires, nothing more
 - **Do not refactor beyond scope** — even if you see something ugly nearby. Note it, do not fix it
 - **Do not guess on unclear tasks** — if a task is ambiguous, pause and ask before proceeding
-- **Mark tasks ` + "`[x]`" + ` immediately** — do not batch-mark at the end. Each completion gets its own edit
+- **Mark tasks `[x]` immediately** — do not batch-mark at the end. Each completion gets its own edit
 - **If a task requires artifact changes** (design, specs, proposal), note it and pause. Do not modify artifacts yourself
 - **One phase per commit** — no more, no less
 
@@ -134,10 +128,10 @@ After completing a phase, report:
 
 Do not offer to start the next phase yourself. One phase. Stop.
 
-When fixing review findings, list every finding and its resolution (fixed / escalated / skipped with reason), suggest the user run review to verify, and commit: ` + "`fix: address review findings for <change-name>`" + `.
+When fixing review findings, list every finding and its resolution (fixed / escalated / skipped with reason), suggest the user run review to verify, and commit: `fix: address review findings for <change-name>`.
 
 ---
 
 ## References
 
-` + "`" + `specs/glossary.md` + "`" + ` — the project's ubiquitous language. You may consult it for terminology after completing a phase. No enforcement, purely optional context.`
+`specs/glossary.md` — the project's ubiquitous language. You may consult it for terminology after completing a phase. No enforcement, purely optional context.
