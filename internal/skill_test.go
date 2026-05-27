@@ -209,6 +209,87 @@ func TestGenerateSkills_CleansStaleResources(t *testing.T) {
 	}
 }
 
+func TestCheckStaleSkills_NoStale(t *testing.T) {
+	root := t.TempDir()
+	result := CheckStaleSkills(root)
+	if result != "" {
+		t.Errorf("expected empty, got %q", result)
+	}
+}
+
+func TestCheckStaleSkills_WithStaleDirs(t *testing.T) {
+	root := t.TempDir()
+	skillsDir := filepath.Join(root, SkillsDir)
+	if err := os.MkdirAll(skillsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"litespec-explore", "litespec-grill", "litespec-propose"} {
+		if err := os.MkdirAll(filepath.Join(skillsDir, name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	result := CheckStaleSkills(root)
+	if result == "" {
+		t.Fatal("expected stale warning, got empty")
+	}
+	if !strings.Contains(result, "litespec-explore") {
+		t.Errorf("expected litespec-explore in warning, got %q", result)
+	}
+	if !strings.Contains(result, "litespec update") {
+		t.Errorf("expected 'litespec update' in warning, got %q", result)
+	}
+}
+
+func TestCheckStaleSkills_IgnoresNonLitespecDirs(t *testing.T) {
+	root := t.TempDir()
+	skillsDir := filepath.Join(root, SkillsDir)
+	if err := os.MkdirAll(skillsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"skill-creator", "the-drill", "research-vision"} {
+		if err := os.MkdirAll(filepath.Join(skillsDir, name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	result := CheckStaleSkills(root)
+	if result != "" {
+		t.Errorf("expected empty (no litespec-* stale dirs), got %q", result)
+	}
+}
+
+func TestCheckStaleSkills_MixedCurrentAndStale(t *testing.T) {
+	root := t.TempDir()
+	skillsDir := filepath.Join(root, SkillsDir)
+	if err := os.MkdirAll(skillsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range Skills {
+		if err := os.MkdirAll(filepath.Join(skillsDir, s.Name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range []string{"litespec-explore", "litespec-grill"} {
+		if err := os.MkdirAll(filepath.Join(skillsDir, name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	result := CheckStaleSkills(root)
+	if result == "" {
+		t.Fatal("expected stale warning, got empty")
+	}
+	for _, s := range Skills {
+		if strings.Contains(result, s.Name) {
+			t.Errorf("current skill %q should not appear in warning, got: %s", s.Name, result)
+		}
+	}
+	if !strings.Contains(result, "litespec-explore") {
+		t.Errorf("expected litespec-explore in warning, got %q", result)
+	}
+}
+
 func TestGenerateSkills_ReadonlyDir(t *testing.T) {
 	original := skill.All()
 	defer func() {

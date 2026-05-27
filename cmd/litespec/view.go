@@ -22,7 +22,7 @@ func cmdView(args []string) error {
 	}
 
 
-	root, err := requireProjectRoot()
+	root, err := requireProjectRootWithStaleCheck()
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func cmdView(args []string) error {
 	return Render(Response{
 		Full:        buildViewFullJSON(root, specs, draft, active, completed, patch, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr, depMap),
 		Minimal:     buildViewMinimalJSON(root, specs, draft, active, completed, patch, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr),
-		Text:        buildViewText(specs, draft, active, completed, patch, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr, changes, depMap),
+		Text:        buildViewText(root, specs, draft, active, completed, patch, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr, changes, depMap),
 		MinimalText: fmt.Sprintf("%d specs\t%d reqs\t%d draft\t%d active\t%d ready\t%d/%d tasks",
 			len(specs), totalReqs, len(draft), len(active), len(completed), totalCompletedTasks, totalTasks),
 	}, asJSON, asMinimal)
@@ -284,7 +284,7 @@ type viewGraphJSON struct {
 	Unrelated  []string                   `json:"unrelated,omitempty"`
 }
 
-func buildViewText(specs []internal.SpecInfo, draft, active, completed, patch []internal.ChangeInfo, totalReqs, totalCompletedTasks, totalTasks int, decisions []*internal.Decision, decErr error, changes []internal.ChangeInfo, depMap map[string][]string) string {
+func buildViewText(root string, specs []internal.SpecInfo, draft, active, completed, patch []internal.ChangeInfo, totalReqs, totalCompletedTasks, totalTasks int, decisions []*internal.Decision, decErr error, changes []internal.ChangeInfo, depMap map[string][]string) string {
 	var sb strings.Builder
 	sep := strings.Repeat("═", 60)
 
@@ -315,10 +315,6 @@ func buildViewText(specs []internal.SpecInfo, draft, active, completed, patch []
 		fmt.Fprintf(&sb, "  ● Decisions: %d/%d\n", activeDec, len(decisions))
 	}
 
-	root := ""
-	if r, err := requireProjectRoot(); err == nil {
-		root = r
-	}
 	backlog, _ := internal.ParseBacklog(internal.BacklogPath(root))
 	if backlog != nil {
 		var parts []string

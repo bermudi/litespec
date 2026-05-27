@@ -29,7 +29,7 @@ func cmdDecide(args []string) error {
 		return err
 	}
 
-	root, err := requireProjectRoot()
+	root, err := requireProjectRootWithStaleCheck()
 	if err != nil {
 		return err
 	}

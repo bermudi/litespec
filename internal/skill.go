@@ -32,7 +32,7 @@ func GenerateSkills(root string) error {
 	}
 
 	// Remove legacy litespec skill directories
-	if err := cleanLegacySkillDirs(skillsDir, activeSkillNames); err != nil {
+	if err := cleanLegacySkillDirs(skillsDir); err != nil {
 		return fmt.Errorf("clean legacy skill dirs: %w", err)
 	}
 
@@ -113,23 +113,45 @@ func cleanSkillDir(skillDir string, keep map[string]bool) {
 // the skill name prefix but are not in the active set.
 const skillNamePrefix = "litespec-"
 
-func cleanLegacySkillDirs(skillsDir string, active map[string]bool) error {
+func findStaleSkillDirs(skillsDir string) ([]string, error) {
 	entries, err := os.ReadDir(skillsDir)
 	if err != nil {
-		return fmt.Errorf("read skills dir: %w", err)
+		return nil, fmt.Errorf("read skills dir: %w", err)
 	}
+
+	active := make(map[string]bool, len(Skills))
+	for _, s := range Skills {
+		active[s.Name] = true
+	}
+
+	var stale []string
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), skillNamePrefix) {
 			continue
 		}
-		if !strings.HasPrefix(entry.Name(), skillNamePrefix) {
-			continue
+		if !active[entry.Name()] {
+			stale = append(stale, entry.Name())
 		}
-		if active[entry.Name()] {
-			continue
-		}
-		if err := os.RemoveAll(filepath.Join(skillsDir, entry.Name())); err != nil {
-			return fmt.Errorf("remove legacy skill dir %s: %w", entry.Name(), err)
+	}
+	return stale, nil
+}
+
+func CheckStaleSkills(root string) string {
+	stale, err := findStaleSkillDirs(filepath.Join(root, SkillsDir))
+	if err != nil || len(stale) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("stale skill directories detected: %s. Run 'litespec update' to regenerate.", strings.Join(stale, ", "))
+}
+
+func cleanLegacySkillDirs(skillsDir string) error {
+	stale, err := findStaleSkillDirs(skillsDir)
+	if err != nil {
+		return err
+	}
+	for _, name := range stale {
+		if err := os.RemoveAll(filepath.Join(skillsDir, name)); err != nil {
+			return fmt.Errorf("remove legacy skill dir %s: %w", name, err)
 		}
 	}
 	return nil

@@ -182,7 +182,7 @@ Tool adapters are auto-detected by scanning for symlinks in adapter skill direct
 | `litespec instructions <artifact>` | Return artifact-specific instructions for AI to create an artifact |
 | `litespec list [--specs|--changes|--decisions|--backlog] [--sort name|recent|deps|number] [--status <state>]` | List specs, changes, decisions, or backlog items (deps sort uses topological order, number sort is for decisions) |
 | `litespec view` | Display dashboard overview with progress bars, specs, changes (draft/active/ready-to-archive), and dependency graph |
-| `litespec update [--tools ...]` | Regenerate skills and adapter symlinks |
+| `litespec update [--tools ...]` | Regenerate skills and adapter symlinks. Stale `litespec-*` skill directories (from previous versions) are removed automatically. Non-litespec directories (e.g., `skill-creator`, `the-drill`, `research-*`) are preserved. |
 | `litespec archive <change> [--allow-incomplete]` | Apply deltas to canon + move to archive (marks change as implemented; errors if unarchived dependencies exist) |
 | `litespec preview <change> [--json]` | Preview what archive would do to canonical specs without making changes |
 | `litespec completion <shell>` | Print shell completion script (bash, zsh, fish) |

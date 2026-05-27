@@ -64,7 +64,7 @@ func cmdList(args []string) error {
 		return fmt.Errorf("--backlog and --changes are mutually exclusive")
 	}
 
-	root, err := requireProjectRoot()
+	root, err := requireProjectRootWithStaleCheck()
 	if err != nil {
 		return err
 	}

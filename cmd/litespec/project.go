@@ -18,3 +18,14 @@ func requireProjectRoot() (string, error) {
 	}
 	return root, nil
 }
+
+func requireProjectRootWithStaleCheck() (string, error) {
+	root, err := requireProjectRoot()
+	if err != nil {
+		return "", err
+	}
+	if warn := internal.CheckStaleSkills(root); warn != "" {
+		fmt.Fprintln(os.Stderr, "WARN", warn)
+	}
+	return root, nil
+}

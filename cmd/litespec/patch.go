@@ -37,7 +37,7 @@ func cmdPatch(args []string) error {
 		return fmt.Errorf("invalid capability name: %w", err)
 	}
 
-	root, err := requireProjectRoot()
+	root, err := requireProjectRootWithStaleCheck()
 	if err != nil {
 		return err
 	}

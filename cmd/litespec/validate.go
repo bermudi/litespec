@@ -50,7 +50,7 @@ func cmdValidate(args []string) error {
 		return fmt.Errorf("--type must be 'change', 'spec', or 'decision', got %q", typeFilter)
 	}
 
-	root, err := requireProjectRoot()
+	root, err := requireProjectRootWithStaleCheck()
 	if err != nil {
 		return err
 	}

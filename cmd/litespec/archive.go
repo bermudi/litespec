@@ -31,7 +31,7 @@ func cmdArchive(args []string) error {
 		return fmt.Errorf("unexpected arguments. Usage: litespec archive <name> [--allow-incomplete]")
 	}
 
-	root, err := requireProjectRoot()
+	root, err := requireProjectRootWithStaleCheck()
 	if err != nil {
 		return err
 	}

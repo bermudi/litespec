@@ -24,7 +24,7 @@ func cmdStatus(args []string) error {
 		name = positional[0]
 	}
 
-	root, err := requireProjectRoot()
+	root, err := requireProjectRootWithStaleCheck()
 	if err != nil {
 		return err
 	}
@@ -93,8 +93,10 @@ func cmdStatus(args []string) error {
 	// Check if this is a new project (no active or archived changes)
 	isNew := len(changes) == 0
 	if isNew {
-		archived, _ := internal.ListArchivedChanges(root)
-		if len(archived) > 0 {
+		archived, archErr := internal.ListArchivedChanges(root)
+		if archErr != nil {
+			isNew = false
+		} else if len(archived) > 0 {
 			isNew = false
 		}
 	}

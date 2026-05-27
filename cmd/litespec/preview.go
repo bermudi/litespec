@@ -27,7 +27,7 @@ func cmdPreview(args []string) error {
 		return fmt.Errorf("unexpected argument %q. Usage: litespec preview <change-name> [--json]", positional[1])
 	}
 
-	root, err := requireProjectRoot()
+	root, err := requireProjectRootWithStaleCheck()
 	if err != nil {
 		return err
 	}
