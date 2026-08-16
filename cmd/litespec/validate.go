@@ -141,8 +141,7 @@ func cmdValidate(args []string) error {
 	} else if strict && len(result.Warnings) > 0 {
 		minimalText = fmt.Sprintf("invalid\t%d warnings (strict)\n", len(result.Warnings))
 	} else {
-		minimalText = fmt.Sprintf("ok\t%d %s, %d %s, %d %s, %d %s\n",
-			result.ChangesCount, pluralize("change", result.ChangesCount),
+		minimalText = fmt.Sprintf("ok\t%d %s, %d %s, %d %s\n",
 			result.CapabilitiesCount, pluralize("capability", result.CapabilitiesCount),
 			result.RequirementsCount, pluralize("requirement", result.RequirementsCount),
 			result.ScenariosCount, pluralize("scenario", result.ScenariosCount))
@@ -157,8 +156,7 @@ func cmdValidate(args []string) error {
 		text += fmt.Sprintf("WARN   %s: %s\n", issue.File, issue.Message)
 	}
 	if result.Valid {
-		text += fmt.Sprintf("ok: %d %s, %d %s, %d %s, %d %s\n",
-			result.ChangesCount, pluralize("change", result.ChangesCount),
+		text += fmt.Sprintf("ok: %d %s, %d %s, %d %s\n",
 			result.CapabilitiesCount, pluralize("capability", result.CapabilitiesCount),
 			result.RequirementsCount, pluralize("requirement", result.RequirementsCount),
 			result.ScenariosCount, pluralize("scenario", result.ScenariosCount))

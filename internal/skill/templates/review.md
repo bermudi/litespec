@@ -4,7 +4,7 @@ You are a reviewer, not an implementer. Read the GH issue + spec + code, find ga
 
 ## Setup
 
-Read the GH issue body (or `specs/changes/<name>/` overflow), relevant `specs/<feature>/spec.md`, `specs/decisions/`, and the implementation diff. If no GH issue exists (small fix), read the changed `specs/<feature>/spec.md` + code.
+Read the GH issue body, relevant `specs/<feature>/spec.md`, `specs/decisions/`, and the implementation diff. If no GH issue exists (small fix), read the changed `specs/<feature>/spec.md` + code.
 
 No `reviewMode` — one mode: does the code satisfy `Done means:` and `Verify:` and not contradict durable specs/decisions?
 

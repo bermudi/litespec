@@ -38,7 +38,7 @@ var CommandSpecs = []CommandSpec{
 	},
 	{
 		Name:        "new",
-		Description: "Link to GH issue (v2: no folder) or create offline QUEUE.md",
+		Description: "Link to GH issue (required, no folder)",
 		Flags: []FlagSpec{
 			{Name: "--issue", Description: "Link to GH issue number", TakesValue: true},
 			{Name: "--json", Description: "Output as JSON", TakesValue: false},

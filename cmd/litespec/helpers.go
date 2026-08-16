@@ -117,22 +117,21 @@ Examples:
 }
 
 func printNewHelp() {
-	fmt.Print(`Usage: litespec new <name> [--issue N] [--json] [--minimal]
+	fmt.Print(`Usage: litespec new <name> --issue N [--json] [--minimal]
 
-Link to GH issue (v2 lean: no folder) or create offline fallback QUEUE.md.
+Link a change name to a GH issue. GH issue is the queue — no folder created.
 
 Arguments:
   <name>            Change name (e.g., add-auth)
 
 Flags:
-  --issue <N>       Link to existing GH issue number (no folder in lean)
+  --issue <N>       GH issue number (required — no offline fallback)
   --json            Output as JSON
   --minimal         Minimal output
 
 Examples:
   litespec new add-auth --issue 42
   litespec new add-auth --issue 42 --json
-  litespec new add-auth           # offline fallback: specs/changes/add-auth/QUEUE.md
 `)
 }
 
@@ -218,7 +217,7 @@ func validateChangeName(name string) error {
 	if len(name) > 100 {
 		return fmt.Errorf("change name cannot exceed 100 characters (got %d)", len(name))
 	}
-	for _, reserved := range []string{"canon", "changes", "archive"} {
+	for _, reserved := range []string{"canon", "decisions"} {
 		if name == reserved {
 			return fmt.Errorf("change name %q is reserved", name)
 		}

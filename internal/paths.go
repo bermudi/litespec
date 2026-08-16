@@ -3,18 +3,13 @@ package internal
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 )
 
 const (
 	CanonDirName       = "canon"
-	ChangeSpecsDirName = "specs"
-	ChangesDirName     = "changes"
-	ArchiveDirName     = "archive"
-	MetaFileName       = ".litespec.yaml"
 	ProjectDirName     = "specs"
 	SkillsDir          = ".agents/skills"
-	BacklogFileName    = "backlog.md"
+	ChangesDirName     = "changes"
 )
 
 var Skills = []SkillInfo{
@@ -77,36 +72,10 @@ func FeatureSpecPath(root, feature string) string {
 	return filepath.Join(root, ProjectDirName, feature, "spec.md")
 }
 
-func ChangesPath(root string) string {
-	return filepath.Join(root, ProjectDirName, ChangesDirName)
-}
-
-func ArchivePath(root string) string {
-	return filepath.Join(root, ProjectDirName, ChangesDirName, ArchiveDirName)
-}
-
-func ChangePath(root, name string) string {
-	return filepath.Join(root, ProjectDirName, ChangesDirName, name)
-}
-
-func ChangeSpecsPath(root, name string) string {
-	return filepath.Join(ChangePath(root, name), ChangeSpecsDirName)
-}
-
 func ValidToolIDs() []string {
 	ids := make([]string, len(Adapters))
 	for i, a := range Adapters {
 		ids[i] = a.ID
 	}
 	return ids
-}
-
-var ArchivedNameRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}-(.+)$`)
-
-func ParseArchivedName(name string) string {
-	m := ArchivedNameRe.FindStringSubmatch(name)
-	if len(m) == 2 {
-		return m[1]
-	}
-	return name
 }

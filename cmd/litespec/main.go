@@ -80,7 +80,7 @@ Workflow (two lanes):
 
 Commands:
   init [--tools <ids>]              Initialize project structure
-  new <name> [--issue N]            Link to GH issue (v2: no folder)
+  new <name> --issue N              Link to GH issue (required, no folder)
   validate [--all|--specs|--decisions] [--type T]   Validate specs and decisions
   view                              Dashboard overview
   update [--tools <ids>]            Regenerate skills and adapters

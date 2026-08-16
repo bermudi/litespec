@@ -101,15 +101,6 @@ func completeCommands() []Completion {
 	return result
 }
 
-func completeArtifactIDs() []Completion {
-	return []Completion{
-		{"proposal", "Why and what — motivation, scope, approach"},
-		{"specs", "Delta specifications — ADDED/MODIFIED/REMOVED/RENAMED"},
-		{"design", "How — technical approach, architecture decisions"},
-		{"tasks", "What to do — phased implementation checklist"},
-	}
-}
-
 func completeShells() []Completion {
 	return []Completion{
 		{"bash", "Bash completion"},
@@ -122,18 +113,6 @@ func completeToolIDs() []Completion {
 	var result []Completion
 	for _, a := range Adapters {
 		result = append(result, Completion{Candidate: a.ID, Description: a.Name})
-	}
-	return result
-}
-
-func completeChangeNames(root string) []Completion {
-	changes, err := ListChanges(root)
-	if err != nil {
-		return nil
-	}
-	var result []Completion
-	for _, c := range changes {
-		result = append(result, Completion{Candidate: c.Name, Description: "change"})
 	}
 	return result
 }

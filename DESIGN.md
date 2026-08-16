@@ -152,8 +152,7 @@ No `patch`, `archive`, `decide`, `preview`, `import` until needed. Add when pain
 GH issue is the queue — the GH issue body is proposal + design + queue (64k limit, no overflow design needed).
 
 - GH issue body is proposal + design + queue. 64k limit — no overflow design needed.
-- `litespec new <name> [--issue N]` links to an existing issue; no `specs/changes/` folder in lean.
-- Offline fallback when `gh` unavailable: local `specs/changes/<name>/QUEUE.md` with same format, validated locally.
+- `litespec new <name> --issue N` links to an existing issue; no `specs/changes/` folder in lean. `--issue` is required — no offline fallback.
 - `view` auto-detects `gh` + GitHub remote. No config flag.
 
 ## Resolved for v2 lean

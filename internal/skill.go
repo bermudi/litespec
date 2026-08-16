@@ -15,10 +15,6 @@ type skillFrontmatter struct {
 	Description string `yaml:"description"`
 }
 
-func GetSkillTemplate(skillID string) string {
-	return skill.Get(skillID)
-}
-
 func GenerateSkills(root string) error {
 	skillsDir := filepath.Join(root, SkillsDir)
 	if err := os.MkdirAll(skillsDir, 0o755); err != nil {

@@ -391,26 +391,6 @@ func TestCLIViewUnknownFlag(t *testing.T) {
 	}
 }
 
-func TestCLIValidateAllDetectsCycle(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	changeDirA := filepath.Join(root, "specs", "changes", "change-a")
-	os.MkdirAll(changeDirA, 0o755)
-	os.WriteFile(filepath.Join(changeDirA, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - change-b\n"), 0o644)
-
-	changeDirB := filepath.Join(root, "specs", "changes", "change-b")
-	os.MkdirAll(changeDirB, 0o755)
-	os.WriteFile(filepath.Join(changeDirB, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - change-a\n"), 0o644)
-
-	out, code := runCLI(t, bin, root, "validate", "--all", "--json")
-	if code != 1 {
-		t.Fatalf("expected exit 1 for cycle, got %d: %s", code, out)
-	}
-	if !strings.Contains(out, "cycle") {
-		t.Errorf("expected cycle error in output, got: %s", out)
-	}
-}
-
 func TestValidateChangeName(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -425,8 +405,7 @@ func TestValidateChangeName(t *testing.T) {
 		{"leading whitespace", " foo", true},
 		{"trailing whitespace", "foo ", true},
 		{"reserved canon", "canon", true},
-		{"reserved changes", "changes", true},
-		{"reserved archive", "archive", true},
+		{"reserved decisions", "decisions", true},
 		{"too long", strings.Repeat("a", 101), true},
 		{"valid simple", "add-auth", false},
 		{"valid with numbers", "fix-123-issue", false},
@@ -515,21 +494,10 @@ func setupDirectTest(t *testing.T) string {
 }
 
 func TestCmdNewDirect_HappyPath(t *testing.T) {
-	root := setupDirectTest(t)
-	err := cmdNew([]string{"my-change"})
+	setupDirectTest(t)
+	err := cmdNew([]string{"my-change", "--issue", "42"})
 	if err != nil {
 		t.Fatalf("cmdNew: %v", err)
-	}
-	changeDir := filepath.Join(root, "specs", "changes", "my-change")
-	if _, statErr := os.Stat(changeDir); os.IsNotExist(statErr) {
-		t.Error("expected change directory to exist")
-	}
-	meta, metaErr := os.ReadFile(filepath.Join(changeDir, ".litespec.yaml"))
-	if metaErr != nil {
-		t.Fatalf("reading metadata: %v", metaErr)
-	}
-	if !strings.Contains(string(meta), "spec-driven") {
-		t.Errorf("expected spec-driven schema in metadata, got: %s", string(meta))
 	}
 }
 
@@ -541,9 +509,17 @@ func TestCmdNewDirect_MissingName(t *testing.T) {
 	}
 }
 
+func TestCmdNewDirect_MissingIssue(t *testing.T) {
+	setupDirectTest(t)
+	err := cmdNew([]string{"my-change"})
+	if err == nil {
+		t.Fatal("expected error for missing --issue")
+	}
+}
+
 func TestCmdNewDirect_InvalidName(t *testing.T) {
 	setupDirectTest(t)
-	err := cmdNew([]string{"foo/bar"})
+	err := cmdNew([]string{"foo/bar", "--issue", "1"})
 	if err == nil {
 		t.Fatal("expected error for invalid name")
 	}
@@ -1363,22 +1339,22 @@ func TestCLIViewMinimalJSON(t *testing.T) {
 func TestCLINewMinimalText(t *testing.T) {
 	bin, root := setupCLITest(t)
 
-	out, code := runCLI(t, bin, root, "new", "test-change", "--minimal")
+	out, code := runCLI(t, bin, root, "new", "test-change", "--issue", "7", "--minimal")
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, out)
 	}
 	if !strings.Contains(out, "test-change") {
-		t.Errorf("expected change path, got: %s", out)
+		t.Errorf("expected change name, got: %s", out)
 	}
-	if strings.Contains(out, "Artifacts:") {
-		t.Error("minimal text should not contain headers")
+	if !strings.Contains(out, "#7") {
+		t.Errorf("expected issue number, got: %s", out)
 	}
 }
 
 func TestCLINewMinimalJSON(t *testing.T) {
 	bin, root := setupCLITest(t)
 
-	out, code := runCLI(t, bin, root, "new", "test-change", "--minimal", "--json")
+	out, code := runCLI(t, bin, root, "new", "test-change", "--issue", "7", "--minimal", "--json")
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, out)
 	}
@@ -1390,14 +1366,8 @@ func TestCLINewMinimalJSON(t *testing.T) {
 	if result["changeName"] == nil {
 		t.Error("minimal JSON should contain changeName")
 	}
-	if result["isComplete"] == nil {
-		t.Error("minimal JSON should contain isComplete")
-	}
-	if _, hasSchema := result["schemaName"]; hasSchema {
-		t.Error("minimal JSON should not contain schemaName")
-	}
-	if _, hasArtifacts := result["artifacts"]; hasArtifacts {
-		t.Error("minimal JSON should not contain artifacts")
+	if result["issue"] == nil {
+		t.Error("minimal JSON should contain issue")
 	}
 }
 

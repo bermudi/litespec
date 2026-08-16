@@ -48,8 +48,7 @@ Ask sharp questions, name unknowns, run a tiny spike if reading can't answer it.
 
 1. Write the GH issue body — one `## <outcome>` per unit, each with `Done means:` + `Verify:` + `- [ ]` checkbox. One unit = one demo + one Verify that fails without it.
 2. If load-bearing (CLI shape, API, file format that breaks things when wrong), edit `specs/<feature>/spec.md` directly — 3-5 SHALL requirements with WHEN/THEN scenarios.
-3. If the shape won't fit in the issue, add `specs/changes/<name>/proposal.md` (why/what) and `design.md` (how) as overflow. Otherwise no files in `specs/changes/`.
-4. Run `litespec validate` (or `gh issue view <N> --json body` + validate locally). Fix formatting before handing off.
+3. Run `litespec validate`. Fix formatting before handing off.
 
 ---
 
@@ -62,5 +61,5 @@ After writing, check if you introduced a term not in `specs/glossary.md`. Offer 
 ## Don't
 
 - Don't prescribe files to edit in the GH issue — scope is outcome + constraints.
-- Don't write `specs/changes/` files for a small fix. Small fix = edit code + update `specs/<feature>/spec.md` directly, no issue required.
+- Don't create files for a small fix. Small fix = edit code + update `specs/<feature>/spec.md` directly, no issue required.
 - Don't invent Verify that doesn't fail without the outcome.
