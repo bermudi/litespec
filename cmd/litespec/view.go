@@ -1,9 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -20,7 +24,6 @@ func cmdView(args []string) error {
 	if !ok {
 		return err
 	}
-
 
 	root, err := requireProjectRootWithStaleCheck()
 	if err != nil {
@@ -72,15 +75,16 @@ func cmdView(args []string) error {
 	}
 
 	decisions, decErr := internal.ListDecisions(root)
-
 	depMap, _ := internal.LoadDepMap(root)
 
+	productContent, productErr := os.ReadFile(internal.ProductPath(root))
+	ghIssues := fetchViewGHIssues(root)
+
 	return Render(Response{
-		Full:        buildViewFullJSON(root, specs, draft, active, completed, patch, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr, depMap),
+		Full:        buildViewFullJSON(root, specs, draft, active, completed, patch, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr, depMap, productContent, productErr, ghIssues),
 		Minimal:     buildViewMinimalJSON(root, specs, draft, active, completed, patch, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr),
-		Text:        buildViewText(root, specs, draft, active, completed, patch, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr, changes, depMap),
-		MinimalText: fmt.Sprintf("%d specs\t%d reqs\t%d draft\t%d active\t%d ready\t%d/%d tasks",
-			len(specs), totalReqs, len(draft), len(active), len(completed), totalCompletedTasks, totalTasks),
+		Text:        buildViewText(root, specs, draft, active, completed, patch, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr, changes, depMap, productContent, productErr, ghIssues),
+		MinimalText: fmt.Sprintf("%d specs\t%d reqs\t%d draft\t%d active\t%d ready\t%d/%d tasks", len(specs), totalReqs, len(draft), len(active), len(completed), totalCompletedTasks, totalTasks),
 	}, asJSON, asMinimal)
 }
 
@@ -218,24 +222,39 @@ func renderDependencyGraph(w io.Writer, depMap map[string][]string, changes []in
 	fmt.Fprint(w, sb.String())
 }
 
+type viewGHIssueJSON struct {
+	Number int    `json:"number"`
+	Title  string `json:"title"`
+	State  string `json:"state"`
+	URL    string `json:"url"`
+}
+
 type viewJSON struct {
-	Summary   viewSummaryJSON   `json:"summary"`
-	Changes   []viewChangeJSON  `json:"changes,omitempty"`
-	Specs     []viewSpecJSON    `json:"specs,omitempty"`
-	Decisions []viewDecisionJSON `json:"decisions,omitempty"`
-	Graph     *viewGraphJSON    `json:"graph,omitempty"`
+	Summary   viewSummaryJSON     `json:"summary"`
+	Changes   []viewChangeJSON    `json:"changes,omitempty"`
+	Specs     []viewSpecJSON      `json:"specs,omitempty"`
+	Decisions []viewDecisionJSON  `json:"decisions,omitempty"`
+	Graph     *viewGraphJSON      `json:"graph,omitempty"`
+	Product   *viewProductJSON    `json:"product,omitempty"`
+	GHIssues  []viewGHIssueJSON   `json:"ghIssues,omitempty"`
+}
+
+type viewProductJSON struct {
+	Path    string `json:"path"`
+	Exists  bool   `json:"exists"`
+	Preview string `json:"preview,omitempty"`
 }
 
 type viewSummaryJSON struct {
-	Specs              int                 `json:"specs"`
-	Requirements       int                 `json:"requirements"`
-	DraftChanges       int                 `json:"draftChanges"`
-	ActiveChanges      int                 `json:"activeChanges"`
-	PatchChanges       int                 `json:"patchChanges,omitempty"`
-	ReadyToArchive     int                 `json:"readyToArchive"`
-	TaskProgress       *viewProgressJSON   `json:"taskProgress,omitempty"`
-	Decisions          *viewDecisionCountJSON `json:"decisions,omitempty"`
-	Backlog            *viewBacklogJSON    `json:"backlog,omitempty"`
+	Specs            int                    `json:"specs"`
+	Requirements     int                    `json:"requirements"`
+	DraftChanges     int                    `json:"draftChanges"`
+	ActiveChanges    int                    `json:"activeChanges"`
+	PatchChanges     int                    `json:"patchChanges,omitempty"`
+	ReadyToArchive   int                    `json:"readyToArchive"`
+	TaskProgress     *viewProgressJSON      `json:"taskProgress,omitempty"`
+	Decisions        *viewDecisionCountJSON `json:"decisions,omitempty"`
+	Backlog          *viewBacklogJSON       `json:"backlog,omitempty"`
 }
 
 type viewProgressJSON struct {
@@ -277,14 +296,37 @@ type viewDecisionJSON struct {
 	Number int    `json:"number"`
 	Slug   string `json:"slug"`
 	Status string `json:"status"`
+	Spine  bool   `json:"spine,omitempty"`
 }
 
 type viewGraphJSON struct {
-	Roots      []string                   `json:"roots"`
-	Unrelated  []string                   `json:"unrelated,omitempty"`
+	Roots     []string `json:"roots"`
+	Unrelated []string `json:"unrelated,omitempty"`
 }
 
-func buildViewText(root string, specs []internal.SpecInfo, draft, active, completed, patch []internal.ChangeInfo, totalReqs, totalCompletedTasks, totalTasks int, decisions []*internal.Decision, decErr error, changes []internal.ChangeInfo, depMap map[string][]string) string {
+func fetchViewGHIssues(root string) []viewGHIssueJSON {
+	if _, err := exec.LookPath("gh"); err != nil {
+		return nil
+	}
+	if _, err := os.Stat(filepath.Join(root, ".git")); err != nil {
+		if out, err := exec.Command("git", "rev-parse", "--is-inside-work-tree").Output(); err != nil || strings.TrimSpace(string(out)) != "true" {
+			return nil
+		}
+	}
+	cmd := exec.Command("gh", "issue", "list", "--json", "number,title,state,url", "--state", "open", "--limit", "50")
+	cmd.Dir = root
+	out, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+	var issues []viewGHIssueJSON
+	if err := json.Unmarshal(out, &issues); err != nil {
+		return nil
+	}
+	return issues
+}
+
+func buildViewText(root string, specs []internal.SpecInfo, draft, active, completed, patch []internal.ChangeInfo, totalReqs, totalCompletedTasks, totalTasks int, decisions []*internal.Decision, decErr error, changes []internal.ChangeInfo, depMap map[string][]string, productContent []byte, productErr error, ghIssues []viewGHIssueJSON) string {
 	var sb strings.Builder
 	sep := strings.Repeat("═", 60)
 
@@ -293,6 +335,24 @@ func buildViewText(root string, specs []internal.SpecInfo, draft, active, comple
 	fmt.Fprintln(&sb)
 	fmt.Fprintln(&sb, sep)
 
+	// Product section — v2 lean durable
+	fmt.Fprintln(&sb, "Product:")
+	if productErr == nil {
+		preview := strings.TrimSpace(string(productContent))
+		if len(preview) > 400 {
+			preview = preview[:400] + "…"
+		}
+		firstLine := strings.Split(preview, "\n")[0]
+		fmt.Fprintf(&sb, "  specs/product.md — %s\n", strings.TrimSpace(firstLine))
+		if strings.Contains(strings.ToLower(preview), "product") || true {
+			fmt.Fprintln(&sb, "  product: mental models + flows")
+		}
+	} else {
+		fmt.Fprintln(&sb, "  specs/product.md — missing (run litespec init to scaffold)")
+		fmt.Fprintln(&sb, "  product: not yet initialized")
+	}
+
+	fmt.Fprintln(&sb)
 	fmt.Fprintln(&sb, "Summary:")
 	fmt.Fprintf(&sb, "  ● Specifications: %d specs, %d requirements\n", len(specs), totalReqs)
 	fmt.Fprintf(&sb, "  ● Draft Changes: %d\n", len(draft))
@@ -384,11 +444,15 @@ func buildViewText(root string, specs []internal.SpecInfo, draft, active, comple
 			if s.RequirementCount != 1 {
 				label = "requirements"
 			}
-			fmt.Fprintf(&sb, "  ▪ %-30s %d %s\n", s.Name, s.RequirementCount, label)
+			fmt.Fprintf(&sb, "  ▪ %-30s %d %s  (specs/%s/spec.md)\n", s.Name, s.RequirementCount, label, s.Name)
 		}
+	} else {
+		fmt.Fprintln(&sb)
+		fmt.Fprintln(&sb, "Specifications")
+		fmt.Fprintln(&sb, strings.Repeat("─", 60))
+		fmt.Fprintln(&sb, "  (no feature specs yet — add specs/<feature>/spec.md)")
 	}
 
-	// Decisions section
 	if decErr == nil && len(decisions) > 0 {
 		var activeDecs []*internal.Decision
 		supersededCount := 0
@@ -406,10 +470,30 @@ func buildViewText(root string, specs []internal.SpecInfo, draft, active, comple
 		fmt.Fprintln(&sb, "Decisions")
 		fmt.Fprintln(&sb, strings.Repeat("─", 60))
 		for _, d := range activeDecs {
-			fmt.Fprintf(&sb, "  %04d  %-30s  %s\n", d.Number, d.Slug, d.Status)
+			marker := " "
+			if d.Spine {
+				marker = "*"
+			}
+			fmt.Fprintf(&sb, "  %s%04d  %-30s  %s\n", marker, d.Number, d.Slug, d.Status)
 		}
 		if supersededCount > 0 {
 			fmt.Fprintf(&sb, "  superseded: %d\n", supersededCount)
+		}
+	}
+
+	if len(ghIssues) > 0 {
+		fmt.Fprintln(&sb)
+		fmt.Fprintln(&sb, "GH Issues (open)")
+		fmt.Fprintln(&sb, strings.Repeat("─", 60))
+		for _, iss := range ghIssues {
+			fmt.Fprintf(&sb, "  #%-6d %-40s %s\n", iss.Number, iss.Title, iss.URL)
+		}
+	} else {
+		if _, err := exec.LookPath("gh"); err != nil {
+			fmt.Fprintln(&sb)
+			fmt.Fprintln(&sb, "GH Issues")
+			fmt.Fprintln(&sb, strings.Repeat("─", 60))
+			fmt.Fprintln(&sb, "  (gh not available — showing local specs only)")
 		}
 	}
 
@@ -483,22 +567,18 @@ func buildViewMinimalJSON(root string, specs []internal.SpecInfo, draft, active,
 	return viewJSON{Summary: summary}
 }
 
-func buildViewFullJSON(root string, specs []internal.SpecInfo, draft, active, completed, patch []internal.ChangeInfo, totalReqs, totalCompletedTasks, totalTasks int, decisions []*internal.Decision, decErr error, depMap map[string][]string) viewJSON {
+func buildViewFullJSON(root string, specs []internal.SpecInfo, draft, active, completed, patch []internal.ChangeInfo, totalReqs, totalCompletedTasks, totalTasks int, decisions []*internal.Decision, decErr error, depMap map[string][]string, productContent []byte, productErr error, ghIssues []viewGHIssueJSON) viewJSON {
 	out := buildViewMinimalJSON(root, specs, draft, active, completed, patch, totalReqs, totalCompletedTasks, totalTasks, decisions, decErr)
 
 	var changes []viewChangeJSON
 	for _, c := range draft {
 		changes = append(changes, viewChangeJSON{
-			Name:   c.Name,
-			Status: "draft",
-			Born:   bornStr(c), LastModified: modifiedStr(c),
+			Name: c.Name, Status: "draft", Born: bornStr(c), LastModified: modifiedStr(c),
 		})
 	}
 	for _, c := range patch {
 		changes = append(changes, viewChangeJSON{
-			Name:   c.Name,
-			Status: "patch",
-			Born:   bornStr(c), LastModified: modifiedStr(c),
+			Name: c.Name, Status: "patch", Born: bornStr(c), LastModified: modifiedStr(c),
 		})
 	}
 	for _, c := range active {
@@ -507,31 +587,20 @@ func buildViewFullJSON(root string, specs []internal.SpecInfo, draft, active, co
 			pct = int(math.Round(float64(c.CompletedTasks) / float64(c.TotalTasks) * 100))
 		}
 		changes = append(changes, viewChangeJSON{
-			Name:           c.Name,
-			Status:         "active",
-			Born:           bornStr(c), LastModified: modifiedStr(c),
-			CompletedTasks: c.CompletedTasks,
-			TotalTasks:     c.TotalTasks,
-			Percentage:     pct,
-			DependsOn:      c.DependsOn,
+			Name: c.Name, Status: "active", Born: bornStr(c), LastModified: modifiedStr(c),
+			CompletedTasks: c.CompletedTasks, TotalTasks: c.TotalTasks, Percentage: pct, DependsOn: c.DependsOn,
 		})
 	}
 	for _, c := range completed {
 		changes = append(changes, viewChangeJSON{
-			Name:           c.Name,
-			Status:         "completed",
-			Born:           bornStr(c), LastModified: modifiedStr(c),
-			CompletedTasks: c.CompletedTasks,
-			TotalTasks:     c.TotalTasks,
+			Name: c.Name, Status: "completed", Born: bornStr(c), LastModified: modifiedStr(c),
+			CompletedTasks: c.CompletedTasks, TotalTasks: c.TotalTasks,
 		})
 	}
 
 	var specEntries []viewSpecJSON
 	for _, s := range specs {
-		specEntries = append(specEntries, viewSpecJSON{
-			Name:             s.Name,
-			RequirementCount: s.RequirementCount,
-		})
+		specEntries = append(specEntries, viewSpecJSON{Name: s.Name, RequirementCount: s.RequirementCount})
 	}
 
 	var decEntries []viewDecisionJSON
@@ -546,11 +615,7 @@ func buildViewFullJSON(root string, specs []internal.SpecInfo, draft, active, co
 			return activeDecs[i].Number < activeDecs[j].Number
 		})
 		for _, d := range activeDecs {
-			decEntries = append(decEntries, viewDecisionJSON{
-				Number: d.Number,
-				Slug:   d.Slug,
-				Status: string(d.Status),
-			})
+			decEntries = append(decEntries, viewDecisionJSON{Number: d.Number, Slug: d.Slug, Status: string(d.Status), Spine: d.Spine})
 		}
 	}
 
@@ -598,6 +663,16 @@ func buildViewFullJSON(root string, specs []internal.SpecInfo, draft, active, co
 	out.Specs = specEntries
 	out.Decisions = decEntries
 	out.Graph = graph
+	if productErr == nil {
+		preview := strings.TrimSpace(string(productContent))
+		if len(preview) > 500 {
+			preview = preview[:500]
+		}
+		out.Product = &viewProductJSON{Path: internal.ProductPath(root), Exists: true, Preview: preview}
+	} else {
+		out.Product = &viewProductJSON{Path: internal.ProductPath(root), Exists: false}
+	}
+	out.GHIssues = ghIssues
 	return out
 }
 

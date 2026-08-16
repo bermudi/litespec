@@ -58,8 +58,6 @@ func run() error {
 		return cmdValidate(os.Args[2:])
 	case "instructions":
 		return cmdInstructions(os.Args[2:])
-	case "archive":
-		return cmdArchive(os.Args[2:])
 	case "new":
 		return cmdNew(os.Args[2:])
 	case "update":
@@ -71,16 +69,10 @@ func run() error {
 	case "__complete":
 		cmdComplete()
 		return nil
-	case "preview":
-		return cmdPreview(os.Args[2:])
 	case "view":
 		return cmdView(os.Args[2:])
-	case "decide":
-		return cmdDecide(os.Args[2:])
 	case "import":
 		return cmdImport(os.Args[2:])
-	case "patch":
-		return cmdPatch(os.Args[2:])
 	default:
 		printUsage()
 		return fmt.Errorf("unknown command: %s", os.Args[1])
@@ -90,22 +82,18 @@ func run() error {
 func printUsage() {
 	fmt.Print(`Usage: litespec <command> [options]
 
-Workflow:
-  explore → grill → propose → apply → archive
-  Thinking → stress-test → materialize → implement → commit to specs
+Workflow (two lanes):
+  Small fix: read product/spec/decisions -> edit code -> update spec if contract
+  New feature: plan[fuzzy] -> plan[clear] (GH issue) -> grill-me -> build -> review -> close
 
 Commands:
   init [--tools <ids>]                                        Initialize project structure
-  new <name>                                                  Create a new change
-  patch <name> <capability>                                   Create a patch-mode change (delta-only)
+  new <name> [--issue N]                                      Link to GH issue (v2: no folder)
   list [--specs|--changes|--decisions|--backlog] [--sort recent|name|deps|number] [--status <state>]   List specs, changes, decisions, or backlog
   status [<name>]                                             Show artifact states
   validate [<name>] [--all|--changes|--specs|--decisions] [--type T]      Validate changes, specs, and decisions
   instructions <artifact>                                     Get artifact instructions
-  archive <name>                                              Apply deltas and archive change
-  preview <name> [--json]                                     Preview what archive would do to canon specs
   view                                                        Dashboard overview with dependency graph
-  decide <slug>                                              Create a new architectural decision record
   import [--source <dir>] [--dry-run] [--force]               Import OpenSpec project to litespec
   update [--tools <ids>]                                      Regenerate skills and adapters
   upgrade                                                     Check for and install the latest version

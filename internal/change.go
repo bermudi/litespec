@@ -129,22 +129,55 @@ func ListChanges(root string) ([]ChangeInfo, error) {
 }
 
 func ListSpecs(root string) ([]SpecInfo, error) {
+	seen := make(map[string]bool)
+	var result []SpecInfo
+
 	specsDir := CanonPath(root)
-	entries, err := os.ReadDir(specsDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
+	if entries, err := os.ReadDir(specsDir); err == nil {
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			name := entry.Name()
+			specPath := filepath.Join(specsDir, name, "spec.md")
+			var reqCount int
+			data, readErr := os.ReadFile(specPath)
+			if readErr == nil {
+				spec, parseErr := ParseMainSpec(string(data))
+				if parseErr == nil {
+					reqCount = len(spec.Requirements)
+				}
+			}
+			result = append(result, SpecInfo{
+				Name:             name,
+				RequirementCount: reqCount,
+			})
+			seen[name] = true
 		}
+	} else if !os.IsNotExist(err) {
 		return nil, fmt.Errorf("read specs directory: %w", err)
 	}
 
-	var result []SpecInfo
+	projectSpecsDir := filepath.Join(root, ProjectDirName)
+	entries, err := os.ReadDir(projectSpecsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return result, nil
+		}
+		return nil, fmt.Errorf("read specs directory: %w", err)
+	}
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 		name := entry.Name()
-		specPath := filepath.Join(specsDir, name, "spec.md")
+		if name == CanonDirName || name == ChangesDirName || name == "decisions" || seen[name] {
+			continue
+		}
+		specPath := filepath.Join(projectSpecsDir, name, "spec.md")
+		if _, statErr := os.Stat(specPath); statErr != nil {
+			continue
+		}
 		var reqCount int
 		data, readErr := os.ReadFile(specPath)
 		if readErr == nil {

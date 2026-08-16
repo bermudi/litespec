@@ -20,7 +20,7 @@ func TestCompleteCommandNames(t *testing.T) {
 		names[c.Candidate] = true
 	}
 
-	for _, cmd := range []string{"init", "new", "patch", "list", "status", "validate", "instructions", "archive", "preview", "view", "decide", "import", "update", "upgrade", "completion"} {
+	for _, cmd := range []string{"init", "new", "list", "status", "validate", "instructions", "view", "import", "update", "upgrade", "completion"} {
 		if !names[cmd] {
 			t.Errorf("missing command %q in completions", cmd)
 		}
@@ -103,25 +103,7 @@ func TestCompleteStatusChangeNames(t *testing.T) {
 }
 
 func TestCompleteArchiveChangeNames(t *testing.T) {
-	root := t.TempDir()
-	changesDir := filepath.Join(root, "specs", "changes")
-	if err := os.MkdirAll(changesDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(filepath.Join(changesDir, "my-change"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	result := Complete(root, []string{"archive", ""})
-	found := false
-	for _, c := range result {
-		if c.Candidate == "my-change" {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("expected 'my-change' in archive completions")
-	}
+	t.Skip("archive command removed in v2")
 }
 
 func TestCompleteInitTools(t *testing.T) {
@@ -313,9 +295,7 @@ func TestCompleteStatusValues(t *testing.T) {
 func TestCompleteJsonFlags(t *testing.T) {
 	tests := []struct{ cmd string }{
 		{"new"},
-		{"patch"},
 		{"view"},
-		{"preview"},
 		{"instructions"},
 		{"status"},
 		{"list"},
@@ -344,7 +324,7 @@ func TestCommandSpecsMatchFlagSet(t *testing.T) {
 		t.Fatalf("cannot read cmd directory: %v", err)
 	}
 
-	flagNameRE := regexp.MustCompile(`fs\.(?:Bool|String)Var\([^,]+,\s*"([a-z][a-z-]*)"`)
+	flagNameRE := regexp.MustCompile(`fs\.(?:Bool|String|Int)Var\([^,]+,\s*"([a-z][a-z-]*)"`)
 	handlerFlags := make(map[string]map[string]bool)
 
 	for _, e := range entries {

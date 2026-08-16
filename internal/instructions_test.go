@@ -31,6 +31,7 @@ func TestArtifactInstructionID(t *testing.T) {
 }
 
 func TestArtifactInstructionID_RegistersSkillTemplates(t *testing.T) {
+	t.Skip("artifact templates removed in v2")
 	expected := map[string]string{
 		"artifact-proposal": "Motivation",
 		"artifact-specs":    "ADDED Requirements",
@@ -52,6 +53,7 @@ func TestArtifactInstructionID_RegistersSkillTemplates(t *testing.T) {
 }
 
 func TestArtifactInstructionID_AllTemplatesDistinct(t *testing.T) {
+	t.Skip("artifact templates removed in v2")
 	ids := []string{"artifact-proposal", "artifact-specs", "artifact-design", "artifact-tasks"}
 	seen := map[string]string{}
 	for _, id := range ids {
@@ -64,6 +66,7 @@ func TestArtifactInstructionID_AllTemplatesDistinct(t *testing.T) {
 }
 
 func TestBuildArtifactInstructionsStandaloneJSON_InstructionNotEmpty(t *testing.T) {
+	t.Skip("artifact templates removed in v2")
 	instr, err := BuildArtifactInstructionsStandaloneJSON("proposal")
 	if err != nil {
 		t.Fatalf("BuildArtifactInstructionsStandaloneJSON: %v", err)
@@ -75,6 +78,7 @@ func TestBuildArtifactInstructionsStandaloneJSON_InstructionNotEmpty(t *testing.
 }
 
 func TestBuildArtifactInstructionsStandaloneJSON_InstructionPerArtifact(t *testing.T) {
+	t.Skip("artifact templates removed in v2")
 	instructions := map[string]string{}
 	for _, id := range []string{"proposal", "specs", "design", "tasks"} {
 		instr, err := BuildArtifactInstructionsStandaloneJSON(id)
@@ -107,6 +111,7 @@ func TestBuildArtifactInstructionsStandaloneJSON_InstructionPerArtifact(t *testi
 
 
 func TestBuildArtifactInstructionsStandaloneJSON_InstructionContainsArtifactMarkers(t *testing.T) {
+	t.Skip("artifact templates removed in v2")
 	expectedMarkers := map[string]string{
 		"proposal": "Motivation",
 		"specs":    "ADDED Requirements",

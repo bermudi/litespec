@@ -271,6 +271,7 @@ func TestCLIVerifyNameWithBulkFlag(t *testing.T) {
 }
 
 func TestCLIInstructionsArtifact(t *testing.T) {
+	t.Skip("artifact instructions deprecated in v2")
 	bin, root := setupCLITest(t)
 	out, code := runCLI(t, bin, root, "instructions", "proposal")
 	if code != 0 {
@@ -525,6 +526,7 @@ func TestCLIInstructionsHelp(t *testing.T) {
 }
 
 func TestCLIArchiveHelp(t *testing.T) {
+	t.Skip("removed in v2: TestCLIArchiveHelp depends on decide/patch/archive/preview")
 	bin := buildBinary(t)
 	root := t.TempDir()
 	out, code := runCLI(t, bin, root, "archive", "--help")
@@ -545,6 +547,7 @@ func TestCLINewExtraArgs(t *testing.T) {
 }
 
 func TestCLIArchiveExtraArgs(t *testing.T) {
+	t.Skip("removed in v2: TestCLIArchiveExtraArgs depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 	_, code := runCLI(t, bin, root, "archive", "foo", "bar")
 	if code != 1 {
@@ -594,6 +597,7 @@ func TestCLIInstructionsUnknownFlag(t *testing.T) {
 }
 
 func TestCLIArchiveUnknownFlag(t *testing.T) {
+	t.Skip("removed in v2: TestCLIArchiveUnknownFlag depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 	_, code := runCLI(t, bin, root, "archive", "foo", "--bogus")
 	if code != 1 {
@@ -618,6 +622,7 @@ func TestCLIValidateTypeMissingValue(t *testing.T) {
 }
 
 func TestCLIArchiveBlocksOnUnarchivedDependency(t *testing.T) {
+	t.Skip("removed in v2: TestCLIArchiveBlocksOnUnarchivedDependency depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	changeDir := filepath.Join(root, "specs", "changes", "child")
@@ -659,6 +664,7 @@ The system SHALL work.
 }
 
 func TestCLIArchiveAllowsIncompleteWithUnarchivedDeps(t *testing.T) {
+	t.Skip("removed in v2: TestCLIArchiveAllowsIncompleteWithUnarchivedDeps depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	changeDir := filepath.Join(root, "specs", "changes", "child")
@@ -703,6 +709,7 @@ The system SHALL work.
 }
 
 func TestCLIArchiveParentWithActiveDependent(t *testing.T) {
+	t.Skip("removed in v2: TestCLIArchiveParentWithActiveDependent depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	parentDir := filepath.Join(root, "specs", "changes", "parent")
@@ -1458,14 +1465,6 @@ func TestCmdInstructionsDirect_UnknownArtifact(t *testing.T) {
 	}
 }
 
-func TestCmdArchiveDirect_NoArgs(t *testing.T) {
-	setupDirectTest(t)
-	err := cmdArchive([]string{})
-	if err == nil {
-		t.Fatal("expected error for no args")
-	}
-}
-
 func TestCmdInitDirect_UnknownFlag(t *testing.T) {
 	err := cmdInit([]string{"--bogus"})
 	if err == nil {
@@ -1801,54 +1800,6 @@ func setupEmptyDir(t *testing.T) string {
 	root := t.TempDir()
 	t.Chdir(root)
 	return root
-}
-
-func TestCmdArchiveDirect_HappyPath(t *testing.T) {
-	root := setupDirectTest(t)
-	createChangeWithArtifacts(t, root, "my-change")
-	tasksPath := filepath.Join(root, "specs", "changes", "my-change", "tasks.md")
-	os.WriteFile(tasksPath, []byte("## Phase 1\n- [x] Done"), 0o644)
-	err := cmdArchive([]string{"my-change"})
-	if err != nil {
-		t.Fatalf("cmdArchive: %v", err)
-	}
-}
-
-func TestCmdArchiveDirect_UnknownFlag(t *testing.T) {
-	setupDirectTest(t)
-	err := cmdArchive([]string{"foo", "--bogus"})
-	if err == nil {
-		t.Fatal("expected error for unknown flag")
-	}
-}
-
-func TestCmdArchiveDirect_NonexistentChange(t *testing.T) {
-	setupDirectTest(t)
-	err := cmdArchive([]string{"nonexistent"})
-	if err == nil {
-		t.Fatal("expected error for nonexistent change")
-	}
-}
-
-func TestCmdArchiveDirect_IncompleteTasks(t *testing.T) {
-	root := setupDirectTest(t)
-	createChangeWithArtifacts(t, root, "my-change")
-	err := cmdArchive([]string{"my-change"})
-	if err == nil {
-		t.Fatal("expected error for incomplete tasks")
-	}
-	if !strings.Contains(err.Error(), "tasks") {
-		t.Errorf("expected tasks error, got: %v", err)
-	}
-}
-
-func TestCmdArchiveDirect_AllowIncomplete(t *testing.T) {
-	root := setupDirectTest(t)
-	createChangeWithArtifacts(t, root, "my-change")
-	err := cmdArchive([]string{"my-change", "--allow-incomplete"})
-	if err != nil {
-		t.Fatalf("cmdArchive --allow-incomplete: %v", err)
-	}
 }
 
 func TestCmdInitDirect_HappyPath(t *testing.T) {
@@ -2450,6 +2401,7 @@ func TestCLIListJSONLastModifiedNotZero(t *testing.T) {
 }
 
 func TestDecideFirst(t *testing.T) {
+	t.Skip("removed in v2: TestDecideFirst depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 	out, code := runCLI(t, bin, root, "decide", "single-workspace")
 	if code != 0 {
@@ -2472,6 +2424,7 @@ func TestDecideFirst(t *testing.T) {
 }
 
 func TestDecideSubsequent(t *testing.T) {
+	t.Skip("removed in v2: TestDecideSubsequent depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 	runCLI(t, bin, root, "decide", "first-decision")
 	out, code := runCLI(t, bin, root, "decide", "second-decision")
@@ -2484,6 +2437,7 @@ func TestDecideSubsequent(t *testing.T) {
 }
 
 func TestDecideDuplicateSlug(t *testing.T) {
+	t.Skip("removed in v2: TestDecideDuplicateSlug depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 	runCLI(t, bin, root, "decide", "foo")
 	out, code := runCLI(t, bin, root, "decide", "foo")
@@ -2496,6 +2450,7 @@ func TestDecideDuplicateSlug(t *testing.T) {
 }
 
 func TestDecideInvalidSlug(t *testing.T) {
+	t.Skip("removed in v2: TestDecideInvalidSlug depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 	out, code := runCLI(t, bin, root, "decide", "My Decision")
 	if code == 0 {
@@ -2517,6 +2472,7 @@ func TestDecideInvalidSlug(t *testing.T) {
 }
 
 func TestListDecisions(t *testing.T) {
+	t.Skip("removed in v2: TestListDecisions depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 	runCLI(t, bin, root, "decide", "first-decision")
 	runCLI(t, bin, root, "decide", "second-decision")
@@ -2534,6 +2490,7 @@ func TestListDecisions(t *testing.T) {
 }
 
 func TestListDecisionsJSON(t *testing.T) {
+	t.Skip("removed in v2: TestListDecisionsJSON depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 	runCLI(t, bin, root, "decide", "test-decision")
 
@@ -2571,6 +2528,7 @@ func TestListDecisionsMutualExclusion(t *testing.T) {
 }
 
 func TestValidateDecisionsFlag(t *testing.T) {
+	t.Skip("removed in v2: TestValidateDecisionsFlag depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 	runCLI(t, bin, root, "decide", "test-decision")
 
@@ -2581,6 +2539,7 @@ func TestValidateDecisionsFlag(t *testing.T) {
 }
 
 func TestValidateDecisionByName(t *testing.T) {
+	t.Skip("removed in v2: TestValidateDecisionByName depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 	runCLI(t, bin, root, "decide", "test-decision")
 
@@ -2591,6 +2550,7 @@ func TestValidateDecisionByName(t *testing.T) {
 }
 
 func TestValidateDecisionTypeFlag(t *testing.T) {
+	t.Skip("removed in v2: TestValidateDecisionTypeFlag depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 	runCLI(t, bin, root, "decide", "test-decision")
 
@@ -2609,6 +2569,7 @@ func TestValidateDecisionsMutualExclusion(t *testing.T) {
 }
 
 func TestCLIPatchStatusText(t *testing.T) {
+	t.Skip("removed in v2: TestCLIPatchStatusText depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	_, code := runCLI(t, bin, root, "patch", "fix-flag", "cli")
@@ -2638,6 +2599,7 @@ func TestCLIPatchStatusText(t *testing.T) {
 }
 
 func TestCLIPatchStatusJSON(t *testing.T) {
+	t.Skip("removed in v2: TestCLIPatchStatusJSON depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	_, code := runCLI(t, bin, root, "patch", "fix-flag", "cli")
@@ -2671,6 +2633,7 @@ func TestCLIPatchStatusJSON(t *testing.T) {
 }
 
 func TestCLIViewPatchSection(t *testing.T) {
+	t.Skip("removed in v2: TestCLIViewPatchSection depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	createSpec(t, root, "auth")
@@ -2706,6 +2669,7 @@ func TestCLIViewPatchSection(t *testing.T) {
 }
 
 func TestCLIViewNoPatchSectionWhenNoPatches(t *testing.T) {
+	t.Skip("removed in v2: TestCLIViewNoPatchSectionWhenNoPatches depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	createChangeWithArtifacts(t, root, "add-auth")
@@ -2723,6 +2687,7 @@ func TestCLIViewNoPatchSectionWhenNoPatches(t *testing.T) {
 }
 
 func TestCLIViewPatchJSON(t *testing.T) {
+	t.Skip("removed in v2: TestCLIViewPatchJSON depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	changeDir := filepath.Join(root, "specs", "changes", "fix-flag")
@@ -2760,6 +2725,7 @@ func TestCLIViewPatchJSON(t *testing.T) {
 }
 
 func TestCLIArchiveStripsSpecsSubtree(t *testing.T) {
+	t.Skip("removed in v2: TestCLIArchiveStripsSpecsSubtree depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	createChangeWithArtifacts(t, root, "my-change")
@@ -2789,6 +2755,7 @@ func TestCLIArchiveStripsSpecsSubtree(t *testing.T) {
 }
 
 func TestCLIPatchStatusBulkJSON(t *testing.T) {
+	t.Skip("removed in v2: TestCLIPatchStatusBulkJSON depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	// Create a patch change
@@ -2898,6 +2865,7 @@ func TestCLIInitMinimalText(t *testing.T) {
 }
 
 func TestCLIDecideJSON(t *testing.T) {
+	t.Skip("removed in v2: TestCLIDecideJSON depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	out, code := runCLI(t, bin, root, "decide", "test-decision", "--json")
@@ -2921,6 +2889,7 @@ func TestCLIDecideJSON(t *testing.T) {
 }
 
 func TestCLIDecideMinimalJSON(t *testing.T) {
+	t.Skip("removed in v2: TestCLIDecideMinimalJSON depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	out, code := runCLI(t, bin, root, "decide", "test-decision", "--minimal", "--json")
@@ -2938,6 +2907,7 @@ func TestCLIDecideMinimalJSON(t *testing.T) {
 }
 
 func TestCLIDecideMinimalText(t *testing.T) {
+	t.Skip("removed in v2: TestCLIDecideMinimalText depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	out, code := runCLI(t, bin, root, "decide", "test-decision", "--minimal")
@@ -3004,6 +2974,7 @@ func TestCLIUpgradeJSON(t *testing.T) {
 }
 
 func TestCLIArchiveJSON(t *testing.T) {
+	t.Skip("removed in v2: TestCLIArchiveJSON depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	// Don't create canon spec — the change ADDEDs will create it
@@ -3032,6 +3003,7 @@ func TestCLIArchiveJSON(t *testing.T) {
 }
 
 func TestCLIArchiveMinimalJSON(t *testing.T) {
+	t.Skip("removed in v2: TestCLIArchiveMinimalJSON depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	createChangeWithArtifacts(t, root, "test-change")
@@ -3298,6 +3270,7 @@ func TestCLINewMinimalText(t *testing.T) {
 }
 
 func TestCLIPatchMinimalText(t *testing.T) {
+	t.Skip("removed in v2: TestCLIPatchMinimalText depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	out, code := runCLI(t, bin, root, "patch", "test-patch", "some-cap", "--minimal")
@@ -3313,6 +3286,7 @@ func TestCLIPatchMinimalText(t *testing.T) {
 }
 
 func TestCLIPreviewMinimalText(t *testing.T) {
+	t.Skip("removed in v2: TestCLIPreviewMinimalText depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	// Create a change with a delta spec
@@ -3331,6 +3305,7 @@ func TestCLIPreviewMinimalText(t *testing.T) {
 }
 
 func TestCLIPreviewMinimalJSON(t *testing.T) {
+	t.Skip("removed in v2: TestCLIPreviewMinimalJSON depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	changeDir := filepath.Join(root, "specs", "changes", "test-preview2")
@@ -3382,6 +3357,7 @@ func TestCLINewMinimalJSON(t *testing.T) {
 }
 
 func TestCLIPatchMinimalJSON(t *testing.T) {
+	t.Skip("removed in v2: TestCLIPatchMinimalJSON depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	out, code := runCLI(t, bin, root, "patch", "test-patch", "some-cap", "--minimal", "--json")
@@ -3405,6 +3381,7 @@ func TestCLIPatchMinimalJSON(t *testing.T) {
 }
 
 func TestCLIArchiveJSONNoWarningCorruption(t *testing.T) {
+	t.Skip("removed in v2: TestCLIArchiveJSONNoWarningCorruption depends on decide/patch/archive/preview")
 	bin, root := setupCLITest(t)
 
 	createChangeWithArtifacts(t, root, "test-archive-warn")

@@ -38,24 +38,14 @@ var CommandSpecs = []CommandSpec{
 	},
 	{
 		Name:        "new",
-		Description: "Create a new change",
+		Description: "Link to GH issue (v2: no folder) or create offline QUEUE.md",
 		Flags: []FlagSpec{
+			{Name: "--issue", Description: "Link to GH issue number", TakesValue: true},
 			{Name: "--json", Description: "Output as JSON", TakesValue: false},
 			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
 		},
 		Positional: &PositionalSpec{
 			Description: "change name",
-		},
-	},
-	{
-		Name:        "patch",
-		Description: "Create a patch-mode change (delta-only)",
-		Flags: []FlagSpec{
-			{Name: "--json", Description: "Output as JSON", TakesValue: false},
-			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
-		},
-		Positional: &PositionalSpec{
-			Description: "change name and capability",
 		},
 	},
 	{
@@ -124,47 +114,11 @@ var CommandSpecs = []CommandSpec{
 		},
 	},
 	{
-		Name:        "archive",
-		Description: "Apply deltas and archive change",
-		Flags: []FlagSpec{
-			{Name: "--allow-incomplete", Description: "Archive even with incomplete tasks or unarchived dependencies", TakesValue: false},
-			{Name: "--json", Description: "Output as JSON", TakesValue: false},
-			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
-		},
-		Positional: &PositionalSpec{
-			Description: "change name",
-			Resolver:    completeChangeNames,
-		},
-	},
-	{
-		Name:        "preview",
-		Description: "Preview what archive would do to canon specs",
-		Flags: []FlagSpec{
-			{Name: "--json", Description: "Output as JSON", TakesValue: false},
-			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
-		},
-		Positional: &PositionalSpec{
-			Description: "change name",
-			Resolver:    completeChangeNames,
-		},
-	},
-	{
 		Name:        "view",
 		Description: "Dashboard overview with dependency graph",
 		Flags: []FlagSpec{
 			{Name: "--json", Description: "Output as JSON", TakesValue: false},
 			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
-		},
-	},
-	{
-		Name:        "decide",
-		Description: "Create a new architectural decision record",
-		Flags: []FlagSpec{
-			{Name: "--json", Description: "Output as JSON", TakesValue: false},
-			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
-		},
-		Positional: &PositionalSpec{
-			Description: "decision slug",
 		},
 	},
 	{

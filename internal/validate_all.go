@@ -23,38 +23,38 @@ func ValidateAll(root string, strict bool) (*ValidationResult, error) {
 
 	changes, err := ListChanges(root)
 	if err != nil {
-		return nil, err
+		changes = nil
 	}
 
-	for _, ci := range changes {
-		changeResult, err := ValidateChange(root, ci.Name)
-		if err != nil {
-			return nil, err
+	if len(changes) > 0 {
+		for _, ci := range changes {
+			changeResult, err := ValidateChange(root, ci.Name)
+			if err != nil {
+				return nil, err
+			}
+			result.Errors = append(result.Errors, changeResult.Errors...)
+			result.Warnings = append(result.Warnings, changeResult.Warnings...)
+			result.ChangesCount += changeResult.ChangesCount
+			result.CapabilitiesCount += changeResult.CapabilitiesCount
+			result.RequirementsCount += changeResult.RequirementsCount
+			result.ScenariosCount += changeResult.ScenariosCount
 		}
-		result.Errors = append(result.Errors, changeResult.Errors...)
-		result.Warnings = append(result.Warnings, changeResult.Warnings...)
-		result.ChangesCount += changeResult.ChangesCount
-		result.CapabilitiesCount += changeResult.CapabilitiesCount
-		result.RequirementsCount += changeResult.RequirementsCount
-		result.ScenariosCount += changeResult.ScenariosCount
-	}
 
-	depMap, err := LoadDepMap(root)
-	if err != nil {
-		return nil, fmt.Errorf("load dependency map: %w", err)
-	}
+		depMap, err := LoadDepMap(root)
+		if err == nil {
+			cycles := DetectCycles(depMap)
+			for _, cycle := range cycles {
+				path := strings.Join(cycle, " -> ")
+				result.Errors = append(result.Errors, ValidationIssue{
+					Severity: SeverityError,
+					Message:  fmt.Sprintf("dependency cycle detected: %s", path),
+				})
+			}
 
-	cycles := DetectCycles(depMap)
-	for _, cycle := range cycles {
-		path := strings.Join(cycle, " -> ")
-		result.Errors = append(result.Errors, ValidationIssue{
-			Severity: SeverityError,
-			Message:  fmt.Sprintf("dependency cycle detected: %s", path),
-		})
+			overlaps := DetectOverlaps(root, changes, depMap)
+			result.Warnings = append(result.Warnings, overlaps...)
+		}
 	}
-
-	overlaps := DetectOverlaps(root, changes, depMap)
-	result.Warnings = append(result.Warnings, overlaps...)
 
 	skillIDs := make([]string, len(Skills))
 	for i, s := range Skills {
@@ -68,12 +68,10 @@ func ValidateAll(root string, strict bool) (*ValidationResult, error) {
 		})
 	}
 
-	result.Valid = len(result.Errors) == 0
-	if strict && len(result.Warnings) > 0 {
-		result.Valid = false
-	}
+	queueResult := ValidateQueues(root)
+	result.Errors = append(result.Errors, queueResult.Errors...)
+	result.Warnings = append(result.Warnings, queueResult.Warnings...)
 
-	// Include decisions if present
 	decisions, decErr := ListDecisions(root)
 	if decErr == nil && len(decisions) > 0 {
 		decResult, decErr := ValidateDecisions(root)
@@ -85,7 +83,6 @@ func ValidateAll(root string, strict bool) (*ValidationResult, error) {
 		result.DecisionsCount += decResult.DecisionsCount
 	}
 
-	// Validate backlog if present
 	backlogResult := ValidateBacklog(root)
 	result.Warnings = append(result.Warnings, backlogResult.Warnings...)
 

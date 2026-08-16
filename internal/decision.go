@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 type DecisionStatus string
@@ -36,6 +38,7 @@ type Decision struct {
 	Consequences string
 	Supersedes   []string
 	SupersededBy []string
+	Spine        bool
 	FilePath     string
 	LastModified time.Time
 }
@@ -61,6 +64,8 @@ func ParseDecision(path string) (*Decision, error) {
 	}
 
 	content := string(data)
+	spine := parseSpineFrontmatter(content)
+	content = stripFrontmatter(content)
 	title := extractH1(content)
 	if title == "" {
 		return nil, fmt.Errorf("decision file %q has no H1 title", base)
@@ -111,6 +116,7 @@ func ParseDecision(path string) (*Decision, error) {
 		Consequences: consequences,
 		Supersedes:   supersedes,
 		SupersededBy: supersededBy,
+		Spine:        spine,
 		FilePath:     path,
 		LastModified: lastMod,
 	}, nil
@@ -229,4 +235,55 @@ func parseSlugList(content string) []string {
 		}
 	}
 	return slugs
+}
+
+func parseSpineFrontmatter(content string) bool {
+	trimmed := strings.TrimSpace(content)
+	if !strings.HasPrefix(trimmed, "---") {
+		return false
+	}
+	lines := strings.Split(trimmed, "\n")
+	if len(lines) < 3 {
+		return false
+	}
+	end := -1
+	for i := 1; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) == "---" {
+			end = i
+			break
+		}
+	}
+	if end == -1 {
+		return false
+	}
+	fmContent := strings.Join(lines[1:end], "\n")
+	var fm struct {
+		Spine bool `yaml:"spine"`
+	}
+	if err := yaml.Unmarshal([]byte(fmContent), &fm); err != nil {
+		return false
+	}
+	return fm.Spine
+}
+
+func stripFrontmatter(content string) string {
+	trimmed := strings.TrimLeft(content, "\r\n \t")
+	if !strings.HasPrefix(trimmed, "---") {
+		return content
+	}
+	lines := strings.Split(content, "\n")
+	start := -1
+	for i, l := range lines {
+		if strings.TrimSpace(l) == "---" {
+			if start == -1 {
+				start = i
+			} else {
+				return strings.Join(lines[i+1:], "\n")
+			}
+		}
+		if start != -1 && i > 20 {
+			break
+		}
+	}
+	return content
 }

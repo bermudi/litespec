@@ -117,43 +117,23 @@ Examples:
 `)
 }
 
-func printPatchHelp() {
-	fmt.Print(`Usage: litespec patch <name> <capability> [--json] [--minimal]
-
-Create a patch-mode change with only a delta spec. No proposal, design, or tasks.
-
-Patch mode is for small, single-capability changes where the delta is the contract.
-For larger changes or anything needing design discussion, use 'litespec new' instead.
-
-Arguments:
-  <name>            Change name (e.g., add-verbose-flag)
-  <capability>     Capability to patch (e.g., cli)
-
-Flags:
-  --json            Output artifact states as JSON
-  --minimal         Minimal output
-
-Examples:
-  litespec patch add-verbose-flag cli
-  litespec patch fix-output-format status
-`)
-}
-
 func printNewHelp() {
-	fmt.Print(`Usage: litespec new <name> [--json] [--minimal]
+	fmt.Print(`Usage: litespec new <name> [--issue N] [--json] [--minimal]
 
-Create a new change directory under specs/changes/ and show the artifact shape.
+Link to GH issue (v2 lean: no folder) or create offline fallback QUEUE.md.
 
 Arguments:
   <name>            Change name (e.g., add-auth)
 
 Flags:
-  --json            Output artifact states as JSON
+  --issue <N>       Link to existing GH issue number (no folder in lean)
+  --json            Output as JSON
   --minimal         Minimal output
 
 Examples:
-  litespec new add-auth
-  litespec new add-auth --json
+  litespec new add-auth --issue 42
+  litespec new add-auth --issue 42 --json
+  litespec new add-auth           # offline fallback: specs/changes/add-auth/QUEUE.md
 `)
 }
 
@@ -244,26 +224,6 @@ Flags:
 Examples:
   litespec instructions proposal
   litespec instructions design --json
-`)
-}
-
-func printArchiveHelp() {
-	fmt.Print(`Usage: litespec archive <name> [--allow-incomplete] [--json] [--minimal]
-
-Apply deltas to canonical specs and archive a change (marks it as implemented).
-
-Arguments:
-  <name>            Change name to archive
-
-Flags:
-  --allow-incomplete    Archive even with incomplete tasks or unarchived dependencies
-  --json                Output as JSON
-  --minimal             Minimal output
-
-Examples:
-  litespec archive my-change
-  litespec archive my-change --allow-incomplete
-  litespec archive my-change --json
 `)
 }
 

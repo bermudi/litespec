@@ -65,6 +65,18 @@ func CanonPath(root string) string {
 	return filepath.Join(root, ProjectDirName, CanonDirName)
 }
 
+func ProductPath(root string) string {
+	return filepath.Join(root, ProjectDirName, "product.md")
+}
+
+func GlossaryPath(root string) string {
+	return filepath.Join(root, ProjectDirName, "glossary.md")
+}
+
+func FeatureSpecPath(root, feature string) string {
+	return filepath.Join(root, ProjectDirName, feature, "spec.md")
+}
+
 func ChangesPath(root string) string {
 	return filepath.Join(root, ProjectDirName, ChangesDirName)
 }
