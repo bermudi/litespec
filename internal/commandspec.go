@@ -49,85 +49,25 @@ var CommandSpecs = []CommandSpec{
 		},
 	},
 	{
-		Name:        "list",
-		Description: "List specs or changes",
-		Flags: []FlagSpec{
-			{Name: "--specs", Description: "List specs instead of changes", TakesValue: false},
-			{Name: "--changes", Description: "List changes (default)", TakesValue: false},
-			{Name: "--decisions", Description: "List architectural decision records", TakesValue: false},
-			{Name: "--backlog", Description: "List backlog items by section", TakesValue: false},
-			{Name: "--sort", Description: "Sort by 'recent', 'name', 'deps', or 'number'", TakesValue: true, Values: []Completion{
-				{"recent", "Sort by last modified"},
-				{"name", "Sort alphabetically"},
-				{"deps", "Sort by dependency order"},
-				{"number", "Sort by decision number"},
-			}},
-			{Name: "--status", Description: "Filter decisions by status (requires --decisions)", TakesValue: true, Values: []Completion{
-				{"proposed", "Proposed decisions"},
-				{"accepted", "Accepted decisions"},
-				{"superseded", "Superseded decisions"},
-			}},
-			{Name: "--json", Description: "Output as JSON", TakesValue: false},
-			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
-		},
-	},
-	{
-		Name:        "status",
-		Description: "Show artifact states",
-		Flags: []FlagSpec{
-			{Name: "--json", Description: "Output as JSON", TakesValue: false},
-			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
-		},
-		Positional: &PositionalSpec{
-			Description: "change name",
-			Resolver:    completeChangeNames,
-		},
-	},
-	{
 		Name:        "validate",
-		Description: "Validate changes and specs",
+		Description: "Validate specs and decisions",
 		Flags: []FlagSpec{
-			{Name: "--all", Description: "Validate all changes, specs, and decisions", TakesValue: false},
-			{Name: "--changes", Description: "Validate all changes only", TakesValue: false},
+			{Name: "--all", Description: "Validate all specs and decisions", TakesValue: false},
 			{Name: "--specs", Description: "Validate all specs only", TakesValue: false},
 			{Name: "--decisions", Description: "Validate all decisions only", TakesValue: false},
 			{Name: "--strict", Description: "Treat warnings as errors", TakesValue: false},
 			{Name: "--json", Description: "Output as JSON", TakesValue: false},
 			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
-			{Name: "--type", Description: "Disambiguate name: change|spec|decision", TakesValue: true, Values: []Completion{
-				{"change", "Disambiguate as change"},
+			{Name: "--type", Description: "Disambiguate name: spec|decision", TakesValue: true, Values: []Completion{
 				{"spec", "Disambiguate as spec"},
 				{"decision", "Disambiguate as decision"},
 			}},
 		},
 	},
 	{
-		Name:        "instructions",
-		Description: "Get artifact instructions",
-		Flags: []FlagSpec{
-			{Name: "--json", Description: "Output as JSON", TakesValue: false},
-			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
-		},
-		Positional: &PositionalSpec{
-			Description: "artifact ID",
-			Resolver:    func(root string) []Completion { return completeArtifactIDs() },
-		},
-	},
-	{
 		Name:        "view",
-		Description: "Dashboard overview with dependency graph",
+		Description: "Dashboard overview",
 		Flags: []FlagSpec{
-			{Name: "--json", Description: "Output as JSON", TakesValue: false},
-			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
-		},
-	},
-	{
-		Name:        "import",
-		Description: "Import OpenSpec project to litespec",
-		Flags: []FlagSpec{
-			{Name: "--source", Description: "Source OpenSpec project directory", TakesValue: true},
-			{Name: "--dry-run", Description: "Preview import without making changes", TakesValue: false},
-			{Name: "--force", Description: "Overwrite existing files in target", TakesValue: false},
 			{Name: "--json", Description: "Output as JSON", TakesValue: false},
 			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
 		},

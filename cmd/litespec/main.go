@@ -50,16 +50,12 @@ func run() error {
 		return nil
 	case "init":
 		return cmdInit(os.Args[2:])
-	case "list":
-		return cmdList(os.Args[2:])
-	case "status":
-		return cmdStatus(os.Args[2:])
-	case "validate":
-		return cmdValidate(os.Args[2:])
-	case "instructions":
-		return cmdInstructions(os.Args[2:])
 	case "new":
 		return cmdNew(os.Args[2:])
+	case "validate":
+		return cmdValidate(os.Args[2:])
+	case "view":
+		return cmdView(os.Args[2:])
 	case "update":
 		return cmdUpdate(os.Args[2:])
 	case "upgrade":
@@ -69,10 +65,6 @@ func run() error {
 	case "__complete":
 		cmdComplete()
 		return nil
-	case "view":
-		return cmdView(os.Args[2:])
-	case "import":
-		return cmdImport(os.Args[2:])
 	default:
 		printUsage()
 		return fmt.Errorf("unknown command: %s", os.Args[1])
@@ -87,17 +79,13 @@ Workflow (two lanes):
   New feature: plan[fuzzy] -> plan[clear] (GH issue) -> grill-me -> build -> review -> close
 
 Commands:
-  init [--tools <ids>]                                        Initialize project structure
-  new <name> [--issue N]                                      Link to GH issue (v2: no folder)
-  list [--specs|--changes|--decisions|--backlog] [--sort recent|name|deps|number] [--status <state>]   List specs, changes, decisions, or backlog
-  status [<name>]                                             Show artifact states
-  validate [<name>] [--all|--changes|--specs|--decisions] [--type T]      Validate changes, specs, and decisions
-  instructions <artifact>                                     Get artifact instructions
-  view                                                        Dashboard overview with dependency graph
-  import [--source <dir>] [--dry-run] [--force]               Import OpenSpec project to litespec
-  update [--tools <ids>]                                      Regenerate skills and adapters
-  upgrade                                                     Check for and install the latest version
-  completion <shell>                                          Generate shell completion script (bash, zsh, fish)
+  init [--tools <ids>]              Initialize project structure
+  new <name> [--issue N]            Link to GH issue (v2: no folder)
+  validate [--all|--specs|--decisions] [--type T]   Validate specs and decisions
+  view                              Dashboard overview
+  update [--tools <ids>]            Regenerate skills and adapters
+  upgrade                           Check for and install the latest version
+  completion <shell>                Generate shell completion script (bash, zsh, fish)
 
 Tools:
   claude    Symlink skills into .claude/skills/ for Claude Code
@@ -105,14 +93,12 @@ Tools:
 Flags:
    --version    Print version
    --help       Print this help message
-   --json       Output structured JSON (status, validate, list, instructions)
+   --json       Output structured JSON (validate, view)
    --strict     Treat warnings as errors (validate)
-   --all        Validate all changes, specs, and decisions
-   --changes    Validate all changes only
+   --all        Validate all specs and decisions
    --specs      Validate all specs only
    --decisions  Validate all decisions only
-   --type       Disambiguate name type: change|spec|decision (validate)
-    --sort       Sort changes by recent, name, or deps (list, default: recent)
+   --type       Disambiguate name type: spec|decision (validate)
 `)
 }
 

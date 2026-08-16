@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,7 +11,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"unicode/utf8"
 
 	"github.com/bermudi/litespec/internal"
 )
@@ -115,6 +112,29 @@ The system SHALL work.
 `), 0o644)
 }
 
+func createDecision(t *testing.T, root, slug string) {
+	t.Helper()
+	decisionsDir := filepath.Join(root, "specs", "decisions")
+	if err := os.MkdirAll(decisionsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `# Decision: ` + slug + `
+
+## Status
+accepted
+
+## Context
+Some context.
+
+## Decision
+Some decision.
+
+## Consequences
+Some consequences.
+`
+	os.WriteFile(filepath.Join(decisionsDir, "0001-"+slug+".md"), []byte(content), 0o644)
+}
+
 func TestCLIVerifyNoArgs(t *testing.T) {
 	bin, root := setupCLITest(t)
 	out, code := runCLI(t, bin, root, "validate", "--json")
@@ -127,22 +147,6 @@ func TestCLIVerifyNoArgs(t *testing.T) {
 	}
 	if result["valid"] != true {
 		t.Error("expected valid")
-	}
-}
-
-func TestCLIVerifyPositionalChange(t *testing.T) {
-	bin, root := setupCLITest(t)
-	createChangeWithArtifacts(t, root, "my-change")
-	out, code := runCLI(t, bin, root, "validate", "my-change", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	if result["valid"] != true {
-		t.Errorf("expected valid, got %v", result["valid"])
 	}
 }
 
@@ -172,35 +176,18 @@ func TestCLIVerifyUnknownName(t *testing.T) {
 
 func TestCLIVerifyAmbiguousName(t *testing.T) {
 	bin, root := setupCLITest(t)
-	createChange(t, root, "shared")
 	createSpec(t, root, "shared")
+	createDecision(t, root, "shared")
 	_, code := runCLI(t, bin, root, "validate", "shared")
 	if code != 1 {
 		t.Fatalf("expected exit 1, got %d", code)
 	}
 }
 
-func TestCLIVerifyAmbiguousWithTypeChange(t *testing.T) {
-	bin, root := setupCLITest(t)
-	createChangeWithArtifacts(t, root, "shared")
-	createSpec(t, root, "shared")
-	out, code := runCLI(t, bin, root, "validate", "shared", "--type", "change", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	if result["valid"] != true {
-		t.Error("expected valid")
-	}
-}
-
 func TestCLIVerifyAmbiguousWithTypeSpec(t *testing.T) {
 	bin, root := setupCLITest(t)
-	createChange(t, root, "shared")
 	createSpec(t, root, "shared")
+	createDecision(t, root, "shared")
 	out, code := runCLI(t, bin, root, "validate", "shared", "--type", "spec", "--json")
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, out)
@@ -216,7 +203,7 @@ func TestCLIVerifyAmbiguousWithTypeSpec(t *testing.T) {
 
 func TestCLIVerifyTypeWithoutName(t *testing.T) {
 	bin, root := setupCLITest(t)
-	_, code := runCLI(t, bin, root, "validate", "--type", "change")
+	_, code := runCLI(t, bin, root, "validate", "--type", "spec")
 	if code != 1 {
 		t.Fatalf("expected exit 1, got %d", code)
 	}
@@ -224,7 +211,7 @@ func TestCLIVerifyTypeWithoutName(t *testing.T) {
 
 func TestCLIVerifyTypeWithBulkFlag(t *testing.T) {
 	bin, root := setupCLITest(t)
-	_, code := runCLI(t, bin, root, "validate", "--all", "--type", "change")
+	_, code := runCLI(t, bin, root, "validate", "--all", "--type", "spec")
 	if code != 1 {
 		t.Fatalf("expected exit 1, got %d", code)
 	}
@@ -238,25 +225,9 @@ func TestCLIVerifyBulkAll(t *testing.T) {
 	}
 }
 
-func TestCLIVerifyBulkChanges(t *testing.T) {
-	bin, root := setupCLITest(t)
-	out, code := runCLI(t, bin, root, "validate", "--changes", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-}
-
 func TestCLIVerifyBulkSpecs(t *testing.T) {
 	bin, root := setupCLITest(t)
 	out, code := runCLI(t, bin, root, "validate", "--specs", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-}
-
-func TestCLIVerifyBulkCombined(t *testing.T) {
-	bin, root := setupCLITest(t)
-	out, code := runCLI(t, bin, root, "validate", "--changes", "--specs", "--json")
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, out)
 	}
@@ -267,141 +238,6 @@ func TestCLIVerifyNameWithBulkFlag(t *testing.T) {
 	_, code := runCLI(t, bin, root, "validate", "my-change", "--all")
 	if code != 1 {
 		t.Fatalf("expected exit 1 for name + bulk, got %d", code)
-	}
-}
-
-func TestCLIInstructionsArtifact(t *testing.T) {
-	t.Skip("artifact instructions deprecated in v2")
-	bin, root := setupCLITest(t)
-	out, code := runCLI(t, bin, root, "instructions", "proposal")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-	if strings.TrimSpace(out) == "" {
-		t.Error("expected non-empty output for instructions proposal")
-	}
-}
-
-func TestCLIInstructionsJSON(t *testing.T) {
-	bin, root := setupCLITest(t)
-	out, code := runCLI(t, bin, root, "instructions", "design", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	for _, field := range []string{"artifactId", "description", "instruction", "outputPath"} {
-		if _, ok := result[field]; !ok {
-			t.Errorf("missing field %q in JSON output", field)
-		}
-	}
-	if result["artifactId"] != "design" {
-		t.Errorf("expected artifactId=design, got %v", result["artifactId"])
-	}
-}
-
-func TestCLIInstructionsUnknownArtifact(t *testing.T) {
-	bin, root := setupCLITest(t)
-	out, code := runCLI(t, bin, root, "instructions", "unknown-artifact")
-	if code != 1 {
-		t.Fatalf("expected exit 1, got %d", code)
-	}
-	if !strings.Contains(out, "valid:") {
-		t.Errorf("expected valid artifact list in error, got: %s", out)
-	}
-}
-
-func TestChangeStatusText(t *testing.T) {
-	tests := []struct {
-		completed int
-		total     int
-		want      string
-	}{
-		{0, 0, "No tasks"},
-		{5, 5, "✓ Complete"},
-		{3, 5, "3/5 tasks"},
-		{0, 3, "0/3 tasks"},
-	}
-	for _, tt := range tests {
-		c := internal.ChangeInfo{CompletedTasks: tt.completed, TotalTasks: tt.total}
-		got := changeStatusText(c)
-		if got != tt.want {
-			t.Errorf("changeStatusText(%d/%d) = %q, want %q", tt.completed, tt.total, got, tt.want)
-		}
-	}
-}
-
-func TestSortChangesByRecent(t *testing.T) {
-	now := time.Now()
-	changes := []internal.ChangeInfo{
-		{Name: "alpha", LastModified: now.Add(-2 * time.Hour)},
-		{Name: "beta", LastModified: now},
-		{Name: "gamma", LastModified: now.Add(-1 * time.Hour)},
-	}
-	sortChanges(changes, "recent", "")
-	if changes[0].Name != "beta" {
-		t.Errorf("first = %q, want %q", changes[0].Name, "beta")
-	}
-	if changes[1].Name != "gamma" {
-		t.Errorf("second = %q, want %q", changes[1].Name, "gamma")
-	}
-	if changes[2].Name != "alpha" {
-		t.Errorf("third = %q, want %q", changes[2].Name, "alpha")
-	}
-}
-
-func TestSortChangesByName(t *testing.T) {
-	now := time.Now()
-	changes := []internal.ChangeInfo{
-		{Name: "charlie", LastModified: now},
-		{Name: "alpha", LastModified: now.Add(-1 * time.Hour)},
-		{Name: "bravo", LastModified: now.Add(-2 * time.Hour)},
-	}
-	sortChanges(changes, "name", "")
-	if changes[0].Name != "alpha" {
-		t.Errorf("first = %q, want %q", changes[0].Name, "alpha")
-	}
-	if changes[1].Name != "bravo" {
-		t.Errorf("second = %q, want %q", changes[1].Name, "bravo")
-	}
-	if changes[2].Name != "charlie" {
-		t.Errorf("third = %q, want %q", changes[2].Name, "charlie")
-	}
-}
-
-func TestMaxNameWidthChanges(t *testing.T) {
-	changes := []internal.ChangeInfo{
-		{Name: "short"},
-		{Name: "a-very-long-change-name"},
-		{Name: "medium-name"},
-	}
-	got := maxNameWidthChanges(changes)
-	want := len("a-very-long-change-name")
-	if got != want {
-		t.Errorf("maxNameWidthChanges = %d, want %d", got, want)
-	}
-}
-
-func TestMaxNameWidthSpecs(t *testing.T) {
-	specs := []internal.SpecInfo{
-		{Name: "ab"},
-		{Name: "a"},
-		{Name: "abc"},
-	}
-	got := maxNameWidthSpecs(specs)
-	if got != 3 {
-		t.Errorf("maxNameWidthSpecs = %d, want 3", got)
-	}
-}
-
-func TestMaxNameWidthEmpty(t *testing.T) {
-	if maxNameWidthChanges(nil) != 0 {
-		t.Error("expected 0 for nil slice")
-	}
-	if maxNameWidthSpecs(nil) != 0 {
-		t.Error("expected 0 for nil slice")
 	}
 }
 
@@ -477,30 +313,6 @@ func TestCLINewHelp(t *testing.T) {
 	}
 }
 
-func TestCLIListHelp(t *testing.T) {
-	bin := buildBinary(t)
-	root := t.TempDir()
-	out, code := runCLI(t, bin, root, "list", "--help")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-	if !strings.Contains(out, "Usage: litespec list") {
-		t.Error("expected list usage in help output")
-	}
-}
-
-func TestCLIStatusHelp(t *testing.T) {
-	bin := buildBinary(t)
-	root := t.TempDir()
-	out, code := runCLI(t, bin, root, "status", "--help")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-	if !strings.Contains(out, "Usage: litespec status") {
-		t.Error("expected status usage in help output")
-	}
-}
-
 func TestCLIValidateHelp(t *testing.T) {
 	bin := buildBinary(t)
 	root := t.TempDir()
@@ -513,43 +325,9 @@ func TestCLIValidateHelp(t *testing.T) {
 	}
 }
 
-func TestCLIInstructionsHelp(t *testing.T) {
-	bin := buildBinary(t)
-	root := t.TempDir()
-	out, code := runCLI(t, bin, root, "instructions", "--help")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-	if !strings.Contains(out, "Usage: litespec instructions") {
-		t.Error("expected instructions usage in help output")
-	}
-}
-
-func TestCLIArchiveHelp(t *testing.T) {
-	t.Skip("removed in v2: TestCLIArchiveHelp depends on decide/patch/archive/preview")
-	bin := buildBinary(t)
-	root := t.TempDir()
-	out, code := runCLI(t, bin, root, "archive", "--help")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-	if !strings.Contains(out, "Usage: litespec archive") {
-		t.Error("expected archive usage in help output")
-	}
-}
-
 func TestCLINewExtraArgs(t *testing.T) {
 	bin, root := setupCLITest(t)
 	_, code := runCLI(t, bin, root, "new", "foo", "bar")
-	if code != 1 {
-		t.Fatalf("expected exit 1 for extra args, got %d", code)
-	}
-}
-
-func TestCLIArchiveExtraArgs(t *testing.T) {
-	t.Skip("removed in v2: TestCLIArchiveExtraArgs depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-	_, code := runCLI(t, bin, root, "archive", "foo", "bar")
 	if code != 1 {
 		t.Fatalf("expected exit 1 for extra args, got %d", code)
 	}
@@ -564,22 +342,6 @@ func TestCLIInitUnknownFlag(t *testing.T) {
 	}
 }
 
-func TestCLIListUnknownFlag(t *testing.T) {
-	bin, root := setupCLITest(t)
-	_, code := runCLI(t, bin, root, "list", "--bogus")
-	if code != 1 {
-		t.Fatalf("expected exit 1 for unknown flag, got %d", code)
-	}
-}
-
-func TestCLIStatusUnknownFlag(t *testing.T) {
-	bin, root := setupCLITest(t)
-	_, code := runCLI(t, bin, root, "status", "--bogus")
-	if code != 1 {
-		t.Fatalf("expected exit 1 for unknown flag, got %d", code)
-	}
-}
-
 func TestCLIValidateUnknownFlag(t *testing.T) {
 	bin, root := setupCLITest(t)
 	_, code := runCLI(t, bin, root, "validate", "--bogus")
@@ -588,309 +350,11 @@ func TestCLIValidateUnknownFlag(t *testing.T) {
 	}
 }
 
-func TestCLIInstructionsUnknownFlag(t *testing.T) {
-	bin, root := setupCLITest(t)
-	_, code := runCLI(t, bin, root, "instructions", "proposal", "--bogus")
-	if code != 1 {
-		t.Fatalf("expected exit 1 for unknown flag, got %d", code)
-	}
-}
-
-func TestCLIArchiveUnknownFlag(t *testing.T) {
-	t.Skip("removed in v2: TestCLIArchiveUnknownFlag depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-	_, code := runCLI(t, bin, root, "archive", "foo", "--bogus")
-	if code != 1 {
-		t.Fatalf("expected exit 1 for unknown flag, got %d", code)
-	}
-}
-
-func TestCLIListSortMissingValue(t *testing.T) {
-	bin, root := setupCLITest(t)
-	_, code := runCLI(t, bin, root, "list", "--sort")
-	if code != 1 {
-		t.Fatalf("expected exit 1 for --sort without value, got %d", code)
-	}
-}
-
 func TestCLIValidateTypeMissingValue(t *testing.T) {
 	bin, root := setupCLITest(t)
 	_, code := runCLI(t, bin, root, "validate", "foo", "--type")
 	if code != 1 {
 		t.Fatalf("expected exit 1 for --type without value, got %d", code)
-	}
-}
-
-func TestCLIArchiveBlocksOnUnarchivedDependency(t *testing.T) {
-	t.Skip("removed in v2: TestCLIArchiveBlocksOnUnarchivedDependency depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	changeDir := filepath.Join(root, "specs", "changes", "child")
-	if err := os.MkdirAll(changeDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - parent\n"), 0o644)
-	os.WriteFile(filepath.Join(changeDir, "proposal.md"), []byte("# Proposal\n\n## Motivation\nSome motivation.\n\n## Scope\nSome scope."), 0o644)
-	os.WriteFile(filepath.Join(changeDir, "design.md"), []byte("# Design\n\n## Architecture\nLine one.\nLine two.\nLine three."), 0o644)
-	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1: Test\n- [x] Task one"), 0o644)
-	specsDir := filepath.Join(changeDir, "specs", "cap")
-	os.MkdirAll(specsDir, 0o755)
-	os.WriteFile(filepath.Join(specsDir, "spec.md"), []byte(`## ADDED Requirements
-
-### Requirement: R1
-The system SHALL work.
-
-#### Scenario: S1
-- **WHEN** triggered
-- **THEN** expected result
-`), 0o644)
-
-	parentDir := filepath.Join(root, "specs", "changes", "parent")
-	if err := os.MkdirAll(parentDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(parentDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
-	os.WriteFile(filepath.Join(parentDir, "proposal.md"), []byte("# Proposal\n\n## Motivation\nSome motivation.\n\n## Scope\nSome scope."), 0o644)
-	os.WriteFile(filepath.Join(parentDir, "design.md"), []byte("# Design\n\n## Architecture\nLine one.\nLine two.\nLine three."), 0o644)
-	os.WriteFile(filepath.Join(parentDir, "tasks.md"), []byte("## Phase 1: Test\n- [ ] Task one"), 0o644)
-
-	out, code := runCLI(t, bin, root, "archive", "child")
-	if code != 1 {
-		t.Fatalf("expected exit 1 for unarchived dependency, got %d: %s", code, out)
-	}
-	if !strings.Contains(out, "unarchived dependencies") {
-		t.Errorf("expected unarchived dependencies error, got: %s", out)
-	}
-}
-
-func TestCLIArchiveAllowsIncompleteWithUnarchivedDeps(t *testing.T) {
-	t.Skip("removed in v2: TestCLIArchiveAllowsIncompleteWithUnarchivedDeps depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	changeDir := filepath.Join(root, "specs", "changes", "child")
-	if err := os.MkdirAll(changeDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - parent\n"), 0o644)
-	os.WriteFile(filepath.Join(changeDir, "proposal.md"), []byte("# Proposal\n\n## Motivation\nSome motivation.\n\n## Scope\nSome scope."), 0o644)
-	os.WriteFile(filepath.Join(changeDir, "design.md"), []byte("# Design\n\n## Architecture\nLine one.\nLine two.\nLine three."), 0o644)
-	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1: Test\n- [x] Task one"), 0o644)
-	specsDir := filepath.Join(changeDir, "specs", "cap")
-	os.MkdirAll(specsDir, 0o755)
-	os.WriteFile(filepath.Join(specsDir, "spec.md"), []byte(`## ADDED Requirements
-
-### Requirement: R1
-The system SHALL work.
-
-#### Scenario: S1
-- **WHEN** triggered
-- **THEN** expected result
-`), 0o644)
-
-	parentDir := filepath.Join(root, "specs", "changes", "parent")
-	if err := os.MkdirAll(parentDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(parentDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
-	os.WriteFile(filepath.Join(parentDir, "proposal.md"), []byte("# Proposal\n\n## Motivation\nSome motivation.\n\n## Scope\nSome scope."), 0o644)
-	os.WriteFile(filepath.Join(parentDir, "design.md"), []byte("# Design\n\n## Architecture\nLine one.\nLine two.\nLine three."), 0o644)
-	os.WriteFile(filepath.Join(parentDir, "tasks.md"), []byte("## Phase 1: Test\n- [ ] Task one"), 0o644)
-
-	out, code := runCLI(t, bin, root, "archive", "child", "--allow-incomplete")
-	if code != 0 {
-		t.Fatalf("expected success with --allow-incomplete, got %d: %s", code, out)
-	}
-	if !strings.Contains(out, "archived — deltas applied, change marked as implemented") {
-		t.Errorf("expected archive success, got: %s", out)
-	}
-	if !strings.Contains(out, "WARN") || !strings.Contains(out, "unarchived dependencies") {
-		t.Errorf("expected warning about unarchived dependencies, got: %s", out)
-	}
-}
-
-func TestCLIArchiveParentWithActiveDependent(t *testing.T) {
-	t.Skip("removed in v2: TestCLIArchiveParentWithActiveDependent depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	parentDir := filepath.Join(root, "specs", "changes", "parent")
-	if err := os.MkdirAll(parentDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(parentDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
-	os.WriteFile(filepath.Join(parentDir, "proposal.md"), []byte("# Proposal\n\n## Motivation\nSome motivation.\n\n## Scope\nSome scope."), 0o644)
-	os.WriteFile(filepath.Join(parentDir, "design.md"), []byte("# Design\n\n## Architecture\nLine one.\nLine two.\nLine three."), 0o644)
-	os.WriteFile(filepath.Join(parentDir, "tasks.md"), []byte("## Phase 1: Test\n- [x] Task one"), 0o644)
-	specsDir := filepath.Join(parentDir, "specs", "cap")
-	os.MkdirAll(specsDir, 0o755)
-	os.WriteFile(filepath.Join(specsDir, "spec.md"), []byte(`## ADDED Requirements
-
-### Requirement: R1
-The system SHALL work.
-
-#### Scenario: S1
-- **WHEN** triggered
-- **THEN** expected result
-`), 0o644)
-
-	childDir := filepath.Join(root, "specs", "changes", "child")
-	if err := os.MkdirAll(childDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(childDir, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - parent\n"), 0o644)
-	os.WriteFile(filepath.Join(childDir, "proposal.md"), []byte("# Proposal\n\n## Motivation\nSome motivation.\n\n## Scope\nSome scope."), 0o644)
-	os.WriteFile(filepath.Join(childDir, "design.md"), []byte("# Design\n\n## Architecture\nLine one.\nLine two.\nLine three."), 0o644)
-	os.WriteFile(filepath.Join(childDir, "tasks.md"), []byte("## Phase 1: Test\n- [ ] Task one"), 0o644)
-
-	out, code := runCLI(t, bin, root, "archive", "parent")
-	if code != 0 {
-		t.Fatalf("expected success archiving parent, got %d: %s", code, out)
-	}
-	if !strings.Contains(out, "archived — deltas applied, change marked as implemented") {
-		t.Errorf("expected archive success, got: %s", out)
-	}
-}
-
-func TestCLIListSortDeps(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	parentDir := filepath.Join(root, "specs", "changes", "add-auth")
-	if err := os.MkdirAll(parentDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(parentDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
-
-	childDir := filepath.Join(root, "specs", "changes", "add-rate-limiting")
-	if err := os.MkdirAll(childDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(childDir, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - add-auth\n"), 0o644)
-
-	out, code := runCLI(t, bin, root, "list", "--sort", "deps", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	changes := result["changes"].([]interface{})
-	if len(changes) != 2 {
-		t.Fatalf("expected 2 changes, got %d", len(changes))
-	}
-	first := changes[0].(map[string]interface{})
-	second := changes[1].(map[string]interface{})
-	if first["name"] != "add-auth" {
-		t.Errorf("first should be add-auth (dep), got %v", first["name"])
-	}
-	if second["name"] != "add-rate-limiting" {
-		t.Errorf("second should be add-rate-limiting (dependent), got %v", second["name"])
-	}
-	deps, _ := second["dependsOn"].([]interface{})
-	if len(deps) != 1 || deps[0] != "add-auth" {
-		t.Errorf("expected dependsOn [add-auth], got %v", deps)
-	}
-}
-
-func TestCLIListTextShowsBornColumn(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	changeDir := filepath.Join(root, "specs", "changes", "ts-change")
-	if err := os.MkdirAll(changeDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-03-15T10:30:00Z\n"), 0o644)
-	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1\n- [x] Done\n"), 0o644)
-
-	out, code := runCLI(t, bin, root, "list")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	if !strings.Contains(out, "ts-change") {
-		t.Error("expected ts-change in output")
-	}
-	if !strings.Contains(out, "2026-03-15") {
-		t.Errorf("expected born date 2026-03-15 in output, got:\n%s", out)
-	}
-	lines := strings.Split(out, "\n")
-	var dataLine string
-	for _, line := range lines {
-		if strings.Contains(line, "ts-change") {
-			dataLine = line
-			break
-		}
-	}
-	if dataLine == "" {
-		t.Fatal("no data line found for ts-change")
-	}
-	fields := strings.Fields(strings.TrimSpace(dataLine))
-	if len(fields) < 4 {
-		t.Errorf("expected at least 4 columns, got %d: %q", len(fields), fields)
-	}
-}
-
-func TestCLIListJSONShowsBornField(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	changeDir := filepath.Join(root, "specs", "changes", "ts-change")
-	if err := os.MkdirAll(changeDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-03-15T10:30:00Z\n"), 0o644)
-	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1\n- [x] Done\n"), 0o644)
-
-	out, code := runCLI(t, bin, root, "list", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	changes := result["changes"].([]interface{})
-	if len(changes) != 1 {
-		t.Fatalf("expected 1 change, got %d", len(changes))
-	}
-	c := changes[0].(map[string]interface{})
-	if c["born"] == nil {
-		t.Error("expected born field in JSON output")
-	}
-	born, ok := c["born"].(string)
-	if !ok {
-		t.Errorf("expected born to be string, got %T", c["born"])
-	}
-	if !strings.HasPrefix(born, "2026-03-15") {
-		t.Errorf("expected born to start with 2026-03-15, got %q", born)
-	}
-}
-
-func TestCLIListJSONBornEmptyWhenNoCreated(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	changeDir := filepath.Join(root, "specs", "changes", "no-ts")
-	if err := os.MkdirAll(changeDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
-
-	out, code := runCLI(t, bin, root, "list", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	changes := result["changes"].([]interface{})
-	if len(changes) != 1 {
-		t.Fatalf("expected 1 change, got %d", len(changes))
-	}
-	c := changes[0].(map[string]interface{})
-	if _, exists := c["born"]; exists {
-		t.Errorf("expected born field to be omitted when no created, got %q", c["born"])
 	}
 }
 
@@ -903,93 +367,6 @@ func TestCLIViewHelp(t *testing.T) {
 	}
 	if !strings.Contains(out, "Usage: litespec view") {
 		t.Error("expected view usage in help output")
-	}
-}
-
-func TestCLIViewDashboard(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	createSpec(t, root, "auth")
-	createSpec(t, root, "database")
-
-	createChangeWithArtifacts(t, root, "add-auth")
-	changeDir := filepath.Join(root, "specs", "changes", "add-auth")
-	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1: Test\n- [x] Task one\n- [ ] Task two"), 0o644)
-
-	createChange(t, root, "draft-change")
-
-	out, code := runCLI(t, bin, root, "view")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	if !strings.Contains(out, "Summary:") {
-		t.Error("expected Summary section")
-	}
-	if !strings.Contains(out, "Active Changes") {
-		t.Error("expected Active Changes section")
-	}
-	if !strings.Contains(out, "Specifications") {
-		t.Error("expected Specifications section")
-	}
-	if !strings.Contains(out, "Specifications: 2 specs, 2 requirements") {
-		t.Error("expected '2 specs, 2 requirements' in summary")
-	}
-	if !strings.Contains(out, "Active Changes: 1 in progress") {
-		t.Error("expected 1 active change")
-	}
-	if !strings.Contains(out, "Draft Changes: 1") {
-		t.Error("expected 1 draft change")
-	}
-	if !strings.Contains(out, "Task Progress: 1/2 (50% complete)") {
-		t.Error("expected 50% task progress")
-	}
-	if !strings.Contains(out, "auth") {
-		t.Error("expected auth spec")
-	}
-	if !strings.Contains(out, "database") {
-		t.Error("expected database spec")
-	}
-	if !strings.Contains(out, "add-auth") {
-		t.Error("expected add-auth change")
-	}
-	if !strings.Contains(out, "draft-change") {
-		t.Error("expected draft-change change")
-	}
-	if !strings.Contains(out, "█████") {
-		t.Error("expected progress bar characters")
-	}
-	if !strings.Contains(out, "50%") {
-		t.Error("expected 50% in progress bar")
-	}
-}
-
-func TestCLIViewNoSpecs(t *testing.T) {
-	bin := buildBinary(t)
-	root := t.TempDir()
-
-	changesDir := filepath.Join(root, "specs", "changes")
-	if err := os.MkdirAll(changesDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	archiveDir := filepath.Join(root, "specs", "changes", "archive")
-	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	out, code := runCLI(t, bin, root, "view")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	if !strings.Contains(out, "Summary:") {
-		t.Error("expected Summary section")
-	}
-	if !strings.Contains(out, "Specifications: 0 specs, 0 requirements") {
-		t.Error("expected 0 specs in summary")
-	}
-	if !strings.Contains(out, "Active Changes: 0 in progress") {
-		t.Error("expected 0 active changes")
 	}
 }
 
@@ -1006,175 +383,11 @@ func TestCLIViewNoProjectRoot(t *testing.T) {
 	}
 }
 
-func TestCLIViewWithDependencyGraph(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	parentDir := filepath.Join(root, "specs", "changes", "parent-change")
-	if err := os.MkdirAll(parentDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(parentDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
-
-	childDir := filepath.Join(root, "specs", "changes", "child-change")
-	if err := os.MkdirAll(childDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(childDir, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - parent-change\n"), 0o644)
-
-	unrelatedDir := filepath.Join(root, "specs", "changes", "unrelated-change")
-	if err := os.MkdirAll(unrelatedDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(unrelatedDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
-
-	out, code := runCLI(t, bin, root, "view")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	if !strings.Contains(out, "Dependency Graph") {
-		t.Error("expected Dependency Graph section when dependencies exist")
-	}
-	lines := strings.Split(out, "\n")
-	parentIdx := -1
-	childIdx := -1
-	for i, line := range lines {
-		if strings.Contains(line, "parent-change") && !strings.Contains(line, "Active Changes") && !strings.Contains(line, "Draft Changes") {
-			parentIdx = i
-		}
-		if strings.Contains(line, "child-change") && !strings.Contains(line, "Active Changes") && !strings.Contains(line, "Draft Changes") {
-			childIdx = i
-		}
-	}
-	if parentIdx == -1 {
-		t.Error("expected parent-change in graph")
-	}
-	if childIdx == -1 {
-		t.Error("expected child-change in graph")
-	}
-	if parentIdx != -1 && childIdx != -1 && childIdx <= parentIdx {
-		t.Errorf("expected parent-change (line %d) before child-change (line %d) in tree", parentIdx, childIdx)
-	}
-	if !strings.Contains(out, "└──") {
-		t.Error("expected box-drawing characters in graph")
-	}
-	if !strings.Contains(out, "Unrelated:") {
-		t.Error("expected Unrelated section for changes with no deps and no dependents")
-	}
-	if !strings.Contains(out, "unrelated-change") {
-		t.Error("expected unrelated-change in unrelated list")
-	}
-}
-
-func TestCLIViewNoDependencyGraphWhenNoDeps(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	createChange(t, root, "change-a")
-	createChange(t, root, "change-b")
-
-	out, code := runCLI(t, bin, root, "view")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	if strings.Contains(out, "Dependency Graph") {
-		t.Error("expected no Dependency Graph section when no dependencies exist")
-	}
-}
-
 func TestCLIViewUnknownFlag(t *testing.T) {
 	bin, root := setupCLITest(t)
 	_, code := runCLI(t, bin, root, "view", "--bogus")
 	if code != 1 {
 		t.Fatalf("expected exit 1 for unknown flag, got %d", code)
-	}
-}
-
-func TestCLIViewTimestampsInAllSections(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	activeDir := filepath.Join(root, "specs", "changes", "active-change")
-	os.MkdirAll(activeDir, 0o755)
-	os.WriteFile(filepath.Join(activeDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-04-01T12:00:00Z\n"), 0o644)
-	os.WriteFile(filepath.Join(activeDir, "tasks.md"), []byte("## Phase 1\n- [x] Done\n- [ ] Todo\n"), 0o644)
-
-	draftDir := filepath.Join(root, "specs", "changes", "draft-change")
-	os.MkdirAll(draftDir, 0o755)
-	os.WriteFile(filepath.Join(draftDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-04-02T08:00:00Z\n"), 0o644)
-
-	completedDir := filepath.Join(root, "specs", "changes", "completed-change")
-	os.MkdirAll(completedDir, 0o755)
-	os.WriteFile(filepath.Join(completedDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-04-03T15:00:00Z\n"), 0o644)
-	os.WriteFile(filepath.Join(completedDir, "tasks.md"), []byte("## Phase 1\n- [x] Done\n"), 0o644)
-
-	out, code := runCLI(t, bin, root, "view")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	for _, section := range []struct {
-		name    string
-		born    string
-		section string
-	}{
-		{"active-change", "2026-04-01", "Active Changes"},
-		{"draft-change", "2026-04-02", "Draft Changes"},
-		{"completed-change", "2026-04-03", "Ready to Archive"},
-	} {
-		if !strings.Contains(out, "born "+section.born) {
-			t.Errorf("expected 'born %s' in %s section, got:\n%s", section.born, section.section, out)
-		}
-	}
-
-	if !strings.Contains(out, "touched") {
-		t.Errorf("expected 'touched' in output, got:\n%s", out)
-	}
-}
-
-func TestCLIViewDependencyGraphTimestamps(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	parentDir := filepath.Join(root, "specs", "changes", "parent-ts")
-	os.MkdirAll(parentDir, 0o755)
-	os.WriteFile(filepath.Join(parentDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-04-01T10:00:00Z\n"), 0o644)
-
-	childDir := filepath.Join(root, "specs", "changes", "child-ts")
-	os.MkdirAll(childDir, 0o755)
-	os.WriteFile(filepath.Join(childDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-04-02T10:00:00Z\ndependsOn:\n  - parent-ts\n"), 0o644)
-
-	out, code := runCLI(t, bin, root, "view")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	if !strings.Contains(out, "Dependency Graph") {
-		t.Error("expected Dependency Graph section")
-	}
-	if !strings.Contains(out, "born 2026-04-01") {
-		t.Errorf("expected parent born date in graph, got:\n%s", out)
-	}
-	if !strings.Contains(out, "born 2026-04-02") {
-		t.Errorf("expected child born date in graph, got:\n%s", out)
-	}
-}
-
-func TestCLIValidateChangesDetectsCycle(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	changeDirA := filepath.Join(root, "specs", "changes", "change-a")
-	os.MkdirAll(changeDirA, 0o755)
-	os.WriteFile(filepath.Join(changeDirA, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - change-b\n"), 0o644)
-
-	changeDirB := filepath.Join(root, "specs", "changes", "change-b")
-	os.MkdirAll(changeDirB, 0o755)
-	os.WriteFile(filepath.Join(changeDirB, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - change-a\n"), 0o644)
-
-	out, code := runCLI(t, bin, root, "validate", "--changes", "--json")
-	if code != 1 {
-		t.Fatalf("expected exit 1 for cycle, got %d: %s", code, out)
-	}
-	if !strings.Contains(out, "cycle") {
-		t.Errorf("expected cycle error in output, got: %s", out)
 	}
 }
 
@@ -1195,45 +408,6 @@ func TestCLIValidateAllDetectsCycle(t *testing.T) {
 	}
 	if !strings.Contains(out, "cycle") {
 		t.Errorf("expected cycle error in output, got: %s", out)
-	}
-}
-
-func TestCLIListSortDepsWithCycle(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	changeDirA := filepath.Join(root, "specs", "changes", "change-a")
-	os.MkdirAll(changeDirA, 0o755)
-	os.WriteFile(filepath.Join(changeDirA, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - change-b\n"), 0o644)
-
-	changeDirB := filepath.Join(root, "specs", "changes", "change-b")
-	os.MkdirAll(changeDirB, 0o755)
-	os.WriteFile(filepath.Join(changeDirB, ".litespec.yaml"), []byte("schema: spec-driven\ndependsOn:\n  - change-a\n"), 0o644)
-
-	out, code := runCLI(t, bin, root, "list", "--sort", "deps", "--json")
-	if code != 0 {
-		t.Fatalf("expected exit 0 for sort deps with cycle, got %d: %s", code, out)
-	}
-	if !strings.Contains(out, "WARN") {
-		t.Errorf("expected cycle warning, got: %s", out)
-	}
-
-	jsonStart := strings.Index(out, "{")
-	if jsonStart < 0 {
-		t.Fatalf("no JSON found in output: %s", out)
-	}
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out[jsonStart:]), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	changes := result["changes"].([]interface{})
-	if len(changes) != 2 {
-		t.Fatalf("expected 2 changes, got %d", len(changes))
-	}
-	if changes[0].(map[string]interface{})["name"] != "change-a" {
-		t.Errorf("expected alphabetical order, first = %v", changes[0].(map[string]interface{})["name"])
-	}
-	if changes[1].(map[string]interface{})["name"] != "change-b" {
-		t.Errorf("expected alphabetical order, second = %v", changes[1].(map[string]interface{})["name"])
 	}
 }
 
@@ -1375,56 +549,6 @@ func TestCmdNewDirect_InvalidName(t *testing.T) {
 	}
 }
 
-func TestCmdStatusDirect_NonexistentChange(t *testing.T) {
-	setupDirectTest(t)
-	err := cmdStatus([]string{"nonexistent"})
-	if err == nil {
-		t.Fatal("expected error for nonexistent change")
-	}
-}
-
-func TestCmdStatusDirect_AllChangesEmpty(t *testing.T) {
-	setupDirectTest(t)
-	err := cmdStatus([]string{})
-	if err != nil {
-		t.Fatalf("cmdStatus (all): %v", err)
-	}
-}
-
-func TestCmdStatusDirect_SpecificChange(t *testing.T) {
-	root := setupDirectTest(t)
-	createChange(t, root, "test-change")
-	err := cmdStatus([]string{"test-change"})
-	if err != nil {
-		t.Fatalf("cmdStatus: %v", err)
-	}
-}
-
-func TestCmdListDirect_EmptyChanges(t *testing.T) {
-	setupDirectTest(t)
-	err := cmdList([]string{})
-	if err != nil {
-		t.Fatalf("cmdList: %v", err)
-	}
-}
-
-func TestCmdListDirect_Specs(t *testing.T) {
-	root := setupDirectTest(t)
-	createSpec(t, root, "auth")
-	err := cmdList([]string{"--specs"})
-	if err != nil {
-		t.Fatalf("cmdList --specs: %v", err)
-	}
-}
-
-func TestCmdListDirect_InvalidSort(t *testing.T) {
-	setupDirectTest(t)
-	err := cmdList([]string{"--sort", "invalid"})
-	if err == nil {
-		t.Fatal("expected error for invalid sort value")
-	}
-}
-
 func TestCmdValidateDirect_InvalidType(t *testing.T) {
 	setupDirectTest(t)
 	err := cmdValidate([]string{"foo", "--type", "invalid"})
@@ -1449,22 +573,6 @@ func TestCmdValidateDirect_TypeWithoutName(t *testing.T) {
 	}
 }
 
-func TestCmdInstructionsDirect_NoArgs(t *testing.T) {
-	setupDirectTest(t)
-	err := cmdInstructions([]string{})
-	if err == nil {
-		t.Fatal("expected error for no args")
-	}
-}
-
-func TestCmdInstructionsDirect_UnknownArtifact(t *testing.T) {
-	setupDirectTest(t)
-	err := cmdInstructions([]string{"bogus"})
-	if err == nil {
-		t.Fatal("expected error for unknown artifact")
-	}
-}
-
 func TestCmdInitDirect_UnknownFlag(t *testing.T) {
 	err := cmdInit([]string{"--bogus"})
 	if err == nil {
@@ -1483,36 +591,6 @@ func TestCmdCompletionDirect_InvalidShell(t *testing.T) {
 	err := cmdCompletion([]string{"powershell"})
 	if err == nil {
 		t.Fatal("expected error for invalid shell")
-	}
-}
-
-func TestCLIStatusJSONWarningOnError(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	goodDir := filepath.Join(root, "specs", "changes", "good-change")
-	if err := os.MkdirAll(goodDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(goodDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
-
-	badDir := filepath.Join(root, "specs", "changes", "bad-change")
-	if err := os.MkdirAll(badDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(badDir, ".litespec.yaml"), []byte("key: [unclosed\n"), 0o644)
-
-	out, code := runCLI(t, bin, root, "status", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	warnings, ok := result["warnings"].([]interface{})
-	if !ok || len(warnings) == 0 {
-		t.Errorf("expected warnings in output, got: %v", result["warnings"])
 	}
 }
 
@@ -1565,185 +643,6 @@ func TestCmdUpdateDirect_UnknownTool(t *testing.T) {
 	}
 }
 
-func TestCreateProgressBar_Half(t *testing.T) {
-	got := createProgressBar(5, 10, 10)
-	want := "[█████░░░░░]"
-	if got != want {
-		t.Errorf("createProgressBar(5,10,10) = %q, want %q", got, want)
-	}
-}
-
-func TestCreateProgressBar_Zero(t *testing.T) {
-	got := createProgressBar(0, 5, 10)
-	want := "[░░░░░░░░░░]"
-	if got != want {
-		t.Errorf("createProgressBar(0,5,10) = %q, want %q", got, want)
-	}
-}
-
-func TestCreateProgressBar_Complete(t *testing.T) {
-	got := createProgressBar(5, 5, 10)
-	want := "[██████████]"
-	if got != want {
-		t.Errorf("createProgressBar(5,5,10) = %q, want %q", got, want)
-	}
-}
-
-func TestCreateProgressBar_ZeroTotal(t *testing.T) {
-	got := createProgressBar(0, 0, 10)
-	want := "──────────"
-	if got != want {
-		t.Errorf("createProgressBar(0,0,10) = %q, want %q", got, want)
-	}
-}
-
-func TestCreateProgressBar_Width(t *testing.T) {
-	got := createProgressBar(3, 6, 20)
-	if utf8.RuneCountInString(got) != 22 {
-		t.Errorf("rune count of createProgressBar(3,6,20) = %d, want 22", utf8.RuneCountInString(got))
-	}
-}
-
-func captureStdout(fn func()) string {
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	fn()
-	w.Close()
-	os.Stdout = old
-	var buf bytes.Buffer
-	io.Copy(&buf, r)
-	return buf.String()
-}
-
-func TestRenderDependencyGraph_SimpleTree(t *testing.T) {
-	depMap := map[string][]string{
-		"child": {"parent"},
-	}
-	changes := []internal.ChangeInfo{
-		{Name: "parent"},
-		{Name: "child"},
-	}
-
-	output := captureStdout(func() {
-		renderDependencyGraph(os.Stdout, depMap, changes)
-	})
-
-	parentIdx := strings.Index(output, "parent")
-	childIdx := strings.Index(output, "child")
-	if parentIdx == -1 {
-		t.Error("expected parent in output")
-	}
-	if childIdx == -1 {
-		t.Error("expected child in output")
-	}
-	if parentIdx != -1 && childIdx != -1 && childIdx <= parentIdx {
-		t.Error("expected parent before child in tree")
-	}
-	if !strings.Contains(output, "└──") {
-		t.Error("expected └── connector in output")
-	}
-}
-
-func TestRenderDependencyGraph_MultipleChildren(t *testing.T) {
-	depMap := map[string][]string{
-		"child-a": {"parent"},
-		"child-b": {"parent"},
-	}
-	changes := []internal.ChangeInfo{
-		{Name: "parent"},
-		{Name: "child-a"},
-		{Name: "child-b"},
-	}
-
-	output := captureStdout(func() {
-		renderDependencyGraph(os.Stdout, depMap, changes)
-	})
-
-	if !strings.Contains(output, "child-a") {
-		t.Error("expected child-a in output")
-	}
-	if !strings.Contains(output, "child-b") {
-		t.Error("expected child-b in output")
-	}
-	if !strings.Contains(output, "parent") {
-		t.Error("expected parent in output")
-	}
-}
-
-func TestRenderDependencyGraph_UnrelatedChanges(t *testing.T) {
-	depMap := map[string][]string{
-		"child": {"parent"},
-	}
-	changes := []internal.ChangeInfo{
-		{Name: "parent"},
-		{Name: "child"},
-		{Name: "lonely"},
-	}
-
-	output := captureStdout(func() {
-		renderDependencyGraph(os.Stdout, depMap, changes)
-	})
-
-	if !strings.Contains(output, "Unrelated:") {
-		t.Error("expected Unrelated section in output")
-	}
-	if !strings.Contains(output, "lonely") {
-		t.Error("expected lonely change in Unrelated section")
-	}
-}
-
-func TestRenderDependencyGraph_DeepChain(t *testing.T) {
-	depMap := map[string][]string{
-		"B": {"A"},
-		"C": {"B"},
-	}
-	changes := []internal.ChangeInfo{
-		{Name: "A"},
-		{Name: "B"},
-		{Name: "C"},
-	}
-
-	output := captureStdout(func() {
-		renderDependencyGraph(os.Stdout, depMap, changes)
-	})
-
-	lines := strings.Split(strings.TrimSpace(output), "\n")
-
-	aIdx := -1
-	bIdx := -1
-	cIdx := -1
-	for i, line := range lines {
-		if strings.Contains(line, "A") && !strings.Contains(line, "Unrelated") {
-			aIdx = i
-		}
-		if strings.Contains(line, "B") && !strings.Contains(line, "Unrelated") {
-			bIdx = i
-		}
-		if strings.Contains(line, "C") && !strings.Contains(line, "Unrelated") {
-			cIdx = i
-		}
-	}
-
-	if aIdx == -1 || bIdx == -1 || cIdx == -1 {
-		t.Fatalf("expected A, B, C in output:\n%s", output)
-	}
-	if !(aIdx < bIdx && bIdx < cIdx) {
-		t.Errorf("expected A < B < C line order, got A=%d B=%d C=%d", aIdx, bIdx, cIdx)
-	}
-
-	cLine := lines[cIdx]
-	if !strings.HasPrefix(strings.TrimSpace(cLine), "└── C") && !strings.HasPrefix(strings.TrimSpace(cLine), "├── C") {
-		t.Errorf("expected C to have tree connector, got: %q", cLine)
-	}
-
-	indentA := len(lines[aIdx]) - len(strings.TrimLeft(lines[aIdx], " │├└─"))
-	indentC := len(lines[cIdx]) - len(strings.TrimLeft(lines[cIdx], " │├└─"))
-	if indentC <= indentA {
-		t.Errorf("expected C to be indented deeper than A, got A indent=%d C indent=%d", indentA, indentC)
-	}
-}
-
 func TestCmdValidateDirect_AllJSON(t *testing.T) {
 	setupDirectTest(t)
 	if err := cmdValidate([]string{"--all", "--json"}); err != nil {
@@ -1751,25 +650,10 @@ func TestCmdValidateDirect_AllJSON(t *testing.T) {
 	}
 }
 
-func TestCmdValidateDirect_ChangesJSON(t *testing.T) {
-	setupDirectTest(t)
-	if err := cmdValidate([]string{"--changes", "--json"}); err != nil {
-		t.Fatalf("cmdValidate --changes --json on empty project: %v", err)
-	}
-}
-
 func TestCmdValidateDirect_SpecsJSON(t *testing.T) {
 	setupDirectTest(t)
 	if err := cmdValidate([]string{"--specs", "--json"}); err != nil {
 		t.Fatalf("cmdValidate --specs --json on empty project: %v", err)
-	}
-}
-
-func TestCmdValidateDirect_SpecificChange(t *testing.T) {
-	root := setupDirectTest(t)
-	createChangeWithArtifacts(t, root, "my-change")
-	if err := cmdValidate([]string{"my-change"}); err != nil {
-		t.Fatalf("cmdValidate my-change: %v", err)
 	}
 }
 
@@ -2288,531 +1172,11 @@ func TestFindProjectRoot_SymlinkedSpecs(t *testing.T) {
 	}
 }
 
-func TestCLIListTextEmptyBorn(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	changeDir := filepath.Join(root, "specs", "changes", "no-born")
-	if err := os.MkdirAll(changeDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
-	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1\n- [x] Done\n"), 0o644)
-
-	out, code := runCLI(t, bin, root, "list")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	if !strings.Contains(out, "no-born") {
-		t.Error("expected no-born in output")
-	}
-	if strings.Contains(out, "0001-01-01") {
-		t.Errorf("expected no zero-date in output, got:\n%s", out)
-	}
-
-	lines := strings.Split(out, "\n")
-	var dataLine string
-	for _, line := range lines {
-		if strings.Contains(line, "no-born") {
-			dataLine = line
-			break
-		}
-	}
-	if dataLine == "" {
-		t.Fatal("no data line found for no-born")
-	}
-	fields := strings.Fields(strings.TrimSpace(dataLine))
-	bornField := fields[2]
-	if bornField == "0001-01-01" {
-		t.Errorf("expected empty born column, got zero date in: %q", dataLine)
-	}
-}
-
-func TestFormatTimestampsBothZero(t *testing.T) {
-	c := internal.ChangeInfo{Name: "test"}
-	got := formatTimestamps(c)
-	if got != "" {
-		t.Errorf("expected empty string for zero timestamps, got %q", got)
-	}
-}
-
-func TestFormatTimestampsOnlyBorn(t *testing.T) {
-	c := internal.ChangeInfo{
-		Name:    "test",
-		Created: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
-	}
-	got := formatTimestamps(c)
-	if !strings.Contains(got, "born 2026-04-01") {
-		t.Errorf("expected born date, got %q", got)
-	}
-	if strings.Contains(got, "touched") {
-		t.Errorf("expected no touched for zero LastModified, got %q", got)
-	}
-}
-
-func TestCLIViewZeroTimestamps(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	changeDir := filepath.Join(root, "specs", "changes", "bare-change")
-	if err := os.MkdirAll(changeDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
-	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1\n- [x] Done\n"), 0o644)
-
-	out, code := runCLI(t, bin, root, "view")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	if !strings.Contains(out, "bare-change") {
-		t.Error("expected bare-change in output")
-	}
-	if strings.Contains(out, "0001-01-01") {
-		t.Errorf("expected no zero-date in view output, got:\n%s", out)
-	}
-}
-
-func TestCLIListJSONLastModifiedNotZero(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	changeDir := filepath.Join(root, "specs", "changes", "ghost")
-	if err := os.MkdirAll(changeDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\n"), 0o644)
-
-	out, code := runCLI(t, bin, root, "list", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	changes := result["changes"].([]interface{})
-	if len(changes) != 1 {
-		t.Fatalf("expected 1 change, got %d", len(changes))
-	}
-	c := changes[0].(map[string]interface{})
-	if _, exists := c["born"]; exists {
-		t.Errorf("expected born field to be omitted, got %q", c["born"])
-	}
-	lm, ok := c["lastModified"].(string)
-	if !ok {
-		t.Fatalf("expected lastModified string, got %T", c["lastModified"])
-	}
-	if strings.HasPrefix(lm, "0001-01-01") {
-		t.Errorf("expected non-zero lastModified, got %q", lm)
-	}
-}
-
-func TestDecideFirst(t *testing.T) {
-	t.Skip("removed in v2: TestDecideFirst depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-	out, code := runCLI(t, bin, root, "decide", "single-workspace")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-	if !strings.Contains(out, "0001-single-workspace.md") {
-		t.Errorf("expected filename in output, got %s", out)
-	}
-	data, err := os.ReadFile(filepath.Join(root, "specs", "decisions", "0001-single-workspace.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	content := string(data)
-	if !strings.Contains(content, "## Status\n\nproposed") {
-		t.Error("scaffold missing proposed status")
-	}
-	if !strings.Contains(content, "## Context") {
-		t.Error("scaffold missing Context section")
-	}
-}
-
-func TestDecideSubsequent(t *testing.T) {
-	t.Skip("removed in v2: TestDecideSubsequent depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-	runCLI(t, bin, root, "decide", "first-decision")
-	out, code := runCLI(t, bin, root, "decide", "second-decision")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-	if !strings.Contains(out, "0002-second-decision.md") {
-		t.Errorf("expected 0002 filename, got %s", out)
-	}
-}
-
-func TestDecideDuplicateSlug(t *testing.T) {
-	t.Skip("removed in v2: TestDecideDuplicateSlug depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-	runCLI(t, bin, root, "decide", "foo")
-	out, code := runCLI(t, bin, root, "decide", "foo")
-	if code == 0 {
-		t.Fatal("expected error for duplicate slug")
-	}
-	if !strings.Contains(out, "already exists") {
-		t.Errorf("expected duplicate error, got %s", out)
-	}
-}
-
-func TestDecideInvalidSlug(t *testing.T) {
-	t.Skip("removed in v2: TestDecideInvalidSlug depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-	out, code := runCLI(t, bin, root, "decide", "My Decision")
-	if code == 0 {
-		t.Fatal("expected error for invalid slug")
-	}
-	if !strings.Contains(out, "lowercase") {
-		t.Errorf("expected slug validation error, got %s", out)
-	}
-
-	out, code = runCLI(t, bin, root, "decide", "-leading-hyphen")
-	if code == 0 {
-		t.Fatal("expected error for leading hyphen")
-	}
-
-	out, code = runCLI(t, bin, root, "decide", "x")
-	if code == 0 {
-		t.Fatal("expected error for short slug")
-	}
-}
-
-func TestListDecisions(t *testing.T) {
-	t.Skip("removed in v2: TestListDecisions depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-	runCLI(t, bin, root, "decide", "first-decision")
-	runCLI(t, bin, root, "decide", "second-decision")
-
-	out, code := runCLI(t, bin, root, "list", "--decisions")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-	if !strings.Contains(out, "0001") || !strings.Contains(out, "first-decision") {
-		t.Errorf("expected first decision in output, got %s", out)
-	}
-	if !strings.Contains(out, "0002") || !strings.Contains(out, "second-decision") {
-		t.Errorf("expected second decision in output, got %s", out)
-	}
-}
-
-func TestListDecisionsJSON(t *testing.T) {
-	t.Skip("removed in v2: TestListDecisionsJSON depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-	runCLI(t, bin, root, "decide", "test-decision")
-
-	out, code := runCLI(t, bin, root, "list", "--decisions", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	decisions := result["decisions"].([]interface{})
-	if len(decisions) != 1 {
-		t.Fatalf("expected 1 decision, got %d", len(decisions))
-	}
-	d := decisions[0].(map[string]interface{})
-	for _, field := range []string{"number", "slug", "title", "status"} {
-		if _, ok := d[field]; !ok {
-			t.Errorf("missing field %q in decision JSON", field)
-		}
-	}
-}
-
-func TestListDecisionsMutualExclusion(t *testing.T) {
-	bin, root := setupCLITest(t)
-	_, code := runCLI(t, bin, root, "list", "--decisions", "--specs")
-	if code == 0 {
-		t.Fatal("expected error for --decisions + --specs")
-	}
-	_, code = runCLI(t, bin, root, "list", "--decisions", "--changes")
-	if code == 0 {
-		t.Fatal("expected error for --decisions + --changes")
-	}
-}
-
-func TestValidateDecisionsFlag(t *testing.T) {
-	t.Skip("removed in v2: TestValidateDecisionsFlag depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-	runCLI(t, bin, root, "decide", "test-decision")
-
-	out, code := runCLI(t, bin, root, "validate", "--decisions")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-}
-
-func TestValidateDecisionByName(t *testing.T) {
-	t.Skip("removed in v2: TestValidateDecisionByName depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-	runCLI(t, bin, root, "decide", "test-decision")
-
-	out, code := runCLI(t, bin, root, "validate", "test-decision")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-}
-
-func TestValidateDecisionTypeFlag(t *testing.T) {
-	t.Skip("removed in v2: TestValidateDecisionTypeFlag depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-	runCLI(t, bin, root, "decide", "test-decision")
-
-	out, code := runCLI(t, bin, root, "validate", "test-decision", "--type", "decision")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-}
-
 func TestValidateDecisionsMutualExclusion(t *testing.T) {
 	bin, root := setupCLITest(t)
-	_, code := runCLI(t, bin, root, "validate", "--decisions", "--changes")
+	_, code := runCLI(t, bin, root, "validate", "--decisions", "--specs")
 	if code == 0 {
-		t.Fatal("expected error for --decisions + --changes")
-	}
-}
-
-func TestCLIPatchStatusText(t *testing.T) {
-	t.Skip("removed in v2: TestCLIPatchStatusText depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	_, code := runCLI(t, bin, root, "patch", "fix-flag", "cli")
-	if code != 0 {
-		t.Fatal("patch failed")
-	}
-
-	out, code := runCLI(t, bin, root, "status", "fix-flag")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-	if !strings.Contains(out, "(patch mode)") {
-		t.Errorf("expected '(patch mode)' in output, got:\n%s", out)
-	}
-	if strings.Contains(out, "proposal") {
-		t.Errorf("expected no 'proposal' line in patch status, got:\n%s", out)
-	}
-	if strings.Contains(out, "design") {
-		t.Errorf("expected no 'design' line in patch status, got:\n%s", out)
-	}
-	if strings.Contains(out, "tasks") {
-		t.Errorf("expected no 'tasks' line in patch status, got:\n%s", out)
-	}
-	if !strings.Contains(out, "specs") {
-		t.Errorf("expected 'specs' line in patch status, got:\n%s", out)
-	}
-}
-
-func TestCLIPatchStatusJSON(t *testing.T) {
-	t.Skip("removed in v2: TestCLIPatchStatusJSON depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	_, code := runCLI(t, bin, root, "patch", "fix-flag", "cli")
-	if code != 0 {
-		t.Fatal("patch failed")
-	}
-
-	out, code := runCLI(t, bin, root, "status", "fix-flag", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	if result["mode"] != "patch" {
-		t.Errorf("expected mode=patch, got %v", result["mode"])
-	}
-	artifacts, ok := result["artifacts"].([]interface{})
-	if !ok {
-		t.Fatalf("expected artifacts array, got %T", result["artifacts"])
-	}
-	if len(artifacts) != 1 {
-		t.Fatalf("expected 1 artifact, got %d", len(artifacts))
-	}
-	art := artifacts[0].(map[string]interface{})
-	if art["id"] != "specs" {
-		t.Errorf("expected artifact id=specs, got %v", art["id"])
-	}
-}
-
-func TestCLIViewPatchSection(t *testing.T) {
-	t.Skip("removed in v2: TestCLIViewPatchSection depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	createSpec(t, root, "auth")
-
-	// Create a patch-mode change
-	changeDir := filepath.Join(root, "specs", "changes", "fix-flag")
-	specSubdir := filepath.Join(changeDir, "specs", "cli")
-	os.MkdirAll(specSubdir, 0o755)
-	os.WriteFile(filepath.Join(specSubdir, "spec.md"), []byte("# cli\n"), 0o644)
-	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-04-25T00:00:00Z\nmode: patch\n"), 0o644)
-
-	out, code := runCLI(t, bin, root, "view")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	if !strings.Contains(out, "Patch Changes") {
-		t.Errorf("expected 'Patch Changes' section, got:\n%s", out)
-	}
-	if !strings.Contains(out, "◆ fix-flag") {
-		t.Errorf("expected '◆ fix-flag' in output, got:\n%s", out)
-	}
-	if !strings.Contains(out, "Patch Changes: 1") {
-		t.Errorf("expected 'Patch Changes: 1' in summary, got:\n%s", out)
-	}
-	// Should not appear in active or draft
-	if strings.Contains(out, "◉ fix-flag") {
-		t.Errorf("patch change should not appear as active (◉)")
-	}
-	if strings.Contains(out, "○ fix-flag") {
-		t.Errorf("patch change should not appear as draft (○)")
-	}
-}
-
-func TestCLIViewNoPatchSectionWhenNoPatches(t *testing.T) {
-	t.Skip("removed in v2: TestCLIViewNoPatchSectionWhenNoPatches depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	createChangeWithArtifacts(t, root, "add-auth")
-	changeDir := filepath.Join(root, "specs", "changes", "add-auth")
-	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1: Test\n- [x] Task one\n- [ ] Task two"), 0o644)
-
-	out, code := runCLI(t, bin, root, "view")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	if strings.Contains(out, "Patch Changes") {
-		t.Errorf("expected no 'Patch Changes' section when no patch changes exist, got:\n%s", out)
-	}
-}
-
-func TestCLIViewPatchJSON(t *testing.T) {
-	t.Skip("removed in v2: TestCLIViewPatchJSON depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	changeDir := filepath.Join(root, "specs", "changes", "fix-flag")
-	specSubdir := filepath.Join(changeDir, "specs", "cli")
-	os.MkdirAll(specSubdir, 0o755)
-	os.WriteFile(filepath.Join(specSubdir, "spec.md"), []byte("# cli\n"), 0o644)
-	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-04-25T00:00:00Z\nmode: patch\n"), 0o644)
-
-	out, code := runCLI(t, bin, root, "view", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-
-	summary := result["summary"].(map[string]interface{})
-	if summary["patchChanges"] != float64(1) {
-		t.Errorf("expected patchChanges=1, got %v", summary["patchChanges"])
-	}
-
-	changes := result["changes"].([]interface{})
-	found := false
-	for _, c := range changes {
-		cm := c.(map[string]interface{})
-		if cm["name"] == "fix-flag" && cm["status"] == "patch" {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("expected fix-flag with status=patch in changes, got: %v", changes)
-	}
-}
-
-func TestCLIArchiveStripsSpecsSubtree(t *testing.T) {
-	t.Skip("removed in v2: TestCLIArchiveStripsSpecsSubtree depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	createChangeWithArtifacts(t, root, "my-change")
-	changeDir := filepath.Join(root, "specs", "changes", "my-change")
-	tasksPath := filepath.Join(changeDir, "tasks.md")
-	os.WriteFile(tasksPath, []byte("## Phase 1\n- [x] Done"), 0o644)
-
-	out, code := runCLI(t, bin, root, "archive", "my-change")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	archiveDir := filepath.Join(root, "specs", "changes", "archive")
-	entries, err := os.ReadDir(archiveDir)
-	if err != nil {
-		t.Fatalf("read archive: %v", err)
-	}
-	if len(entries) == 0 {
-		t.Fatal("expected archived directory to exist")
-	}
-
-	archivedPath := filepath.Join(archiveDir, entries[0].Name())
-	specsPath := filepath.Join(archivedPath, "specs")
-	if _, err := os.Stat(specsPath); err == nil {
-		t.Errorf("expected specs/ subtree to be stripped from archived directory, but it exists at %s", specsPath)
-	}
-}
-
-func TestCLIPatchStatusBulkJSON(t *testing.T) {
-	t.Skip("removed in v2: TestCLIPatchStatusBulkJSON depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	// Create a patch change
-	changeDir := filepath.Join(root, "specs", "changes", "fix-flag")
-	specSubdir := filepath.Join(changeDir, "specs", "cli")
-	os.MkdirAll(specSubdir, 0o755)
-	os.WriteFile(filepath.Join(specSubdir, "spec.md"), []byte("# cli\n"), 0o644)
-	os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), []byte("schema: spec-driven\ncreated: 2026-04-25T00:00:00Z\nmode: patch\n"), 0o644)
-
-	// Create a full-proposal change
-	createChange(t, root, "full-change")
-
-	out, code := runCLI(t, bin, root, "status", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-
-	changes := result["changes"].([]interface{})
-	if len(changes) != 2 {
-		t.Fatalf("expected 2 changes, got %d", len(changes))
-	}
-
-	patchFound := false
-	fullFound := false
-	for _, c := range changes {
-		cm := c.(map[string]interface{})
-		if cm["changeName"] == "fix-flag" {
-			if cm["mode"] != "patch" {
-				t.Errorf("expected fix-flag mode=patch, got %v", cm["mode"])
-			}
-			patchFound = true
-		}
-		if cm["changeName"] == "full-change" {
-			if _, hasMode := cm["mode"]; hasMode {
-				t.Errorf("expected full-change to have no mode field, got mode=%v", cm["mode"])
-			}
-			fullFound = true
-		}
-	}
-	if !patchFound {
-		t.Error("expected fix-flag in bulk status")
-	}
-	if !fullFound {
-		t.Error("expected full-change in bulk status")
+		t.Fatal("expected error for --decisions + --specs")
 	}
 }
 
@@ -2872,61 +1236,6 @@ func TestCLIInitMinimalText(t *testing.T) {
 	}
 }
 
-func TestCLIDecideJSON(t *testing.T) {
-	t.Skip("removed in v2: TestCLIDecideJSON depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	out, code := runCLI(t, bin, root, "decide", "test-decision", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	if result["number"] == nil {
-		t.Error("expected number field")
-	}
-	if result["slug"] != "test-decision" {
-		t.Errorf("expected slug=test-decision, got %v", result["slug"])
-	}
-	if result["filePath"] == nil {
-		t.Error("expected filePath field")
-	}
-}
-
-func TestCLIDecideMinimalJSON(t *testing.T) {
-	t.Skip("removed in v2: TestCLIDecideMinimalJSON depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	out, code := runCLI(t, bin, root, "decide", "test-decision", "--minimal", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	if _, hasTitle := result["title"]; hasTitle {
-		t.Error("minimal JSON should not contain title")
-	}
-}
-
-func TestCLIDecideMinimalText(t *testing.T) {
-	t.Skip("removed in v2: TestCLIDecideMinimalText depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	out, code := runCLI(t, bin, root, "decide", "test-decision", "--minimal")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-	if !strings.Contains(out, "0001-test-decision.md") {
-		t.Errorf("expected minimal file path, got: %s", out)
-	}
-}
-
 func TestCLIUpdateJSON(t *testing.T) {
 	bin, _ := setupCLITest(t)
 
@@ -2981,119 +1290,6 @@ func TestCLIUpgradeJSON(t *testing.T) {
 	// The main thing is that --json is accepted as a valid flag
 }
 
-func TestCLIArchiveJSON(t *testing.T) {
-	t.Skip("removed in v2: TestCLIArchiveJSON depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	// Don't create canon spec — the change ADDEDs will create it
-	createChangeWithArtifacts(t, root, "test-change")
-
-	// Mark all tasks done
-	tasksPath := filepath.Join(root, "specs", "changes", "test-change", "tasks.md")
-	os.WriteFile(tasksPath, []byte("## Phase 1: Test\n\n- [x] Task"), 0o644)
-
-	out, code := runCLI(t, bin, root, "archive", "test-change", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	if result["change"] != "test-change" {
-		t.Errorf("expected change=test-change, got %v", result["change"])
-	}
-	caps, ok := result["capabilities"].([]interface{})
-	if !ok || len(caps) == 0 {
-		t.Error("expected non-empty capabilities array")
-	}
-}
-
-func TestCLIArchiveMinimalJSON(t *testing.T) {
-	t.Skip("removed in v2: TestCLIArchiveMinimalJSON depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	createChangeWithArtifacts(t, root, "test-change")
-
-	tasksPath := filepath.Join(root, "specs", "changes", "test-change", "tasks.md")
-	os.WriteFile(tasksPath, []byte("## Phase 1: Test\n\n- [x] Task"), 0o644)
-
-	out, code := runCLI(t, bin, root, "archive", "test-change", "--minimal", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	if result["archived"] != true {
-		t.Errorf("expected archived=true, got %v", result["archived"])
-	}
-	if _, hasChange := result["change"]; hasChange {
-		t.Error("minimal JSON should not contain change name")
-	}
-}
-
-func TestCLIImportJSON(t *testing.T) {
-	bin, _ := setupCLITest(t)
-
-	source := t.TempDir()
-	os.MkdirAll(filepath.Join(source, "openspec", "specs"), 0o755)
-	os.MkdirAll(filepath.Join(source, "openspec", "changes"), 0o755)
-	// Create a minimal canon spec
-	capDir := filepath.Join(source, "openspec", "specs", "auth")
-	os.MkdirAll(capDir, 0o755)
-	os.WriteFile(filepath.Join(capDir, "spec.md"), []byte(`# auth Specification
-
-## Requirements
-
-### Requirement: Login
-The system SHALL authenticate.
-
-#### Scenario: Valid
-- **WHEN** valid creds
-- **THEN** result
-`), 0o644)
-
-	root := t.TempDir()
-	out, code := runCLI(t, bin, root, "import", "--source", source, "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	if result["canonSpecs"] == nil {
-		t.Error("expected canonSpecs field")
-	}
-}
-
-func TestCLIImportDryRunJSON(t *testing.T) {
-	bin, _ := setupCLITest(t)
-
-	source := t.TempDir()
-	os.MkdirAll(filepath.Join(source, "openspec", "specs"), 0o755)
-	os.MkdirAll(filepath.Join(source, "openspec", "changes"), 0o755)
-
-	root := t.TempDir()
-	out, code := runCLI(t, bin, root, "import", "--source", source, "--dry-run", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	if result["dryRun"] != true {
-		t.Errorf("expected dryRun=true, got %v", result["dryRun"])
-	}
-}
-
 func TestCLIValidateMinimalJSON(t *testing.T) {
 	bin, root := setupCLITest(t)
 
@@ -3126,55 +1322,6 @@ func TestCLIValidateMinimalText(t *testing.T) {
 	}
 	if !strings.HasPrefix(out, "ok\t") {
 		t.Errorf("expected minimal text starting with 'ok\\t', got: %s", out)
-	}
-}
-
-func TestCLIListMinimalText(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	out, code := runCLI(t, bin, root, "list", "--minimal")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-	if strings.Contains(out, "Changes:") {
-		t.Error("minimal text should not contain headers")
-	}
-}
-
-func TestCLIListMinimalJSON(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	// Create a change so we can test field filtering
-	runCLI(t, bin, root, "new", "test-change")
-
-	out, code := runCLI(t, bin, root, "list", "--minimal", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	changes, ok := result["changes"].([]interface{})
-	if !ok {
-		t.Fatalf("expected changes array, got %T", result["changes"])
-	}
-	if len(changes) == 0 {
-		t.Fatal("expected at least one change")
-	}
-	first := changes[0].(map[string]interface{})
-	if first["name"] == nil {
-		t.Error("minimal JSON should contain name")
-	}
-	if first["status"] == nil {
-		t.Error("minimal JSON should contain status")
-	}
-	if _, hasBorn := first["born"]; hasBorn {
-		t.Error("minimal JSON should not contain born field")
-	}
-	if _, hasCompleted := first["completedTasks"]; hasCompleted {
-		t.Error("minimal JSON should not contain completedTasks field")
 	}
 }
 
@@ -3213,55 +1360,6 @@ func TestCLIViewMinimalJSON(t *testing.T) {
 	}
 }
 
-func TestCLIStatusMinimalJSON(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	out, code := runCLI(t, bin, root, "status", "--minimal", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	if _, hasWarnings := result["warnings"]; hasWarnings {
-		t.Error("minimal JSON should not contain warnings")
-	}
-}
-
-func TestCLIStatusMinimalText(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	out, code := runCLI(t, bin, root, "status", "--minimal")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-}
-
-func TestCLIInstructionsMinimalJSON(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	out, code := runCLI(t, bin, root, "instructions", "proposal", "--minimal", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	if result["artifactId"] == nil {
-		t.Error("minimal JSON should contain artifactId")
-	}
-	if result["instruction"] == nil {
-		t.Error("minimal JSON should contain instruction")
-	}
-	if _, hasDesc := result["description"]; hasDesc {
-		t.Error("minimal JSON should not contain description")
-	}
-}
-
 func TestCLINewMinimalText(t *testing.T) {
 	bin, root := setupCLITest(t)
 
@@ -3274,67 +1372,6 @@ func TestCLINewMinimalText(t *testing.T) {
 	}
 	if strings.Contains(out, "Artifacts:") {
 		t.Error("minimal text should not contain headers")
-	}
-}
-
-func TestCLIPatchMinimalText(t *testing.T) {
-	t.Skip("removed in v2: TestCLIPatchMinimalText depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	out, code := runCLI(t, bin, root, "patch", "test-patch", "some-cap", "--minimal")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-	if !strings.Contains(out, "test-patch") {
-		t.Errorf("expected change path, got: %s", out)
-	}
-	if strings.Contains(out, "Artifacts:") {
-		t.Error("minimal text should not contain headers")
-	}
-}
-
-func TestCLIPreviewMinimalText(t *testing.T) {
-	t.Skip("removed in v2: TestCLIPreviewMinimalText depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	// Create a change with a delta spec
-	changeDir := filepath.Join(root, "specs", "changes", "test-preview")
-	specDir := filepath.Join(changeDir, "specs", "my-cap")
-	os.MkdirAll(specDir, 0o755)
-	os.WriteFile(filepath.Join(specDir, "spec.md"), []byte("# My Cap\n\n## ADDED Requirements\n\n### REQ-1\nSomething SHALL work.\n\n#### Scenario: basic\nWHEN x\nTHEN y\n"), 0o644)
-
-	out, code := runCLI(t, bin, root, "preview", "test-preview", "--minimal")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-	if !strings.Contains(out, "capabilities") {
-		t.Errorf("expected minimal totals, got: %s", out)
-	}
-}
-
-func TestCLIPreviewMinimalJSON(t *testing.T) {
-	t.Skip("removed in v2: TestCLIPreviewMinimalJSON depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	changeDir := filepath.Join(root, "specs", "changes", "test-preview2")
-	specDir := filepath.Join(changeDir, "specs", "my-cap")
-	os.MkdirAll(specDir, 0o755)
-	os.WriteFile(filepath.Join(specDir, "spec.md"), []byte("# My Cap\n\n## ADDED Requirements\n\n### REQ-1\nSomething SHALL work.\n\n#### Scenario: basic\nWHEN x\nTHEN y\n"), 0o644)
-
-	out, code := runCLI(t, bin, root, "preview", "test-preview2", "--minimal", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	if result["totals"] == nil {
-		t.Error("minimal JSON should contain totals")
-	}
-	if _, hasCaps := result["capabilities"]; hasCaps {
-		t.Error("minimal JSON should not contain capabilities")
 	}
 }
 
@@ -3364,55 +1401,3 @@ func TestCLINewMinimalJSON(t *testing.T) {
 	}
 }
 
-func TestCLIPatchMinimalJSON(t *testing.T) {
-	t.Skip("removed in v2: TestCLIPatchMinimalJSON depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	out, code := runCLI(t, bin, root, "patch", "test-patch", "some-cap", "--minimal", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	if result["changeName"] == nil {
-		t.Error("minimal JSON should contain changeName")
-	}
-	if result["isComplete"] == nil {
-		t.Error("minimal JSON should contain isComplete")
-	}
-	if _, hasArtifacts := result["artifacts"]; hasArtifacts {
-		t.Error("minimal JSON should not contain artifacts")
-	}
-}
-
-func TestCLIArchiveJSONNoWarningCorruption(t *testing.T) {
-	t.Skip("removed in v2: TestCLIArchiveJSONNoWarningCorruption depends on decide/patch/archive/preview")
-	bin, root := setupCLITest(t)
-
-	createChangeWithArtifacts(t, root, "test-archive-warn")
-
-	// Mark all tasks done
-	tasksPath := filepath.Join(root, "specs", "changes", "test-archive-warn", "tasks.md")
-	os.WriteFile(tasksPath, []byte("## Phase 1: Test\n\n- [x] Task"), 0o644)
-
-	out, code := runCLI(t, bin, root, "archive", "test-archive-warn", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	// Verify stdout is pure JSON (no WARN lines prepended)
-	if strings.Contains(out, "WARN") {
-		t.Errorf("WARN leaked into JSON output: %s", out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	if result["change"] == nil {
-		t.Error("expected change field")
-	}
-}

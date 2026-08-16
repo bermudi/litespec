@@ -3,21 +3,19 @@ package main
 import (
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/bermudi/litespec/internal"
 )
 
 func cmdValidate(args []string) error {
 	fs := newFlagSet("validate", printValidateHelp)
-	var flagAll, flagChanges, flagSpecs, flagDecisions, strict, asJSON, asMinimal bool
+	var flagAll, flagSpecs, flagDecisions, strict, asJSON, asMinimal bool
 	var typeFilter string
-	fs.BoolVar(&flagAll, "all", false, "validate all changes, specs, and decisions")
-	fs.BoolVar(&flagChanges, "changes", false, "validate all changes only")
+	fs.BoolVar(&flagAll, "all", false, "validate all specs and decisions")
 	fs.BoolVar(&flagSpecs, "specs", false, "validate all specs only")
 	fs.BoolVar(&flagDecisions, "decisions", false, "validate all decisions only")
 	fs.BoolVar(&strict, "strict", false, "treat warnings as errors")
-	fs.StringVar(&typeFilter, "type", "", "disambiguate name: change|spec|decision")
+	fs.StringVar(&typeFilter, "type", "", "disambiguate name: spec|decision")
 	fs.BoolVar(&asJSON, "json", false, "output as JSON")
 	fs.BoolVar(&asMinimal, "minimal", false, "minimal output")
 
@@ -32,10 +30,10 @@ func cmdValidate(args []string) error {
 		positional = fsArgs[0]
 	}
 
-	hasBulk := flagAll || flagChanges || flagSpecs || flagDecisions
+	hasBulk := flagAll || flagSpecs || flagDecisions
 
 	if positional != "" && hasBulk {
-		return fmt.Errorf("positional name and bulk flags (--all, --changes, --specs, --decisions) are mutually exclusive")
+		return fmt.Errorf("positional name and bulk flags (--all, --specs, --decisions) are mutually exclusive")
 	}
 
 	if typeFilter != "" && positional == "" {
@@ -46,8 +44,8 @@ func cmdValidate(args []string) error {
 		return fmt.Errorf("--type cannot be used with bulk flags")
 	}
 
-	if typeFilter != "" && typeFilter != "change" && typeFilter != "spec" && typeFilter != "decision" {
-		return fmt.Errorf("--type must be 'change', 'spec', or 'decision', got %q", typeFilter)
+	if typeFilter != "" && typeFilter != "spec" && typeFilter != "decision" {
+		return fmt.Errorf("--type must be 'spec' or 'decision', got %q", typeFilter)
 	}
 
 	root, err := requireProjectRootWithStaleCheck()
@@ -58,17 +56,11 @@ func cmdValidate(args []string) error {
 	var result *internal.ValidationResult
 
 	if positional != "" {
-		changeList, _ := internal.ListChanges(root)
 		specList, _ := internal.ListSpecs(root)
-		changeNames := make([]string, len(changeList))
-		for i, c := range changeList {
-			changeNames[i] = c.Name
-		}
 		specNames := make([]string, len(specList))
 		for i, s := range specList {
 			specNames[i] = s.Name
 		}
-		isChange := slices.Contains(changeNames, positional)
 		isSpec := slices.Contains(specNames, positional)
 		isDecision := false
 		decisionMatch, _ := internal.FindDecisionBySlug(root, positional)
@@ -76,21 +68,13 @@ func cmdValidate(args []string) error {
 			isDecision = true
 		}
 
-		if typeFilter == "change" {
-			isSpec = false
-			isDecision = false
-		} else if typeFilter == "spec" {
-			isChange = false
+		if typeFilter == "spec" {
 			isDecision = false
 		} else if typeFilter == "decision" {
-			isChange = false
 			isSpec = false
 		}
 
 		matches := 0
-		if isChange {
-			matches++
-		}
 		if isSpec {
 			matches++
 		}
@@ -99,24 +83,21 @@ func cmdValidate(args []string) error {
 		}
 
 		if matches > 1 {
-			return fmt.Errorf("%q is ambiguous — matches multiple artifact types. Use --type change, --type spec, or --type decision", positional)
+			return fmt.Errorf("%q is ambiguous — matches multiple artifact types. Use --type spec or --type decision", positional)
 		}
 
 		if matches == 0 {
-			return fmt.Errorf("%q not found as a change, spec, or decision", positional)
+			return fmt.Errorf("%q not found as a spec or decision", positional)
 		}
 
-		if isChange {
-			result, err = internal.ValidateChange(root, positional)
-		} else if isSpec {
+		if isSpec {
 			result, err = internal.ValidateSpec(root, positional)
 		} else {
 			result, err = internal.ValidateDecision(root, positional)
 		}
 	} else {
-		// Mutual exclusion: --decisions is exclusive with --changes and --specs
-		if flagDecisions && (flagChanges || flagSpecs) {
-			return fmt.Errorf("--decisions cannot be combined with --changes or --specs (use --all to validate everything)")
+		if flagDecisions && flagSpecs {
+			return fmt.Errorf("--decisions cannot be combined with --specs (use --all to validate everything)")
 		}
 
 		if flagDecisions {
@@ -127,53 +108,10 @@ func cmdValidate(args []string) error {
 			if strict && len(result.Warnings) > 0 {
 				result.Valid = false
 			}
+		} else if flagSpecs {
+			result, err = internal.ValidateSpecs(root)
 		} else {
-			validateSpecs := flagSpecs || flagAll || (!flagChanges && !flagSpecs && !flagDecisions)
-			validateChanges := flagChanges || flagAll || (!flagChanges && !flagSpecs && !flagDecisions)
-
-			if validateSpecs && validateChanges {
-				result, err = internal.ValidateAll(root, strict)
-			} else if validateSpecs {
-				result, err = internal.ValidateSpecs(root)
-			} else {
-			changes, listErr := internal.ListChanges(root)
-			if listErr != nil {
-				return listErr
-			}
-			result = &internal.ValidationResult{Valid: true}
-			for _, ci := range changes {
-				changeResult, changeErr := internal.ValidateChange(root, ci.Name)
-				if changeErr != nil {
-					return changeErr
-				}
-				result.Errors = append(result.Errors, changeResult.Errors...)
-				result.Warnings = append(result.Warnings, changeResult.Warnings...)
-				result.ChangesCount += changeResult.ChangesCount
-				result.CapabilitiesCount += changeResult.CapabilitiesCount
-				result.RequirementsCount += changeResult.RequirementsCount
-				result.ScenariosCount += changeResult.ScenariosCount
-			}
-
-			depMap, depErr := internal.LoadDepMap(root)
-			if depErr == nil {
-				cycles := internal.DetectCycles(depMap)
-				for _, cycle := range cycles {
-					path := strings.Join(cycle, " -> ")
-					result.Errors = append(result.Errors, internal.ValidationIssue{
-						Severity: internal.SeverityError,
-						Message:  fmt.Sprintf("dependency cycle detected: %s", path),
-					})
-				}
-
-				overlaps := internal.DetectOverlaps(root, changes, depMap)
-				result.Warnings = append(result.Warnings, overlaps...)
-			}
-
-			result.Valid = len(result.Errors) == 0
-				if strict && len(result.Warnings) > 0 {
-					result.Valid = false
-				}
-			}
+			result, err = internal.ValidateAll(root, strict)
 		}
 	}
 

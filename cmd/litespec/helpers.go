@@ -4,8 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
-	"sort"
 	"strings"
 
 	"github.com/bermudi/litespec/internal"
@@ -138,100 +136,36 @@ Examples:
 `)
 }
 
-func printListHelp() {
-	fmt.Print(`Usage: litespec list [--specs|--changes|--decisions|--backlog] [--sort <mode>] [--status <state>] [--json] [--minimal]
-
-List active changes in the project (default), specs with --specs, decisions with --decisions, or backlog items with --backlog.
-
-Flags:
-  --specs           List specs instead of changes
-  --changes         List changes (default)
-  --decisions       List architectural decision records
-  --backlog         List backlog items by section
-  --sort <field>    Sort by 'recent' (default), 'name', 'deps', or 'number' (decisions)
-  --status <state>  Filter decisions by status: proposed, accepted, superseded (requires --decisions)
-  --json            Output as JSON
-  --minimal         Minimal output
-
-Examples:
-  litespec list
-  litespec list --changes --sort name
-  litespec list --sort deps
-  litespec list --specs --json
-  litespec list --decisions
-  litespec list --decisions --status accepted --sort recent
-  litespec list --backlog
-`)
-}
-
-func printStatusHelp() {
-	fmt.Print(`Usage: litespec status [<name>] [--json] [--minimal]
-
-Show artifact states for a change or all changes.
-
-Arguments:
-  <name>            Change name (omit to show all changes)
-
-Flags:
-  --json            Output as JSON
-  --minimal         Minimal output
-
-Examples:
-  litespec status
-  litespec status my-change
-  litespec status --json
-`)
-}
-
 func printValidateHelp() {
-	fmt.Print(`Usage: litespec validate [<name>] [--all|--changes|--specs|--decisions] [--type T] [--strict] [--json] [--minimal]
+	fmt.Print(`Usage: litespec validate [<name>] [--all|--specs|--decisions] [--type T] [--strict] [--json] [--minimal]
 
-Validate changes, specs, and decisions.
+Validate specs and decisions.
 
 Arguments:
-  <name>            Validate a specific change, spec, or decision by name
+  <name>            Validate a specific spec or decision by name
 
 Flags:
-  --all             Validate all changes, specs, and decisions
-  --changes         Validate all changes only
+  --all             Validate all specs and decisions
   --specs           Validate all specs only
   --decisions       Validate all decisions only
-  --type <T>        Disambiguate name: change|spec|decision
+  --type <T>        Disambiguate name: spec|decision
   --strict          Treat warnings as errors
   --json            Output as JSON
   --minimal         Minimal output
 
 Examples:
   litespec validate
-  litespec validate my-change
+  litespec validate my-spec
   litespec validate --all --strict
   litespec validate shared --type spec
   litespec validate --decisions
 `)
 }
 
-func printInstructionsHelp() {
-	fmt.Print(`Usage: litespec instructions <artifact> [--json] [--minimal]
-
-Get artifact-specific instructions for writing proposals, specs, designs, or tasks.
-
-Arguments:
-  <artifact>        One of: proposal, specs, design, tasks
-
-Flags:
-  --json            Output as JSON
-  --minimal         Minimal output
-
-Examples:
-  litespec instructions proposal
-  litespec instructions design --json
-`)
-}
-
 func printViewHelp() {
 	fmt.Print(`Usage: litespec view [--json] [--minimal]
 
-Display a dashboard overview of specs, changes, and their dependency relationships.
+Display a dashboard overview of product, specs, decisions, and open GH issues.
 
 Flags:
   --json            Output as JSON
@@ -266,70 +200,6 @@ func splitCSV(s string) []string {
 		parts[i] = strings.TrimSpace(parts[i])
 	}
 	return parts
-}
-
-func sortChanges(changes []internal.ChangeInfo, sortBy string, root string) {
-	switch sortBy {
-	case "name":
-		sort.Slice(changes, func(i, j int) bool {
-			return changes[i].Name < changes[j].Name
-		})
-	case "deps":
-		depMap, err := internal.LoadDepMap(root)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "WARN  could not load dependency map, falling back to alphabetical sort\n")
-			sort.Slice(changes, func(i, j int) bool {
-				return changes[i].Name < changes[j].Name
-			})
-			return
-		}
-		cycles := internal.DetectCycles(depMap)
-		if len(cycles) > 0 {
-			for _, cycle := range cycles {
-				fmt.Fprintf(os.Stderr, "WARN  dependency cycle: %s\n", strings.Join(cycle, " -> "))
-			}
-			sort.Slice(changes, func(i, j int) bool {
-				return changes[i].Name < changes[j].Name
-			})
-			return
-		}
-		sorted := internal.TopologicalSort(changes, depMap)
-		copy(changes, sorted)
-	default:
-		sort.Slice(changes, func(i, j int) bool {
-			return changes[i].LastModified.After(changes[j].LastModified)
-		})
-	}
-}
-
-func changeStatusText(c internal.ChangeInfo) string {
-	if c.TotalTasks == 0 {
-		return "No tasks"
-	}
-	if c.CompletedTasks == c.TotalTasks {
-		return "✓ Complete"
-	}
-	return fmt.Sprintf("%d/%d tasks", c.CompletedTasks, c.TotalTasks)
-}
-
-func maxNameWidthChanges(changes []internal.ChangeInfo) int {
-	m := 0
-	for _, c := range changes {
-		if len(c.Name) > m {
-			m = len(c.Name)
-		}
-	}
-	return m
-}
-
-func maxNameWidthSpecs(specs []internal.SpecInfo) int {
-	m := 0
-	for _, s := range specs {
-		if len(s.Name) > m {
-			m = len(s.Name)
-		}
-	}
-	return m
 }
 
 func validateChangeName(name string) error {

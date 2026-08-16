@@ -20,7 +20,7 @@ func TestCompleteCommandNames(t *testing.T) {
 		names[c.Candidate] = true
 	}
 
-	for _, cmd := range []string{"init", "new", "list", "status", "validate", "instructions", "view", "import", "update", "upgrade", "completion"} {
+	for _, cmd := range []string{"init", "new", "validate", "view", "update", "upgrade", "completion"} {
 		if !names[cmd] {
 			t.Errorf("missing command %q in completions", cmd)
 		}
@@ -51,19 +51,6 @@ func TestCompleteSingleWordDash(t *testing.T) {
 	t.Error("expected '--version' in completions for '--'")
 }
 
-func TestCompleteInstructionsArtifactIDs(t *testing.T) {
-	result := Complete("", []string{"instructions", ""})
-	names := make(map[string]bool)
-	for _, c := range result {
-		names[c.Candidate] = true
-	}
-	for _, id := range []string{"proposal", "specs", "design", "tasks"} {
-		if !names[id] {
-			t.Errorf("missing artifact %q", id)
-		}
-	}
-}
-
 func TestCompleteCompletionShells(t *testing.T) {
 	result := Complete("", []string{"completion", ""})
 	if len(result) != 3 {
@@ -78,32 +65,6 @@ func TestCompleteCompletionShells(t *testing.T) {
 			t.Errorf("missing shell %q", shell)
 		}
 	}
-}
-
-func TestCompleteStatusChangeNames(t *testing.T) {
-	root := t.TempDir()
-	changesDir := filepath.Join(root, "specs", "changes")
-	if err := os.MkdirAll(changesDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range []string{"foo", "bar"} {
-		if err := os.MkdirAll(filepath.Join(changesDir, name), 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	result := Complete(root, []string{"status", ""})
-	names := make(map[string]bool)
-	for _, c := range result {
-		names[c.Candidate] = true
-	}
-	if !names["foo"] || !names["bar"] {
-		t.Errorf("expected foo and bar, got %v", names)
-	}
-}
-
-func TestCompleteArchiveChangeNames(t *testing.T) {
-	t.Skip("archive command removed in v2")
 }
 
 func TestCompleteInitTools(t *testing.T) {
@@ -123,38 +84,24 @@ func TestCompleteValidateFlags(t *testing.T) {
 	for _, c := range result {
 		names[c.Candidate] = true
 	}
-	for _, flag := range []string{"--all", "--changes", "--specs", "--decisions", "--strict", "--json", "--type"} {
+	for _, flag := range []string{"--all", "--specs", "--decisions", "--strict", "--json", "--type"} {
 		if !names[flag] {
 			t.Errorf("missing flag %q in validate completions", flag)
 		}
 	}
 }
 
-func TestCompleteSortValues(t *testing.T) {
-	result := Complete("", []string{"list", "--sort", ""})
-	if len(result) != 4 {
-		t.Fatalf("expected 4 sort values, got %d", len(result))
-	}
-	names := make(map[string]bool)
-	for _, c := range result {
-		names[c.Candidate] = true
-	}
-	if !names["recent"] || !names["name"] || !names["deps"] || !names["number"] {
-		t.Errorf("expected recent, name, deps, and number, got %v", names)
-	}
-}
-
 func TestCompleteTypeValues(t *testing.T) {
 	result := Complete("", []string{"validate", "--type", ""})
-	if len(result) != 3 {
-		t.Fatalf("expected 3 type values, got %d", len(result))
+	if len(result) != 2 {
+		t.Fatalf("expected 2 type values, got %d", len(result))
 	}
 	names := make(map[string]bool)
 	for _, c := range result {
 		names[c.Candidate] = true
 	}
-	if !names["change"] || !names["spec"] || !names["decision"] {
-		t.Errorf("expected change, spec, and decision, got %v", names)
+	if !names["spec"] || !names["decision"] {
+		t.Errorf("expected spec and decision, got %v", names)
 	}
 }
 
@@ -173,7 +120,7 @@ func TestCompleteHiddenCompleteCommand(t *testing.T) {
 }
 
 func TestCompleteErrorSilentFallback(t *testing.T) {
-	result := Complete("/nonexistent/path", []string{"status", ""})
+	result := Complete("/nonexistent/path", []string{"validate", ""})
 	if len(result) != 0 {
 		t.Errorf("expected empty completions on error, got %d", len(result))
 	}
@@ -276,29 +223,10 @@ func TestCommandSpecsEveryFlagHasDescription(t *testing.T) {
 	}
 }
 
-func TestCompleteStatusValues(t *testing.T) {
-	result := Complete("", []string{"list", "--status", ""})
-	if len(result) != 3 {
-		t.Fatalf("expected 3 status values, got %d", len(result))
-	}
-	names := make(map[string]bool)
-	for _, c := range result {
-		names[c.Candidate] = true
-	}
-	for _, v := range []string{"proposed", "accepted", "superseded"} {
-		if !names[v] {
-			t.Errorf("expected %q in status completions", v)
-		}
-	}
-}
-
 func TestCompleteJsonFlags(t *testing.T) {
 	tests := []struct{ cmd string }{
 		{"new"},
 		{"view"},
-		{"instructions"},
-		{"status"},
-		{"list"},
 		{"validate"},
 	}
 	for _, tt := range tests {
