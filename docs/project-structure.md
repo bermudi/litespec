@@ -1,289 +1,124 @@
 # Project Structure
 
-litespec uses a structured directory layout that makes specs the single source of truth while keeping work in progress isolated.
-
-## Overview
-
-```
-project/
-├── specs/                       # All spec-driven content
-│   ├── canon/                   # Accepted capabilities (source of truth)
-│   ├── changes/                  # Active work in progress
-│   │   ├── <change-name>/        # Active change
-│   │   └── archive/             # Completed changes
-│   └── changes/archive/
-│       └── YYYY-MM-DD-<name>/   # Archived change
-└── .agents/skills/               # Generated AI skills (canonical)
-```
-
-## The `specs/` Directory
-
-The `specs/` directory is the heart of litespec — all specification-driven development lives here.
-
-### `specs/canon/` — Source of Truth
-
-Canonical specs represent accepted capabilities. These are the definitive requirements that your codebase should satisfy.
-
-```
-specs/canon/
-├── validate/
-│   └── spec.md                  # Validation capabilities
-├── archive/
-│   └── spec.md                  # Archive behavior
-├── status/
-│   └── spec.md                  # Status reporting
-└── <capability>/
-    └── spec.md
-```
-
-Each capability has exactly one `spec.md` file. This is the canonical spec format.
-
-#### Canonical Spec Format
-
-```markdown
-# <capability>
-
-## Purpose                        (optional)
-
-## Requirements                   (required)
-
-### Requirement: <name>
-<body text — must contain SHALL or MUST>
-
-#### Scenario: <name>
-- **WHEN** <condition>
-- **THEN** <expected outcome>
-```
-
-Key rules:
-- `## Requirements` is required — all `### Requirement:` blocks live here
-- `## Purpose` is optional prose context before requirements
-- ADDED and MODIFIED requirements must have at least one scenario
-- Requirement body text must contain `SHALL` or `MUST`
-- Scenarios use opaque WHEN/THEN text format
-
-Example from `specs/canon/validate/spec.md`:
-
-```markdown
-# validate
-
-## Requirements
-
-### Requirement: JSON Output for Validate
-The `litespec validate` command MUST support a `--json` flag that returns structured JSON output...
-
-#### Scenario: Validate single change with JSON flag
-- **WHEN** `litespec validate <change-name> --json` is run
-- **THEN** output is valid JSON with `valid`, `errors`, and `warnings` fields
-```
-
-### `specs/changes/` — Work in Progress
-
-Active changes live here, isolated from the canonical source of truth.
-
-```
-specs/changes/
-├── <change-name>/               # Active change
-│   ├── .litespec.yaml          # Metadata
-│   ├── proposal.md             # Why & what
-│   ├── design.md               # How (technical decisions)
-│   ├── tasks.md                # Phased implementation checklist
-│   └── specs/                  # Delta specs
-│       └── <capability>/
-│           └── spec.md
-└── archive/                    # Completed changes (moved here)
-    └── YYYY-MM-DD-<name>/
-```
-
-## Active Change Directory
-
-Each active change contains all planning artifacts and delta specs needed to implement it.
-
-### `.litespec.yaml` — Change Metadata
-
-```yaml
-schema: spec-driven
-created: 2026-04-02T21:06:51Z
-```
-
-Minimal metadata. No phase tracking — that's derived from `tasks.md`.
-
-### `proposal.md` — Why & What
-
-Answers fundamental questions:
-
-```markdown
-# <change-name>
-
-## Motivation
-Why this change exists. What problem it solves.
-
-## Scope
-What's included. Specific deliverables and boundaries.
-
-## Non-Goals
-What's explicitly out of scope.
-```
-
-### `design.md` — How
-
-Technical decisions and architecture:
-
-```markdown
-## Architecture
-High-level structure. How pieces fit together.
-
-## Decisions
-Key trade-offs and choices with rationale.
-
-## File Changes
-Table of files being modified or created.
-```
-
-### `tasks.md` — Phased Checklist
-
-Implementation organized into focused phases:
-
-```markdown
-## Phase 1: Foundation
-- [ ] Set up database schema
-- [ ] Create migration
-
-## Phase 2: Core Logic
-- [ ] Implement auth service
-- [ ] Add middleware
-```
-
-Phase tracking is automatic — the first phase with unchecked tasks is the current phase.
-
-### `specs/` — Delta Specs
-
-Delta specs propose modifications to canonical specs using ADDED/MODIFIED/REMOVED/RENAMED operations:
-
-```markdown
-# <capability>
-
-## ADDED Requirements
-### Requirement: New Feature
-The system SHALL do something new...
-
-## MODIFIED Requirements
-### Requirement: Existing Feature
-The system SHALL now do this instead of that...
-
-## REMOVED Requirements
-### Requirement: Old Feature
-(No body — just marks it for removal)
-
-## RENAMED Requirements
-### Requirement: Old Name
-(Header changes, content preserved)
-```
-
-Delta operations merge in strict order at archive time: RENAMED → REMOVED → MODIFIED → ADDED.
-
-## Archived Change Directory
-
-Once a change is complete, `litespec archive` applies the deltas to `canon/` and moves the remaining planning artifacts to the archive.
-
-```
-specs/changes/archive/
-└── 2026-04-02-shell-completions/
-    ├── .litespec.yaml
-    ├── proposal.md
-    ├── design.md
-    └── tasks.md
-```
-
-Archived changes contain only planning artifacts. The `specs/` subtree is merged into `specs/canon/` and removed from the change directory during archive.
-
-## The `.agents/skills/` Directory
-
-AI skills are generated into `.agents/skills/` — this is the canonical location.
-
-```
-.agents/skills/
-├── litespec-think/             # Explore ideas and stress-test plans
-├── litespec-plan/              # Create or update change proposals and patches
-├── litespec-build/             # Implement changes, fix findings, research gaps
-└── litespec-review/            # Adversarial review of artifacts or implementation
-```
-
-Each skill is a single `SKILL.md` file with YAML frontmatter:
-
-```markdown
----
-name: litespec-plan
-description: Materialize a complete change proposal...
----
-
-Enter propose mode. Your job is to...
-```
-
-Skills are lean — minimal token usage, no boilerplate. The `--tools claude` option creates symlinks in `.claude/skills/` for Claude Code integration.
-
-## Why This Structure
-
-### Git-Native
-
-litespec works with git, not against it:
-- Each change maps cleanly to a feature branch (`change/<name>`)
-- Phases align naturally with per-phase commits
-- Archive time is the merge point into main
-
-### Spec-Driven
-
-Specs are the source of truth:
-- `canon/` contains accepted capabilities
-- Delta specs in `specs/changes/<name>/specs/` propose modifications
-- Archive merges deltas atomically
-
-### Clear Separation
-
-Active work is isolated:
-- Active changes in `specs/changes/<name>/` don't affect the source of truth
-- Archived changes preserve intent without creating parallel spec trees
-- Skills provide workflow guidance without cluttering the codebase
-
-### Progressive Rigor
-
-The structure supports different workflows:
-- **Quick Feature:** plan → build → archive
-- **Exploratory:** think (exploration/grilling modes) → plan → build → review → archive
-- **Adopt:** plan (adopt mode) → archive
-
-## File System Summary
+litespec v2 keeps the durable spec surface small and links it to a GitHub issue queue. The tree below is everything that lives on disk permanently; the issue is the queue, not a folder.
 
 ```
 project/
 ├── specs/
-│   ├── canon/                    # Accepted capabilities
-│   │   ├── <capability>/
-│   │   │   └── spec.md          # Canonical spec
-│   │   └── ...
-│   └── changes/
-│       ├── <name>/              # Active change
-│       │   ├── .litespec.yaml
-│       │   ├── proposal.md
-│       │   ├── design.md
-│       │   ├── tasks.md
-│       │   └── specs/
-│       │       └── <capability>/
-│       │           └── spec.md  # Delta spec
-│       └── archive/
-│           └── YYYY-MM-DD-<name>/
-│               ├── .litespec.yaml
-│               ├── proposal.md
-│               ├── design.md
-│               ├── tasks.md
-│               └── specs/
-└── .agents/skills/
-    └── litespec-<skill>/
-        └── SKILL.md              # Canonical skill file
+│   ├── product.md          # mental models + flows
+│   ├── glossary.md         # ubiquitous language (optional)
+│   ├── decisions/          # NNNN-<slug>.md decision records
+│   └── <feature>/
+│       └── spec.md         # load-bearing contract
+├── .agents/skills/         # generated skills (canonical)
+├── .claude/skills/         # symlinks for Claude Code
+└── mkdocs.yml              # docs site config
 ```
 
-This structure makes it easy to:
-- See what's accepted vs. what's in progress
-- Understand the evolution of a capability through archived changes
-- Guide AI agents through the spec-driven development process
-- Maintain a single source of truth while keeping work isolated
+Everything under `specs/` is durable. GitHub issues and their comments are disposable.
+
+## `specs/` — durable contracts
+
+The `specs/` directory holds the long-lived source of truth. It is small by design: only things that would mislead a future reader if they were stale.
+
+### `specs/product.md` — mental models + flows
+
+What the project is, what it is not, how to think about it, and 2–3 representative flows. Human + agent maintained. Read it at the start of every plan/build/review session.
+
+### `specs/glossary.md` — ubiquitous language
+
+Curated, optional but recommended. Defines the shared terms used in specs, code, and decisions. `litespec-plan` reads it and nudges when a new term appears. See the [Glossary](glossary.md) page for the concept and maintenance workflow.
+
+### `specs/decisions/NNNN-<slug>.md` — durable rulings
+
+Long-lived architectural decisions. File name is a zero-padded number and a slug, e.g. `0001-use-json-logger.md`.
+
+```markdown
+---
+spine: true
+---
+
+# Title
+
+## Status
+proposed | accepted | superseded
+
+## Context
+## Decision
+## Consequences
+```
+
+`spine: true` frontmatter marks a load-bearing decision that `litespec view` highlights. Decisions are created by `touch` + `validate`, not by a CLI. They are durable; only supersede or amend, do not delete after a feature ships.
+
+### `specs/<feature>/spec.md` — load-bearing contracts
+
+One spec per load-bearing feature or capability. Edited in place; there is only one spec file per feature, with no separate approved layer or lifecycle markers. The format is:
+
+```markdown
+# <feature>
+
+## Requirements
+
+### Requirement: <name>
+Body must contain SHALL or MUST.
+
+#### Scenario: <short name>
+- **WHEN** <condition>
+- **THEN** <outcome>
+```
+
+Small fixes may edit the spec in place. New features may draft the spec during `litespec-plan` clear mode. Only load-bearing capabilities get a spec; if a feature is not a durable contract, it does not need one.
+
+## `.agents/skills/` and `.claude/skills/`
+
+Generated agent skills live in `.agents/skills/`. This is the canonical location; nearly every AI coding agent discovers it natively.
+
+```
+.agents/skills/
+├── litespec-plan/
+│   └── SKILL.md
+├── litespec-build/
+│   └── SKILL.md
+└── litespec-review/
+    └── SKILL.md
+```
+
+Each skill is a single `SKILL.md` with YAML frontmatter and focused instructions. Run `litespec update` to regenerate them from the templates in `internal/skill/templates/`.
+
+`litespec init --tools claude` (or `litespec update --tools claude`) creates symlinks in `.claude/skills/` because Claude Code does not read `.agents/`. Those symlinks point back into `.agents/skills/` and are auto-detected on later `update` runs.
+
+Project-specific skills such as `skill-creator` or `the-drill` live directly in `.agents/skills/` as tracked git files. They are not generated by `litespec update`.
+
+## `mkdocs.yml`
+
+If the project publishes a docs site, `mkdocs.yml` is the MkDocs Material configuration. `litespec init` does not create this file; add or copy it when you want a generated site.
+
+A minimal `mkdocs.yml` looks like:
+
+```yaml
+site_name: your-project
+site_description: A lean, AI-native spec-driven project
+
+theme:
+  name: material
+
+nav:
+  - Home: index.md
+```
+
+This layout is intentionally minimal. The durable surface lives under `specs/`; the queue and conversation live in the GitHub issue, not on disk.
+
+## Two lanes
+
+The same structure supports both speeds:
+
+- **Small fix — zero ceremony:**
+  No `litespec new`, no GH issue. Read `specs/product.md` + the relevant `specs/<feature>/spec.md` + `specs/decisions/` and `specs/glossary.md`, edit code and spec in place, stop.
+
+- **New feature — plan fuzzy → clear:**
+  ```
+  litespec new <name> --issue N
+  ```
+  `litespec-plan` writes proposal + design + units into the GH issue body. `litespec-build` implements one unit at a time, satisfies `Done means:` and `Verify:`, checks the box, commits, and stops. `litespec-review` checks spec vs. implementation. Close the issue when done.
+
+The queue lives in the GitHub issue, not in the file tree.

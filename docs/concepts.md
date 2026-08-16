@@ -1,25 +1,109 @@
 # Concepts
 
-## What a Spec IS (and ISN'T)
+litespec is built for AI-native, spec-driven development. These concepts are the foundation. For the full design rationale, see [`DESIGN.md`](https://github.com/bermudi/litespec/blob/main/DESIGN.md).
 
-A spec is a contract — `specs/<feature>/spec.md` with load-bearing requirements written as SHALL/MUST and scenarios as WHEN/THEN. No `canon/` — edit the file directly. Only load-bearing features get a spec; small fixes edit it in place. GH issue is the queue — it holds proposal + design + queue (units with Done means + Verify), not `specs/changes/` or `backlog.md`.
+## Why spec-driven development for AI agents
 
-## Why Spec-Driven Works
+AI coding agents are great at implementation, but context is lost between sessions. A spec is a durable contract that survives the chat window. It states **what** the system must do (requirements with `SHALL` or `MUST`) and **when** it matters (named `WHEN`/`THEN` scenarios), so the next agent can verify the same thing the first agent built.
 
-You think about **what** before **how**. `litespec-plan` in fuzzy mode asks 2-3 questions before any file; clear mode nails the GH issue + spec draft. Each unit is one demo-able outcome with a Verify that would fail without it — `build` must satisfy Verify before ticking the box. `review` is adversarial and checks spec vs implementation.
+Specs are not roadmaps, design documents, or hand-wavy intentions. They are small, load-bearing contracts for the parts of the system that break if they are wrong: CLI shapes, API surfaces, file formats, and core workflows.
 
-## What Makes a Good Requirement
+## The two-lane workflow
 
-SHALL/MUST is mandatory — body text must contain it. Each requirement has named scenarios (`#### Scenario: <name>`) with WHEN/THEN. One responsibility per requirement. Codebase-design reference enforces thin vertical slices, not horizontal layering.
+Work is either a small fix or a new feature. The lanes differ in ceremony, not rigor.
 
-## When to Use Litespec (and When Not To)
+### Small fix — zero ceremony
 
-Use for load-bearing capabilities (CLI, API, file formats) that survive 6 months. Don't for one-offs, trivial refactors, or prototypes. Two lanes keep rigor proportional: small fix is zero ceremony (read product/spec/decisions -> edit -> done), new feature uses plan fuzzy/clear -> grill-me -> build -> review -> close issue.
+"Fix the typo" or "rename this function." The agent reads `specs/product.md`, the relevant `specs/<feature>/spec.md`, and `specs/decisions/` / `specs/glossary.md`; edits the code; and updates the spec in place if the contract changed. No `litespec new`, no GitHub issue, no queue.
 
-## Durable vs Disposable
+### New feature — plan, then build
 
-Durable (curated, small): `specs/product.md` (mental models + 2-3 flows), `specs/<feature>/spec.md`, `specs/decisions/NNNN-slug.md` (spine: true for load-bearing), `specs/glossary.md`. Disposable: GH issues (closed). If being stale would mislead, keep it; else delete after merge.
+A fuzzy idea becomes a clear issue, then a demo-able unit at a time:
 
-## The Bottom Line
+1. **Plan fuzzy** — `litespec-plan` reads the codebase, asks two or three questions, does a quick spike, and writes nothing. Ephemeral.
+2. **Plan clear** — `litespec-plan` writes the GitHub issue body: proposal, design, and queue of units. It also drafts `specs/<feature>/spec.md` if the feature is load-bearing.
+3. **Grill-me** — stress-test the plan with `litespec-plan`, pulling in codebase-design and domain-modeling references when needed.
+4. **Build one unit** — `litespec-build` implements one `## <outcome>` from the issue. It satisfies `Done means:` and `Verify:`, ticks the checkbox, commits, and stops.
+5. **Review** — `litespec-review` is adversarial: it checks the issue + spec against the implementation.
+6. **Close the issue** — the issue is disposable. Durable specs, decisions, and glossary stay.
 
-Specs are communication — between present and future you, between you and teammates. GH issue is the queue that keeps what doesn't rot, drops the ceremony.
+Unidirectional. One unit per session.
+
+## GitHub issue as the queue
+
+The GitHub issue body is the change: proposal, design, and queue. Each queue item is a unit:
+
+```markdown
+## Show graph for 2 changes
+Done means: `litespec view` shows arrows between deps
+Verify: `go test ./...` and view output contains "->"
+- [ ] pending
+```
+
+`litespec new <name> --issue N` links the feature to the issue. `--issue` is required. There is no offline fallback.
+
+The 64 KiB issue limit is enough because the queue contains only units, not full designs. Durable design and reasoning live in `specs/product.md`, `specs/<feature>/spec.md`, and `specs/decisions/`.
+
+## Durable specs vs. ephemeral issues
+
+**Durable (curated, small):**
+
+- `specs/product.md` — mental models, flows, and what the project is and isn't.
+- `specs/<feature>/spec.md` — load-bearing contracts. Edited directly.
+- `specs/decisions/NNNN-<slug>.md` — durable rulings. `spine: true` marks load-bearing ones.
+- `specs/glossary.md` — ubiquitous language.
+
+**Disposable (closed after the work ships):**
+
+- GitHub issues and their comments.
+
+Rule of thumb from `DESIGN.md`: if being stale would mislead a new person or agent, keep it. Otherwise it goes in the issue and is closed when done.
+
+## Direct spec edits
+
+There is no staging file for spec changes. Small fixes and new features edit `specs/<feature>/spec.md` directly. If a requirement changes, change the file. If a feature is load-bearing, create the file.
+
+A spec uses this format:
+
+```markdown
+# <feature>
+
+## Requirements
+
+### Requirement: <name>
+Body must contain SHALL or MUST.
+
+#### Scenario: <short name>
+- **WHEN** <condition>
+- **THEN** <outcome>
+```
+
+Each load-bearing requirement has a `SHALL` or `MUST` body and at least one named `WHEN`/`THEN` scenario.
+
+## Convention over configuration
+
+litespec has no config file. Conventions are enough:
+
+- `specs/` is where durable docs live.
+- `.agents/skills/` is the canonical skill directory.
+- `.claude/skills/` is a symlink for Claude Code.
+- `litespec view` auto-detects `gh` and the GitHub remote.
+- Tool adapters are discovered by scanning symlinked skill directories.
+
+Adapters are added only when a concrete need appears.
+
+## Three lean skills
+
+AI skills are generated by `litespec update` into `.agents/skills/`. They are short, directive, and progressive: details live in `references/` and are loaded only when the branch applies.
+
+| Skill | What it does |
+|-------|--------------|
+| `litespec-plan` | Fuzzy exploration, clear issue writing, grilling, codebase design, and domain modeling. |
+| `litespec-build` | One unit at a time. Satisfy `Done means:` and `Verify:`, tick the box, commit, stop. |
+| `litespec-review` | Adversarial review of the issue + spec against the implementation. |
+
+These are the only generated skills. Project-specific skills are tracked directly in `.agents/skills/` and are not generated by the CLI.
+
+## The bottom line
+
+litespec gives AI agents a durable, verifiable contract to work against and a lean workflow that keeps the contract aligned with the code. The GitHub issue carries the temporary plan; the `specs/` directory carries the durable truth.

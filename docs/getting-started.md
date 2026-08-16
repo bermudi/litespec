@@ -1,14 +1,14 @@
 # Getting Started
 
-This guide walks you through installing litespec and setting up your first project.
+This guide walks you through installing litespec v2 and running the commands you'll use every day. v2 is leaner: the GH issue is the queue, feature specs live at `specs/<feature>/spec.md`, and there are three generated skills.
 
 ## Prerequisites
 
-litespec is a Go CLI tool. You need:
+litespec is a Go CLI. You need:
 
 - **Go 1.26 or later** — [Install Go](https://go.dev/dl/)
 
-Check your Go version:
+Check your version:
 
 ```bash
 go version
@@ -16,81 +16,114 @@ go version
 
 ## Installation
 
-### Install via `go install` (Recommended)
-
-This is the quickest way to get litespec:
+### Install via `go install` (recommended)
 
 ```bash
 go install github.com/bermudi/litespec/cmd/litespec@latest
 ```
 
-The binary will be installed to `~/go/bin/litespec`. Make sure this directory is on your PATH:
+The binary lands in `~/go/bin/litespec`. Add that directory to your PATH:
 
 ```bash
 export PATH="$HOME/go/bin:$PATH"
 ```
 
-Add this line to your shell profile (`~/.bashrc`, `~/.zshrc`, etc.) to persist it across sessions.
+Put that in your shell profile (`~/.bashrc`, `~/.zshrc`, etc.) to persist it.
 
-### Build from Source
+### Build from source
 
-If you prefer to build from source or want to modify litespec:
+If you want an unreleased commit or to hack on litespec:
 
 ```bash
 git clone https://github.com/bermudi/litespec.git
 cd litespec
 go build -o litespec ./cmd/litespec
-```
-
-Then move the binary somewhere on your PATH:
-
-```bash
 mv litespec ~/.local/bin/
 ```
 
-### Verify Installation
+### Verify the binary
 
-Confirm litespec is installed and check its version:
-
-```bash
-litespec --version
-```
-
-You should see `litespec v0.1.0` (or a newer version).
-
-## Initialize a Project
-
-Navigate to your project directory and run:
+Check the help output to confirm the v2 command set:
 
 ```bash
-litespec init
+$ litespec --help
+Usage: litespec <command> [options]
+
+Workflow (two lanes):
+  Small fix: read product/spec/decisions -> edit code -> update spec if contract
+  New feature: plan[fuzzy] -> plan[clear] (GH issue) -> grill-me -> build -> review -> close
+
+Commands:
+  init [--tools <ids>]              Initialize project structure
+  new <name> --issue N              Link to GH issue (required, no folder)
+  validate [--all|--specs|--decisions] [--type T]   Validate specs and decisions
+  view                              Dashboard overview
+  update [--tools <ids>]            Regenerate skills and adapters
+  upgrade                           Check for and install the latest version
+  completion <shell>                Generate shell completion script (bash, zsh, fish)
+
+Tools:
+  claude    Symlink skills into .claude/skills/ for Claude Code
+
+Flags:
+   --version    Print version
+   --help       Print this help message
+   --json       Output structured JSON (validate, view)
+   --strict     Treat warnings as errors (validate)
+   --all        Validate all specs and decisions
+   --specs      Validate all specs only
+   --decisions  Validate all decisions only
+   --type       Disambiguate name type: spec|decision (validate)
 ```
 
-This creates the litespec project structure:
+## Initialize a project
+
+Run this in the project root:
+
+```bash
+$ litespec init --tools claude
+Created specs/ directory structure
+Generated .agents/skills/
+Generated adapter commands for: claude
+Project initialized.
+
+GH issue is the queue — proposal + design + queue live in the GH issue body. Run `litespec view` to see product + specs + GH issues.
+```
+
+This scaffolds:
 
 ```
 your-project/
 ├── specs/
-│   ├── canon/          # Canonical specs (current capabilities)
-│   ├── changes/        # Active change proposals
-│   └── changes/archive/ # Completed changes
-└── .agents/
-    └── skills/         # Generated skill files for AI agents
+│   ├── product.md       # mental models + flows
+│   ├── glossary.md      # ubiquitous language
+│   └── decisions/       # durable rulings
+├── .agents/
+│   └── skills/
+│       ├── litespec-plan/
+│       ├── litespec-build/
+│       └── litespec-review/
+└── .claude/
+    └── skills/          # symlinks to .agents/skills/ (Claude Code)
 ```
 
-### Set Up Tool Symlinks
+`.agents/skills/` is the canonical skill directory. The `.claude/skills/` path is only generated when you pass `--tools claude` or run `litespec update --tools claude`.
 
-If you're using **Claude Code**, generate symlinks so Claude can find the skills:
+## Regenerate skills
+
+After you change specs or decisions, refresh the generated skills:
 
 ```bash
-litespec init --tools claude
+$ litespec update
+Updated .agents/skills/
+Updated adapter symlinks for: claude
 ```
 
-This creates symlinks in `.claude/skills/` pointing to the generated skills in `.agents/skills/`. Subsequent `litespec update` commands will auto-detect and refresh these symlinks without needing `--tools` again.
+`litespec update` auto-detects active adapters, so you usually don't need `--tools` again.
 
-## Enable Shell Completions
+To check for a newer binary, run `litespec upgrade` (only works for `go install` installations).
 
-litespec provides shell completions for bash, zsh, and fish.
+## Enable shell completions
 
 ### Bash
 
@@ -98,7 +131,7 @@ litespec provides shell completions for bash, zsh, and fish.
 litespec completion bash > ~/.local/share/bash-completion/completions/litespec
 ```
 
-Or source it directly in your `.bashrc`:
+Or source it directly:
 
 ```bash
 source <(litespec completion bash)
@@ -123,53 +156,99 @@ autoload -U compinit && compinit
 litespec completion fish > ~/.config/fish/completions/litespec.fish
 ```
 
-## Verify Your Setup
+## View the dashboard
 
-Run a quick check to confirm everything is working:
+`litespec view` shows product, specs, and open GH issues:
 
-```bash
-# List available commands
-litespec --help
+```text
 
-# Check project structure
-ls -la specs/
-ls -la .agents/skills/
+Litespec Dashboard
 
-# Validate everything is set up correctly
-litespec validate
+════════════════════════════════════════════════════════════
+Product:
+  specs/product.md — # Product
+  product: mental models + flows
+
+Summary:
+  ● Specifications: 0 specs, 0 requirements
+
+Specifications
+────────────────────────────────────────────────────────────
+  (no feature specs yet — add specs/<feature>/spec.md)
+
+════════════════════════════════════════════════════════════
+
 ```
 
-## Next Steps
+If `gh` is installed and authenticated, open issues appear under `GH Issues (open)`.
 
-Now that litespec is installed and initialized:
+## Start a feature
 
-- Read the [Tutorial](tutorial.md) for a complete walkthrough from init to archive
-- Learn about the [Workflow](workflow.md) for spec-driven development
-- Explore the [CLI Reference](cli-reference.md) for all commands and flags
-- Upgrading from v0.18.x? Read the [Migration Guide](migrating-to-v0.19.md)
+In v2, `litespec new` links a feature to a GH issue. `--issue` is required; there is no offline fallback.
+
+````text
+$ litespec new add-feature --issue 1
+Linked: add-feature -> GH issue #1
+Issue: https://github.com/your-org/your-project/issues/1
+
+GH issue body is proposal + design + queue (64k limit).
+No folder created — GH issue is the queue.
+
+Template for GH issue body:
+## Proposal for add-feature
+...
+
+## Design
+...
+
+## Queue
+
+## <outcome>
+Done means: ...
+Verify: ```bash
+...
+```
+- [ ] pending
+````
+
+The issue body is the plan. The `litespec-build` skill works through it one unit at a time.
+
+## Validate your specs
+
+`litespec validate` lints `specs/<feature>/spec.md` and decisions:
+
+- each requirement body contains `SHALL` or `MUST`
+- each load-bearing requirement has at least one `#### Scenario:` with `WHEN` and `THEN`
+- decisions follow the `NNNN-<slug>.md` format
+
+Before you add specs:
+
+```bash
+$ litespec validate
+ok: 0 capabilities, 0 requirements, 0 scenarios
+```
+
+## Next steps
+
+- [Tutorial: Your First Feature](tutorial.md) — a complete feature cycle
+- [Workflow](workflow.md) — small fix vs new feature
+- [Concepts](concepts.md) — what makes a good spec
+- [CLI Reference](cli-reference.md) — command details
 
 ## Troubleshooting
 
 ### `litespec: command not found`
 
-Make sure `~/go/bin` is on your PATH. Add this to your shell profile:
+Add `~/go/bin` to your PATH and reload your shell.
 
-```bash
-export PATH="$HOME/go/bin:$PATH"
-```
+### `litespec new` says `--issue is required`
 
-### Symlink errors with `--tools claude`
+Create the GH issue first, then run `litespec new <name> --issue N`. v2 has no offline queue.
 
-On Windows, symlinks may require developer mode or administrator privileges. You can also manually copy the skills directory if symlinks aren't working.
+### `litespec view` doesn't show GH issues
 
-### Completions not working
+Check that `gh` is installed, authenticated, and that the repo has open issues. `view` runs `gh issue list --state open`.
 
-Restart your shell after installing completions. For zsh, run `compinit` manually:
+### `validate` reports errors
 
-```bash
-autoload -U compinit && compinit
-```
-
-### `validate` reports errors after init
-
-If you see validation errors immediately after init, ensure you're in a git repository. litespec expects to work within a version-controlled project.
+Every requirement body must contain `SHALL` or `MUST`. Every load-bearing requirement needs at least one `#### Scenario:` with both `WHEN` and `THEN`.

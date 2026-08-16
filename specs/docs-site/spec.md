@@ -18,7 +18,7 @@ The project SHALL use MkDocs with the Material theme as its documentation engine
 
 ### Requirement: Documentation Pages
 
-The `docs/` directory SHALL contain the following markdown pages: `index.md` (landing page), `concepts.md` (philosophy and why spec-driven dev matters), `getting-started.md` (installation, init), `tutorial.md` (worked "first change" walkthrough with real output from init to archive), `workflow.md` (the explore→grill→... flow with named patterns like "Quick Feature", "Exploratory", and "Adopt"), `cli-reference.md` (every command and flag), `delta-specs.md` (delta format explained with before/after merge examples), `project-structure.md` (directory layout explained), and `glossary.md` (explains what the ubiquitous language is, how litespec uses it, how to maintain it, and links to `specs/glossary.md` as the living source of truth — does not duplicate or inline terms).
+The `docs/` directory SHALL contain the following markdown pages: `index.md` (landing page), `concepts.md` (philosophy and why spec-driven dev matters), `getting-started.md` (installation, init), `tutorial.md` (worked feature walkthrough from plan to review), `workflow.md` (the two-lane flow: small fix vs new feature), `cli-reference.md` (every command and flag for the 7 v2 commands), `project-structure.md` (directory layout explained), and `glossary.md` (explains what the ubiquitous language is, how litespec uses it, how to maintain it, and links to `specs/glossary.md` as the living source of truth — does not duplicate or inline terms).
 
 #### Scenario: Complete page set
 
@@ -32,34 +32,34 @@ The `docs/` directory SHALL contain the following markdown pages: `index.md` (la
 
 ### Requirement: Tutorial Walkthrough
 
-The `tutorial.md` page SHALL contain a complete worked example from `litespec init` through `litespec archive`, showing what the AI says and does at each step. The example SHALL include actual file contents at each stage (proposal, specs, design, tasks) and describe the state of the repository before and after each command.
+The `tutorial.md` page SHALL contain a complete worked example of the new-feature lane: `litespec init` → plan[fuzzy] → plan[clear] (write GH issue) → build (implement one unit) → review → close issue. The example SHALL include actual GH issue body format, example spec.md contents, and command output at each stage.
 
 #### Scenario: Tutorial covers full workflow
 
 - **WHEN** a new user reads the tutorial
-- **THEN** they understand exactly what happens from init to archive and have a mental model of the full workflow
+- **THEN** they understand exactly what happens from init to closing the GH issue and have a mental model of the full v2 workflow
 
 ### Requirement: Concepts Page
 
-The `concepts.md` page SHALL explain what a spec IS vs ISN'T, what makes a good requirement and scenario, progressive rigor, and WHY spec-driven development works. It SHALL include examples of good vs bad specs.
+The `concepts.md` page SHALL explain what a spec IS vs ISN'T, what makes a good requirement and scenario, the two-lane workflow, GH issue as queue, direct spec edits, and WHY spec-driven development works for AI agents. It SHALL include examples of good vs bad specs.
 
 #### Scenario: Concepts convince the reader
 
 - **WHEN** a skeptical reader visits the concepts page
 - **THEN** they understand the rationale behind spec-driven development and when it applies
 
-### Requirement: Delta Specs Worked Example
+### Requirement: CLI Reference Completeness
 
-The `delta-specs.md` page SHALL include a before/after example showing how a canonical spec changes after applying ADDED/MODIFIED/REMOVED/RENAMED delta operations at archive time. The example SHALL be concrete and show the exact transformation.
+The `cli-reference.md` page SHALL document all 7 v2 commands (`init`, `new`, `validate`, `view`, `update`, `upgrade`, `completion`) with usage, flags, and examples. It SHALL NOT reference removed commands (`list`, `status`, `instructions`, `import`, `preview`, `archive`, `patch`).
 
-#### Scenario: Delta merge is clear
+#### Scenario: CLI reference matches binary
 
-- **WHEN** a user reads the delta-specs page
-- **THEN** they understand how delta operations merge into the canonical spec
+- **WHEN** a user runs `litespec --help` and compares to the CLI reference page
+- **THEN** every command and flag listed in the help output is documented on the page
 
 ### Requirement: Tool Compatibility
 
-The documentation SHALL explicitly list which AI tools are supported by litespec and how they integrate (currently Claude Code via symlinks, planned: Cursor, etc.). This SHALL be documented in either `getting-started.md` or a dedicated section in `index.md`.
+The documentation SHALL explicitly list which AI tools are supported by litespec and how they integrate (currently Claude Code via symlinks). This SHALL be documented in either `getting-started.md` or a dedicated section in `index.md`.
 
 #### Scenario: Tool support is clear
 

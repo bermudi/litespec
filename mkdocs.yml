@@ -54,9 +54,7 @@ nav:
   - Getting Started:
     - Installation: getting-started.md
     - Tutorial: tutorial.md
-    - Migrating to v0.19: migrating-to-v0.19.md
   - Workflow: workflow.md
   - CLI Reference: cli-reference.md
-  - Delta Specs: delta-specs.md
   - Project Structure: project-structure.md
   - Glossary: glossary.md

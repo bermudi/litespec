@@ -1,27 +1,72 @@
 # CLI Reference
 
-Complete command-line interface reference for litespec.
+Complete command-line reference for litespec v2.
+
+```
+Usage: litespec <command> [options]
+
+Workflow (two lanes):
+  Small fix: read product/spec/decisions -> edit code -> update spec if contract
+  New feature: plan[fuzzy] -> plan[clear] (GH issue) -> grill-me -> build -> review -> close
+
+Commands:
+  init [--tools <ids>]              Initialize project structure
+  new <name> --issue N              Link to GH issue (required, no folder)
+  validate [--all|--specs|--decisions] [--type T]   Validate specs and decisions
+  view                              Dashboard overview
+  update [--tools <ids>]            Regenerate skills and adapters
+  upgrade                           Check for and install the latest version
+  completion <shell>                Generate shell completion script (bash, zsh, fish)
+
+Tools:
+  claude    Symlink skills into .claude/skills/ for Claude Code
+
+Flags:
+   --version    Print version
+   --help       Print this help message
+   --json       Output structured JSON (validate, view)
+   --strict     Treat warnings as errors (validate)
+   --all        Validate all specs and decisions
+   --specs      Validate all specs only
+   --decisions  Validate all decisions only
+   --type       Disambiguate name type: spec|decision (validate)
+```
+
+The flags above are the top-level defaults. Each command also supports its own flags and aliases, shown below.
 
 ## Global Flags
 
 | Flag | Description |
 |------|-------------|
-| `--version`, `-v` | Print version information |
-| `--help`, `-h` | Print help message |
-| `--json` | Output structured JSON (supported by all commands) |
-| `--minimal` | Output minimal/terse output (supported by all commands) |
+| `--version` | Print version information |
+| `--help` | Print help message |
+| `--json` | Output structured JSON where supported |
+| `--strict` | Treat warnings as errors (`validate` only) |
+| `--all` | Validate all specs and decisions (`validate` only) |
+| `--specs` | Validate all specs only (`validate` only) |
+| `--decisions` | Validate all decisions only (`validate` only) |
+| `--type <T>` | Disambiguate name type: `spec` or `decision` (`validate` only) |
 
-## Commands
+## `init`
 
-### `init`
+Usage:
+
+```bash
+litespec init [--tools <ids>] [--json] [--minimal]
+```
+
+Description:
 
 Initialize a new litespec project in the current directory.
 
-```
-litespec init [--tools <ids>]
-```
+Creates:
 
-**Flags:**
+- `specs/product.md`
+- `specs/glossary.md`
+- `specs/decisions/`
+- `.agents/skills/` (`litespec-plan`, `litespec-build`, `litespec-review`)
+
+Flags:
 
 | Flag | Description |
 |------|-------------|
@@ -29,527 +74,161 @@ litespec init [--tools <ids>]
 | `--json` | Output as JSON |
 | `--minimal` | Minimal output |
 
-**Behavior:**
-- Creates `specs/canon/` — canonical spec directory
-- Creates `specs/changes/` — change proposals directory
-- Creates `specs/changes/archive/` — archived changes directory
-- Creates `.agents/skills/` — generated skill files
-- Generates skills from canonical specs
-- Optionally creates tool-specific symlinks
-- Auto-detects existing adapters from previous runs
+Examples:
 
-**Examples:**
 ```bash
-# Basic initialization
 litespec init
-
-# Initialize with Claude Code symlinks
 litespec init --tools claude
+litespec init --json
 ```
 
-**Tips:**
-- Run this in your project root
-- Use `--tools claude` to set up Claude Code integration automatically
-- Skills are generated from `specs/canon/` specs during initialization
+## `new`
 
----
+Usage:
 
-### `new`
-
-Create a new change directory under `specs/changes/`.
-
-```
-litespec new <name>
-```
-
-**Arguments:**
-- `<name>` — Change name (e.g., `add-auth`, `fix-login-bug`)
-
-**Flags:**
-
-| Flag | Description |
-|------|-------------|
-| `--json` | Output as JSON |
-| `--minimal` | Minimal output |
-
-**Behavior:**
-- Creates `specs/changes/<name>/` directory
-- Creates `specs/changes/<name>/specs/` directory for delta specs
-- Creates `.litespec.yaml` with metadata (schema, timestamp)
-- Fails if change already exists
-- Validates change name (rejects empty, path separators, `..`, whitespace, reserved names like `canon`/`changes`/`archive`, names longer than 100 characters)
-
-**Examples:**
 ```bash
-# Create a new change
-litespec new add-user-auth
-
-# Create a change for a bug fix
-litespec new fix-rate-limit
+litespec new <name> --issue N [--json] [--minimal]
 ```
 
-**Tips:**
-- Use kebab-case for change names
-- Change name appears in archive path as `<date>-<name>`
+Description:
 
----
+Link a change name to a GH issue. The GH issue is the queue; no local change folder is created. `--issue` is required; there is no offline fallback.
 
-### `patch`
+Arguments:
 
-Create a patch-mode change (delta-only, no planning artifacts).
+- `<name>` — Change name, e.g. `add-auth`
 
-```
-litespec patch <name> <capability> [--json] [--minimal]
-```
-
-**Arguments:**
-- `<name>` — Change name
-- `<capability>` — Capability to create delta spec for
-
-**Flags:**
+Flags:
 
 | Flag | Description |
 |------|-------------|
+| `--issue <N>` | GH issue number (required) |
 | `--json` | Output as JSON |
 | `--minimal` | Minimal output |
 
-**Behavior:**
-- Creates `specs/changes/<name>/` with `mode: patch` in `.litespec.yaml`
-- Creates `specs/changes/<name>/specs/<capability>/spec.md`
-- No proposal, design, or tasks files — the delta is the contract
-- Use for small, single-capability changes that need no design discussion
+Examples:
 
-**Exit Codes:**
-- `0` — Success
-- `1` — Error
-
----
-
-### `list`
-
-List active changes or canonical specs with metadata.
-
-```
-litespec list [--specs|--changes|--decisions|--backlog] [--sort recent|name|deps|number] [--status <state>] [--json]
-```
-
-**Flags:**
-
-| Flag | Description |
-|------|-------------|
-| `--specs` | List specs instead of changes |
-| `--changes` | List changes (default) |
-| `--decisions` | List architectural decision records |
-| `--backlog` | List backlog items by section |
-| `--sort <field>` | Sort by `recent` (default), `name`, `deps` (topological), or `number` |
-| `--status <state>` | Filter decisions by status (requires --decisions) |
-| `--json` | Output as JSON |
-| `--minimal` | Minimal output |
-
-**Default output (changes):**
-- Shows task progress (`✓ Complete`, `X/Y tasks`, `No tasks`)
-- Shows relative last-modified time (`just now`, `Xm ago`, `Xh ago`, `Xd ago`, or date)
-- Columns aligned to widest name
-
-**Specs output:**
-- Lists all canonical specs alphabetically
-- Shows requirement count per spec
-
-**Examples:**
 ```bash
-# List changes (default)
-litespec list
-
-# List specs
-litespec list --specs
-
-# Sort changes by name
-litespec list --sort name
-
-# JSON output for scripts
-litespec list --json
-litespec list --specs --json
+litespec new add-auth --issue 42
 ```
 
-**JSON Output Format:**
+The command validates the change name, prints the issue URL, and outputs a template for the GH issue body:
 
-Changes:
-```json
-{
-  "changes": [
-    {
-      "name": "add-auth",
-      "completedTasks": 5,
-      "totalTasks": 8,
-      "lastModified": "2026-04-02T10:30:00Z",
-      "status": "in-progress",
-      "dependsOn": ["core-setup"]
-    }
-  ],
-  "warnings": []
-}
+```markdown
+## Proposal for add-auth
+...
+
+## Design
+...
+
+## Queue
+
+## <outcome>
+Done means: ...
+Verify: ```bash
+...
+```
+- [ ] pending
 ```
 
-Specs:
-```json
-{
-  "specs": [
-    {
-      "name": "validate",
-      "requirementCount": 12
-    }
-  ]
-}
-```
+## `validate`
 
-**Tips:**
-- `--sort recent`, `--sort name`, and `--sort deps` apply to changes; `--sort number` applies to decisions; specs are always alphabetical
-- Relative time shows locale date for items older than 30 days
-- Use `--json` for integration with other tools
+Usage:
 
----
-
-### `status`
-
-Show artifact states for a change or all changes.
-
-```
-litespec status [<name>] [--json] [--minimal]
-```
-
-**Arguments:**
-- `<name>` — Optional change name (omit to show all changes)
-
-**Flags:**
-
-| Flag | Description |
-|------|-------------|
-| `--json` | Output as JSON |
-| `--minimal` | Minimal output |
-
-**Artifact States:**
-- `BLOCKED` — Dependencies not satisfied
-- `READY` — All dependencies exist, artifact does not
-- `DONE` — Artifact file exists
-
-**Default output (all changes):**
-```
-add-auth
-  proposal:    DONE
-  specs:       READY
-  design:      READY
-  tasks:       BLOCKED
-```
-
-**Named change output:**
-```
-Change: add-auth
-Created: 2026-04-02 10:30:00
-
-  proposal    DONE       Why and what — the motivation, scope, and approach
-  specs       READY      Delta specifications
-  design      READY      How — the technical approach, architecture decisions
-  tasks       BLOCKED    What to do — the phased implementation checklist
-```
-
-**Examples:**
 ```bash
-# Show all changes
-litespec status
-
-# Show specific change
-litespec status add-auth
-
-# JSON output
-litespec status --json
-litespec status add-auth --json
+litespec validate [<name>] [--all|--specs|--decisions] [--type T] [--strict] [--json] [--minimal]
 ```
 
-**JSON Output Format:**
+Description:
 
-All changes:
-```json
-{
-  "changes": [
-    {
-      "changeName": "add-auth",
-      "schemaName": "spec-driven",
-      "isComplete": false,
-      "artifacts": [
-        {
-          "id": "proposal",
-          "outputPath": "proposal.md",
-          "status": "done"
-        }
-      ]
-    }
-  ],
-  "warnings": []
-}
-```
+Validate the structure of specs and decisions.
 
-**Tips:**
-- Shows creation timestamp for named changes
-- Exits with code 1 if change not found
-- Use to track which artifacts are ready for creation
+Spec checks:
 
----
+- Requirement body text contains `SHALL` or `MUST`.
+- Each requirement has at least one `#### Scenario:` with `WHEN` and `THEN`.
+- Specs are valid Markdown and parseable.
 
-### `validate`
+Decision checks:
 
-Validate changes and specs for structure, delta syntax, and dangling deltas.
+- Required sections: Context, Decision, Consequences.
+- Valid status: `proposed`, `accepted`, or `superseded`.
+- No duplicate numbers or slugs.
+- Supersede pointers resolve and point to `superseded` decisions.
+- No supersede cycles.
 
-```
-litespec validate [<name>] [--all|--changes|--specs|--decisions] [--type change|spec|decision] [--strict] [--json]
-```
-
-**Arguments:**
-- `<name>` — Optional change or spec name
-
-**Flags:**
+Flags:
 
 | Flag | Description |
 |------|-------------|
-| `--all` | Validate all changes and specs |
-| `--changes` | Validate all changes only |
+| `<name>` | Validate a specific spec or decision by name |
+| `--all` | Validate all specs and decisions |
 | `--specs` | Validate all specs only |
 | `--decisions` | Validate all decisions only |
-| `--type <T>` | Disambiguate name: `change`, `spec`, or `decision` |
+| `--type <T>` | Disambiguate name: `spec` or `decision` |
 | `--strict` | Treat warnings as errors |
 | `--json` | Output as JSON |
 | `--minimal` | Minimal output |
 
-**Validation Checks:**
-- Artifact structure and existence
-- Delta spec syntax (ADDED/MODIFIED/REMOVED/RENAMED markers)
-- Dangling deltas (references to non-existent requirements)
-- Spec format requirements (SHALL/MUST in body, scenarios for ADDED/MODIFIED)
-- Whole-word keyword matching (SHALL/MUST not counted inside code blocks)
-- Duplicate requirement names within a delta spec
-- Duplicate scenario names within a requirement
-- Scenario content validation (WHEN and THEN markers required)
-- Cross-operation conflict detection (same requirement targeted by multiple operations)
-- RENAMED same-name detection (warning when old name equals new name)
-- Dependency cycle detection (with `--all` or `--changes`)
-- Dependency overlap detection (unrelated changes modifying same requirement)
-- Skill template validation (warning for missing templates)
-- Tasks.md phase heading requirement
-- Dependency resolution (declared deps must exist as active or archived changes)
-- Decision format and structure validation
+Default behavior with no arguments is equivalent to `--all`.
 
-**Default behavior (no arguments):**
-- Validates all changes and all specs (equivalent to `--all`)
+Examples:
 
-**Examples:**
 ```bash
-# Validate all (default)
 litespec validate
-
-# Validate specific change
-litespec validate my-change
-
-# Validate specific spec
-litespec validate auth
-
-# Disambiguate ambiguous name
-litespec validate shared --type change
-
-# Validate all changes only
-litespec validate --changes
-
-# Validate with strict mode
+litespec validate my-spec
 litespec validate --all --strict
-
-# JSON output
-litespec validate --json
+litespec validate shared --type spec
+litespec validate --decisions
 ```
 
-**JSON Output Format:**
-```json
-{
-  "valid": false,
-  "errors": [
-    {
-      "severity": "error",
-      "message": "Requirement 'non-existent' not found in spec",
-      "file": "specs/changes/my-change/specs/auth/spec.md"
-    }
-  ],
-  "warnings": [
-    {
-      "severity": "warning",
-      "message": "No scenarios defined",
-      "file": "specs/changes/my-change/specs/auth/spec.md"
-    }
-  ],
-  "summary": {
-    "total": 2,
-    "invalid": 1
-  }
-}
-```
+## `view`
 
-**Exit Codes:**
-- `0` — Validation passed
-- `1` — Validation failed or error occurred
+Usage:
 
-**Tips:**
-- Dangling delta detection catches broken refs during validation, not just at archive time
-- `--strict` is useful in CI/CD pipelines
-- Use `--type` when a name exists as both a change and a spec
-
----
-
-### `instructions`
-
-Get artifact-specific instructions for writing proposals, specs, designs, or tasks.
-
-```
-litespec instructions <artifact> [--json]
-```
-
-**Arguments:**
-- `<artifact>` — One of: `proposal`, `specs`, `design`, `tasks`
-
-**Flags:**
-
-| Flag | Description |
-|------|-------------|
-| `--json` | Output as JSON |
-| `--minimal` | Minimal output |
-
-**Behavior:**
-- Returns static artifact creation guidance
-- No change context required
-- Used by AI skills to understand how to create artifacts
-
-**Examples:**
 ```bash
-# Get proposal instructions
-litespec instructions proposal
-
-# Get design instructions as JSON
-litespec instructions design --json
-
-# Get tasks instructions
-litespec instructions tasks
+litespec view [--json] [--minimal]
 ```
 
-**JSON Output Format:**
-```json
-{
-  "artifactId": "design",
-  "description": "How — technical approach, architecture decisions, data flow, file changes",
-  "instruction": "... detailed instructions ...",
-  "template": "... propose skill template ...",
-  "outputPath": "design.md"
-}
-```
+Description:
 
-**Exit Codes:**
-- `0` — Success
-- `1` — Unknown artifact or error
+Display a dashboard overview of product, specs, decisions, and open GH issues.
 
-**Tips:**
-- Each artifact has unique guidance (proposal focuses on motivation/scope, specs on delta format, design on architecture, tasks on phases)
-- Instructions are static templates that provide consistent guidance for each artifact type
-- Use this to understand expected artifact structure
+If `gh` is installed and the project is a Git repository with a GitHub remote, `view` calls `gh issue list` and shows open issues. Otherwise it shows only local specs and decisions.
 
----
-
-### `preview`
-
-Preview what archive would do to canonical specs without making changes.
-
-```
-litespec preview <name> [--json] [--minimal]
-```
-
-**Arguments:**
-- `<name>` — Change name to preview
-
-**Flags:**
+Flags:
 
 | Flag | Description |
 |------|-------------|
 | `--json` | Output as JSON |
 | `--minimal` | Minimal output |
 
-**Behavior:**
-- Reads the change's delta specs
-- Simulates the RENAMED→REMOVED→MODIFIED→ADDED merge against current canonical specs
-- Shows diff of what would change (which requirements added/modified/removed)
-- No files are modified — this is a dry run
+Examples:
 
-**Exit Codes:**
-- `0` — Success
-- `1` — Error
-
----
-
-### `archive`
-
-Apply deltas and archive a completed change.
-
-```
-litespec archive <name> [--allow-incomplete]
-```
-
-**Arguments:**
-- `<name>` — Change name to archive
-
-**Flags:**
-
-| Flag | Description |
-|------|-------------|
-| `--allow-incomplete` | Archive even with incomplete tasks or unarchived dependencies |
-| `--json` | Output as JSON |
-| `--minimal` | Minimal output |
-
-**Archive Process:**
-1. **Validate** — Run full validation on the change
-2. **Check dependencies** — Verify all declared `dependsOn` are archived (unless `--allow-incomplete`). Errors if unarchived dependencies exist.
-3. **Check tasks** — Verify all tasks complete (unless `--allow-incomplete`)
-4. **Merge deltas** — Apply RENAMED→REMOVED→MODIFIED→ADDED to `specs/canon/`
-5. **Move and strip** — Relocate to `specs/changes/archive/<YYYY-MM-DD>-<name>/` and remove specs/ subtree
-
-The archive operation is transactional: the change is moved to the archive first, then canonical specs are written atomically. If the write fails, the change is restored from archive.
-
-**Delta Merge Order:**
-1. `RENAMED` — Establish correct headers
-2. `REMOVED` — Eliminate requirements
-3. `MODIFIED` — Update remaining requirements
-4. `ADDED` — Append new requirements
-
-**Examples:**
 ```bash
-# Archive completed change
-litespec archive add-auth
-
-# Archive incomplete change (bypass task check)
-litespec archive add-auth --allow-incomplete
+litespec view
+litespec view --json
 ```
 
-**Exit Codes:**
-- `0` — Success
-- `1` — Validation failed, tasks incomplete, or error
+## `update`
 
-**Tips:**
-- Archived directory contains only planning artifacts (proposal, design, tasks) — the specs/ subtree is merged into canon and removed from the change directory
-- Canon creates new directories if capability doesn't exist
-- Date prefix in archive path prevents conflicts
+Usage:
 
----
-
-### `update`
-
-Regenerate skills and adapter commands from current specs.
-
-```
-litespec update [--tools <ids>]
+```bash
+litespec update [--tools <ids>] [--json] [--minimal]
 ```
 
-**Flags:**
+Description:
+
+Regenerate skills and adapter symlinks from the built-in templates.
+
+- Writes `.agents/skills/<skill>/SKILL.md` for each generated skill.
+- Writes reference files from `internal/skill/templates/references/`.
+- Cleans stale skill directories and symlinks.
+- Auto-detects active adapters (e.g., existing `.claude/skills/` symlinks).
+- Does not modify `specs/` content.
+
+Flags:
 
 | Flag | Description |
 |------|-------------|
@@ -557,290 +236,82 @@ litespec update [--tools <ids>]
 | `--json` | Output as JSON |
 | `--minimal` | Minimal output |
 
-**Behavior:**
-- Regenerates all skills in `.agents/skills/`
-- Auto-detects active tool adapters by scanning for existing symlinks (e.g., `.claude/skills/`)
-- When `--tools` is provided, only the listed adapters are updated
-- Does not modify `specs/` directory
-- Fails if not a litespec project
+Examples:
 
-**Examples:**
 ```bash
-# Regenerate skills only
 litespec update
-
-# Update skills and recreate Claude symlinks
 litespec update --tools claude
 ```
 
-**Exit Codes:**
-- `0` — Success
-- `1` — Not a litespec project or error
+## `upgrade`
 
-**Tips:**
-- Use after modifying canonical specs to regenerate skills
-- Faster than `init` for skill refresh
-- Does not create project structure (assumes it exists)
-- Auto-detects active adapters — no need to pass `--tools` if you've set them up before
+Usage:
 
----
-
-### `view`
-
-Display a dashboard overview with progress bars, change categories, and dependency graph.
-
-```
-litespec view
-```
-
-**Flags:**
-
-| Flag | Description |
-|------|-------------|
-| `--json` | Output as JSON |
-| `--minimal` | Minimal output |
-
-**Behavior:**
-- Shows summary section (spec count, draft/active/completed changes, task progress)
-- Lists active changes with progress bars `[█████░░░░░]` and percentage
-- Lists draft changes (no tasks yet)
-- Lists completed changes (all tasks done)
-- Lists specifications sorted by requirement count (highest first)
-- Renders dependency graph with box-drawing characters when any active change has `dependsOn`
-
-**Example output:**
-```
-
-Litespec Dashboard
-
-════════════════════════════════════════════════════════════
-Summary:
-  ● Specifications: 14 specs, 70 requirements
-  ● Draft Changes: 1
-  ● Active Changes: 2 in progress
-  ● Completed Changes: 1
-  ● Task Progress: 15/20 (75% complete)
-
-Active Changes
-────────────────────────────────────────────────────────────
-  ◉ add-rate-limiting                [██████████░░░░░░░░░] 53%
-  ◉ refactor-auth                    [████████████████░░░░] 80%
-
-Specifications
-────────────────────────────────────────────────────────────
-  ▪ validate                         13 requirements
-  ▪ docs-site                         8 requirements
-
-Dependency Graph
-────────────────────────────────────────────────────────────
-  ├── core-setup
-  │   └── add-rate-limiting
-
-════════════════════════════════════════════════════════════
-```
-
-**Tips:**
-- Use for a quick overview of project status
-- Active changes are sorted by completion percentage (lowest first)
-- Dependency graph only appears when at least one change has `dependsOn`
-- Use `litespec list` for more detailed change/spec information
-
----
-
-### `upgrade`
-
-Check for the latest version and upgrade the binary.
-
-```
-litespec upgrade
-```
-
-**Flags:**
-
-| Flag | Description |
-|------|-------------|
-| `--json` | Output as JSON |
-| `--minimal` | Minimal output |
-
-**Behavior:**
-- Queries GitHub Releases for the latest version tag
-- Compares with current installed version
-- Upgrades via `go install github.com/bermudi/litespec@latest`
-- Only works for installations via `go install` — reports error otherwise
-
-**Examples:**
 ```bash
-# Check for updates and upgrade
-litespec upgrade
+litespec upgrade [--json] [--minimal]
 ```
 
-**Exit Codes:**
-- `0` — Already at latest version or upgrade successful
-- `1` — Error (not installed via go install, network error, etc.)
+Description:
 
----
+Check for the latest release and upgrade via `go install github.com/bermudi/litespec/cmd/litespec@latest`.
 
-### `import`
+Only works for binaries installed with `go install`. Exits with no change if already up to date.
 
-Import an OpenSpec project to litespec format.
-
-```
-litespec import --source <directory> [--dry-run] [--force]
-```
-
-**Arguments:**
-- `--source <directory>` — Path to the OpenSpec project root (required)
-
-**Flags:**
+Flags:
 
 | Flag | Description |
 |------|-------------|
-| `--dry-run` | Show what would be imported without making changes |
-| `--force` | Overwrite existing files without prompting |
 | `--json` | Output as JSON |
 | `--minimal` | Minimal output |
 
-**Behavior:**
-- Detects OpenSpec project structure (canonical specs and changes)
-- Migrates canonical specs to `specs/canon/`
-- Migrates active and archived changes to `specs/changes/`
-- Converts OpenSpec metadata format to litespec format
-- Preserves all delta operations and scenario content
+Examples:
 
-**Examples:**
 ```bash
-# Import an OpenSpec project
-litespec import --source /path/to/openspec-project
-
-# Preview what would be imported
-litespec import --source /path/to/openspec-project --dry-run
-
-# Force overwrite existing files
-litespec import --source /path/to/openspec-project --force
+litespec upgrade
+litespec upgrade --json
 ```
 
-**Tips:**
-- Use `--dry-run` first to see the plan before committing to changes
-- The source directory is not modified — import is always a one-way migration
-- Archived changes retain their original date prefix in the archive name
+## `completion`
 
----
+Usage:
 
-### `decide`
-
-Create a new architectural decision record.
-
-```
-litespec decide <slug> [--json] [--minimal]
-```
-
-**Arguments:**
-- `<slug>` — Decision slug (e.g., `use-bcrypt-for-hashing`)
-
-**Flags:**
-
-| Flag | Description |
-|------|-------------|
-| `--json` | Output as JSON |
-| `--minimal` | Minimal output |
-
-**Behavior:**
-- Creates `specs/decisions/` directory if it doesn't exist
-- Generates `NNNN-<slug>.md` with numbered prefix (auto-incremented)
-- Template includes Status, Context, Decision, and Consequences sections
-- Decisions are persistent architectural rulings that span changes
-
-**Exit Codes:**
-- `0` — Success
-- `1` — Error
-
----
-
-### `completion`
-
-Generate shell completion script.
-
-```
+```bash
 litespec completion <shell>
 ```
 
-**Arguments:**
-- `<shell>` — One of: `bash`, `zsh`, `fish`
+Description:
 
-**Supported Shells:**
-- `bash` — Uses `_litespec()` completion function
-- `zsh` — Uses `#compdef litespec` with `_arguments`
-- `fish` — Uses `complete -c litespec` commands
+Generate a shell completion script.
 
-**Examples:**
+Supported shells: `bash`, `zsh`, `fish`.
+
+Examples:
+
 ```bash
-# Generate bash completion
-litespec completion bash
+# Bash
+litespec completion bash > ~/.local/share/bash-completion/completions/litespec
+eval "$(litespec completion bash)"
 
-# Generate zsh completion
-litespec completion zsh
-
-# Generate fish completion
-litespec completion fish
-
-# Install bash completion
-litespec completion bash | sudo tee /etc/bash_completion.d/litespec
-
-# Install zsh completion (add to ~/.zshrc)
+# Zsh
 litespec completion zsh > ~/.zsh/completion/_litespec
+fpath=(~/.zsh/completion $fpath)
+autoload -U compinit && compinit
+
+# Fish
+litespec completion fish > ~/.config/fish/completions/litespec.fish
 ```
 
-**Exit Codes:**
-- `0` — Success
-- `1` — Invalid shell or error
+`completion` has no flags and accepts exactly one shell argument.
 
-**Tips:**
-- Source the script to enable completion
-- Completions are dynamic — query project state for change/spec names
-- Hidden `__complete` command provides completion data
+## Tool Adapters
 
----
+The `--tools` flag for `init` and `update` creates tool-specific adapter symlinks that point to the canonical `.agents/skills/` directory.
 
-## Hidden Commands
+| Tool ID | Name | Skills Directory |
+|---------|------|------------------|
+| `claude` | Claude Code | `.claude/skills/` |
 
-### `__complete`
-
-Internal backend for dynamic shell completions.
-
-```
-litespec __complete <words...>
-```
-
-**Behavior:**
-- Receives command-line words as positional arguments
-- Prints completion candidates: `candidate\tdescription` (one per line)
-- Errors during resolution produce no output (silent fallback)
-
-**Dynamic Completions:**
-- Change names from filesystem
-- Spec names from filesystem
-- Tool IDs from adapter config
-- Artifact IDs from artifact registry
-- Flags and static values hardcoded
-
-**Examples:**
-```bash
-# Complete command names
-litespec __complete litespec
-
-# Complete change names for status
-litespec __complete litespec status
-
-# Complete tool IDs for --tools
-litespec __complete litespec init --tools
-```
-
-**Tips:**
-- Not intended for direct use — used by shell scripts
-- Tab character separates candidate from description
-- Bash ignores description, zsh/fish use it
-
----
+Run `litespec init --tools claude` once. Subsequent `litespec update` calls auto-detect and refresh the symlinks.
 
 ## Exit Codes
 
@@ -849,75 +320,8 @@ litespec __complete litespec init --tools
 | `0` | Success |
 | `1` | Error, validation failed, or invalid arguments |
 
-All commands follow consistent exit code behavior for scripting and automation.
-
----
-
-## Tool Integration
-
-### Claude Code
-
-Generate symlinks for Claude Code integration:
-
-```bash
-litespec init --tools claude
-# or
-litespec update --tools claude
-```
-
-This creates symlinks in `.claude/skills/` pointing to `.agents/skills/`.
-
-**Supported Tools:**
-
-| Tool ID | Name | Skills Directory |
-|---------|------|-----------------|
-| `claude` | Claude Code | `.claude/skills/` |
-
----
-
-## Project Structure
-
-```
-project/
-├── specs/
-│   ├── canon/                    # Source of truth
-│   │   └── <capability>/
-│   │       └── spec.md
-│   └── changes/                  # Active changes
-│       ├── <name>/
-│       │   ├── .litespec.yaml
-│       │   ├── proposal.md
-│       │   ├── design.md
-│       │   ├── tasks.md
-│       │   └── specs/
-│       │       └── <capability>/
-│       │           └── spec.md
-│       └── archive/              # Completed changes
-│           └── <date>-<name>/
-└── .agents/skills/               # Generated skills
-    ├── litespec-think/
-    ├── litespec-plan/
-    ├── litespec-build/
-    └── litespec-review/
-```
-
----
-
-## Delta Spec Operations
-
-| Marker | Behavior |
-|--------|----------|
-| `## ADDED Requirements` | Append to end of main spec |
-| `## MODIFIED Requirements` | Replace matching requirement by header |
-| `## REMOVED Requirements` | Delete from main spec |
-| `## RENAMED Requirements` | Change section header, preserve content |
-
-**Merge Order:** RENAMED → REMOVED → MODIFIED → ADDED
-
----
-
 ## See Also
 
-- [Concepts](concepts.md) — Philosophy and core ideas behind litespec
-- [Getting Started](getting-started.md) — Installation and first steps
-- [Tutorial](tutorial.md) — Worked walkthrough of a complete change
+- [Workflow](workflow.md)
+- [Concepts](concepts.md)
+- [Getting Started](getting-started.md)
