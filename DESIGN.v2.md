@@ -1,0 +1,168 @@
+# litespec v2 — Design (draft lean)
+
+> Lean cut. Comment inline — this is for red pen.
+
+## Stack
+
+- Go, `github.com/bermudi/litespec`, binary `litespec`
+- No config file. Convention over config.
+
+## Directory
+
+```
+project/
+├── specs/
+│   ├── product.md          # mental models + 2-3 flows (human + agent, agent-maintained)
+│   ├── glossary.md         # optional, curated terms (from mattpocock)
+│   ├── decisions/
+│   │   └── NNNN-slug.md    # durable rulings, see below
+│   ├── <feature>/
+│   │   └── spec.md         # only load-bearing features/contracts (optional)
+│   └── changes/<name>/     # only when proposal/design won't fit in GH issue
+│       ├── proposal.md     # why/what (only for greenfield/uncertain)
+│       └── design.md       # how (only for greenfield/uncertain)
+└── .agents/skills/
+    ├── litespec-plan/      # fuzzy + clear, see Skills
+    ├── litespec-build/
+    └── litespec-review/
+```
+
+Notes:
+- No `canon/`. `specs/<feature>/spec.md` is the durable spec when needed.
+- No `backlog.md`. GH issues is the backlog.
+- No `QUEUE.md` file. GH issue body is the queue (see below). `changes/` only for overflow docs.
+
+## What lives forever vs what gets deleted
+
+**Durable (curated, small):**
+- `product.md` — what we are, what we aren't, how we think, 2-3 flows
+- `specs/<feature>/spec.md` — promises that break things if wrong (CLI, API shape, file formats)
+- `decisions/` — why we chose a hard path
+- `glossary.md` — shared words
+
+**Disposable (deleted after merge):**
+- GH issues (closed), issue comments, `specs/changes/<name>/` proposal/design
+
+Test: if being stale would mislead a new person/agent, keep it. Else delete after merge.
+
+## Two lanes
+
+**Small fix — zero ceremony:**
+You say "fix typo" -> agent reads product + relevant spec + decisions/glossary -> edits code -> updates the one `specs/<feature>/spec.md` if it was a contract change -> done. No `new`, no issue required.
+
+**New feature / greenfield (plan fuzzy -> clear):**
+```
+you: "add X" -> plan[fuzzy] (read code, ask 2-3 questions, no files — references/fuzzy.md)
+          -> plan[clear] (rough shape in GH issue body + draft spec if load-bearing — references/clear.md)
+          -> you: "looks good" or "grill-me" (references/grilling.md)
+          -> if shape still fuzzy and won't fit in issue: agent writes proposal/design
+             into specs/changes/<name>/ (only as overflow when gh is unavailable
+             or issue body too small — GH issue stays the queue)
+          -> build: one unit at a time (see unit rule)
+          -> review
+          -> close GH issue, delete changes/ overflow if any
+```
+
+`grill-me` is a skill reference, not a CLI. `plan` owns spec drafting in clear mode: if the feature is load-bearing, it writes/updates `specs/<feature>/spec.md` alongside the issue.
+
+## Unit rule
+
+One unit = one thing you can demo + one `Verify:` that would fail if it's missing.
+
+In GH issue body:
+```markdown
+## Show graph for 2 changes
+Done means: `litespec view` shows arrows between deps
+Verify: `go test ./...` and view output contains "->"
+- [ ] pending
+```
+
+Agent ticks by checking the box. No `tasks.md`.
+
+## Spec format (only for load-bearing)
+
+```markdown
+# <feature>
+
+## Requirements
+
+### Requirement: <name>
+Body must contain SHALL or MUST.
+
+#### Scenario: <short name>
+- **WHEN** <condition>
+- **THEN** <outcome>
+```
+
+ADDED/MODIFIED not needed — edit the file directly. Small fix edits it, greenfield creates it.
+
+## Decisions
+
+File: `specs/decisions/NNNN-slug.md`
+
+```markdown
+# Title
+
+## Status
+proposed | accepted | superseded
+
+## Context
+## Decision
+## Consequences
+```
+
+Optional frontmatter: `spine: true` for load-bearing. Created by agent via skill `references/adr.md`, not a CLI. `validate` checks sections, `view` stars spine.
+
+No `litespec decide` command. `touch` + `validate` is enough.
+
+## Glossary
+
+`specs/glossary.md`, optional but highly recommended. Curated. Skill nudges when a new core term appears. No gate.
+
+
+## Skills
+
+3 generated skills, lean, directive, progressive disclosure. `think+plan` merged — fuzzy vs clear are modes of `plan`.
+
+| Skill | When |
+|-------|------|
+| plan | turn intent into bounded GH issue (+ spec + overflow). Fuzzy vs clear are references |
+| build | implement one unit, satisfy Verify |
+| review | adversarial check, report findings |
+
+`litespec-plan` references (load only when branch applies, distilled from AgenticWiki — no links, no theory):
+- `references/fuzzy.md` — half-baked idea, questions, research/spike, no files yet
+- `references/clear.md` — sharp idea: write GH issue body + `specs/<feature>/spec.md` + overflow `specs/changes/` if needed (owns the Verify rule)
+- `references/grilling.md` — `grill-me` or shape still fuzzy
+- `references/codebase-design.md` — thin vertical slice, reuse existing path, smallest coherent change (distilled from tracer bullets / vertical slices / infrastructure blindness / over-engineering)
+- `references/domain-modeling.md` — new ubiquitous term -> glossary
+
+No alias for `think`. Add if dogfooding shows we miss it. Detail lives in `references/` only when that branch applies — borrow grill/domain ideas from mattpocock/skills on our terms.
+
+Generated via `litespec update` from `internal/skill/templates/` (embed.FS). `.agents/skills/` is canonical.
+
+## CLI (minimal)
+
+| Command | Purpose |
+|---------|---------|
+| `litespec init` | scaffold `specs/` + skills |
+| `litespec new <name> [--issue N]` | create `specs/changes/<name>/` scaffold + link to GH issue |
+| `litespec validate [--decisions]` | lint specs + decisions + GH issue queue format + Verify shell |
+| `litespec view` | product + features + open GH issues (via `gh` if present) + decisions (spine starred) |
+| `litespec update` | regenerate skills |
+
+No `patch`, `archive`, `decide`, `preview`, `import` until needed. Add when pain appears.
+
+## GH issues as queue
+
+- Source of truth for what to do. GH issue body holds Done/Verify/Status checklist.
+- `specs/changes/<name>/` kept only as overflow when `gh` is unavailable or issue body
+  too small for proposal/design. Lean: no `QUEUE.md` file otherwise.
+- Offline/no-GH fallback: same checklist in `specs/changes/<name>/QUEUE.md`, validated locally.
+- `view` auto-detects `gh` + GitHub remote. No config flag.
+
+## Resolved for v2 lean
+
+- `specs/changes/<name>/` kept only when `gh` unavailable (overflow).
+- Product flows: list explicitly in `product.md` (models + flows as lists).
+- `litespec new` starts as link only (`--issue N`), not auto-create. Add `gh issue create` later if needed.

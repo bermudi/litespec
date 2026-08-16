@@ -6,9 +6,7 @@ import (
 
 func TestGet_ReturnsNonEmptyForKnownIDs(t *testing.T) {
 	knownIDs := []string{
-		"think", "plan", "build", "review",
-		"artifact-proposal", "artifact-specs",
-		"artifact-design", "artifact-tasks",
+		"plan", "build", "review",
 	}
 	for _, id := range knownIDs {
 		tmpl := Get(id)

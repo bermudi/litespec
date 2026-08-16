@@ -19,24 +19,19 @@ const (
 
 var Skills = []SkillInfo{
 	{
-		ID:          "think",
-		Name:        "litespec-think",
-		Description: "Explore ideas, stress-test plans, and grill unresolved design decisions. Use when the user says 'explore', 'grill', 'grill me', 'let's think about', 'stress-test', 'help me decide', or 'what should I do next'. Covers exploration, grilling, and workflow routing modes.",
-	},
-	{
 		ID:          "plan",
 		Name:        "litespec-plan",
-		Description: "Create or update litespec change proposals, patches, and adopt existing code. Use when the user wants to propose a new change, create a change, patch a small fix, adopt existing code into specs, or says 'propose', 'patch', 'adopt', or 'new change'.",
+		Description: "Shape intent into a bounded GH issue (+ spec if load-bearing). Use fuzzy mode for half-baked ideas/questions/research and clear mode to nail the issue. Handles grilling ('grill-me'), codebase design, and glossary. Use when the user wants to plan, shape, explore, grill, or says 'plan', 'shape', 'grill-me', or 'let's think about'.",
 	},
 	{
 		ID:          "build",
 		Name:        "litespec-build",
-		Description: "Implement litespec changes phase by phase, fix review findings, and research knowledge gaps. Use when the user wants to start coding, implement tasks, fix review feedback, research external dependencies, or says 'apply', 'implement', 'fix', or 'research'.",
+		Description: "Implement one GH issue unit at a time, satisfying Done means and Verify. Use when the user wants to build, implement a unit, fix review findings, or says 'build', 'implement', or 'fix'.",
 	},
 	{
 		ID:          "review",
 		Name:        "litespec-review",
-		Description: "Adversarial review of litespec artifacts or implementation. Use when the user wants to review a change, check completeness, stress-test implementation against specs, or says 'review' or 'check this'.",
+		Description: "Adversarial review of GH issue + spec vs implementation. Use when the user wants to review a change, check Verify strength, or says 'review' or 'check this'.",
 	},
 }
 
