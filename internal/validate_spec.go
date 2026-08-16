@@ -116,7 +116,7 @@ func ValidateSpecs(root string) (*ValidationResult, error) {
 				continue
 			}
 			name := entry.Name()
-			if name == CanonDirName || name == ChangesDirName || name == "decisions" || seen[name] {
+			if name == CanonDirName || name == ChangesDirName || seen[name] {
 				continue
 			}
 			specPath := filepath.Join(projectSpecsDir, name, "spec.md")

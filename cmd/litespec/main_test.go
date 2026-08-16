@@ -1808,13 +1808,21 @@ func TestCmdInitDirect_HappyPath(t *testing.T) {
 		t.Fatalf("cmdInit: %v", err)
 	}
 	for _, dir := range []string{
-		filepath.Join(root, "specs", "canon"),
-		filepath.Join(root, "specs", "changes"),
-		filepath.Join(root, "specs", "changes", "archive"),
+		filepath.Join(root, "specs", "product.md"),
+		filepath.Join(root, "specs", "glossary.md"),
+		filepath.Join(root, "specs", "decisions"),
 		filepath.Join(root, ".agents", "skills"),
 	} {
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
 			t.Errorf("expected %s to exist", dir)
+		}
+	}
+	for _, dir := range []string{
+		filepath.Join(root, "specs", "canon"),
+		filepath.Join(root, "specs", "backlog.md"),
+	} {
+		if _, err := os.Stat(dir); err == nil {
+			t.Errorf("expected %s to NOT exist in lean v2", dir)
 		}
 	}
 }

@@ -78,12 +78,12 @@ func cmdInit(args []string) error {
 	return Render(Response{
 		Full: initResultJSON{
 			Initialized: true,
-			Directories: []string{"specs/canon/", "specs/changes/"},
+			Directories: []string{"specs/product.md", "specs/glossary.md", "specs/decisions/"},
 			Skills:      skillNames,
 			Adapters:    toolIDs,
 		},
 		Minimal:     initMinimalJSON{Initialized: true},
-		Text:        "Project initialized.\n\nTip: Create specs/backlog.md with ## Deferred, ## Open Questions, and ## Future Versions sections to surface backlog counts in `litespec view`.\n",
+		Text:        "Project initialized.\n\nGH issue is the queue — proposal + design + queue live in the GH issue body. Run `litespec view` to see product + specs + GH issues.\n",
 		MinimalText: "initialized",
 	}, asJSON, asMinimal)
 }

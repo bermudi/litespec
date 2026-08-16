@@ -84,8 +84,9 @@ func printInitHelp() {
 Initialize a new litespec project in the current directory.
 
 Creates:
-  specs/canon/      Canonical spec directory
-  specs/changes/    Change proposals directory
+  specs/product.md    Product mental models + flows
+  specs/glossary.md   Glossary (if missing)
+  specs/decisions/    Decisions directory
   .agents/skills/   Generated skill files
 
 Flags:

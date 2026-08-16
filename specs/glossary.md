@@ -1,18 +1,12 @@
 # Glossary
 
-Project-wide ubiquitous language. Read this before every conversation.
+Project-wide ubiquitous language. Curated, optional but recommended. Read this before every conversation.
 
-- **Archive**: Promoting a change to implemented — merging its deltas into canon and moving the change directory to `specs/changes/archive/`.
-- **Artifact**: One of the four planning documents in a change: proposal.md, specs/, design.md, tasks.md. Created in dependency order during propose.
-- **Canon**: The source-of-truth specs in `specs/canon/`. Represents what the system currently IS — accepted capabilities, not proposed changes.
-- **Change**: An isolated proposed modification in `specs/changes/<name>/`. Contains planning artifacts (proposal, specs, design, tasks). Tentative until archived.
-- **Delta**: A spec describing differences against canon using ADDED/MODIFIED/REMOVED/RENAMED markers. Not a standalone spec — only meaningful relative to a canonical spec.
-- **Design**: The architecture artifact of a change — decisions, file changes, and impact analysis. Created after specs so it can reference requirements.
-- **Patch**: A lightweight change mode for small, single-capability modifications. Does not require proposal, design, or tasks artifacts. The delta is the contract. Created via `litespec patch <name> <capability>`.
-- **Patch mode**: A change classification stored as `mode: patch` in `.litespec.yaml`. Patch-mode changes skip planning artifacts and are rendered separately in status and view outputs.
-- **Phase**: A group of related tasks in `tasks.md`. One phase = one apply session = one commit. The first phase with unchecked tasks is the current phase.
-- **Proposal**: The first artifact of a change — motivation, scope, and non-goals. Sets the contract for everything that follows.
-- **Scenario**: A named, concrete example under a requirement using WHEN/THEN format. Every ADDED and MODIFIED requirement must have at least one.
-- **Skill**: Generated agent instructions in `.agents/skills/<name>/SKILL.md`. Produced from Go templates via `litespec update`, never written directly.
-- **Spec**: A capability document with requirements and scenarios. Exists in two forms: canonical (current truth) and delta (proposed changes).
-- **Tasks**: The phased implementation checklist. Organized into phases, applied one phase at a time. Checkbox state drives phase tracking.
+- **Decision**: A durable ruling in `specs/decisions/NNNN-slug.md` with `Status`/`Context`/`Decision`/`Consequences`, optional `spine: true` for load-bearing. Created via `touch` + `validate`, not a CLI.
+- **GH Issue is the queue**: The GH issue body holds proposal + design + queue. Each unit is `## <outcome>` with `Done means:` and `Verify:` that must fail without the outcome. 64k limit, no overflow. Offline fallback: `specs/changes/<name>/QUEUE.md` when `gh` unavailable.
+- **Glossary**: `specs/glossary.md` — curated terms. Managed via plan skill, graceful degradation if absent.
+- **Product**: `specs/product.md` — mental models + 2-3 flows (human + agent, agent-maintained).
+- **Scenario**: A named example under a requirement using `WHEN`/`THEN` format. Load-bearing requirements must have at least one scenario. Body text must contain SHALL or MUST.
+- **Skill**: Generated agent instructions in `.agents/skills/<name>/SKILL.md` via `litespec update`. Only three: `litespec-plan` (fuzzy/clear + grilling/codebase-design/domain-modeling), `litespec-build` (one unit), `litespec-review` (adversarial).
+- **Spec**: A load-bearing contract in `specs/<feature>/spec.md` with SHALL/MUST and WHEN/THEN scenarios. No `canon/` — edit the file directly.
+- **Unit**: One demo-able outcome per GH issue `##` with `Done means:` and `Verify:` that must fail without the outcome. Built one at a time, ticked via checkbox. No `tasks.md`.

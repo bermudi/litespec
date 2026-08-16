@@ -2,81 +2,33 @@
 
 A lean, AI-native spec-driven development CLI.
 
-litespec gives AI coding agents structured workflows that keep your codebase aligned with your specifications. It's a reimagining of OpenSpec with stronger opinions: fewer concepts, leaner skills, unidirectional flow, and proper dangling-delta validation.
-
-The CLI is a read-only context provider. The AI writes artifacts directly. litespec tells it what to do, where things are, and whether they're valid.
+litespec gives AI coding agents structured workflows that keep your codebase aligned with specifications. GH issue is the queue — proposal + design + queue live in the GH issue body, not `specs/changes/`. Three lean skills, two lanes, direct spec edits.
 
 ---
 
 ## What makes litespec different
 
-**Convention over configuration** — zero config files. All defaults, all the time. No stub `config.yaml` to fill in — it works out of the box.
+**GH issue is the queue** — not `specs/changes/` or `QUEUE.md`. 64k limit, no overflow. Offline fallback: `specs/changes/<name>/QUEUE.md`.
 
-**Unidirectional workflow** — `think → plan → build → review → archive`. No going backward. If something's wrong after plan, start over. This prevents partial states and confusion.
+**Two lanes** — small fix (zero ceremony, no issue) vs new feature (plan fuzzy -> clear -> grill-me -> build one unit at a time -> review -> close issue).
 
-**Lean skills** — minimal tokens, zero boilerplate. Each skill is focused instructions, not pages of boilerplate that waste your AI context.
+**3 skills only** — `litespec-plan` (fuzzy/clear + grilling/codebase-design/domain-modeling), `litespec-build` (one unit with Done means + Verify), `litespec-review` (adversarial). Generated via `litespec update` into `.agents/skills/`.
 
-**Git-native** — specs live in your repo. Branch per change, per-phase commits. Your PRs carry the spec history.
-
-**Read-only CLI** — the AI never writes through the CLI. It writes artifact files directly. The CLI exists to give the AI structured data (status, instructions, validation).
-
-**Dangling delta detection** — catches broken deltas during `validate`, not just at archive time. This saves you from bad merges at the worst possible moment.
+**Direct spec edits** — `specs/<feature>/spec.md` with SHALL/MUST + WHEN/THEN. No `canon/`, no `backlog.md`, no ADDED/MODIFIED.
 
 ---
 
 ## Why use litespec
 
-- **Structured workflows for AI agents** — give your AI a clear path from idea to implementation
-- **Specs as source of truth** — your capabilities are documented, tested, and versioned
-- **Isolated changes** — each proposed modification lives in its own directory with proposal, specs, design, and tasks
-- **Delta-based merging** — modify specs with ADDED/MODIFIED/REMOVED/RENAMED markers that merge cleanly at archive time
-- **Artifact-specific instructions** — `litespec instructions <artifact>` gives the AI targeted guidance for each artifact type
-- **Works with your tools** — Claude Code, Cursor, and more via skill symlinks
+- **Structured workflows for AI** — clear path from fuzzy idea to demo-able unit
+- **Specs as source of truth** — only load-bearing contracts, curated and small
+- **GH-native queue** — issues are the backlog, `view` shows `gh issue list` when available
 
 ---
 
 ## The workflow
 
-```
-think (explore/grill) → plan → build → review → archive
-                            │
-                        plan (adopt mode)
-```
-
-| Phase | Skill | What happens |
-|-------|-------|-------------|
-| explore | think | Ephemeral thinking. No artifacts. Conversational. |
-| grill | think | Relentless Q&A. Resolves every branch of the design tree. |
-| propose | plan | Materializes everything: change dir, proposal, specs, design, tasks. This is the commit point. |
-| apply | build | Implements tasks per phase. One phase per invocation. |
-| review | review | Context-aware AI review. Adversarial first, then compliance. |
-| adopt | plan | Reverse-engineers specs from existing code. Separate path. |
-| archive | CLI | Applies delta operations, moves change to archive. |
-
----
-
-## Quick start
-
-```bash
-# Initialize a project
-litespec init
-
-# Create a new change
-litespec new add-user-auth
-
-# See what's going on
-litespec status add-user-auth
-
-# Check everything is valid
-litespec validate
-
-# When done, merge and archive
-litespec archive add-user-auth
-```
-
-There's also a **patch lane** for small, single-capability changes: `patch → plan (patch mode) → build → review → archive` — no planning artifacts needed, the delta is the contract.
-
-Then use the skills in `.agents/skills/` with your AI agent. The skills tell the AI what to do — litespec tells the AI what exists.
+Two lanes, unidirectional, no backward flow. `litespec init` scaffolds `specs/product.md`, `specs/glossary.md`, `specs/decisions/` + skills. `litespec new <name> --issue N` links to GH issue. `litespec validate` lints specs + decisions + GH issue Verify. `litespec view` shows product + specs + GH issues + spine.
 
 ---
 

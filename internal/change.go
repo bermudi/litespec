@@ -32,18 +32,57 @@ var (
 )
 
 func InitProject(root string) error {
-	dirs := []string{
-		CanonPath(root),
-		ChangesPath(root),
-		ArchivePath(root),
+	specsDir := filepath.Join(root, ProjectDirName)
+	if err := os.MkdirAll(specsDir, 0o755); err != nil {
+		return fmt.Errorf("create specs directory: %w", err)
 	}
-	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return fmt.Errorf("create directory %s: %w", dir, err)
+	decisionsDir := DecisionsPath(root)
+	if err := os.MkdirAll(decisionsDir, 0o755); err != nil {
+		return fmt.Errorf("create decisions directory: %w", err)
+	}
+	productPath := ProductPath(root)
+	if _, err := os.Stat(productPath); os.IsNotExist(err) {
+		if err := os.WriteFile(productPath, []byte(productTemplate), 0o644); err != nil {
+			return fmt.Errorf("write product.md: %w", err)
+		}
+	}
+	glossaryPath := GlossaryPath(root)
+	if _, err := os.Stat(glossaryPath); os.IsNotExist(err) {
+		if err := os.WriteFile(glossaryPath, []byte(glossaryTemplate), 0o644); err != nil {
+			return fmt.Errorf("write glossary.md: %w", err)
 		}
 	}
 	return nil
 }
+
+const productTemplate = `# Product
+
+## Mental Models
+
+- Agent-native workflows over file-heavy ceremony
+- GH issue is the queue — proposal + design + queue live in the issue body
+- Lean skills with progressive disclosure (fuzzy/clear/grilling/codebase-design/domain-modeling)
+
+## Flows
+
+1. Small fix — zero ceremony: You say "fix typo" -> agent reads product + relevant spec + decisions/glossary -> edits code -> updates the one specs/<feature>/spec.md if contract change -> done. No new, no issue required.
+
+2. New feature — plan[fuzzy] (read code, ask 2-3 questions, no files) -> plan[clear] (write GH issue: proposal + design + units with Verify; also draft spec if load-bearing) -> you: "looks good" or "grill-me" -> build: one unit at a time -> review -> close GH issue
+
+## What we are
+
+- A lean spec-driven CLI for AI coding agents
+- Convention over configuration, zero config files
+
+## What we aren't
+
+- A delta-merge system (edit specs directly)
+- A backlog tracker (GH issues are the backlog)
+`
+
+const glossaryTemplate = "# Glossary\n\nProject-wide ubiquitous language. Curated, optional but recommended.\n\n- **Spec**: A load-bearing contract in specs/<feature>/spec.md with SHALL/MUST and WHEN/THEN scenarios.\n- **Decision**: A durable ruling in specs/decisions/NNNN-slug.md with spine: true for load-bearing.\n- **Unit**: One demo-able outcome per GH issue ## with Done means: and Verify: that must fail without the outcome.\n"
+
+
 
 func CreateChange(root, name string) error {
 	changeDir := ChangePath(root, name)
@@ -171,7 +210,7 @@ func ListSpecs(root string) ([]SpecInfo, error) {
 			continue
 		}
 		name := entry.Name()
-		if name == CanonDirName || name == ChangesDirName || name == "decisions" || seen[name] {
+		if name == CanonDirName || name == ChangesDirName || seen[name] {
 			continue
 		}
 		specPath := filepath.Join(projectSpecsDir, name, "spec.md")
