@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"slices"
 
 	"github.com/bermudi/litespec/internal"
@@ -62,6 +63,11 @@ func cmdValidate(args []string) error {
 			specNames[i] = s.Name
 		}
 		isSpec := slices.Contains(specNames, positional)
+		if !isSpec {
+			if _, statErr := os.Stat(internal.FeatureSpecPath(root, positional)); statErr == nil {
+				isSpec = true
+			}
+		}
 		isDecision := false
 		decisionMatch, _ := internal.FindDecisionBySlug(root, positional)
 		if decisionMatch != nil {

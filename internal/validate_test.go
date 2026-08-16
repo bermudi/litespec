@@ -10,7 +10,7 @@ import (
 func setupTestProject(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-	if err := os.MkdirAll(CanonPath(root), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, ProjectDirName), 0o755); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
 	return root
@@ -18,7 +18,7 @@ func setupTestProject(t *testing.T) string {
 
 func writeMainSpecFile(t *testing.T, root, capability, content string) {
 	t.Helper()
-	dir := filepath.Join(CanonPath(root), capability)
+	dir := filepath.Join(root, ProjectDirName, capability)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}

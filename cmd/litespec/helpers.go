@@ -217,7 +217,7 @@ func validateChangeName(name string) error {
 	if len(name) > 100 {
 		return fmt.Errorf("change name cannot exceed 100 characters (got %d)", len(name))
 	}
-	for _, reserved := range []string{"canon", "decisions"} {
+	for _, reserved := range []string{"decisions"} {
 		if name == reserved {
 			return fmt.Errorf("change name %q is reserved", name)
 		}

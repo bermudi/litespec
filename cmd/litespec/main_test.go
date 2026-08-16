@@ -29,7 +29,7 @@ func setupCLITest(t *testing.T) (string, string) {
 	t.Helper()
 	bin := buildBinary(t)
 	root := t.TempDir()
-	specsDir := filepath.Join(root, "specs", "canon")
+	specsDir := filepath.Join(root, "specs")
 	changesDir := filepath.Join(root, "specs", "changes")
 	archiveDir := filepath.Join(root, "specs", "changes", "archive")
 	if err := os.MkdirAll(specsDir, 0o755); err != nil {
@@ -95,7 +95,7 @@ The system SHALL work.
 
 func createSpec(t *testing.T, root, name string) {
 	t.Helper()
-	specDir := filepath.Join(root, "specs", "canon", name)
+	specDir := filepath.Join(root, "specs", name)
 	if err := os.MkdirAll(specDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -404,7 +404,6 @@ func TestValidateChangeName(t *testing.T) {
 		{"traversal embedded", "foo..bar", true},
 		{"leading whitespace", " foo", true},
 		{"trailing whitespace", "foo ", true},
-		{"reserved canon", "canon", true},
 		{"reserved decisions", "decisions", true},
 		{"too long", strings.Repeat("a", 101), true},
 		{"valid simple", "add-auth", false},
@@ -430,7 +429,7 @@ func TestCLINewInvalidName(t *testing.T) {
 		{"empty", ""},
 		{"path separator", "foo/bar"},
 		{"traversal", ".."},
-		{"reserved", "canon"},
+		{"reserved", "decisions"},
 		{"whitespace padded", " foo "},
 	}
 	for _, tt := range tests {
@@ -480,7 +479,7 @@ func setupDirectTest(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	dirs := []string{
-		filepath.Join(root, "specs", "canon"),
+		filepath.Join(root, "specs"),
 		filepath.Join(root, "specs", "changes"),
 		filepath.Join(root, "specs", "changes", "archive"),
 	}
@@ -677,12 +676,13 @@ func TestCmdInitDirect_HappyPath(t *testing.T) {
 			t.Errorf("expected %s to exist", dir)
 		}
 	}
-	for _, dir := range []string{
-		filepath.Join(root, "specs", "canon"),
+	for _, path := range []string{
 		filepath.Join(root, "specs", "backlog.md"),
+		filepath.Join(root, "specs", "changes"),
+		filepath.Join(root, "specs", "canon"),
 	} {
-		if _, err := os.Stat(dir); err == nil {
-			t.Errorf("expected %s to NOT exist in lean v2", dir)
+		if _, err := os.Stat(path); err == nil {
+			t.Errorf("expected %s to NOT exist in lean v2", path)
 		}
 	}
 }

@@ -6,7 +6,6 @@ import (
 )
 
 const (
-	CanonDirName       = "canon"
 	ProjectDirName     = "specs"
 	SkillsDir          = ".agents/skills"
 	ChangesDirName     = "changes"
@@ -54,10 +53,6 @@ func FindProjectRoot() (string, error) {
 		}
 		dir = parent
 	}
-}
-
-func CanonPath(root string) string {
-	return filepath.Join(root, ProjectDirName, CanonDirName)
 }
 
 func ProductPath(root string) string {

@@ -58,52 +58,20 @@ const glossaryTemplate = "# Glossary\n\nProject-wide ubiquitous language. Curate
 func ListSpecs(root string) ([]SpecInfo, error) {
 	var result []SpecInfo
 
-	specsDir := CanonPath(root)
-	if entries, err := os.ReadDir(specsDir); err == nil {
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				continue
-			}
-			name := entry.Name()
-			specPath := filepath.Join(specsDir, name, "spec.md")
-			var reqCount int
-			data, readErr := os.ReadFile(specPath)
-			if readErr == nil {
-				spec, parseErr := ParseMainSpec(string(data))
-				if parseErr == nil {
-					reqCount = len(spec.Requirements)
-				}
-			}
-			result = append(result, SpecInfo{
-				Name:             name,
-				RequirementCount: reqCount,
-			})
-		}
-	} else if !os.IsNotExist(err) {
-		return nil, fmt.Errorf("read specs directory: %w", err)
-	}
-
 	projectSpecsDir := filepath.Join(root, ProjectDirName)
 	entries, err := os.ReadDir(projectSpecsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			sort.Slice(result, func(i, j int) bool {
-				return result[i].Name < result[j].Name
-			})
 			return result, nil
 		}
 		return nil, fmt.Errorf("read specs directory: %w", err)
-	}
-	seen := make(map[string]bool)
-	for _, s := range result {
-		seen[s.Name] = true
 	}
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 		name := entry.Name()
-		if name == CanonDirName || name == ChangesDirName || name == "decisions" || seen[name] {
+		if name == ChangesDirName || name == "decisions" {
 			continue
 		}
 		specPath := filepath.Join(projectSpecsDir, name, "spec.md")
