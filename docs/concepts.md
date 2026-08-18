@@ -40,7 +40,7 @@ Verify: `go test ./...` and view output contains "->"
 - [ ] pending
 ```
 
-`litespec new <name> --issue N` links the feature to the issue. `--issue` is required. There is no offline fallback.
+`litespec new <name> --issue N` links the feature to the issue. `--issue` is required. Add the `litespec` label to the issue so `validate` discovers it.
 
 The 64 KiB issue limit is enough because the queue contains only units, not full designs. Durable design and reasoning live in `specs/product.md`, `specs/<feature>/spec.md`, and `specs/decisions/`.
 

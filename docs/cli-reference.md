@@ -92,7 +92,7 @@ litespec new <name> --issue N [--json] [--minimal]
 
 Description:
 
-Link a change name to a GH issue. The GH issue is the queue; no local change folder is created. `--issue` is required; there is no offline fallback.
+Link a change name to a GH issue. The GH issue is the queue; no local change folder is created. `--issue` is required — it links the change name to the GH issue. Add the `litespec` label to the issue so `validate` discovers it.
 
 Arguments:
 
@@ -136,7 +136,7 @@ Verify: ```bash
 Usage:
 
 ```bash
-litespec validate [<name>] [--all|--specs|--decisions] [--type T] [--strict] [--json] [--minimal]
+litespec validate [<name>|--all|--specs|--decisions|--issue N|--queue <path>] [--type T] [--strict] [--json] [--minimal]
 ```
 
 Description:
@@ -180,6 +180,8 @@ litespec validate my-spec
 litespec validate --all --strict
 litespec validate shared --type spec
 litespec validate --decisions
+litespec validate --issue 42
+litespec validate --queue specs/queues/add-auth.md
 ```
 
 ## `view`

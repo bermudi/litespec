@@ -120,12 +120,13 @@ func printNewHelp() {
 	fmt.Print(`Usage: litespec new <name> --issue N [--json] [--minimal]
 
 Link a change name to a GH issue. GH issue is the queue — no folder created.
+Add the ` + "`litespec`" + ` label to the issue so ` + "`validate`" + ` discovers it.
 
 Arguments:
   <name>            Change name (e.g., add-auth)
 
 Flags:
-  --issue <N>       GH issue number (required — no offline fallback)
+  --issue <N>       GH issue number (required — links the change name to the GH issue)
   --json            Output as JSON
   --minimal         Minimal output
 

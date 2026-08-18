@@ -21,7 +21,7 @@ No `litespec new`. No GH issue. No folder.
 For greenfield, API shape, CLI behavior, or anything that will outlast the issue.
 
 1. **Open a GH issue** (or use an existing one).
-2. Run `litespec new <name> --issue N`. `--issue` is required — there is no offline fallback.
+2. Run `litespec new <name> --issue N`. `--issue` is required — it links the change name to the GH issue. Add the `litespec` label to the issue so `validate` discovers it.
 3. `litespec-plan` in **fuzzy** mode: read code, ask 2–3 questions, maybe spike, write no files. Use `references/fuzzy.md`.
 4. `litespec-plan` in **clear** mode: write the GH issue body with `## Proposal`, `## Design`, and `## Queue` (units with `Done means:` and `Verify:`). Draft `specs/<feature>/spec.md` if the feature is load-bearing. Use `references/clear.md`.
 5. **grill-me** (optional): adversarial shaping. Use `references/grilling.md`. Pull in `codebase-design` or `domain-modeling` when needed.

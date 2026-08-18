@@ -184,7 +184,7 @@ If `gh` is installed and authenticated, open issues appear under `GH Issues (ope
 
 ## Start a feature
 
-In v2, `litespec new` links a feature to a GH issue. `--issue` is required; there is no offline fallback.
+In v2, `litespec new` links a feature to a GH issue. `--issue` is required — it links the change name to the GH issue. Add the `litespec` label to the issue so `validate` discovers it.
 
 ````text
 $ litespec new add-feature --issue 1

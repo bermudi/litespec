@@ -34,14 +34,7 @@ func ValidateGHIssueQueues(root string) (*ValidationResult, error) {
 		return result, nil
 	}
 
-	cmd := exec.Command("gh", "issue", "list",
-		"--label", "litespec",
-		"--state", "open",
-		"--json", "number,title,body,url",
-		"--limit", "50",
-	)
-	cmd.Dir = root
-	out, err := cmd.Output()
+	out, err := ghIssueList(root)
 	if err != nil {
 		result.Warnings = append(result.Warnings, ValidationIssue{
 			Severity:     SeverityWarning,
@@ -60,7 +53,12 @@ func ValidateGHIssueQueues(root string) (*ValidationResult, error) {
 	} else {
 		var issues []ghIssue
 		if err := json.Unmarshal(out, &issues); err != nil {
-			return nil, fmt.Errorf("parse gh issue list output: %w", err)
+			result.Warnings = append(result.Warnings, ValidationIssue{
+				Severity:     SeverityWarning,
+				Message:      fmt.Sprintf("parse gh issue list output: %v — issue queue not validated", err),
+				StrictExempt: true,
+			})
+			return result, nil
 		}
 
 		for _, issue := range issues {
@@ -109,6 +107,24 @@ func parseQueueUnits(body string) []queueUnit {
 
 var lookPathBash = exec.LookPath
 var lookPathGh = exec.LookPath
+
+var ghIssueView = func(root string, number int) ([]byte, error) {
+	cmd := exec.Command("gh", "issue", "view", strconv.Itoa(number),
+		"--json", "number,title,body,url")
+	cmd.Dir = root
+	return cmd.Output()
+}
+
+var ghIssueList = func(root string) ([]byte, error) {
+	cmd := exec.Command("gh", "issue", "list",
+		"--label", "litespec",
+		"--state", "open",
+		"--json", "number,title,body,url",
+		"--limit", "50",
+	)
+	cmd.Dir = root
+	return cmd.Output()
+}
 
 func lintVerifyShell(block string, source string, unitHeading string) []ValidationIssue {
 	if strings.TrimSpace(block) == "" {
@@ -250,11 +266,7 @@ func ValidateGHIssueByNumber(root string, number int) (*ValidationResult, error)
 		return nil, fmt.Errorf("gh not available")
 	}
 
-	cmd := exec.Command("gh", "issue", "view", strconv.Itoa(number),
-		"--json", "number,title,body,url",
-	)
-	cmd.Dir = root
-	out, err := cmd.Output()
+	out, err := ghIssueView(root, number)
 	if err != nil {
 		return nil, fmt.Errorf("gh issue view %d failed: %w", number, err)
 	}

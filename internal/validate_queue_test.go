@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -405,6 +406,96 @@ Verify:
 			t.Fatalf("expected warning in Warnings containing 'bash unavailable', got %v", result.Warnings)
 		}
 	})
+
+	t.Run("--issue N via ValidateGHIssueByNumber", func(t *testing.T) {
+		root := t.TempDir()
+
+		issue := ghIssue{
+			Number: 42,
+			Title:  "Add auth",
+			Body:   wellFormed,
+			URL:    "https://github.com/bermudi/litespec/issues/42",
+		}
+		data, err := json.Marshal(issue)
+		if err != nil {
+			t.Fatalf("marshal issue: %v", err)
+		}
+
+		oldLook := lookPathGh
+		lookPathGh = func(string) (string, error) { return "gh", nil }
+		defer func() { lookPathGh = oldLook }()
+
+		oldView := ghIssueView
+		ghIssueView = func(string, int) ([]byte, error) { return data, nil }
+		defer func() { ghIssueView = oldView }()
+
+		result, err := ValidateGHIssueByNumber(root, 42)
+		if err != nil {
+			t.Fatalf("ValidateGHIssueByNumber: %v", err)
+		}
+		if !result.Valid {
+			t.Fatalf("expected Valid true, got false")
+		}
+		if len(result.Errors) > 0 {
+			t.Fatalf("expected no errors, got %v", result.Errors)
+		}
+		if result.UnitsCount != 1 {
+			t.Fatalf("expected UnitsCount 1, got %d", result.UnitsCount)
+		}
+	})
+
+	t.Run("--issue N with malformed unit", func(t *testing.T) {
+		root := t.TempDir()
+
+		issue := ghIssue{
+			Number: 7,
+			Title:  "Add auth",
+			Body:   missingDoneMeans,
+			URL:    "https://github.com/bermudi/litespec/issues/7",
+		}
+		data, err := json.Marshal(issue)
+		if err != nil {
+			t.Fatalf("marshal issue: %v", err)
+		}
+
+		oldLook := lookPathGh
+		lookPathGh = func(string) (string, error) { return "gh", nil }
+		defer func() { lookPathGh = oldLook }()
+
+		oldView := ghIssueView
+		ghIssueView = func(string, int) ([]byte, error) { return data, nil }
+		defer func() { ghIssueView = oldView }()
+
+		result, err := ValidateGHIssueByNumber(root, 7)
+		if err != nil {
+			t.Fatalf("ValidateGHIssueByNumber: %v", err)
+		}
+		if result.Valid {
+			t.Fatalf("expected Valid false, got true")
+		}
+		if !containsIssue(result.Errors, "missing Done means:") {
+			t.Fatalf("expected error containing 'missing Done means:', got %v", result.Errors)
+		}
+		if result.UnitsCount != 1 {
+			t.Fatalf("expected UnitsCount 1, got %d", result.UnitsCount)
+		}
+	})
+
+	t.Run("--issue N gh absent returns error", func(t *testing.T) {
+		root := t.TempDir()
+
+		old := lookPathGh
+		lookPathGh = func(string) (string, error) { return "", exec.ErrNotFound }
+		defer func() { lookPathGh = old }()
+
+		_, err := ValidateGHIssueByNumber(root, 42)
+		if err == nil {
+			t.Fatalf("expected error when gh is absent, got nil")
+		}
+		if !strings.Contains(err.Error(), "gh not available") {
+			t.Fatalf("expected error containing 'gh not available', got %v", err)
+		}
+	})
 }
 
 func containsIssue(issues []ValidationIssue, substr string) bool {
@@ -434,6 +525,37 @@ func TestValidateGHIssueQueues_NoGitHubRemote(t *testing.T) {
 	for _, w := range result.Warnings {
 		if !w.StrictExempt {
 			t.Fatalf("expected all queue-absence warnings to be StrictExempt, got %q", w.Message)
+		}
+	}
+}
+
+func TestValidateGHIssueQueues_JSONParseFailureWarns(t *testing.T) {
+	root := t.TempDir()
+
+	oldLook := lookPathGh
+	lookPathGh = func(string) (string, error) { return "gh", nil }
+	defer func() { lookPathGh = oldLook }()
+
+	oldList := ghIssueList
+	ghIssueList = func(string) ([]byte, error) { return []byte("not valid json"), nil }
+	defer func() { ghIssueList = oldList }()
+
+	result, err := ValidateGHIssueQueues(root)
+	if err != nil {
+		t.Fatalf("ValidateGHIssueQueues: %v", err)
+	}
+	if !result.Valid {
+		t.Fatalf("expected Valid true, got false")
+	}
+	if len(result.Errors) > 0 {
+		t.Fatalf("expected no errors, got %v", result.Errors)
+	}
+	if !containsIssue(result.Warnings, "parse gh issue list output") {
+		t.Fatalf("expected warning about parse failure, got %v", result.Warnings)
+	}
+	for _, w := range result.Warnings {
+		if !w.StrictExempt {
+			t.Fatalf("expected parse-failure warning to be StrictExempt, got %q", w.Message)
 		}
 	}
 }

@@ -33,7 +33,7 @@ func cmdNew(args []string) error {
 	}
 
 	if issue == 0 {
-		return fmt.Errorf("--issue is required (GH issue is the queue — there is no offline fallback)")
+		return fmt.Errorf("--issue is required (links the change name to the GH issue)")
 	}
 	if issue < 1 {
 		return fmt.Errorf("--issue must be a positive integer, got %d", issue)
@@ -70,6 +70,7 @@ func cmdNew(args []string) error {
 	}
 	textSB.WriteString("\nGH issue body is proposal + design + queue (64k limit).\n")
 	textSB.WriteString("No folder created — GH issue is the queue.\n")
+	textSB.WriteString("Add the `litespec` label to the issue so `validate` discovers it.\n")
 	textSB.WriteString("\nTemplate for GH issue body:\n")
 	textSB.WriteString(fmt.Sprintf("## Proposal for %s\n...\n\n## Design\n...\n\n## Queue\n\n## <outcome>\nDone means: ...\nVerify: ```bash\n...\n```\n- [ ] pending\n", name))
 
