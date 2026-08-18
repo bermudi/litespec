@@ -25,7 +25,7 @@ type queueUnit struct {
 func ValidateGHIssueQueues(root string) (*ValidationResult, error) {
 	result := &ValidationResult{Valid: true}
 
-	if _, err := exec.LookPath("gh"); err != nil {
+	if _, err := lookPathGh("gh"); err != nil {
 		result.Warnings = append(result.Warnings, ValidationIssue{
 			Severity:     SeverityWarning,
 			Message:      "gh not available — issue queue not validated",
@@ -115,6 +115,7 @@ func parseQueueUnits(body string) []queueUnit {
 }
 
 var lookPathBash = exec.LookPath
+var lookPathGh = exec.LookPath
 
 func lintVerifyShell(block string, source string, unitHeading string) []ValidationIssue {
 	if strings.TrimSpace(block) == "" {
@@ -232,7 +233,7 @@ func ValidateQueueBody(body string, source string) []ValidationIssue {
 func ValidateGHIssueByNumber(root string, number int) (*ValidationResult, error) {
 	result := &ValidationResult{Valid: true}
 
-	if _, err := exec.LookPath("gh"); err != nil {
+	if _, err := lookPathGh("gh"); err != nil {
 		return nil, fmt.Errorf("gh not available")
 	}
 
