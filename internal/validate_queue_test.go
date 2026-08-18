@@ -67,8 +67,27 @@ Verify:
 
 	t.Run("Verify without fenced block", func(t *testing.T) {
 		_, issues := ValidateQueueBody(missingFence, source)
-		if !containsIssue(issues, "not followed by fenced code block") {
-			t.Fatalf("expected error containing 'not followed by fenced code block', got %v", issues)
+		if !containsIssue(issues, "not followed by a command or fenced code block") {
+			t.Fatalf("expected error containing 'not followed by a command or fenced code block', got %v", issues)
+		}
+	})
+
+	t.Run("inline Verify command passes", func(t *testing.T) {
+		body := "## My outcome\nDone means: something\nVerify: `go test ./internal/ -run TestX` and a fixture asserts errors\n- [ ] pending\n"
+		units, issues := ValidateQueueBody(body, source)
+		if len(issues) > 0 {
+			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
+		}
+		if len(units) != 1 {
+			t.Fatalf("expected 1 unit, got %d", len(units))
+		}
+	})
+
+	t.Run("inline Verify with empty content fails", func(t *testing.T) {
+		body := "## My outcome\nDone means: something\nVerify:   \n- [ ] pending\n"
+		_, issues := ValidateQueueBody(body, source)
+		if !containsIssue(issues, "not followed by a command or fenced code block") {
+			t.Fatalf("expected error for empty Verify content, got %v", issues)
 		}
 	})
 
@@ -118,6 +137,58 @@ More design text.
 		_, issues := ValidateQueueBody(body, source)
 		if len(issues) > 0 {
 			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
+		}
+	})
+
+	t.Run("prose ## sections skipped, units validated", func(t *testing.T) {
+		body := `## Proposal
+
+We are doing X because Y.
+
+## Design
+
+- Some bullet about design.
+- Another bullet.
+
+## Not doing
+
+Nothing here.
+
+## Queue
+
+## Real unit
+Done means: it works
+Verify:
+` + "```bash\necho hi\n```\n" + `- [ ] pending
+
+## Spec draft
+
+The spec goes here. It mentions ` + "`Verify:`" + ` inline but no line starts with it.
+`
+		units, issues := ValidateQueueBody(body, source)
+		if len(issues) > 0 {
+			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
+		}
+		if len(units) != 1 {
+			t.Fatalf("expected 1 unit, got %d: %v", len(units), units)
+		}
+		if units[0].Heading != "Real unit" {
+			t.Fatalf("expected unit heading 'Real unit', got %q", units[0].Heading)
+		}
+	})
+
+	t.Run("prose section with checkbox but no Done means/Verify is skipped", func(t *testing.T) {
+		body := `## Proposal
+
+- [ ] a todo in the proposal, not a unit
+
+` + wellFormed
+		units, issues := ValidateQueueBody(body, source)
+		if len(issues) > 0 {
+			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
+		}
+		if len(units) != 1 {
+			t.Fatalf("expected 1 unit, got %d", len(units))
 		}
 	})
 }

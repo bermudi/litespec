@@ -142,8 +142,23 @@ func lintVerifyShell(block string, source string, unitHeading string) []Validati
 	return nil
 }
 
+func isUnit(unit queueUnit) bool {
+	for _, line := range unit.Body {
+		if strings.HasPrefix(line, "Done means:") || strings.HasPrefix(line, "Verify:") {
+			return true
+		}
+	}
+	return false
+}
+
 func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIssue) {
-	units := parseQueueUnits(body)
+	all := parseQueueUnits(body)
+	units := make([]queueUnit, 0, len(all))
+	for _, u := range all {
+		if isUnit(u) {
+			units = append(units, u)
+		}
+	}
 	var issues []ValidationIssue
 
 	for _, unit := range units {
@@ -157,8 +172,9 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 
 		doneFound := false
 		verifyFound := false
-		fencedAfterVerify := false
 		checkboxFound := false
+		inlineVerify := false
+		hasFencedBlock := false
 		var verifyBlock string
 
 		for i, line := range unit.Body {
@@ -167,9 +183,12 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 			}
 			if !verifyFound && strings.HasPrefix(line, "Verify:") {
 				verifyFound = true
+				if strings.TrimSpace(line[len("Verify:"):]) != "" {
+					inlineVerify = true
+				}
 				for j := i + 1; j < len(unit.Body); j++ {
 					if strings.HasPrefix(unit.Body[j], "```") {
-						fencedAfterVerify = true
+						hasFencedBlock = true
 						var blockLines []string
 						for k := j + 1; k < len(unit.Body); k++ {
 							if strings.HasPrefix(unit.Body[k], "```") {
@@ -202,13 +221,13 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 				Message:  fmt.Sprintf("%s: unit %q missing Verify:", source, unit.Heading),
 				File:     source,
 			})
-		} else if !fencedAfterVerify {
+		} else if !inlineVerify && !hasFencedBlock {
 			issues = append(issues, ValidationIssue{
 				Severity: SeverityError,
-				Message:  fmt.Sprintf("%s: unit %q Verify: not followed by fenced code block", source, unit.Heading),
+				Message:  fmt.Sprintf("%s: unit %q Verify: not followed by a command or fenced code block", source, unit.Heading),
 				File:     source,
 			})
-		} else {
+		} else if hasFencedBlock {
 			issues = append(issues, lintVerifyShell(verifyBlock, source, unit.Heading)...)
 		}
 		if !checkboxFound {

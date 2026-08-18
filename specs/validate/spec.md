@@ -23,7 +23,7 @@ The `litespec validate` command SHALL validate feature specs under `specs/<featu
 
 ### Requirement: GH Issue Queue Validation
 
-The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec` via `gh issue list` and lint each issue body as a queue. A unit is an `## <outcome>` heading; each unit SHALL have a non-empty heading, a `Done means:` line, a `Verify:` line followed by a fenced code block within the unit body, and a `- [ ]` or `- [x]` checkbox. Missing or malformed elements SHALL produce an error identifying the issue number and unit heading. Issues without the `litespec` label SHALL NOT be scanned. The `litespec` label is a hardcoded convention; no config file governs it.
+The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec` via `gh issue list` and lint each issue body as a queue. A `##` section is treated as a unit only when its body contains a `Done means:` or `Verify:` line; prose sections such as `## Proposal`, `## Design`, `## Not doing`, `## Queue`, and `## Spec draft` SHALL be skipped. Each unit SHALL have a non-empty heading, a `Done means:` line, a `Verify:` line carrying either an inline backtick command on the same line or a fenced code block within the unit body, and a `- [ ]` or `- [x]` checkbox. Missing or malformed elements SHALL produce an error identifying the issue number and unit heading. Issues without the `litespec` label SHALL NOT be scanned. The `litespec` label is a hardcoded convention; no config file governs it.
 
 #### Scenario: Well-formed queue passes
 
@@ -35,19 +35,29 @@ The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec
 - **WHEN** a labeled issue has a `## <outcome>` unit without a `Done means:` line
 - **THEN** validation reports an error naming the issue number and unit heading
 
-#### Scenario: Verify without fenced block fails
+#### Scenario: Verify without command or fenced block fails
 
-- **WHEN** a unit's `Verify:` line is not followed by a fenced code block
+- **WHEN** a unit's `Verify:` line has no inline backtick command and no fenced code block
 - **THEN** validation reports an error identifying the unit
+
+#### Scenario: Inline Verify command passes
+
+- **WHEN** a unit's `Verify:` line carries an inline backtick command on the same line
+- **THEN** validation accepts the unit without shell-linting the inline command
 
 #### Scenario: Unlabeled issue is not scanned
 
 - **WHEN** an open issue lacks the `litespec` label
 - **THEN** validate does not attempt to parse its body
 
+#### Scenario: Prose sections are skipped
+
+- **WHEN** a labeled issue body contains `## Proposal`, `## Design`, and `## Spec draft` sections alongside `## <outcome>` units
+- **THEN** validate lints only the units and reports no errors for the prose sections
+
 ### Requirement: Verify Shell Syntax Lint
 
-For each unit's `Verify:` fenced code block, validate SHALL run `bash -n` on the block contents and report any syntax error as a validation error identifying the issue number, unit heading, and shell error text. If `bash` is not on `PATH`, validate SHALL emit a warning per block (not an error) and check only that the block is non-empty. Validate SHALL NOT execute the Verify block.
+For each unit's `Verify:` fenced code block, validate SHALL run `bash -n` on the block contents and report any syntax error as a validation error identifying the issue number, unit heading, and shell error text. An inline `Verify:` command (backtick command on the `Verify:` line) SHALL be accepted as non-empty content and is not shell-linted, since inline Verify lines may mix commands with prose code references. If `bash` is not on `PATH`, validate SHALL emit a warning per fenced block (not an error) and check only that the block is non-empty. Validate SHALL NOT execute the Verify command.
 
 #### Scenario: Valid shell passes
 
