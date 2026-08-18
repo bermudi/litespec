@@ -2,410 +2,102 @@
 
 ## Requirements
 
-### Requirement: JSON Output for Validate
+### Requirement: Spec and Decision Validation
 
-The `litespec validate` command MUST support a `--json` flag that returns structured JSON output containing a `valid` boolean, `errors` array, and `warnings` array. Each issue MUST include `severity`, `message`, and `file` fields. This applies to all validate modes: positional name, bulk flags, and default (no arguments).
+The `litespec validate` command SHALL validate feature specs under `specs/<feature>/spec.md` and decisions under `specs/decisions/`. Each requirement body SHALL contain `SHALL` or `MUST` as a whole word outside code spans, and each requirement SHALL have at least one `#### Scenario:` with `WHEN`/`THEN` content. Decisions SHALL have `## Status` (one of `proposed`, `accepted`, `superseded`), `## Context`, `## Decision`, `## Consequences`; supersede pointers SHALL resolve to existing decisions. `ValidateAll` SHALL include specs, decisions, and skill templates in its scope. A `ValidateSpec(root, name)` and `ValidateDecision(root, slug)` function SHALL exist for single-artifact validation.
 
-#### Scenario: Validate single change with JSON flag
+#### Scenario: Valid spec passes
 
-- **WHEN** `litespec validate <change-name> --json` is run
-- **THEN** output is valid JSON with `valid`, `errors`, and `warnings` fields
+- **WHEN** `litespec validate <feature>` is run on a spec with SHALL/MUST requirements and WHEN/THEN scenarios
+- **THEN** validation succeeds with no errors
 
-#### Scenario: Validate all with JSON flag
+#### Scenario: Decision missing a required section fails
 
-- **WHEN** `litespec validate --all --json` is run
-- **THEN** output is valid JSON with `valid`, `errors`, and `warnings` fields covering all changes and specs
-
-#### Scenario: Validate specs with JSON flag
-
-- **WHEN** `litespec validate --specs --json` is run
-- **THEN** output is valid JSON with `valid`, `errors`, and `warnings` fields covering only specs
-
-#### Scenario: Validate changes with JSON flag
-
-- **WHEN** `litespec validate --changes --json` is run
-- **THEN** output is valid JSON with `valid`, `errors`, and `warnings` fields covering only changes
-
-### Requirement: Consistent JSON Flag Convention
-
-All litespec commands that support `--json` MUST use the same flag name and return valid JSON to stdout. Each command's JSON output MUST reflect its current argument surface (positional names, bulk flags, etc.).
-
-#### Scenario: JSON flag consistency across commands
-
-- **WHEN** any litespec command is run with `--json`
-- **THEN** the output is valid JSON to stdout
-
-### Requirement: Positional Name Argument
-
-The `litespec validate` command MUST accept an optional positional `<name>` argument. When provided, the command SHALL auto-detect whether the name refers to a change or a spec by checking both `ListChanges()` and `ListSpecs()`. The `--change` flag SHALL be removed.
-
-#### Scenario: Validate a named change
-
-- **WHEN** `litespec validate my-feature` is run and `my-feature` exists as a change
-- **THEN** only that change is validated
-
-#### Scenario: Validate a named spec
-
-- **WHEN** `litespec validate auth` is run and `auth` exists as a spec
-- **THEN** only that spec is validated
-
-#### Scenario: Unknown name
-
-- **WHEN** `litespec validate nonexistent` is run and the name matches neither a change nor a spec
-- **THEN** an error is printed to stderr with exit code 1
-
-#### Scenario: No name and no flags
-
-- **WHEN** `litespec validate` is run with no arguments
-- **THEN** it behaves identically to `--all` (validates all changes and specs)
-
-### Requirement: Type Disambiguation
-
-When a positional name matches both a change and a spec, the command MUST report an ambiguity error. The user SHALL use `--type change` or `--type spec` to disambiguate. The `--type` flag MUST only be used with a positional name. Using `--type` without a positional name or with bulk flags SHALL produce an error.
-
-#### Scenario: Ambiguous name without --type
-
-- **WHEN** `litespec validate shared-name` is run and `shared-name` exists as both a change and a spec
-- **THEN** an error is printed to stderr indicating the name is ambiguous and suggesting `--type`
-
-#### Scenario: Ambiguous name with --type change
-
-- **WHEN** `litespec validate shared-name --type change` is run
-- **THEN** only the change is validated
-
-#### Scenario: Ambiguous name with --type spec
-
-- **WHEN** `litespec validate shared-name --type spec` is run
-- **THEN** only the spec is validated
-
-#### Scenario: --type without positional name
-
-- **WHEN** `litespec validate --type change` is run with no positional name
-- **THEN** an error is printed indicating `--type` requires a positional name
-
-#### Scenario: --type with bulk flag
-
-- **WHEN** `litespec validate --all --type change` is run
-- **THEN** an error is printed indicating `--type` cannot be used with bulk flags
-
-### Requirement: Bulk Validation Flags
-
-The `litespec validate` command MUST support `--all`, `--changes`, and `--specs` flags. `--all` validates all changes and all specs. `--changes` validates all changes only. `--specs` validates all specs only. The flags MAY be combined — combining `--changes` and `--specs` is equivalent to `--all`. These flags are mutually exclusive with the positional `<name>` argument.
-
-#### Scenario: Validate all
-
-- **WHEN** `litespec validate --all` is run
-- **THEN** all changes and all specs are validated
-
-#### Scenario: Validate all changes
-
-- **WHEN** `litespec validate --changes` is run
-- **THEN** only changes are validated
-
-#### Scenario: Validate all specs
-
-- **WHEN** `litespec validate --specs` is run
-- **THEN** only specs are validated
-
-#### Scenario: Combined --changes and --specs
-
-- **WHEN** `litespec validate --changes --specs` is run
-- **THEN** all changes and all specs are validated, equivalent to `--all`
-
-#### Scenario: Bulk flag with positional name
-
-- **WHEN** `litespec validate my-change --all` is run
-- **THEN** an error is printed indicating the positional name and bulk flags are mutually exclusive
-
-### Requirement: Single Spec Validation
-
-A `ValidateSpec(root, name)` function MUST exist in the internal package that validates a single spec by name. It is the singular counterpart to the existing `ValidateSpecs(root)` which validates all specs. It SHALL read and parse the spec at `specs/canon/<name>/spec.md`, validate its structure and requirements, and return a `*ValidationResult`.
-
-#### Scenario: Validate existing spec
-
-- **WHEN** `ValidateSpec(root, "auth")` is called and the spec exists
-- **THEN** a ValidationResult is returned reflecting the spec's validity
-
-#### Scenario: Validate missing spec
-
-- **WHEN** `ValidateSpec(root, "nonexistent")` is called
-- **THEN** an error is returned indicating the spec was not found
-
-### Requirement: Dependency Validation
-
-The `ValidateChange` function SHALL validate `dependsOn` references when present in a change's `.litespec.yaml`. Each dependency name SHALL be resolved against active changes first, then archived changes. Unresolvable references SHALL produce an error that includes the source file path. When validating multiple changes via `ValidateAll`, cycle detection SHALL run across all active changes' dependency graphs and report cycle paths as errors.
-
-When an active change declares `dependsOn` references, the dangling-delta check SHALL virtually merge each active dependency's deltas into the canonical spec before validating the current change's operations. This means MODIFIED/REMOVED/RENAMED operations SHALL resolve against the "effective canon" (canonical spec + all active dependency deltas), not just the bare canonical spec. After all dependencies are archived, the effective canon equals the real canon, so validation results remain stable.
-
-#### Scenario: Valid dependency on active change
-
-- **WHEN** change A declares `dependsOn: [B]` and B is an active change
-- **THEN** validation passes for the dependency reference
-
-#### Scenario: Valid dependency on archived change
-
-- **WHEN** change A declares `dependsOn: [B]` and B exists only in archive
-- **THEN** validation passes for the dependency reference
-
-#### Scenario: Invalid dependency reference
-
-- **WHEN** change A declares `dependsOn: [nonexistent]` and no active or archived change matches
-- **THEN** an error is reported with the `.litespec.yaml` file path: "dependency \"nonexistent\" not found"
-
-#### Scenario: Cycle detected during bulk validation
-
-- **WHEN** `validate --all` is run and a dependency cycle exists among active changes
-- **THEN** an error is reported identifying the cycle path
-
-#### Scenario: MODIFIED requirement resolves via active dependency delta
-
-- **WHEN** change A ADDS requirement "Login" to capability "auth" and change B declares `dependsOn: [A]` and MODIFIES "Login" in capability "auth"
-- **THEN** validation of B passes because "Login" exists in the effective canon (canon + A's ADDED delta)
-
-#### Scenario: ADDED requirement conflicts with dependency's ADDED delta
-
-- **WHEN** change A ADDS requirement "Login" to capability "auth" and change B declares `dependsOn: [A]` and also ADDS "Login" to capability "auth"
-- **THEN** validation of B reports an error because "Login" already exists in the effective canon
-
-#### Scenario: No dependency means no virtual merge
-
-- **WHEN** change B MODIFIES "Login" in capability "auth" without depending on any change, and "Login" does not exist in canon
-- **THEN** validation of B reports a dangling-delta error as before
-
-#### Scenario: Virtual merge applies RENAMED before checking
-
-- **WHEN** change A RENAMES "Login" to "SignIn" in capability "auth" and change B declares `dependsOn: [A]` and MODIFIES "SignIn" in capability "auth"
-- **THEN** validation of B passes because the effective canon has "SignIn" after applying A's rename
-
-### Requirement: Empty Name Rejection
-
-The validation system MUST reject requirement and scenario names that are empty or contain only whitespace. This applies to both canonical specs and delta specs. An empty name SHALL produce an error indicating the file and the nature of the empty name.
-
-#### Scenario: Empty requirement name in delta spec
-
-- **WHEN** a delta spec contains `### Requirement:` with no name
-- **THEN** validation reports an error: "empty requirement name" with the file path
-
-#### Scenario: Whitespace-only requirement name
-
-- **WHEN** a delta spec contains `### Requirement:   ` with only spaces
-- **THEN** validation reports an error: "empty requirement name" with the file path
-
-#### Scenario: Empty scenario name
-
-- **WHEN** a requirement contains `#### Scenario:` with no name
-- **THEN** validation reports an error: "empty scenario name in requirement <name>" with the file path
-
-#### Scenario: Whitespace-only scenario name
-
-- **WHEN** a requirement contains `#### Scenario:   ` with only spaces
-- **THEN** validation reports an error: "empty scenario name in requirement <name>" with the file path
-
-### Requirement: Duplicate Name Detection
-
-The validation system MUST detect duplicate requirement names within a single delta spec file and duplicate scenario names within a single requirement. Duplicates SHALL produce an error identifying both the original and duplicate name.
-
-#### Scenario: Duplicate requirement names in single delta
-
-- **WHEN** a delta spec file contains two ADDED requirements both named "Login"
-- **THEN** validation reports an error: "duplicate requirement name \"Login\"" with the file path
-
-#### Scenario: Duplicate scenario names in single requirement
-
-- **WHEN** a requirement contains two scenarios both named "happy path"
-- **THEN** validation reports an error: "duplicate scenario name \"happy path\" in requirement <name>" with the file path
-
-### Requirement: Scenario Content Validation
-
-ADDED and MODIFIED requirements MUST have at least one scenario whose content contains both `WHEN` and `THEN` markers as plain text (bold formatting is not required). Markers MAY appear in any order within the scenario body. Scenarios with empty content SHALL produce an error. The marker check SHALL use case-sensitive substring matching.
-
-#### Scenario: Scenario without WHEN/THEN content
-
-- **WHEN** an ADDED requirement has a scenario with empty body
-- **THEN** validation reports an error indicating the scenario must contain WHEN and THEN
-
-#### Scenario: Scenario with valid WHEN/THEN content
-
-- **WHEN** an ADDED requirement has a scenario with "WHEN ... THEN ..."
-- **THEN** validation passes for that scenario
-
-### Requirement: Whole-Word Keyword Matching
-
-The SHALL/MUST keyword check in requirement content MUST match whole words only. Keywords appearing inside fenced code blocks (```...```), inline code (`` `...` ``), or as substrings of other words SHALL NOT satisfy the requirement. The check SHALL strip code spans before applying word boundary detection.
-
-#### Scenario: SHALL inside code block not accepted
-
-- **WHEN** an ADDED requirement's only "SHALL" appears inside a fenced code block
-- **THEN** validation reports an error that the requirement must contain SHALL or MUST
-
-#### Scenario: SHALL inside inline code not accepted
-
-- **WHEN** an ADDED requirement's only "SHALL" appears inside backtick inline code
-- **THEN** validation reports an error that the requirement must contain SHALL or MUST
-
-#### Scenario: SHALL as whole word accepted
-
-- **WHEN** an ADDED requirement contains "The system SHALL do X" outside code blocks
-- **THEN** validation passes for the keyword check
-
-#### Scenario: SHALL as substring not accepted
-
-- **WHEN** an ADDED requirement contains "MARSHALL" but no standalone "SHALL"
-- **THEN** validation reports an error that the requirement must contain SHALL or MUST
-
-### Requirement: Cross-Operation Conflict Detection
-
-The validation system MUST detect conflicting operations on the same requirement within a single delta spec. If a requirement appears in more than one operation section (e.g., both MODIFIED and REMOVED), an error SHALL be reported. Additionally, RENAMED operations SHALL be checked for conflicts using both the old name (against MODIFIED/REMOVED) and the new name (against ADDED).
-
-#### Scenario: MODIFIED and REMOVED on same requirement
-
-- **WHEN** a delta spec MODIFIES requirement "Login" and also REMOVES requirement "Login"
-- **THEN** validation reports an error: "conflicting operations on requirement \"Login\""
-
-#### Scenario: RENAMED old name conflicts with MODIFIED
-
-- **WHEN** a delta spec RENAMES "Login"→"Auth" and also MODIFIES "Login"
-- **THEN** validation reports an error about conflicting operations on "Login"
-
-#### Scenario: RENAMED new name conflicts with ADDED
-
-- **WHEN** a delta spec RENAMES "Login"→"Auth" and also ADDS "Auth"
-- **THEN** validation reports an error about conflicting operations on "Auth"
-
-### Requirement: RENAMED Overlap Uses Old Name
-
-The `DetectOverlaps` function in `deps.go` MUST use the RENAMED requirement's `OldName` field when checking for overlaps with MODIFIED/REMOVED operations in other changes. This ensures that if change A renames "Login"→"Auth" and change B modifies "Login", the overlap is detected.
-
-#### Scenario: RENAMED overlaps with MODIFIED in another change
-
-- **WHEN** change A RENAMES "Login"→"Auth" and change B MODIFIES "Login" in the same capability
-- **THEN** a warning is reported about the overlap on "Login"
-
-#### Scenario: RENAMED does not overlap with its new name
-
-- **WHEN** change A RENAMES "Login"→"Auth" and change B MODIFIES "Auth" in the same capability
-- **THEN** no overlap warning is reported (B modifies the new name, which is valid after A archives)
-
-### Requirement: Decision Validation
-
-The `litespec validate` command SHALL validate decisions when `--decisions` is specified or when `--all` is used. Validation SHALL parse each file in `specs/decisions/`, check required section presence, verify status is a valid enum, detect duplicate numbers, detect duplicate slugs, and verify all supersede pointers resolve. `ValidateAll` SHALL include decisions in its scope. A `ValidateDecision(root, slug)` function SHALL exist for validating a single decision by slug.
+- **WHEN** a decision file lacks `## Consequences`
+- **THEN** validation reports an error identifying the missing section and file
 
 #### Scenario: Validate all includes decisions
 
-- **WHEN** `litespec validate --all` is run and `specs/decisions/` contains malformed files
-- **THEN** errors for the decisions are included in the combined result
+- **WHEN** `litespec validate --all` is run and `specs/decisions/` contains a malformed file
+- **THEN** the decision error is included in the combined result
 
-#### Scenario: Validate only decisions
+### Requirement: GH Issue Queue Validation
 
-- **WHEN** `litespec validate --decisions` is run
-- **THEN** only decision files are validated; changes and specs are skipped
+The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec` via `gh issue list` and lint each issue body as a queue. A unit is an `## <outcome>` heading; each unit SHALL have a non-empty heading, a `Done means:` line, a `Verify:` line immediately followed by a fenced code block, and a `- [ ]` or `- [x]` checkbox. Missing or malformed elements SHALL produce an error identifying the issue number and unit heading. Issues without the `litespec` label SHALL NOT be scanned. The `litespec` label is a hardcoded convention; no config file governs it.
 
-#### Scenario: Duplicate number detected
+#### Scenario: Well-formed queue passes
 
-- **WHEN** two files `0003-foo.md` and `0003-bar.md` both exist in `specs/decisions/`
-- **THEN** validation reports an error identifying the duplicate number
+- **WHEN** `litespec validate` scans an open issue labeled `litespec` whose body has `## <outcome>` with `Done means:`, `Verify:` + fenced block, and `- [ ]`
+- **THEN** validation succeeds for that issue
 
-#### Scenario: Positional name resolves to decision
+#### Scenario: Unit missing Done means fails
 
-- **WHEN** `litespec validate 0003-foo` is run and `0003-foo` matches a decision slug (and no change or spec)
-- **THEN** only that decision is validated
+- **WHEN** a labeled issue has a `## <outcome>` unit without a `Done means:` line
+- **THEN** validation reports an error naming the issue number and unit heading
 
-#### Scenario: Ambiguous name across decision and change
+#### Scenario: Verify without fenced block fails
 
-- **WHEN** `litespec validate foo` is run and `foo` is both a change and a decision slug suffix
-- **THEN** validation reports an ambiguity error suggesting `--type decision`
+- **WHEN** a unit's `Verify:` line is not followed by a fenced code block
+- **THEN** validation reports an error identifying the unit
 
-### Requirement: Type Disambiguation Includes Decision
+#### Scenario: Unlabeled issue is not scanned
 
-The `--type` flag accepted by `litespec validate` SHALL accept `decision` as a valid value in addition to `change` and `spec`. When `--type decision` is supplied, the positional name SHALL be resolved against decision slugs (matching either the full `NNNN-slug` name or the slug portion alone).
+- **WHEN** an open issue lacks the `litespec` label
+- **THEN** validate does not attempt to parse its body
 
-#### Scenario: Explicit decision type
+### Requirement: Verify Shell Syntax Lint
 
-- **WHEN** `litespec validate beta-tools --type decision` is run
-- **THEN** the decision whose slug matches `beta-tools` is validated
+For each unit's `Verify:` fenced code block, validate SHALL run `bash -n` on the block contents and report any syntax error as a validation error identifying the issue number, unit heading, and shell error text. If `bash` is not on `PATH`, validate SHALL emit a warning per block (not an error) and check only that the block is non-empty. Validate SHALL NOT execute the Verify block.
 
-### Requirement: Optional Planning Artifacts
+#### Scenario: Valid shell passes
 
-The `ValidateChange` function MUST treat `proposal.md`, `design.md`, and `tasks.md` as optional. Their absence SHALL NOT produce an error. The presence of at least one valid delta spec under `specs/<capability>/` remains required and SHALL produce an error if missing. This makes patch-mode changes (delta-only) valid by construction.
+- **WHEN** a Verify fenced block contains syntactically valid bash
+- **THEN** `bash -n` succeeds and validation passes for that block
 
-#### Scenario: Patch-mode change validates without planning artifacts
+#### Scenario: Shell syntax error fails
 
-- **WHEN** `litespec validate <name>` is run on a change containing only `specs/<capability>/spec.md` with valid delta content
-- **THEN** validation succeeds with no errors
+- **WHEN** a Verify fenced block contains an unclosed quote
+- **THEN** validation reports an error with the `bash -n` output and the unit heading
 
-#### Scenario: Missing delta still fails
+#### Scenario: bash absent degrades to warning
 
-- **WHEN** `litespec validate <name>` is run on a change with no `specs/` directory or with a `specs/` directory containing no delta files
-- **THEN** validation fails with an error indicating the change has no delta spec files
+- **WHEN** `bash` is not on `PATH` and a Verify block is non-empty
+- **THEN** validation emits a warning, not an error, for that block
 
-#### Scenario: Full proposal change still validates
+### Requirement: Local Queue Fallback
 
-- **WHEN** `litespec validate <name>` is run on a change with `proposal.md`, `design.md`, `tasks.md`, and a valid delta
-- **THEN** validation succeeds (planning artifacts pass through their content checks)
+When `gh` is not on `PATH` or no GitHub remote is configured, validate SHALL auto-discover files at `specs/queues/<name>.md` and apply the same unit format and Verify shell lint rules as for GH issue bodies. `<name>` mirrors the change name supplied to `litespec new <name> --issue N`. The `--queue <path>` flag SHALL validate a single local queue file. The `--issue N` flag SHALL fetch and validate a single GH issue by number. When `gh` is available, both GH issues labeled `litespec` and local `specs/queues/*.md` files SHALL be validated.
 
-### Requirement: Proposal Content Validation
+#### Scenario: Local queue validated when gh absent
 
-When `proposal.md` exists, the `ValidateChange` function MUST verify it contains a `## Motivation` heading (or the legacy `## Why`) and a `## Scope` heading (or the legacy `## What Changes`), and that each of those sections has at least one non-blank body line before the next heading. Missing headings or empty sections SHALL produce errors identifying the file path.
+- **WHEN** `gh` is absent and `specs/queues/add-auth.md` exists with a well-formed queue
+- **THEN** validate lints that file and reports its units
 
-#### Scenario: Proposal with required sections passes
+#### Scenario: --queue flag validates one file
 
-- **WHEN** a change's `proposal.md` contains `## Motivation` with body text and `## Scope` with body text
-- **THEN** validation passes for the proposal
+- **WHEN** `litespec validate --queue specs/queues/add-auth.md` is run
+- **THEN** only that file is validated as a queue
 
-#### Scenario: Proposal missing motivation heading fails
+#### Scenario: --issue flag fetches one issue
 
-- **WHEN** a change's `proposal.md` lacks both `## Motivation` and `## Why` headings
-- **THEN** validation reports an error indicating the proposal is missing the motivation section
+- **WHEN** `litespec validate --issue 42` is run and `gh` is available
+- **THEN** only issue #42 is fetched and validated
 
-#### Scenario: Proposal missing scope heading fails
+#### Scenario: Both gh and local queues validated together
 
-- **WHEN** a change's `proposal.md` lacks both `## Scope` and `## What Changes` headings
-- **THEN** validation reports an error indicating the proposal is missing the scope section
+- **WHEN** `gh` is available and both labeled issues and `specs/queues/*.md` files exist
+- **THEN** validate lints both sources and merges results
 
-#### Scenario: Proposal section with no body fails
+### Requirement: Offline Graceful Degradation
 
-- **WHEN** a change's `proposal.md` contains `## Motivation` immediately followed by another heading with no body lines between them
-- **THEN** validation reports an error indicating the motivation section is empty
+When `gh` is not on `PATH` or no GitHub remote is configured AND no `specs/queues/` directory exists, validate SHALL emit a single warning that the queue was not checked and continue validating specs and decisions. The command's exit status SHALL reflect only the specs and decisions that were validated. Under `--strict`, the absence of any queue source SHALL NOT itself be an error.
 
-#### Scenario: Empty proposal file fails
+#### Scenario: No gh and no queues directory warns once
 
-- **WHEN** a change's `proposal.md` exists but is empty or whitespace-only
-- **THEN** validation reports errors for missing motivation and scope sections
+- **WHEN** `gh` is absent and `specs/queues/` does not exist
+- **THEN** validate emits one warning and proceeds to validate specs and decisions
 
-### Requirement: Design Content Validation
+#### Scenario: Specs still validated offline
 
-When `design.md` exists, the `ValidateChange` function MUST verify it contains at least one `## ` heading and at least three non-blank content lines outside fenced code blocks. This catches stub files without prescribing structure. Failure SHALL produce an error identifying the file path.
-
-#### Scenario: Design with content passes
-
-- **WHEN** a change's `design.md` contains a `## Approach` heading and several non-blank content lines
-- **THEN** validation passes for the design
-
-#### Scenario: Empty design fails
-
-- **WHEN** a change's `design.md` exists but is empty or whitespace-only
-- **THEN** validation reports an error indicating the design appears to be a stub
-
-#### Scenario: Design with only headings fails
-
-- **WHEN** a change's `design.md` contains only headings with no body content outside code fences
-- **THEN** validation reports an error indicating the design appears to be a stub
-
-#### Scenario: Design content inside code fences does not count
-
-- **WHEN** a change's `design.md` contains one heading and three non-blank lines all inside a fenced code block
-- **THEN** validation reports an error indicating the design appears to be a stub
-
-### Requirement: Empty-Phase Detection in Tasks
-
-When `tasks.md` exists, the existing phase-heading and checkbox checks MUST be extended so that every `## Phase` block contains at least one checkbox line (`- [ ]` or `- [x]`). A phase with no checkboxes SHALL produce an error identifying the file path and the phase heading.
-
-#### Scenario: Phase with no checkboxes fails
-
-- **WHEN** a change's `tasks.md` contains `## Phase 1` followed by another `## Phase 2` heading with no checkboxes between them
-- **THEN** validation reports an error identifying the empty phase
-
-#### Scenario: Phase with at least one checkbox passes
-
-- **WHEN** a change's `tasks.md` contains `## Phase 1` followed by `- [ ] do thing` and then `## Phase 2`
-- **THEN** validation passes for that phase
+- **WHEN** `gh` is absent, no `specs/queues/` exists, and a spec has an error
+- **THEN** validate reports the spec error and exits non-zero
