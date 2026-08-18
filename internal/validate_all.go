@@ -50,6 +50,14 @@ func ValidateAll(root string, strict bool) (*ValidationResult, error) {
 	result.Warnings = append(result.Warnings, queueResult.Warnings...)
 	result.UnitsCount += queueResult.UnitsCount
 
+	localQueueResult, err := ValidateLocalQueues(root)
+	if err != nil {
+		return nil, err
+	}
+	result.Errors = append(result.Errors, localQueueResult.Errors...)
+	result.Warnings = append(result.Warnings, localQueueResult.Warnings...)
+	result.UnitsCount += localQueueResult.UnitsCount
+
 	result.Valid = len(result.Errors) == 0
 	if strict && len(result.Warnings) > 0 {
 		result.Valid = false

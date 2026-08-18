@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -65,7 +66,13 @@ func ValidateGHIssueQueues(root string) (*ValidationResult, error) {
 	for _, issue := range issues {
 		source := fmt.Sprintf("GH issue #%d", issue.Number)
 		result.UnitsCount += countQueueUnits(issue.Body)
-		result.Errors = append(result.Errors, ValidateQueueBody(issue.Body, source)...)
+		for _, iss := range ValidateQueueBody(issue.Body, source) {
+			if iss.Severity == SeverityWarning {
+				result.Warnings = append(result.Warnings, iss)
+			} else {
+				result.Errors = append(result.Errors, iss)
+			}
+		}
 	}
 
 	result.Valid = len(result.Errors) == 0
@@ -247,7 +254,13 @@ func ValidateGHIssueByNumber(root string, number int) (*ValidationResult, error)
 
 	source := fmt.Sprintf("GH issue #%d", issue.Number)
 	result.UnitsCount += countQueueUnits(issue.Body)
-	result.Errors = append(result.Errors, ValidateQueueBody(issue.Body, source)...)
+	for _, iss := range ValidateQueueBody(issue.Body, source) {
+		if iss.Severity == SeverityWarning {
+			result.Warnings = append(result.Warnings, iss)
+		} else {
+			result.Errors = append(result.Errors, iss)
+		}
+	}
 	result.Valid = len(result.Errors) == 0
 	return result, nil
 }
@@ -261,7 +274,43 @@ func ValidateQueueFile(path string) (*ValidationResult, error) {
 	result := &ValidationResult{Valid: true}
 	source := fmt.Sprintf("queue file %s", path)
 	result.UnitsCount += countQueueUnits(string(body))
-	result.Errors = append(result.Errors, ValidateQueueBody(string(body), source)...)
+	for _, iss := range ValidateQueueBody(string(body), source) {
+		if iss.Severity == SeverityWarning {
+			result.Warnings = append(result.Warnings, iss)
+		} else {
+			result.Errors = append(result.Errors, iss)
+		}
+	}
+	result.Valid = len(result.Errors) == 0
+	return result, nil
+}
+
+func ValidateLocalQueues(root string) (*ValidationResult, error) {
+	result := &ValidationResult{Valid: true}
+
+	dir := filepath.Join(root, "specs", "queues")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return result, nil
+		}
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		sub, err := ValidateQueueFile(path)
+		if err != nil {
+			return nil, err
+		}
+		result.Errors = append(result.Errors, sub.Errors...)
+		result.Warnings = append(result.Warnings, sub.Warnings...)
+		result.UnitsCount += sub.UnitsCount
+	}
+
 	result.Valid = len(result.Errors) == 0
 	return result, nil
 }

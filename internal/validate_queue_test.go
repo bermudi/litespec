@@ -1,7 +1,9 @@
 package internal
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -206,6 +208,122 @@ Verify:
 		}
 		if !found {
 			t.Fatalf("expected error containing 'Verify block is empty', got %v", issues)
+		}
+	})
+}
+
+func TestLocalQueueFallback(t *testing.T) {
+	wellFormed := `## Add auth
+Done means: authentication is wired
+Verify:
+` + "```bash\necho ok\n```\n" + `- [ ] pending
+`
+
+	missingDoneMeans := `## Add auth
+Verify:
+` + "```bash\necho ok\n```\n" + `- [ ] pending
+`
+
+	t.Run("local queue validated when gh absent", func(t *testing.T) {
+		root := t.TempDir()
+		queuePath := filepath.Join(root, "specs", "queues", "add-auth.md")
+		if err := os.MkdirAll(filepath.Dir(queuePath), 0755); err != nil {
+			t.Fatalf("mkdir: %v", err)
+		}
+		if err := os.WriteFile(queuePath, []byte(wellFormed), 0644); err != nil {
+			t.Fatalf("write queue: %v", err)
+		}
+
+		result, err := ValidateLocalQueues(root)
+		if err != nil {
+			t.Fatalf("ValidateLocalQueues: %v", err)
+		}
+		if len(result.Errors) > 0 {
+			t.Fatalf("expected no errors, got %v", result.Errors)
+		}
+		if result.UnitsCount != 1 {
+			t.Fatalf("expected UnitsCount 1, got %d", result.UnitsCount)
+		}
+	})
+
+	t.Run("local queue with malformed unit", func(t *testing.T) {
+		root := t.TempDir()
+		queuePath := filepath.Join(root, "specs", "queues", "add-auth.md")
+		if err := os.MkdirAll(filepath.Dir(queuePath), 0755); err != nil {
+			t.Fatalf("mkdir: %v", err)
+		}
+		if err := os.WriteFile(queuePath, []byte(missingDoneMeans), 0644); err != nil {
+			t.Fatalf("write queue: %v", err)
+		}
+
+		result, err := ValidateLocalQueues(root)
+		if err != nil {
+			t.Fatalf("ValidateLocalQueues: %v", err)
+		}
+		if !containsIssue(result.Errors, "missing Done means:") {
+			t.Fatalf("expected error containing 'missing Done means:', got %v", result.Errors)
+		}
+	})
+
+	t.Run("no specs/queues/ directory", func(t *testing.T) {
+		root := t.TempDir()
+		result, err := ValidateLocalQueues(root)
+		if err != nil {
+			t.Fatalf("ValidateLocalQueues: %v", err)
+		}
+		if len(result.Errors) > 0 {
+			t.Fatalf("expected no errors, got %v", result.Errors)
+		}
+		if len(result.Warnings) > 0 {
+			t.Fatalf("expected no warnings, got %v", result.Warnings)
+		}
+		if result.UnitsCount != 0 {
+			t.Fatalf("expected UnitsCount 0, got %d", result.UnitsCount)
+		}
+	})
+
+	t.Run("--queue path via ValidateQueueFile", func(t *testing.T) {
+		root := t.TempDir()
+		queuePath := filepath.Join(root, "queue.md")
+		if err := os.WriteFile(queuePath, []byte(wellFormed), 0644); err != nil {
+			t.Fatalf("write queue: %v", err)
+		}
+
+		result, err := ValidateQueueFile(queuePath)
+		if err != nil {
+			t.Fatalf("ValidateQueueFile: %v", err)
+		}
+		if len(result.Errors) > 0 {
+			t.Fatalf("expected no errors, got %v", result.Errors)
+		}
+		if result.UnitsCount != 1 {
+			t.Fatalf("expected UnitsCount 1, got %d", result.UnitsCount)
+		}
+	})
+
+	t.Run("warning routing", func(t *testing.T) {
+		root := t.TempDir()
+		queuePath := filepath.Join(root, "queue.md")
+		if err := os.WriteFile(queuePath, []byte(wellFormed), 0644); err != nil {
+			t.Fatalf("write queue: %v", err)
+		}
+
+		old := lookPathBash
+		lookPathBash = func(string) (string, error) { return "", exec.ErrNotFound }
+		defer func() { lookPathBash = old }()
+
+		result, err := ValidateQueueFile(queuePath)
+		if err != nil {
+			t.Fatalf("ValidateQueueFile: %v", err)
+		}
+		if !result.Valid {
+			t.Fatalf("expected Valid true, got false")
+		}
+		if len(result.Errors) > 0 {
+			t.Fatalf("expected no errors, got %v", result.Errors)
+		}
+		if !containsIssue(result.Warnings, "bash unavailable") {
+			t.Fatalf("expected warning in Warnings containing 'bash unavailable', got %v", result.Warnings)
 		}
 	})
 }
