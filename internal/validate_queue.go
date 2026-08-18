@@ -102,6 +102,40 @@ func parseQueueUnits(body string) []queueUnit {
 	return units
 }
 
+var lookPathBash = exec.LookPath
+
+func lintVerifyShell(block string, source string, unitHeading string) []ValidationIssue {
+	if strings.TrimSpace(block) == "" {
+		return []ValidationIssue{{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: unit %q Verify block is empty", source, unitHeading),
+			File:     source,
+		}}
+	}
+
+	bashPath, err := lookPathBash("bash")
+	if err != nil {
+		return []ValidationIssue{{
+			Severity: SeverityWarning,
+			Message:  fmt.Sprintf("%s: unit %q Verify block not syntax-checked (bash unavailable)", source, unitHeading),
+			File:     source,
+		}}
+	}
+
+	cmd := exec.Command(bashPath, "-n", "-c", block)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		trimmed := strings.TrimSpace(string(out))
+		return []ValidationIssue{{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: unit %q Verify shell syntax error: %s", source, unitHeading, trimmed),
+			File:     source,
+		}}
+	}
+
+	return nil
+}
+
 func ValidateQueueBody(body string, source string) []ValidationIssue {
 	units := parseQueueUnits(body)
 	var issues []ValidationIssue
@@ -119,6 +153,7 @@ func ValidateQueueBody(body string, source string) []ValidationIssue {
 		verifyFound := false
 		fencedAfterVerify := false
 		checkboxFound := false
+		var verifyBlock string
 
 		for i, line := range unit.Body {
 			if strings.HasPrefix(line, "Done means:") {
@@ -129,6 +164,14 @@ func ValidateQueueBody(body string, source string) []ValidationIssue {
 				for j := i + 1; j < len(unit.Body); j++ {
 					if strings.HasPrefix(unit.Body[j], "```") {
 						fencedAfterVerify = true
+						var blockLines []string
+						for k := j + 1; k < len(unit.Body); k++ {
+							if strings.HasPrefix(unit.Body[k], "```") {
+								break
+							}
+							blockLines = append(blockLines, unit.Body[k])
+						}
+						verifyBlock = strings.Join(blockLines, "\n")
 						break
 					}
 				}
@@ -159,6 +202,8 @@ func ValidateQueueBody(body string, source string) []ValidationIssue {
 				Message:  fmt.Sprintf("%s: unit %q Verify: not followed by fenced code block", source, unit.Heading),
 				File:     source,
 			})
+		} else {
+			issues = append(issues, lintVerifyShell(verifyBlock, source, unit.Heading)...)
 		}
 		if !checkboxFound {
 			issues = append(issues, ValidationIssue{

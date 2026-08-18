@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"os/exec"
 	"strings"
 	"testing"
 )
@@ -115,6 +116,96 @@ More design text.
 		issues := ValidateQueueBody(body, source)
 		if len(issues) > 0 {
 			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
+		}
+	})
+}
+
+func TestVerifyShellLint(t *testing.T) {
+	source := "test-source"
+
+	t.Run("bad syntax -> error", func(t *testing.T) {
+		body := `## My outcome
+Done means: something works
+Verify:
+` + "```bash\necho \"unclosed\n```\n" + `- [ ] pending
+`
+		issues := ValidateQueueBody(body, source)
+		if len(issues) == 0 {
+			t.Fatalf("expected an error, got none")
+		}
+		found := false
+		for _, issue := range issues {
+			if strings.Contains(issue.Message, "Verify shell syntax error") {
+				found = true
+				if issue.Severity != SeverityError {
+					t.Fatalf("expected error severity, got %s", issue.Severity)
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("expected error containing 'Verify shell syntax error', got %v", issues)
+		}
+	})
+
+	t.Run("good syntax -> pass", func(t *testing.T) {
+		body := `## My outcome
+Done means: something works
+Verify:
+` + "```bash\necho hello\n```\n" + `- [ ] pending
+`
+		issues := ValidateQueueBody(body, source)
+		if len(issues) > 0 {
+			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
+		}
+	})
+
+	t.Run("bash absent -> warning", func(t *testing.T) {
+		old := lookPathBash
+		lookPathBash = func(string) (string, error) { return "", exec.ErrNotFound }
+		defer func() { lookPathBash = old }()
+
+		body := `## My outcome
+Done means: something works
+Verify:
+` + "```bash\necho hello\n```\n" + `- [ ] pending
+`
+		issues := ValidateQueueBody(body, source)
+		if len(issues) == 0 {
+			t.Fatalf("expected a warning, got none")
+		}
+		found := false
+		for _, issue := range issues {
+			if strings.Contains(issue.Message, "bash unavailable") {
+				found = true
+				if issue.Severity != SeverityWarning {
+					t.Fatalf("expected warning severity, got %s", issue.Severity)
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("expected warning containing 'bash unavailable', got %v", issues)
+		}
+
+		emptyBody := `## My outcome
+Done means: something works
+Verify:
+` + "```bash\n```\n" + `- [ ] pending
+`
+		issues = ValidateQueueBody(emptyBody, source)
+		if len(issues) == 0 {
+			t.Fatalf("expected an error for empty block, got none")
+		}
+		found = false
+		for _, issue := range issues {
+			if strings.Contains(issue.Message, "Verify block is empty") {
+				found = true
+				if issue.Severity != SeverityError {
+					t.Fatalf("expected error severity for empty block, got %s", issue.Severity)
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("expected error containing 'Verify block is empty', got %v", issues)
 		}
 	})
 }
