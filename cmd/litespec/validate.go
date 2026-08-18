@@ -183,70 +183,29 @@ func cmdValidate(args []string) error {
 		return err
 	}
 
-	out := internal.BuildValidationResultJSON(result)
+	okText := fmt.Sprintf("ok: %d %s, %d %s, %d %s, %d %s\n",
+		result.CapabilitiesCount, pluralize("capability", result.CapabilitiesCount),
+		result.RequirementsCount, pluralize("requirement", result.RequirementsCount),
+		result.ScenariosCount, pluralize("scenario", result.ScenariosCount),
+		result.UnitsCount, pluralize("unit", result.UnitsCount))
+	okMinimalText := fmt.Sprintf("ok\t%d %s, %d %s, %d %s, %d %s\n",
+		result.CapabilitiesCount, pluralize("capability", result.CapabilitiesCount),
+		result.RequirementsCount, pluralize("requirement", result.RequirementsCount),
+		result.ScenariosCount, pluralize("scenario", result.ScenariosCount),
+		result.UnitsCount, pluralize("unit", result.UnitsCount))
 
-	// Build minimal JSON representation
-	minJSON := validateMinimalJSON{Valid: out.Valid}
-	for _, e := range out.Errors {
-		minJSON.Errors = append(minJSON.Errors, e.Message)
-	}
-
-	// Build minimal text representation
-	var minimalText string
-	if !result.Valid {
-		minimalText = fmt.Sprintf("invalid\t%d errors\n", len(result.Errors))
-		for _, issue := range result.Errors {
-			minimalText += fmt.Sprintf("error\t%s\t%s\n", issue.File, issue.Message)
-		}
-	} else if strict && hasNonExemptWarnings(result.Warnings) {
-		minimalText = fmt.Sprintf("invalid\t%d warnings (strict)\n", len(result.Warnings))
-	} else {
-		minimalText = fmt.Sprintf("ok\t%d %s, %d %s, %d %s, %d %s\n",
-			result.CapabilitiesCount, pluralize("capability", result.CapabilitiesCount),
-			result.RequirementsCount, pluralize("requirement", result.RequirementsCount),
-			result.ScenariosCount, pluralize("scenario", result.ScenariosCount),
-			result.UnitsCount, pluralize("unit", result.UnitsCount))
-	}
-
-	// Build text representation
-	var text string
-	for _, issue := range result.Errors {
-		text += fmt.Sprintf("ERROR  %s: %s\n", issue.File, issue.Message)
-	}
-	for _, issue := range result.Warnings {
-		text += fmt.Sprintf("WARN   %s: %s\n", issue.File, issue.Message)
-	}
-	if result.Valid {
-		text += fmt.Sprintf("ok: %d %s, %d %s, %d %s, %d %s\n",
-			result.CapabilitiesCount, pluralize("capability", result.CapabilitiesCount),
-			result.RequirementsCount, pluralize("requirement", result.RequirementsCount),
-			result.ScenariosCount, pluralize("scenario", result.ScenariosCount),
-			result.UnitsCount, pluralize("unit", result.UnitsCount))
-	}
-
-	if err := Render(Response{
-		Full:        out,
-		Minimal:     minJSON,
-		Text:        text,
-		MinimalText: minimalText,
-	}, asJSON, asMinimal); err != nil {
-		return err
-	}
-
-	if !result.Valid {
-		return fmt.Errorf("validation failed")
-	}
-	if strict {
-		for _, w := range result.Warnings {
-			if !w.StrictExempt {
-				return fmt.Errorf("validation failed")
-			}
-		}
-	}
-	return nil
+	return renderValidationResult(result, asJSON, asMinimal, strict, okText, okMinimalText, "")
 }
 
 func renderQueueResult(result *internal.ValidationResult, asJSON, asMinimal, strict bool) error {
+	okText := fmt.Sprintf("ok: %d units\n", result.UnitsCount)
+	okMinimalText := fmt.Sprintf("ok\t%d units\n", result.UnitsCount)
+	invalidText := fmt.Sprintf("invalid: %d errors\n", len(result.Errors))
+
+	return renderValidationResult(result, asJSON, asMinimal, strict, okText, okMinimalText, invalidText)
+}
+
+func renderValidationResult(result *internal.ValidationResult, asJSON, asMinimal, strict bool, okText, okMinimalText, invalidText string) error {
 	out := internal.BuildValidationResultJSON(result)
 
 	minJSON := validateMinimalJSON{Valid: out.Valid}
@@ -263,7 +222,7 @@ func renderQueueResult(result *internal.ValidationResult, asJSON, asMinimal, str
 	} else if strict && hasNonExemptWarnings(result.Warnings) {
 		minimalText = fmt.Sprintf("invalid\t%d warnings (strict)\n", len(result.Warnings))
 	} else {
-		minimalText = fmt.Sprintf("ok\t%d units\n", result.UnitsCount)
+		minimalText = okMinimalText
 	}
 
 	var text string
@@ -274,9 +233,9 @@ func renderQueueResult(result *internal.ValidationResult, asJSON, asMinimal, str
 		text += fmt.Sprintf("WARN   %s: %s\n", issue.File, issue.Message)
 	}
 	if result.Valid {
-		text += fmt.Sprintf("ok: %d units\n", result.UnitsCount)
-	} else {
-		text += fmt.Sprintf("invalid: %d errors\n", len(result.Errors))
+		text += okText
+	} else if invalidText != "" {
+		text += invalidText
 	}
 
 	if err := Render(Response{
