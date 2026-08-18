@@ -76,7 +76,7 @@ For each unit's `Verify:` fenced code block, validate SHALL run `bash -n` on the
 
 ### Requirement: Local Queue Fallback
 
-When `gh` is not on `PATH` or no GitHub remote is configured, validate SHALL auto-discover files at `specs/queues/<name>.md` and apply the same unit format and Verify shell lint rules as for GH issue bodies. `<name>` mirrors the change name supplied to `litespec new <name> --issue N`. The `--queue <path>` flag SHALL validate a single local queue file. The `--issue N` flag SHALL fetch and validate a single GH issue by number. When `gh` is available, both GH issues labeled `litespec` and local `specs/queues/*.md` files SHALL be validated.
+When `gh` is not on `PATH` or `gh issue list` fails (e.g. no GitHub remote is configured), validate SHALL auto-discover files at `specs/queues/<name>.md` and apply the same unit format and Verify shell lint rules as for GH issue bodies. `<name>` mirrors the change name supplied to `litespec new <name> --issue N`. The `--queue <path>` flag SHALL validate a single local queue file. The `--issue N` flag SHALL fetch and validate a single GH issue by number. When `gh` is available and `gh issue list` succeeds, both GH issues labeled `litespec` and local `specs/queues/*.md` files SHALL be validated. A `gh issue list` failure SHALL produce a warning and skip GH queue validation without failing the command.
 
 #### Scenario: Local queue validated when gh absent
 
@@ -98,9 +98,14 @@ When `gh` is not on `PATH` or no GitHub remote is configured, validate SHALL aut
 - **WHEN** `gh` is available and both labeled issues and `specs/queues/*.md` files exist
 - **THEN** validate lints both sources and merges results
 
+#### Scenario: gh issue list failure warns and skips
+
+- **WHEN** `gh` is on `PATH` but `gh issue list` fails (e.g. no GitHub remote)
+- **THEN** validate emits a warning and skips GH queue validation without failing the command
+
 ### Requirement: Offline Graceful Degradation
 
-When `gh` is not on `PATH` or no GitHub remote is configured AND no `specs/queues/` directory exists, validate SHALL emit a single warning that the queue was not checked and continue validating specs and decisions. The command's exit status SHALL reflect only the specs and decisions that were validated. Under `--strict`, the absence of any queue source SHALL NOT itself be an error.
+When `gh` is not on `PATH` or `gh issue list` fails AND no `specs/queues/` directory exists, validate SHALL emit a single warning that the queue was not checked and continue validating specs and decisions. The command's exit status SHALL reflect only the specs and decisions that were validated. Under `--strict`, the absence of any queue source SHALL NOT itself be an error.
 
 #### Scenario: No gh and no queues directory warns once
 

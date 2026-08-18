@@ -183,7 +183,8 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 			}
 			if !verifyFound && strings.HasPrefix(line, "Verify:") {
 				verifyFound = true
-				if strings.TrimSpace(line[len("Verify:"):]) != "" {
+				rest := strings.TrimSpace(line[len("Verify:"):])
+				if rest != "" && strings.Contains(rest, "`") {
 					inlineVerify = true
 				}
 				for j := i + 1; j < len(unit.Body); j++ {

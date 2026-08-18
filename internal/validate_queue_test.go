@@ -91,6 +91,14 @@ Verify:
 		}
 	})
 
+	t.Run("inline Verify without backtick command fails", func(t *testing.T) {
+		body := "## My outcome\nDone means: something\nVerify: TODO write this\n- [ ] pending\n"
+		_, issues := ValidateQueueBody(body, source)
+		if !containsIssue(issues, "not followed by a command or fenced code block") {
+			t.Fatalf("expected error for non-backtick Verify content, got %v", issues)
+		}
+	})
+
 	t.Run("missing checkbox", func(t *testing.T) {
 		_, issues := ValidateQueueBody(missingCheckbox, source)
 		if !containsIssue(issues, "missing checkbox") {
