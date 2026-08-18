@@ -51,20 +51,28 @@ func ValidateGHIssueQueues(root string) (*ValidationResult, error) {
 		return result, nil
 	}
 
-	var issues []ghIssue
-	if err := json.Unmarshal(out, &issues); err != nil {
-		return nil, fmt.Errorf("parse gh issue list output: %w", err)
-	}
+	if len(out) == 0 {
+		result.Warnings = append(result.Warnings, ValidationIssue{
+			Severity:     SeverityWarning,
+			Message:      "gh issue list returned empty output — issue queue not validated",
+			StrictExempt: true,
+		})
+	} else {
+		var issues []ghIssue
+		if err := json.Unmarshal(out, &issues); err != nil {
+			return nil, fmt.Errorf("parse gh issue list output: %w", err)
+		}
 
-	for _, issue := range issues {
-		source := fmt.Sprintf("GH issue #%d", issue.Number)
-		units, unitIssues := ValidateQueueBody(issue.Body, source)
-		result.UnitsCount += len(units)
-		for _, iss := range unitIssues {
-			if iss.Severity == SeverityWarning {
-				result.Warnings = append(result.Warnings, iss)
-			} else {
-				result.Errors = append(result.Errors, iss)
+		for _, issue := range issues {
+			source := fmt.Sprintf("GH issue #%d", issue.Number)
+			units, unitIssues := ValidateQueueBody(issue.Body, source)
+			result.UnitsCount += len(units)
+			for _, iss := range unitIssues {
+				if iss.Severity == SeverityWarning {
+					result.Warnings = append(result.Warnings, iss)
+				} else {
+					result.Errors = append(result.Errors, iss)
+				}
 			}
 		}
 	}
