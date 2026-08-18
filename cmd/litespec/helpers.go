@@ -254,3 +254,12 @@ func pluralize(word string, count int) string {
 	}
 	return word + "s"
 }
+
+func hasNonExemptWarnings(warnings []internal.ValidationIssue) bool {
+	for _, w := range warnings {
+		if !w.StrictExempt {
+			return true
+		}
+	}
+	return false
+}

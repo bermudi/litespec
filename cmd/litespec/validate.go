@@ -183,7 +183,7 @@ func cmdValidate(args []string) error {
 		for _, issue := range result.Errors {
 			minimalText += fmt.Sprintf("error\t%s\t%s\n", issue.File, issue.Message)
 		}
-	} else if strict && len(result.Warnings) > 0 {
+	} else if strict && hasNonExemptWarnings(result.Warnings) {
 		minimalText = fmt.Sprintf("invalid\t%d warnings (strict)\n", len(result.Warnings))
 	} else {
 		minimalText = fmt.Sprintf("ok\t%d %s, %d %s, %d %s, %d %s\n",
@@ -218,8 +218,15 @@ func cmdValidate(args []string) error {
 		return err
 	}
 
-	if !result.Valid || (strict && len(result.Warnings) > 0) {
+	if !result.Valid {
 		return fmt.Errorf("validation failed")
+	}
+	if strict {
+		for _, w := range result.Warnings {
+			if !w.StrictExempt {
+				return fmt.Errorf("validation failed")
+			}
+		}
 	}
 	return nil
 }
@@ -238,7 +245,7 @@ func renderQueueResult(result *internal.ValidationResult, asJSON, asMinimal, str
 		for _, issue := range result.Errors {
 			minimalText += fmt.Sprintf("error\t%s\t%s\n", issue.File, issue.Message)
 		}
-	} else if strict && len(result.Warnings) > 0 {
+	} else if strict && hasNonExemptWarnings(result.Warnings) {
 		minimalText = fmt.Sprintf("invalid\t%d warnings (strict)\n", len(result.Warnings))
 	} else {
 		minimalText = fmt.Sprintf("ok\t%d units\n", result.UnitsCount)
@@ -266,8 +273,15 @@ func renderQueueResult(result *internal.ValidationResult, asJSON, asMinimal, str
 		return err
 	}
 
-	if !result.Valid || (strict && len(result.Warnings) > 0) {
+	if !result.Valid {
 		return fmt.Errorf("validation failed")
+	}
+	if strict {
+		for _, w := range result.Warnings {
+			if !w.StrictExempt {
+				return fmt.Errorf("validation failed")
+			}
+		}
 	}
 	return nil
 }

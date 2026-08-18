@@ -13,9 +13,10 @@ type Scenario struct {
 }
 
 type ValidationIssue struct {
-	Severity Severity
-	Message  string
-	File     string
+	Severity     Severity
+	Message      string
+	File         string
+	StrictExempt bool
 }
 
 type ValidationResult struct {

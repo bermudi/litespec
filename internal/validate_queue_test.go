@@ -336,3 +336,25 @@ func containsIssue(issues []ValidationIssue, substr string) bool {
 	}
 	return false
 }
+
+func TestValidateGHIssueQueues_NoGitHubRemote(t *testing.T) {
+	root := t.TempDir()
+	result, err := ValidateGHIssueQueues(root)
+	if err != nil {
+		t.Fatalf("ValidateGHIssueQueues: %v", err)
+	}
+	if !result.Valid {
+		t.Fatalf("expected Valid true, got false")
+	}
+	if len(result.Errors) > 0 {
+		t.Fatalf("expected no errors, got %v", result.Errors)
+	}
+	if !containsIssue(result.Warnings, "issue queue not validated") {
+		t.Fatalf("expected a warning about queue not validated, got %v", result.Warnings)
+	}
+	for _, w := range result.Warnings {
+		if !w.StrictExempt {
+			t.Fatalf("expected all queue-absence warnings to be StrictExempt, got %q", w.Message)
+		}
+	}
+}

@@ -59,8 +59,13 @@ func ValidateAll(root string, strict bool) (*ValidationResult, error) {
 	result.UnitsCount += localQueueResult.UnitsCount
 
 	result.Valid = len(result.Errors) == 0
-	if strict && len(result.Warnings) > 0 {
-		result.Valid = false
+	if strict {
+		for _, w := range result.Warnings {
+			if !w.StrictExempt {
+				result.Valid = false
+				break
+			}
+		}
 	}
 
 	return result, nil

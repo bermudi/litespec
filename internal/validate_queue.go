@@ -27,9 +27,9 @@ func ValidateGHIssueQueues(root string) (*ValidationResult, error) {
 
 	if _, err := exec.LookPath("gh"); err != nil {
 		result.Warnings = append(result.Warnings, ValidationIssue{
-			Severity: SeverityWarning,
-			Message:  "gh not available — issue queue not validated",
-			File:     "",
+			Severity:     SeverityWarning,
+			Message:      "gh not available — issue queue not validated",
+			StrictExempt: true,
 		})
 		return result, nil
 	}
@@ -38,6 +38,11 @@ func ValidateGHIssueQueues(root string) (*ValidationResult, error) {
 	gitCmd.Dir = root
 	gitOut, err := gitCmd.Output()
 	if err != nil || !strings.Contains(string(gitOut), "github.com") {
+		result.Warnings = append(result.Warnings, ValidationIssue{
+			Severity:     SeverityWarning,
+			Message:      "no GitHub remote configured — issue queue not validated",
+			StrictExempt: true,
+		})
 		return result, nil
 	}
 
@@ -51,9 +56,9 @@ func ValidateGHIssueQueues(root string) (*ValidationResult, error) {
 	out, err := cmd.Output()
 	if err != nil {
 		result.Warnings = append(result.Warnings, ValidationIssue{
-			Severity: SeverityWarning,
-			Message:  fmt.Sprintf("gh issue list failed — issue queue not validated: %v", err),
-			File:     "",
+			Severity:     SeverityWarning,
+			Message:      fmt.Sprintf("gh issue list failed — issue queue not validated: %v", err),
+			StrictExempt: true,
 		})
 		return result, nil
 	}
