@@ -34,18 +34,6 @@ func ValidateGHIssueQueues(root string) (*ValidationResult, error) {
 		return result, nil
 	}
 
-	gitCmd := exec.Command("git", "config", "--get", "remote.origin.url")
-	gitCmd.Dir = root
-	gitOut, err := gitCmd.Output()
-	if err != nil || !strings.Contains(string(gitOut), "github.com") {
-		result.Warnings = append(result.Warnings, ValidationIssue{
-			Severity:     SeverityWarning,
-			Message:      "no GitHub remote configured — issue queue not validated",
-			StrictExempt: true,
-		})
-		return result, nil
-	}
-
 	cmd := exec.Command("gh", "issue", "list",
 		"--label", "litespec",
 		"--state", "open",
@@ -235,13 +223,6 @@ func ValidateGHIssueByNumber(root string, number int) (*ValidationResult, error)
 
 	if _, err := lookPathGh("gh"); err != nil {
 		return nil, fmt.Errorf("gh not available")
-	}
-
-	gitCmd := exec.Command("git", "config", "--get", "remote.origin.url")
-	gitCmd.Dir = root
-	gitOut, err := gitCmd.Output()
-	if err != nil || !strings.Contains(string(gitOut), "github.com") {
-		return nil, fmt.Errorf("not a GitHub repository")
 	}
 
 	cmd := exec.Command("gh", "issue", "view", strconv.Itoa(number),
