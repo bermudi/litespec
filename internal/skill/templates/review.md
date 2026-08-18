@@ -34,10 +34,32 @@ If a fix needs a new decision, report "needs decision: <question>" instead of in
 - Flag Verify that would pass without the outcome.
 
 ### Verdict
-`PASS` or `CHANGES REQUESTED` + what to do next (`build` for fixes, `plan` if shape was wrong).
+`PASS` or `CHANGES REQUESTED`.
 
 ---
 
-## Ending
+## Triage
 
-Report only. User decides. If asked to fix, tell them to use `litespec-build`.
+You report findings — you do not fix them. But you route each finding to the right lane so the user knows what to do next. The fork is structural: does the finding cite a unit's `Done means:` or `Verify:`?
+
+**PASS** — all units satisfy their contracts. SUGGESTIONs are optional polish; the user decides whether to pursue them via the small fix lane. The issue can close.
+
+**CHANGES REQUESTED** — for each finding, state its lane:
+
+- **CRITICAL, breaks a unit's `Done means:` or `Verify:`** → that unit is not done. Name the unit. The user unchecks its box in the issue, then re-invokes `litespec-build` to rebuild it. The issue stays open until all units re-pass. Load `references/review/adversarial-review.md` if the finding stems from an interaction bug you constructed adversarially.
+
+- **CRITICAL or WARNING, outside any unit's contract** (neighboring code, help text, stale decision, drive-by) → small fix lane. No unit, no issue reopen. The user fixes directly, updates `specs/<feature>/spec.md` if it was a contract change, commits.
+
+- **SUGGESTION** → small fix lane, user's discretion. Not blocking.
+
+- **"needs decision: <question>"** → the user creates a decision in `specs/decisions/` first (`touch` + `litespec validate --decisions`), then routes the fix per the two rules above.
+
+- **Shape was wrong** (the unit's outcome doesn't match what the code needs to do) → `litespec-plan`, not a fix. State this explicitly.
+
+Do not invent units for findings that aren't units. Do not reopen the issue for small fixes. The issue closes when all its units pass — everything else is small fix lane.
+
+---
+
+## References
+
+`references/review/adversarial-review.md` — load when probing interaction bugs, state transitions, wiring gaps, or multi-entity scenarios. Suspends the "no speculation" rule: surface candidate bugs, let the user triage.

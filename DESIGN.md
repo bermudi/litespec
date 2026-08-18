@@ -53,9 +53,12 @@ you: "add X" -> plan[fuzzy] (read code, ask 2-3 questions, no files — referenc
           -> plan[clear] (write GH issue: proposal + design + units with Verify; also draft spec if load-bearing — references/clear.md)
           -> you: "looks good" or "grill-me" (references/grilling.md)
           -> build: one unit at a time (see unit rule)
-          -> review
+          -> review: triage findings into lanes
+          -> fix per lane (rebuild unit via build, or small fix lane)
           -> close GH issue
 ```
+
+Review triages findings structurally: CRITICAL breaking a unit's `Done means:`/`Verify:` → uncheck box, rebuild via `build` (scope expands — fix the pattern, not just the line). Everything else → small fix lane. No fix skill, no finding tracker — findings route to existing tracking (unit checkboxes) or get fixed immediately.
 
 `grill-me` is a skill reference, not a CLI. `plan` owns spec drafting in clear mode: if the feature is load-bearing, it writes/updates `specs/<feature>/spec.md` alongside the issue.
 
@@ -122,7 +125,7 @@ No `litespec decide` command. `touch` + `validate` is enough.
 |-------|------|
 | plan | turn intent into bounded GH issue (+ spec). Fuzzy vs clear are references |
 | build | implement one unit, satisfy Verify |
-| review | adversarial check, report findings |
+| review | adversarial check, triage findings into lanes |
 
 `litespec-plan` references (load only when branch applies, distilled from AgenticWiki — no links, no theory):
 - `references/fuzzy.md` — half-baked idea, questions, research/spike, no files yet
@@ -130,6 +133,12 @@ No `litespec decide` command. `touch` + `validate` is enough.
 - `references/grilling.md` — `grill-me` or shape still fuzzy
 - `references/codebase-design.md` — thin vertical slice, reuse existing path, smallest coherent change (distilled from tracer bullets / vertical slices / infrastructure blindness / over-engineering)
 - `references/domain-modeling.md` — new ubiquitous term -> glossary
+
+`litespec-build` references:
+- `references/build/review-fixing.md` — rebuilding a unit that review reopened. Scope expands: fix the pattern, not just the cited line
+
+`litespec-review` references:
+- `references/review/adversarial-review.md` — constructing adversarial scenarios for interaction bugs, state transitions, wiring gaps
 
 No alias for `think`. Add if dogfooding shows we miss it. Detail lives in `references/` only when that branch applies — borrow grill/domain ideas from mattpocock/skills on our terms.
 

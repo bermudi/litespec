@@ -46,7 +46,8 @@ you: "add X" -> plan[fuzzy] (read code, ask 2-3 questions, no files — referenc
           -> plan[clear] (write GH issue: proposal + design + units with Verify; also draft spec if load-bearing — references/clear.md)
           -> you: "looks good" or "grill-me" (references/grilling.md)
           -> build: one unit at a time (see unit rule)
-          -> review
+          -> review: triage findings into lanes
+          -> fix per lane
           -> close GH issue
 ```
 
@@ -54,8 +55,18 @@ you: "add X" -> plan[fuzzy] (read code, ask 2-3 questions, no files — referenc
 - `plan[clear]` materializes the GH issue (proposal + design + queue) + draft spec if load-bearing
 - `grill-me` is a skill reference, not a CLI
 - `build` implements one unit per session, satisfies Done means + Verify (Verify must fail without outcome), checks box, commits, stops
-- `review` is adversarial — context-aware check of GH issue + spec vs implementation
+- `review` is adversarial — context-aware check of GH issue + spec vs implementation, then triages findings into lanes (see below)
 - GH issue is the queue: each unit is `## <outcome>` with `Done means:` and `Verify:` and status checkbox
+
+**Review triage — routing findings to lanes:**
+Review reports findings + verdict (`PASS` | `CHANGES REQUESTED`), then routes each finding:
+- **CRITICAL breaking a unit's `Done means:`/`Verify:`** → unit is not done. Uncheck its box, rebuild via `build` (loads `references/build/review-fixing.md` — scope expands, fix the pattern not just the line). Issue stays open until all units re-pass.
+- **CRITICAL/WARNING outside any unit's contract** (neighboring code, help text, stale decision, drive-by) → small fix lane. No unit, no issue reopen.
+- **SUGGESTION** → small fix lane, user's discretion. Not blocking.
+- **"needs decision"** → create decision in `specs/decisions/` first, then route the fix per the two rules above.
+- **Shape was wrong** → `plan`, not a fix.
+
+Do not invent units for non-unit findings. Do not reopen the issue for small fixes. The issue closes when all its units pass.
 
 ## Key Design Decisions
 
@@ -71,6 +82,7 @@ These came from deliberate debate. Respect the reasoning:
 - **Direct spec edits** — no ADDED/MODIFIED delta flow. Edit `specs/<feature>/spec.md` directly. Preserve SHALL/MUST + WHEN/THEN but drop delta merge complexity
 - **No `canon/`, `backlog.md` in lean** — GH issues is the backlog, `specs/<feature>/spec.md` is the durable spec when needed
 - **Validate structure, not semantics** — the CLI validates structural contracts (syntax, references, spec format). Do not encode heuristic checks that compensate for model limitations. If a model gap bites repeatedly, fix the prompt in the relevant skill — that scales with model capability
+- **Review triages into existing lanes** — no fix skill, no 4th concept. Review routes each finding structurally: does it cite a unit's `Done means:`/`Verify:`? If yes → rebuild that unit (uncheck box, `build` with scope expansion). If no → small fix lane. Findings are ephemeral — they route to existing tracking (unit checkboxes) or get fixed immediately. No finding tracker, no `tasks.md`
 
 ## Working Conventions
 
