@@ -45,42 +45,42 @@ Verify:
 `
 
 	t.Run("well-formed fixture passes", func(t *testing.T) {
-		issues := ValidateQueueBody(wellFormed, source)
+		_, issues := ValidateQueueBody(wellFormed, source)
 		if len(issues) > 0 {
 			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
 		}
 	})
 
 	t.Run("missing Done means", func(t *testing.T) {
-		issues := ValidateQueueBody(missingDoneMeans, source)
+		_, issues := ValidateQueueBody(missingDoneMeans, source)
 		if !containsIssue(issues, "missing Done means:") {
 			t.Fatalf("expected error containing 'missing Done means:', got %v", issues)
 		}
 	})
 
 	t.Run("missing Verify", func(t *testing.T) {
-		issues := ValidateQueueBody(missingVerify, source)
+		_, issues := ValidateQueueBody(missingVerify, source)
 		if !containsIssue(issues, "missing Verify:") {
 			t.Fatalf("expected error containing 'missing Verify:', got %v", issues)
 		}
 	})
 
 	t.Run("Verify without fenced block", func(t *testing.T) {
-		issues := ValidateQueueBody(missingFence, source)
+		_, issues := ValidateQueueBody(missingFence, source)
 		if !containsIssue(issues, "not followed by fenced code block") {
 			t.Fatalf("expected error containing 'not followed by fenced code block', got %v", issues)
 		}
 	})
 
 	t.Run("missing checkbox", func(t *testing.T) {
-		issues := ValidateQueueBody(missingCheckbox, source)
+		_, issues := ValidateQueueBody(missingCheckbox, source)
 		if !containsIssue(issues, "missing checkbox") {
 			t.Fatalf("expected error containing 'missing checkbox', got %v", issues)
 		}
 	})
 
 	t.Run("empty heading", func(t *testing.T) {
-		issues := ValidateQueueBody(emptyHeading, source)
+		_, issues := ValidateQueueBody(emptyHeading, source)
 		if !containsIssue(issues, "empty unit heading") {
 			t.Fatalf("expected error containing 'empty unit heading', got %v", issues)
 		}
@@ -101,7 +101,7 @@ Verify:
 Verify:
 ` + "```\necho bad\n```\n" + `- [ ] pending
 `
-		issues := ValidateQueueBody(body, source)
+		_, issues := ValidateQueueBody(body, source)
 		if len(issues) != 1 {
 			t.Fatalf("expected 1 error for the malformed unit, got %d: %v", len(issues), issues)
 		}
@@ -115,7 +115,7 @@ Verify:
 More design text.
 
 ` + wellFormed
-		issues := ValidateQueueBody(body, source)
+		_, issues := ValidateQueueBody(body, source)
 		if len(issues) > 0 {
 			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
 		}
@@ -131,7 +131,7 @@ Done means: something works
 Verify:
 ` + "```bash\necho \"unclosed\n```\n" + `- [ ] pending
 `
-		issues := ValidateQueueBody(body, source)
+		_, issues := ValidateQueueBody(body, source)
 		if len(issues) == 0 {
 			t.Fatalf("expected an error, got none")
 		}
@@ -155,7 +155,7 @@ Done means: something works
 Verify:
 ` + "```bash\necho hello\n```\n" + `- [ ] pending
 `
-		issues := ValidateQueueBody(body, source)
+		_, issues := ValidateQueueBody(body, source)
 		if len(issues) > 0 {
 			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
 		}
@@ -171,7 +171,7 @@ Done means: something works
 Verify:
 ` + "```bash\necho hello\n```\n" + `- [ ] pending
 `
-		issues := ValidateQueueBody(body, source)
+		_, issues := ValidateQueueBody(body, source)
 		if len(issues) == 0 {
 			t.Fatalf("expected a warning, got none")
 		}
@@ -193,7 +193,7 @@ Done means: something works
 Verify:
 ` + "```bash\n```\n" + `- [ ] pending
 `
-		issues = ValidateQueueBody(emptyBody, source)
+		_, issues = ValidateQueueBody(emptyBody, source)
 		if len(issues) == 0 {
 			t.Fatalf("expected an error for empty block, got none")
 		}

@@ -58,8 +58,9 @@ func ValidateGHIssueQueues(root string) (*ValidationResult, error) {
 
 	for _, issue := range issues {
 		source := fmt.Sprintf("GH issue #%d", issue.Number)
-		result.UnitsCount += countQueueUnits(issue.Body)
-		for _, iss := range ValidateQueueBody(issue.Body, source) {
+		units, unitIssues := ValidateQueueBody(issue.Body, source)
+		result.UnitsCount += len(units)
+		for _, iss := range unitIssues {
 			if iss.Severity == SeverityWarning {
 				result.Warnings = append(result.Warnings, iss)
 			} else {
@@ -70,10 +71,6 @@ func ValidateGHIssueQueues(root string) (*ValidationResult, error) {
 
 	result.Valid = len(result.Errors) == 0
 	return result, nil
-}
-
-func countQueueUnits(body string) int {
-	return len(parseQueueUnits(body))
 }
 
 func parseQueueUnits(body string) []queueUnit {
@@ -137,7 +134,7 @@ func lintVerifyShell(block string, source string, unitHeading string) []Validati
 	return nil
 }
 
-func ValidateQueueBody(body string, source string) []ValidationIssue {
+func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIssue) {
 	units := parseQueueUnits(body)
 	var issues []ValidationIssue
 
@@ -215,7 +212,7 @@ func ValidateQueueBody(body string, source string) []ValidationIssue {
 		}
 	}
 
-	return issues
+	return units, issues
 }
 
 func ValidateGHIssueByNumber(root string, number int) (*ValidationResult, error) {
@@ -240,8 +237,9 @@ func ValidateGHIssueByNumber(root string, number int) (*ValidationResult, error)
 	}
 
 	source := fmt.Sprintf("GH issue #%d", issue.Number)
-	result.UnitsCount += countQueueUnits(issue.Body)
-	for _, iss := range ValidateQueueBody(issue.Body, source) {
+	units, unitIssues := ValidateQueueBody(issue.Body, source)
+	result.UnitsCount += len(units)
+	for _, iss := range unitIssues {
 		if iss.Severity == SeverityWarning {
 			result.Warnings = append(result.Warnings, iss)
 		} else {
@@ -260,8 +258,9 @@ func ValidateQueueFile(path string) (*ValidationResult, error) {
 
 	result := &ValidationResult{Valid: true}
 	source := fmt.Sprintf("queue file %s", path)
-	result.UnitsCount += countQueueUnits(string(body))
-	for _, iss := range ValidateQueueBody(string(body), source) {
+	units, unitIssues := ValidateQueueBody(string(body), source)
+	result.UnitsCount += len(units)
+	for _, iss := range unitIssues {
 		if iss.Severity == SeverityWarning {
 			result.Warnings = append(result.Warnings, iss)
 		} else {
