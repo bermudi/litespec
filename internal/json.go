@@ -24,6 +24,7 @@ type ValidationSummaryJSON struct {
 	Requirements int `json:"requirements"`
 	Scenarios    int `json:"scenarios"`
 	Decisions    int `json:"decisions,omitempty"`
+	Units        int `json:"units,omitempty"`
 }
 
 func BuildValidationResultJSON(r *ValidationResult) ValidationResultJSON {
@@ -46,6 +47,7 @@ func BuildValidationResultJSON(r *ValidationResult) ValidationResultJSON {
 			Requirements: r.RequirementsCount,
 			Scenarios:    r.ScenariosCount,
 			Decisions:    r.DecisionsCount,
+			Units:        r.UnitsCount,
 		},
 	}
 }

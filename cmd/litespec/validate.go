@@ -11,6 +11,7 @@ import (
 type validateMinimalJSON struct {
 	Valid  bool     `json:"valid"`
 	Errors []string `json:"errors,omitempty"`
+	Units  int      `json:"units,omitempty"`
 }
 
 func cmdValidate(args []string) error {
@@ -170,7 +171,7 @@ func cmdValidate(args []string) error {
 	out := internal.BuildValidationResultJSON(result)
 
 	// Build minimal JSON representation
-	minJSON := validateMinimalJSON{Valid: out.Valid}
+	minJSON := validateMinimalJSON{Valid: out.Valid, Units: result.UnitsCount}
 	for _, e := range out.Errors {
 		minJSON.Errors = append(minJSON.Errors, e.Message)
 	}
@@ -185,10 +186,11 @@ func cmdValidate(args []string) error {
 	} else if strict && len(result.Warnings) > 0 {
 		minimalText = fmt.Sprintf("invalid\t%d warnings (strict)\n", len(result.Warnings))
 	} else {
-		minimalText = fmt.Sprintf("ok\t%d %s, %d %s, %d %s\n",
+		minimalText = fmt.Sprintf("ok\t%d %s, %d %s, %d %s, %d %s\n",
 			result.CapabilitiesCount, pluralize("capability", result.CapabilitiesCount),
 			result.RequirementsCount, pluralize("requirement", result.RequirementsCount),
-			result.ScenariosCount, pluralize("scenario", result.ScenariosCount))
+			result.ScenariosCount, pluralize("scenario", result.ScenariosCount),
+			result.UnitsCount, pluralize("unit", result.UnitsCount))
 	}
 
 	// Build text representation
@@ -200,10 +202,11 @@ func cmdValidate(args []string) error {
 		text += fmt.Sprintf("WARN   %s: %s\n", issue.File, issue.Message)
 	}
 	if result.Valid {
-		text += fmt.Sprintf("ok: %d %s, %d %s, %d %s\n",
+		text += fmt.Sprintf("ok: %d %s, %d %s, %d %s, %d %s\n",
 			result.CapabilitiesCount, pluralize("capability", result.CapabilitiesCount),
 			result.RequirementsCount, pluralize("requirement", result.RequirementsCount),
-			result.ScenariosCount, pluralize("scenario", result.ScenariosCount))
+			result.ScenariosCount, pluralize("scenario", result.ScenariosCount),
+			result.UnitsCount, pluralize("unit", result.UnitsCount))
 	}
 
 	if err := Render(Response{
@@ -224,7 +227,7 @@ func cmdValidate(args []string) error {
 func renderQueueResult(result *internal.ValidationResult, asJSON, asMinimal, strict bool) error {
 	out := internal.BuildValidationResultJSON(result)
 
-	minJSON := validateMinimalJSON{Valid: out.Valid}
+	minJSON := validateMinimalJSON{Valid: out.Valid, Units: result.UnitsCount}
 	for _, e := range out.Errors {
 		minJSON.Errors = append(minJSON.Errors, e.Message)
 	}

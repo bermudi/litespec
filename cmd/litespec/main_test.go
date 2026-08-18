@@ -1371,3 +1371,59 @@ func TestCLINewMinimalJSON(t *testing.T) {
 	}
 }
 
+func TestValidateSummaryIncludesUnits(t *testing.T) {
+	bin, root := setupCLITest(t)
+	createSpec(t, root, "foo")
+
+	queueDir := filepath.Join(root, "specs", "queues")
+	if err := os.MkdirAll(queueDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	queueContent := "## Add auth\nDone means: authentication is wired\nVerify:\n```bash\necho ok\n```\n- [ ] pending\n"
+	if err := os.WriteFile(filepath.Join(queueDir, "test.md"), []byte(queueContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("text", func(t *testing.T) {
+		out, code := runCLI(t, bin, root, "validate")
+		if code != 0 {
+			t.Fatalf("exit %d: %s", code, out)
+		}
+		if !strings.Contains(out, "1 unit") {
+			t.Errorf("expected text summary to contain '1 unit', got:\n%s", out)
+		}
+	})
+
+	t.Run("json", func(t *testing.T) {
+		out, code := runCLI(t, bin, root, "validate", "--all", "--json")
+		if code != 0 {
+			t.Fatalf("exit %d: %s", code, out)
+		}
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(out), &result); err != nil {
+			t.Fatalf("json: %v\n%s", err, out)
+		}
+		summary, ok := result["summary"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("expected summary object, got %v", result["summary"])
+		}
+		if got, want := summary["units"], float64(1); got != want {
+			t.Errorf("summary.units = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("minimal json", func(t *testing.T) {
+		out, code := runCLI(t, bin, root, "validate", "--all", "--minimal", "--json")
+		if code != 0 {
+			t.Fatalf("exit %d: %s", code, out)
+		}
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(out), &result); err != nil {
+			t.Fatalf("json: %v\n%s", err, out)
+		}
+		if got, want := result["units"], float64(1); got != want {
+			t.Errorf("units = %v, want %v", got, want)
+		}
+	})
+}
+
