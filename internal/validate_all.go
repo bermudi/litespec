@@ -42,6 +42,14 @@ func ValidateAll(root string, strict bool) (*ValidationResult, error) {
 		result.DecisionsCount += decResult.DecisionsCount
 	}
 
+	queueResult, err := ValidateGHIssueQueues(root)
+	if err != nil {
+		return nil, err
+	}
+	result.Errors = append(result.Errors, queueResult.Errors...)
+	result.Warnings = append(result.Warnings, queueResult.Warnings...)
+	result.UnitsCount += queueResult.UnitsCount
+
 	result.Valid = len(result.Errors) == 0
 	if strict && len(result.Warnings) > 0 {
 		result.Valid = false
