@@ -23,8 +23,8 @@ type ValidationSummaryJSON struct {
 	Capabilities int `json:"capabilities"`
 	Requirements int `json:"requirements"`
 	Scenarios    int `json:"scenarios"`
-	Decisions    int `json:"decisions,omitempty"`
-	Units        int `json:"units,omitempty"`
+	Decisions    int `json:"decisions"`
+	Units        int `json:"units"`
 }
 
 func BuildValidationResultJSON(r *ValidationResult) ValidationResultJSON {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"slices"
@@ -11,7 +12,6 @@ import (
 type validateMinimalJSON struct {
 	Valid  bool     `json:"valid"`
 	Errors []string `json:"errors,omitempty"`
-	Units  int      `json:"units,omitempty"`
 }
 
 func cmdValidate(args []string) error {
@@ -33,6 +33,24 @@ func cmdValidate(args []string) error {
 	ok, err := parseFlagSet(fs, args)
 	if !ok {
 		return err
+	}
+
+	issueSet := false
+	queueSet := false
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "issue":
+			issueSet = true
+		case "queue":
+			queueSet = true
+		}
+	})
+
+	if issueSet && issueNumber < 1 {
+		return fmt.Errorf("--issue must be a positive integer, got %d", issueNumber)
+	}
+	if queueSet && queuePath == "" {
+		return fmt.Errorf("--queue requires a non-empty path")
 	}
 
 	fsArgs := fs.Args()
@@ -59,11 +77,11 @@ func cmdValidate(args []string) error {
 		return fmt.Errorf("--type must be 'spec' or 'decision', got %q", typeFilter)
 	}
 
-	if issueNumber != 0 && queuePath != "" {
+	if issueSet && queueSet {
 		return fmt.Errorf("--issue and --queue are mutually exclusive")
 	}
 
-	if issueNumber != 0 || queuePath != "" {
+	if issueSet || queueSet {
 		if positional != "" {
 			return fmt.Errorf("--issue/--queue cannot be combined with a positional name")
 		}
@@ -154,9 +172,6 @@ func cmdValidate(args []string) error {
 			if err != nil {
 				return err
 			}
-			if strict && len(result.Warnings) > 0 {
-				result.Valid = false
-			}
 		} else if flagSpecs {
 			result, err = internal.ValidateSpecs(root)
 		} else {
@@ -171,7 +186,7 @@ func cmdValidate(args []string) error {
 	out := internal.BuildValidationResultJSON(result)
 
 	// Build minimal JSON representation
-	minJSON := validateMinimalJSON{Valid: out.Valid, Units: result.UnitsCount}
+	minJSON := validateMinimalJSON{Valid: out.Valid}
 	for _, e := range out.Errors {
 		minJSON.Errors = append(minJSON.Errors, e.Message)
 	}
@@ -234,7 +249,7 @@ func cmdValidate(args []string) error {
 func renderQueueResult(result *internal.ValidationResult, asJSON, asMinimal, strict bool) error {
 	out := internal.BuildValidationResultJSON(result)
 
-	minJSON := validateMinimalJSON{Valid: out.Valid, Units: result.UnitsCount}
+	minJSON := validateMinimalJSON{Valid: out.Valid}
 	for _, e := range out.Errors {
 		minJSON.Errors = append(minJSON.Errors, e.Message)
 	}

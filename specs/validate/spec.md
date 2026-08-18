@@ -23,7 +23,7 @@ The `litespec validate` command SHALL validate feature specs under `specs/<featu
 
 ### Requirement: GH Issue Queue Validation
 
-The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec` via `gh issue list` and lint each issue body as a queue. A unit is an `## <outcome>` heading; each unit SHALL have a non-empty heading, a `Done means:` line, a `Verify:` line immediately followed by a fenced code block, and a `- [ ]` or `- [x]` checkbox. Missing or malformed elements SHALL produce an error identifying the issue number and unit heading. Issues without the `litespec` label SHALL NOT be scanned. The `litespec` label is a hardcoded convention; no config file governs it.
+The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec` via `gh issue list` and lint each issue body as a queue. A unit is an `## <outcome>` heading; each unit SHALL have a non-empty heading, a `Done means:` line, a `Verify:` line followed by a fenced code block within the unit body, and a `- [ ]` or `- [x]` checkbox. Missing or malformed elements SHALL produce an error identifying the issue number and unit heading. Issues without the `litespec` label SHALL NOT be scanned. The `litespec` label is a hardcoded convention; no config file governs it.
 
 #### Scenario: Well-formed queue passes
 

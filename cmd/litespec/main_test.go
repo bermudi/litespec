@@ -1421,8 +1421,11 @@ func TestValidateSummaryIncludesUnits(t *testing.T) {
 		if err := json.Unmarshal([]byte(out), &result); err != nil {
 			t.Fatalf("json: %v\n%s", err, out)
 		}
-		if got, want := result["units"], float64(1); got != want {
-			t.Errorf("units = %v, want %v", got, want)
+		if _, present := result["units"]; present {
+			t.Errorf("minimal JSON must not include units, got: %v", result["units"])
+		}
+		if _, present := result["summary"]; present {
+			t.Errorf("minimal JSON must not include summary, got: %v", result["summary"])
 		}
 	})
 }
