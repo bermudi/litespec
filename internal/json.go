@@ -12,9 +12,10 @@ type ValidationResultJSON struct {
 }
 
 type ValidationIssueJSON struct {
-	Severity string `json:"severity"`
-	Message  string `json:"message"`
-	File     string `json:"file"`
+	Severity     string `json:"severity"`
+	Message      string `json:"message"`
+	File         string `json:"file"`
+	StrictExempt bool   `json:"strictExempt,omitempty"`
 }
 
 type ValidationSummaryJSON struct {
@@ -30,11 +31,11 @@ type ValidationSummaryJSON struct {
 func BuildValidationResultJSON(r *ValidationResult) ValidationResultJSON {
 	errors := make([]ValidationIssueJSON, len(r.Errors))
 	for i, e := range r.Errors {
-		errors[i] = ValidationIssueJSON{Severity: "error", Message: e.Message, File: e.File}
+		errors[i] = ValidationIssueJSON{Severity: "error", Message: e.Message, File: e.File, StrictExempt: e.StrictExempt}
 	}
 	warnings := make([]ValidationIssueJSON, len(r.Warnings))
 	for i, w := range r.Warnings {
-		warnings[i] = ValidationIssueJSON{Severity: "warning", Message: w.Message, File: w.File}
+		warnings[i] = ValidationIssueJSON{Severity: "warning", Message: w.Message, File: w.File, StrictExempt: w.StrictExempt}
 	}
 	return ValidationResultJSON{
 		Valid:    r.Valid,
