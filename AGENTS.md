@@ -27,7 +27,7 @@ The design emerged from a structured grilling session — question by question, 
 - **Specs** live in `specs/<feature>/spec.md` — only load-bearing contracts (SHALL/MUST + WHEN/THEN). No `canon/` — edit the file directly
 - **Decisions** live in `specs/decisions/` as `NNNN-<slug>.md` — durable rulings with `spine: true` for load-bearing. Created via `touch` + `validate`, not a CLI
 - **Glossary** lives in `specs/glossary.md` — ubiquitous language, curated, optional but recommended. Managed via plan skill, graceful degradation if absent
-- **GH issues are the change/queue** — GH issue body holds proposal + design + queue (units with Done means + Verify). GH issue is the queue, 64k limit, no overflow. No offline fallback — `--issue` is required for `litespec new`
+- **GH issues are the change/queue** — GH issue body holds proposal + design + queue (units with Done means + Verify). GH issue is the queue, 64k limit, no overflow. Offline fallback via `specs/queues/<name>.md` when `gh` unavailable; `--issue` required for `litespec new` to link to GH
 - **Units** — one demo-able outcome per `##` with `Done means:` and `Verify:` that must fail without the outcome. Built one at a time, ticked via checkbox. No `tasks.md`
 - **Two lanes** — small fix (zero ceremony, no issue required) vs new feature (plan fuzzy -> clear -> grill-me -> build -> review -> close issue)
 - **Skills** are generated into `.agents/skills/` (canonical). Only three: `litespec-plan` (fuzzy/clear + grilling/codebase-design/domain-modeling), `litespec-build` (one unit at a time), `litespec-review` (adversarial). Nearly all agents discover `.agents/skills/` natively; Claude Code via symlink in `.claude/skills/`. `litespec-plan` has fuzzy mode for half-baked ideas and clear mode to nail the GH issue. Project-specific skills (`skill-creator`, `the-drill`) are tracked directly in git — NOT generated
@@ -64,10 +64,12 @@ These came from deliberate debate. Respect the reasoning:
 - **Convention over configuration** — no config files unless a concrete need arises. OpenSpec ships a stub config.yaml that nobody fills in. We skip it entirely until needed. Tool adapters are auto-detected by scanning for symlinks in adapter skill directories (e.g., `.claude/skills/`) that point into `.agents/skills/`
 - **`.agents/skills/` is canonical** — one source of truth, discovered natively by nearly every AI coding agent. `--tools claude` creates symlinks in `.claude/skills/` as the only exception (Claude Code does not read `.agents/`). No other tool-specific adapters are needed
 - **Lean skills** — minimal token usage. Each skill is focused instructions, not pages of boilerplate. 3 skills only: plan (fuzzy/clear), build (one unit), review (adversarial). Progressive disclosure via `references/` — detail lives there only when branch applies
-- **GH issue is the queue/change** — proposal + design + queue live in the issue body, not `specs/changes/` or `QUEUE.md`. Keeps what doesn't rot, drops ceremony. Small fix needs no issue at all
+- **GH issue is the queue/change** — proposal + design + queue live in the issue body, not `QUEUE.md`. Keeps what doesn't rot, drops ceremony. Small fix needs no issue at all
+- **`litespec` label marks queue issues** — hardcoded convention, no config. `validate` scans open issues with this label; `view` filters to it. `plan[clear]` instructs adding the label when creating the issue
+- **Local queue fallback** — `specs/queues/<name>.md` mirrors the GH issue 1:1 when `gh` is unavailable. `<name>` comes from `litespec new <name> --issue N`. Handles multi-feature changes
 - **Unit = demo + failing Verify** — one thing you can demo + one Verify that would fail if missing. `build` must satisfy Verify before claiming done
 - **Direct spec edits** — no ADDED/MODIFIED delta flow. Edit `specs/<feature>/spec.md` directly. Preserve SHALL/MUST + WHEN/THEN but drop delta merge complexity
-- **No `canon/`, `backlog.md`, `specs/changes/` in lean** — GH issues is the backlog, `specs/<feature>/spec.md` is the durable spec when needed
+- **No `canon/`, `backlog.md` in lean** — GH issues is the backlog, `specs/<feature>/spec.md` is the durable spec when needed
 - **Validate structure, not semantics** — the CLI validates structural contracts (syntax, references, spec format). Do not encode heuristic checks that compensate for model limitations. If a model gap bites repeatedly, fix the prompt in the relevant skill — that scales with model capability
 
 ## Working Conventions

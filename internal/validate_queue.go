@@ -3,7 +3,9 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -168,4 +170,53 @@ func ValidateQueueBody(body string, source string) []ValidationIssue {
 	}
 
 	return issues
+}
+
+func ValidateGHIssueByNumber(root string, number int) (*ValidationResult, error) {
+	result := &ValidationResult{Valid: true}
+
+	if _, err := exec.LookPath("gh"); err != nil {
+		return nil, fmt.Errorf("gh not available")
+	}
+
+	gitCmd := exec.Command("git", "config", "--get", "remote.origin.url")
+	gitCmd.Dir = root
+	gitOut, err := gitCmd.Output()
+	if err != nil || !strings.Contains(string(gitOut), "github.com") {
+		return nil, fmt.Errorf("not a GitHub repository")
+	}
+
+	cmd := exec.Command("gh", "issue", "view", strconv.Itoa(number),
+		"--json", "number,title,body,url",
+	)
+	cmd.Dir = root
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("gh issue view %d failed: %w", number, err)
+	}
+
+	var issue ghIssue
+	if err := json.Unmarshal(out, &issue); err != nil {
+		return nil, fmt.Errorf("parse gh issue: %w", err)
+	}
+
+	source := fmt.Sprintf("GH issue #%d", issue.Number)
+	result.UnitsCount += countQueueUnits(issue.Body)
+	result.Errors = append(result.Errors, ValidateQueueBody(issue.Body, source)...)
+	result.Valid = len(result.Errors) == 0
+	return result, nil
+}
+
+func ValidateQueueFile(path string) (*ValidationResult, error) {
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &ValidationResult{Valid: true}
+	source := fmt.Sprintf("queue file %s", path)
+	result.UnitsCount += countQueueUnits(string(body))
+	result.Errors = append(result.Errors, ValidateQueueBody(string(body), source)...)
+	result.Valid = len(result.Errors) == 0
+	return result, nil
 }

@@ -8,10 +8,17 @@ import (
 	"github.com/bermudi/litespec/internal"
 )
 
+type validateMinimalJSON struct {
+	Valid  bool     `json:"valid"`
+	Errors []string `json:"errors,omitempty"`
+}
+
 func cmdValidate(args []string) error {
 	fs := newFlagSet("validate", printValidateHelp)
 	var flagAll, flagSpecs, flagDecisions, strict, asJSON, asMinimal bool
 	var typeFilter string
+	var issueNumber int
+	var queuePath string
 	fs.BoolVar(&flagAll, "all", false, "validate all specs and decisions")
 	fs.BoolVar(&flagSpecs, "specs", false, "validate all specs only")
 	fs.BoolVar(&flagDecisions, "decisions", false, "validate all decisions only")
@@ -19,6 +26,8 @@ func cmdValidate(args []string) error {
 	fs.StringVar(&typeFilter, "type", "", "disambiguate name: spec|decision")
 	fs.BoolVar(&asJSON, "json", false, "output as JSON")
 	fs.BoolVar(&asMinimal, "minimal", false, "minimal output")
+	fs.IntVar(&issueNumber, "issue", 0, "fetch and validate a single GH issue by number")
+	fs.StringVar(&queuePath, "queue", "", "validate a single local queue markdown file")
 
 	ok, err := parseFlagSet(fs, args)
 	if !ok {
@@ -47,6 +56,39 @@ func cmdValidate(args []string) error {
 
 	if typeFilter != "" && typeFilter != "spec" && typeFilter != "decision" {
 		return fmt.Errorf("--type must be 'spec' or 'decision', got %q", typeFilter)
+	}
+
+	if issueNumber != 0 && queuePath != "" {
+		return fmt.Errorf("--issue and --queue are mutually exclusive")
+	}
+
+	if issueNumber != 0 || queuePath != "" {
+		if positional != "" {
+			return fmt.Errorf("--issue/--queue cannot be combined with a positional name")
+		}
+		if hasBulk {
+			return fmt.Errorf("--issue/--queue cannot be combined with bulk flags")
+		}
+		if typeFilter != "" {
+			return fmt.Errorf("--issue/--queue cannot be combined with --type")
+		}
+
+		root, err := requireProjectRootWithStaleCheck()
+		if err != nil {
+			return err
+		}
+
+		var result *internal.ValidationResult
+		if issueNumber != 0 {
+			result, err = internal.ValidateGHIssueByNumber(root, issueNumber)
+		} else {
+			result, err = internal.ValidateQueueFile(queuePath)
+		}
+		if err != nil {
+			return err
+		}
+
+		return renderQueueResult(result, asJSON, asMinimal, strict)
 	}
 
 	root, err := requireProjectRootWithStaleCheck()
@@ -128,10 +170,6 @@ func cmdValidate(args []string) error {
 	out := internal.BuildValidationResultJSON(result)
 
 	// Build minimal JSON representation
-	type validateMinimalJSON struct {
-		Valid  bool     `json:"valid"`
-		Errors []string `json:"errors,omitempty"`
-	}
 	minJSON := validateMinimalJSON{Valid: out.Valid}
 	for _, e := range out.Errors {
 		minJSON.Errors = append(minJSON.Errors, e.Message)
@@ -166,6 +204,54 @@ func cmdValidate(args []string) error {
 			result.CapabilitiesCount, pluralize("capability", result.CapabilitiesCount),
 			result.RequirementsCount, pluralize("requirement", result.RequirementsCount),
 			result.ScenariosCount, pluralize("scenario", result.ScenariosCount))
+	}
+
+	if err := Render(Response{
+		Full:        out,
+		Minimal:     minJSON,
+		Text:        text,
+		MinimalText: minimalText,
+	}, asJSON, asMinimal); err != nil {
+		return err
+	}
+
+	if !result.Valid || (strict && len(result.Warnings) > 0) {
+		return fmt.Errorf("validation failed")
+	}
+	return nil
+}
+
+func renderQueueResult(result *internal.ValidationResult, asJSON, asMinimal, strict bool) error {
+	out := internal.BuildValidationResultJSON(result)
+
+	minJSON := validateMinimalJSON{Valid: out.Valid}
+	for _, e := range out.Errors {
+		minJSON.Errors = append(minJSON.Errors, e.Message)
+	}
+
+	var minimalText string
+	if !result.Valid {
+		minimalText = fmt.Sprintf("invalid\t%d errors\n", len(result.Errors))
+		for _, issue := range result.Errors {
+			minimalText += fmt.Sprintf("error\t%s\t%s\n", issue.File, issue.Message)
+		}
+	} else if strict && len(result.Warnings) > 0 {
+		minimalText = fmt.Sprintf("invalid\t%d warnings (strict)\n", len(result.Warnings))
+	} else {
+		minimalText = fmt.Sprintf("ok\t%d units\n", result.UnitsCount)
+	}
+
+	var text string
+	for _, issue := range result.Errors {
+		text += fmt.Sprintf("ERROR  %s: %s\n", issue.File, issue.Message)
+	}
+	for _, issue := range result.Warnings {
+		text += fmt.Sprintf("WARN   %s: %s\n", issue.File, issue.Message)
+	}
+	if result.Valid {
+		text += fmt.Sprintf("ok: %d units\n", result.UnitsCount)
+	} else {
+		text += fmt.Sprintf("invalid: %d errors\n", len(result.Errors))
 	}
 
 	if err := Render(Response{

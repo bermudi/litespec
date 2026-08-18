@@ -136,9 +136,9 @@ Examples:
 }
 
 func printValidateHelp() {
-	fmt.Print(`Usage: litespec validate [<name>] [--all|--specs|--decisions] [--type T] [--strict] [--json] [--minimal]
+	fmt.Print(`Usage: litespec validate [<name>|--all|--specs|--decisions|--issue N|--queue <path>] [--type T] [--strict] [--json] [--minimal]
 
-Validate specs and decisions.
+Validate specs, decisions, and queue.
 
 Arguments:
   <name>            Validate a specific spec or decision by name
@@ -147,6 +147,8 @@ Flags:
   --all             Validate all specs and decisions
   --specs           Validate all specs only
   --decisions       Validate all decisions only
+  --issue <N>       Fetch and validate a single GH issue by number
+  --queue <path>    Validate a single local queue markdown file
   --type <T>        Disambiguate name: spec|decision
   --strict          Treat warnings as errors
   --json            Output as JSON
@@ -158,6 +160,7 @@ Examples:
   litespec validate --all --strict
   litespec validate shared --type spec
   litespec validate --decisions
+  litespec validate --queue specs/queues/add-auth.md
 `)
 }
 

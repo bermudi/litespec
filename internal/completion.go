@@ -70,7 +70,32 @@ func CompletionScript(shell string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(data), nil
+	script := string(data)
+	if shell == "bash" {
+		script = strings.Replace(script, "{{CANDIDATES}}", allCompletionCandidates(), 1)
+	}
+	return script, nil
+}
+
+func allCompletionCandidates() string {
+	seen := make(map[string]bool)
+	var candidates []string
+	for _, c := range CommandSpecs {
+		if c.Hidden {
+			continue
+		}
+		if !seen[c.Name] {
+			seen[c.Name] = true
+			candidates = append(candidates, c.Name)
+		}
+		for _, f := range c.Flags {
+			if !seen[f.Name] {
+				seen[f.Name] = true
+				candidates = append(candidates, f.Name)
+			}
+		}
+	}
+	return strings.Join(candidates, " ")
 }
 
 var errInvalidShell = invalidShellError{}

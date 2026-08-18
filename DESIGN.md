@@ -27,7 +27,7 @@ project/
 Notes:
 - No `canon/`. `specs/<feature>/spec.md` is the durable spec when needed.
 - No `backlog.md`. GH issues is the backlog.
-- No `specs/changes/` and no `QUEUE.md` in v2 lean. GH issue body is proposal + design + queue.
+- No `QUEUE.md` in v2 lean. GH issue body is proposal + design + queue. Local queue fallback is `specs/queues/<name>.md` when `gh` is unavailable.
 
 ## What lives forever vs what gets deleted
 
@@ -141,7 +141,7 @@ Generated via `litespec update` from `internal/skill/templates/` (embed.FS). `.a
 |---------|---------|
 | `litespec init` | scaffold `specs/` + skills |
 | `litespec new <name> [--issue N]` | link to GH issue (no folder in lean) |
-| `litespec validate [--decisions]` | lint specs + decisions + GH issue queue format + Verify shell |
+| `litespec validate [--decisions] [--issue N] [--queue <path>]` | lint specs + decisions + GH issue queue (labeled litespec) + local specs/queues/ fallback + Verify shell (bash -n) |
 | `litespec view` | product + features + open GH issues (via `gh` if present) + decisions (spine starred) |
 | `litespec update` | regenerate skills |
 
@@ -152,11 +152,12 @@ No `patch`, `archive`, `decide`, `preview`, `import` until needed. Add when pain
 GH issue is the queue — the GH issue body is proposal + design + queue (64k limit, no overflow design needed).
 
 - GH issue body is proposal + design + queue. 64k limit — no overflow design needed.
-- `litespec new <name> --issue N` links to an existing issue; no `specs/changes/` folder in lean. `--issue` is required — no offline fallback.
+- The `litespec` label marks queue issues. `validate` scans open issues with this label; `view` filters to it.
+- `litespec new <name> --issue N` links to a GH issue; when `gh` is unavailable, `specs/queues/<name>.md` is the local fallback.
 - `view` auto-detects `gh` + GitHub remote. No config flag.
 
 ## Resolved for v2 lean
 
-- No `specs/changes/` in lean — GH issue is the change.
+- Local queue fallback at `specs/queues/<name>.md` when `gh` unavailable — mirrors the GH issue 1:1, handles multi-feature changes
 - Product flows: list explicitly in `product.md` (models + flows as lists).
 - `litespec new` starts as link only (`--issue N`), not auto-create. Add `gh issue create` later if needed.

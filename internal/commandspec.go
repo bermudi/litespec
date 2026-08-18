@@ -55,6 +55,8 @@ var CommandSpecs = []CommandSpec{
 			{Name: "--all", Description: "Validate all specs and decisions", TakesValue: false},
 			{Name: "--specs", Description: "Validate all specs only", TakesValue: false},
 			{Name: "--decisions", Description: "Validate all decisions only", TakesValue: false},
+			{Name: "--issue", Description: "Fetch and validate a single GH issue by number", TakesValue: true},
+			{Name: "--queue", Description: "Validate a single local queue markdown file", TakesValue: true},
 			{Name: "--strict", Description: "Treat warnings as errors", TakesValue: false},
 			{Name: "--json", Description: "Output as JSON", TakesValue: false},
 			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
