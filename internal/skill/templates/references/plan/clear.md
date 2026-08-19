@@ -7,11 +7,13 @@ Use when the idea is sharp and you need to nail the GH issue (+ spec if load-bea
 3. **Queue — one `##` per unit.** Each unit:
    ```
    ## <one demo-able outcome>
+   Depends: <other unit heading>, <another unit heading>
    Done means: <observable, human-checkable>
    Verify: `<command that fails without the outcome>`
    Status: pending
    ```
    `Verify:` must fail for a plausible state where the outcome is missing. A `go test` that doesn't check output is not a Verify.
+   `Depends:` is optional, references `##` headings in the same issue, comma-separated. A unit is unblocked when all its `Depends:` units are checked `- [x]`.
 
 4. **Spec if load-bearing.** If the feature is a promise that breaks things when wrong (CLI shape, API, file format), edit `specs/<feature>/spec.md` directly in the same change — not a delta. Keep to 3-5 SHALL requirements, each with a WHEN/THEN scenario.
 

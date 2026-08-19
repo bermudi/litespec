@@ -559,3 +559,68 @@ func TestValidateGHIssueQueues_JSONParseFailureWarns(t *testing.T) {
 		}
 	}
 }
+
+func TestQueueDepends(t *testing.T) {
+	source := "GH issue #1"
+
+	unit := func(heading, depends, done string) string {
+		dep := ""
+		if depends != "" {
+			dep = "Depends: " + depends + "\n"
+		}
+		return "## " + heading + "\n" +
+			dep +
+			"Done means: " + done + "\n" +
+			"Verify:\n" + "```bash\necho " + heading + "\n```\n" +
+			"- [ ] pending\n"
+	}
+
+	t.Run("Depends parsing", func(t *testing.T) {
+		body := unit("Unit A", "Foo, Bar", "something") + "\n" +
+			unit("Foo", "", "foo works") + "\n" +
+			unit("Bar", "", "bar works")
+		units, issues := ValidateQueueBody(body, source)
+		if len(issues) > 0 {
+			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
+		}
+		if len(units) != 3 {
+			t.Fatalf("expected 3 units, got %d", len(units))
+		}
+		if len(units[0].Depends) != 2 || units[0].Depends[0] != "Foo" || units[0].Depends[1] != "Bar" {
+			t.Fatalf("expected Depends [Foo Bar], got %v", units[0].Depends)
+		}
+	})
+
+	t.Run("dangling reference", func(t *testing.T) {
+		body := unit("Unit A", "Nonexistent", "something") + "\n" + unit("Real Unit", "", "real works")
+		_, issues := ValidateQueueBody(body, source)
+		if !containsIssue(issues, "depends on non-existent unit") {
+			t.Fatalf("expected error for dangling dependency, got %v", issues)
+		}
+	})
+
+	t.Run("valid reference", func(t *testing.T) {
+		body := unit("Unit A", "Existing Unit", "something") + "\n" + unit("Existing Unit", "", "existing works")
+		_, issues := ValidateQueueBody(body, source)
+		if len(issues) > 0 {
+			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
+		}
+	})
+
+	t.Run("no Depends passes", func(t *testing.T) {
+		_, issues := ValidateQueueBody(unit("Unit A", "", "something"), source)
+		if len(issues) > 0 {
+			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
+		}
+	})
+
+	t.Run("multiple valid", func(t *testing.T) {
+		body := unit("Unit A", "First Unit, Second Unit", "something") + "\n" +
+			unit("First Unit", "", "first works") + "\n" +
+			unit("Second Unit", "", "second works")
+		_, issues := ValidateQueueBody(body, source)
+		if len(issues) > 0 {
+			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
+		}
+	})
+}

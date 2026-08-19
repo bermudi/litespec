@@ -14,7 +14,7 @@ If the GH issue has no `## <outcome>` with `Done means:`/`Verify:`, stop — ask
 
 ## One unit per session
 
-1. Pick the first unchecked unit in the GH issue (top to bottom).
+1. Pick the first unchecked AND unblocked unit in the GH issue (top to bottom). A unit is unblocked when all its `Depends:` units are checked `- [x]`. Units without `Depends:` are always unblocked.
 2. Implement it — smallest coherent change. Extend the existing path, don't add a parallel one. No speculative abstraction.
 3. Run its `Verify:` yourself. It must pass. If it doesn't fail without the outcome, strengthen it before claiming done.
 4. Check the box in the issue (`- [x]`), commit with the Verify output in the message.

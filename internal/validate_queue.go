@@ -20,6 +20,7 @@ type ghIssue struct {
 type queueUnit struct {
 	Heading string
 	Body    []string
+	Depends []string
 }
 
 func ValidateGHIssueQueues(root string) (*ValidationResult, error) {
@@ -167,6 +168,24 @@ func isUnit(unit queueUnit) bool {
 	return false
 }
 
+func parseDepends(body []string) []string {
+	var deps []string
+	for _, line := range body {
+		if !strings.HasPrefix(line, "Depends:") {
+			continue
+		}
+		rest := strings.TrimSpace(line[len("Depends:"):])
+		for _, part := range strings.Split(rest, ",") {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				deps = append(deps, part)
+			}
+		}
+		break
+	}
+	return deps
+}
+
 func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIssue) {
 	all := parseQueueUnits(body)
 	units := make([]queueUnit, 0, len(all))
@@ -253,6 +272,30 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 				Message:  fmt.Sprintf("%s: unit %q missing checkbox", source, unit.Heading),
 				File:     source,
 			})
+		}
+	}
+
+	headings := make(map[string]bool, len(units))
+	for _, u := range units {
+		headings[u.Heading] = true
+	}
+
+	for i := range units {
+		deps := parseDepends(units[i].Body)
+		units[i].Depends = deps
+		seen := make(map[string]bool, len(deps))
+		for _, dep := range deps {
+			if seen[dep] {
+				continue
+			}
+			seen[dep] = true
+			if !headings[dep] {
+				issues = append(issues, ValidationIssue{
+					Severity: SeverityError,
+					Message:  fmt.Sprintf("%s: unit %q depends on non-existent unit %q", source, units[i].Heading, dep),
+					File:     source,
+				})
+			}
 		}
 	}
 

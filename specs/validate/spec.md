@@ -55,6 +55,33 @@ The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec
 - **WHEN** a labeled issue body contains `## Proposal`, `## Design`, and `## Spec draft` sections alongside `## <outcome>` units
 - **THEN** validate lints only the units and reports no errors for the prose sections
 
+### Requirement: Queue Unit Depends Validation
+
+A unit MAY include a `Depends:` line listing comma-separated `##` heading references.
+`validate` SHALL parse `Depends:` and check each reference matches a `##` heading in the same queue.
+A dangling reference (heading not found) SHALL produce an error naming the unit and the missing dependency.
+`Depends:` is optional; units without it SHALL pass.
+
+#### Scenario: Valid Depends passes
+
+- **WHEN** a unit has `Depends: <existing unit heading>`
+- **THEN** validation succeeds
+
+#### Scenario: Dangling Depends fails
+
+- **WHEN** a unit has `Depends: <non-existent heading>`
+- **THEN** validation reports an error naming the unit and the missing dependency
+
+#### Scenario: No Depends passes
+
+- **WHEN** a unit has no `Depends:` line
+- **THEN** validation succeeds
+
+#### Scenario: Multiple Depends all valid passes
+
+- **WHEN** a unit has `Depends: <heading1>, <heading2>` and both headings exist as units
+- **THEN** validation succeeds
+
 ### Requirement: Verify Shell Syntax Lint
 
 For each unit's `Verify:` fenced code block, validate SHALL run `bash -n` on the block contents and report any syntax error as a validation error identifying the issue number, unit heading, and shell error text. An inline `Verify:` command (backtick command on the `Verify:` line) SHALL be accepted as non-empty content and is not shell-linted, since inline Verify lines may mix commands with prose code references. If `bash` is not on `PATH`, validate SHALL emit a warning per fenced block (not an error) and check only that the block is non-empty. Validate SHALL NOT execute the Verify command.
