@@ -49,9 +49,9 @@ You say "fix typo" -> agent reads product + relevant spec + decisions/glossary -
 
 **New feature / greenfield (plan fuzzy -> clear):**
 ```
-you: "add X" -> plan[fuzzy] (read code, ask 2-3 questions, no files — references/fuzzy.md)
+you: "add X" -> plan[fuzzy] (read code, grill by default — references/fuzzy.md loads references/grilling.md; no files)
           -> plan[clear] (write GH issue: proposal + design + units with Verify; also draft spec if load-bearing — references/clear.md)
-          -> you: "looks good" or "grill-me" (references/grilling.md)
+          -> you: "looks good" (grilling happened in fuzzy) or "grill-me" (more grilling with references/grilling.md)
           -> build: one unit at a time (see unit rule)
           -> review: triage findings into lanes
           -> fix per lane (rebuild unit via build, or small fix lane)
@@ -128,9 +128,9 @@ No `litespec decide` command. `touch` + `validate` is enough.
 | review | adversarial check, triage findings into lanes |
 
 `litespec-plan` references (load only when branch applies, distilled from AgenticWiki — no links, no theory):
-- `references/fuzzy.md` — half-baked idea, questions, research/spike, no files yet
+- `references/fuzzy.md` — half-baked idea; grill by default with `references/grilling.md`, research/spike, no files yet
 - `references/clear.md` — sharp idea: write GH issue body (proposal+design+queue) + `specs/<feature>/spec.md` if load-bearing (owns the Verify rule)
-- `references/grilling.md` — `grill-me` or shape still fuzzy
+- `references/grilling.md` — default fuzzy process; also `grill-me` or unresolved branches
 - `references/codebase-design.md` — thin vertical slice, reuse existing path, smallest coherent change (distilled from tracer bullets / vertical slices / infrastructure blindness / over-engineering)
 - `references/domain-modeling.md` — new ubiquitous term -> glossary
 

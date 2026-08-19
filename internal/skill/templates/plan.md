@@ -20,7 +20,7 @@ Both are in this skill. Start in fuzzy. Load clear only when you can answer: "wh
 
 ## References — load only when branch applies
 
-- `references/grilling.md` — when shape is fuzzy or user says `grill-me`
+- `references/grilling.md` — default fuzzy process; also load when the user says `grill-me`
 - `references/codebase-design.md` — when planning a feature that touches boundaries/modules
 - `references/domain-modeling.md` — when a new ubiquitous term appears -> glossary
 - `references/fuzzy.md` — fuzzy mode
@@ -40,7 +40,7 @@ Derive a kebab-case change name from the description. Check for active changes w
 
 ## Fuzzy work
 
-Ask sharp questions, name unknowns, run a tiny spike if reading can't answer it. The spike is evidence, not production code. End with a one-paragraph rough shape and "ready to nail it?" — then load `clear.md`.
+Grill by default: load `references/grilling.md` and ask one question at a time to find the forks. Name unknowns, run a tiny spike if reading can't answer a question — the spike is evidence, not production code. End with a one-paragraph rough shape and "ready to nail it?" — then load `clear.md`.
 
 ---
 

@@ -29,8 +29,8 @@ The design emerged from a structured grilling session — question by question, 
 - **Glossary** lives in `specs/glossary.md` — ubiquitous language, curated, optional but recommended. Managed via plan skill, graceful degradation if absent
 - **GH issues are the change/queue** — GH issue body holds proposal + design + queue (units with Done means + Verify). GH issue is the queue, 64k limit, no overflow. Offline fallback via `specs/queues/<name>.md` when `gh` unavailable; `--issue` required for `litespec new` to link to GH
 - **Units** — one demo-able outcome per `##` with `Done means:` and `Verify:` that must fail without the outcome. Built one at a time, ticked via checkbox. No `tasks.md`
-- **Two lanes** — small fix (zero ceremony, no issue required) vs new feature (plan fuzzy -> clear -> grill-me -> build -> review -> close issue)
-- **Skills** are generated into `.agents/skills/` (canonical). Only three: `litespec-plan` (fuzzy/clear + grilling/codebase-design/domain-modeling), `litespec-build` (one unit at a time), `litespec-review` (adversarial). Nearly all agents discover `.agents/skills/` natively; Claude Code via symlink in `.claude/skills/`. `litespec-plan` has fuzzy mode for half-baked ideas and clear mode to nail the GH issue. Project-specific skills (`skill-creator`, `the-drill`) are tracked directly in git — NOT generated
+- **Two lanes** — small fix (zero ceremony, no issue required) vs new feature (plan fuzzy (grill by default) -> clear -> build -> review -> close issue)
+- **Skills** are generated into `.agents/skills/` (canonical). Only three: `litespec-plan` (fuzzy/grill/clear + codebase-design/domain-modeling), `litespec-build` (one unit at a time), `litespec-review` (adversarial). Nearly all agents discover `.agents/skills/` natively; Claude Code via symlink in `.claude/skills/`. `litespec-plan` has fuzzy mode (grill by default) for half-baked ideas and clear mode to nail the GH issue. Project-specific skills (`skill-creator`, `the-drill`) are tracked directly in git — NOT generated
 - **Scenarios** — each requirement has named scenarios (`#### Scenario: <name>`) with WHEN/THEN format. Load-bearing requirements must have at least one scenario. Body text must contain SHALL or MUST
 
 ## Workflow
@@ -42,18 +42,18 @@ You say "fix typo" -> agent reads product + relevant spec + decisions/glossary -
 
 **New feature / greenfield (plan fuzzy -> clear):**
 ```
-you: "add X" -> plan[fuzzy] (read code, ask 2-3 questions, no files — references/fuzzy.md)
+you: "add X" -> plan[fuzzy] (read code, grill by default — references/fuzzy.md loads references/grilling.md; no files)
           -> plan[clear] (write GH issue: proposal + design + units with Verify; also draft spec if load-bearing — references/clear.md)
-          -> you: "looks good" or "grill-me" (references/grilling.md)
+          -> you: "looks good" (grilling happened in fuzzy) or "grill-me" (more grilling with references/grilling.md)
           -> build: one unit at a time (see unit rule)
           -> review: triage findings into lanes
           -> fix per lane
           -> close GH issue
 ```
 
-- `plan[fuzzy]` is ephemeral — no files, questions/spike only
+- `plan[fuzzy]` is ephemeral — no files, grill/spike only
 - `plan[clear]` materializes the GH issue (proposal + design + queue) + draft spec if load-bearing
-- `grill-me` is a skill reference, not a CLI
+- `grill-me` is a skill reference, not a CLI. `references/fuzzy.md` loads `references/grilling.md` by default
 - `build` implements one unit per session, satisfies Done means + Verify (Verify must fail without outcome), checks box, commits, stops
 - `review` is adversarial — context-aware check of GH issue + spec vs implementation, then triages findings into lanes (see below)
 - GH issue is the queue: each unit is `## <outcome>` with `Done means:` and `Verify:` and status checkbox
@@ -74,7 +74,7 @@ These came from deliberate debate. Respect the reasoning:
 
 - **Convention over configuration** — no config files unless a concrete need arises. OpenSpec ships a stub config.yaml that nobody fills in. We skip it entirely until needed. Tool adapters are auto-detected by scanning for symlinks in adapter skill directories (e.g., `.claude/skills/`) that point into `.agents/skills/`
 - **`.agents/skills/` is canonical** — one source of truth, discovered natively by nearly every AI coding agent. `--tools claude` creates symlinks in `.claude/skills/` as the only exception (Claude Code does not read `.agents/`). No other tool-specific adapters are needed
-- **Lean skills** — minimal token usage. Each skill is focused instructions, not pages of boilerplate. 3 skills only: plan (fuzzy/clear), build (one unit), review (adversarial). Progressive disclosure via `references/` — detail lives there only when branch applies
+- **Lean skills** — minimal token usage. Each skill is focused instructions, not pages of boilerplate. 3 skills only: plan (fuzzy/grill/clear), build (one unit), review (adversarial). Progressive disclosure via `references/` — detail lives there only when branch applies
 - **GH issue is the queue/change** — proposal + design + queue live in the issue body, not `QUEUE.md`. Keeps what doesn't rot, drops ceremony. Small fix needs no issue at all
 - **`litespec` label marks queue issues** — hardcoded convention, no config. `validate` scans open issues with this label; `view` filters to it. `plan[clear]` instructs adding the label when creating the issue
 - **Local queue fallback** — `specs/queues/<name>.md` mirrors the GH issue 1:1 when `gh` is unavailable. `<name>` comes from `litespec new <name> --issue N`. Handles multi-feature changes
@@ -99,7 +99,7 @@ These came from deliberate debate. Respect the reasoning:
 
 **Domain skills** (`litespec-plan`, `litespec-build`, `litespec-review`) are generated by the Go binary. The pipeline is:
 
-1. Add a `SkillInfo` entry to `internal/paths.go` (`Skills` slice) — defines ID, name, and description (plan is fuzzy/clear, build is one unit, review is adversarial)
+1. Add a `SkillInfo` entry to `internal/paths.go` (`Skills` slice) — defines ID, name, and description (plan is fuzzy/grill/clear, build is one unit, review is adversarial)
 2. Create a template file in `internal/skill/templates/<id>.md` — embedded via `embed.FS`
 3. Run `litespec update` — generates `.agents/skills/<name>/SKILL.md` from the `SkillInfo` metadata + registered template. Skills can also include resource files in `internal/skill/templates/references/<id>/`, which are generated into `.agents/skills/<name>/references/`. `litespec-plan` has 5 references: fuzzy, clear, grilling, codebase-design, domain-modeling
 

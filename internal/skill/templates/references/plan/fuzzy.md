@@ -4,7 +4,7 @@ Use when the idea is half-baked — questions, unknowns, research needed, no cle
 
 - Read product.md, relevant specs, decisions, glossary, and the code the change would touch. Don't speculate about behavior you haven't opened.
 - Separate outcome from solution. Ask: what must be demo-able when done?
-- List 2-3 sharp questions that block a clear plan. Run a tiny spike if reading can't answer it — the spike is evidence, not production code.
+- Grill by default. Load `references/grilling.md` and ask one question at a time to find the forks. Run a tiny spike if reading can't answer a question — the spike is evidence, not production code.
 - Name the unknowns explicitly. Don't hide them in a file.
 
 ## Don't
