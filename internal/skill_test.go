@@ -128,6 +128,50 @@ func TestGenerateSkills_MissingTemplate(t *testing.T) {
 	}
 }
 
+func TestGenerateSkills_RefusesSymlinkWithoutOverwritingTarget(t *testing.T) {
+	original := skill.All()
+	defer func() {
+		resetTemplates()
+		for k, v := range original {
+			skill.Register(k, v)
+		}
+	}()
+
+	registerAllTemplates(t)
+
+	root := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "sentinel")
+	const sentinelContent = "do not overwrite\n"
+	if err := os.WriteFile(outside, []byte(sentinelContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	skillDir := filepath.Join(root, SkillsDir, Skills[0].Name)
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	skillFile := filepath.Join(skillDir, "SKILL.md")
+	if err := os.Symlink(outside, skillFile); err != nil {
+		t.Fatal(err)
+	}
+
+	err := GenerateSkills(root)
+	if err == nil {
+		t.Fatal("expected GenerateSkills to reject symlink")
+	}
+	if !strings.Contains(err.Error(), "refusing to generate skills through symlink") {
+		t.Errorf("expected clear symlink error, got: %v", err)
+	}
+
+	data, err := os.ReadFile(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != sentinelContent {
+		t.Fatalf("sentinel changed: got %q, want %q", data, sentinelContent)
+	}
+}
+
 func TestGenerateSkills_WritesResourceFiles(t *testing.T) {
 	original := skill.All()
 	originalResources := skill.GetResources("review")

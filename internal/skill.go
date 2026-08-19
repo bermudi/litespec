@@ -17,6 +17,9 @@ type skillFrontmatter struct {
 
 func GenerateSkills(root string) error {
 	skillsDir := filepath.Join(root, SkillsDir)
+	if err := rejectSkillPathSymlinks(skillsDir); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(skillsDir, 0o755); err != nil {
 		return fmt.Errorf("create skills directory: %w", err)
 	}
@@ -85,6 +88,49 @@ func GenerateSkills(root string) error {
 		}
 	}
 
+	return nil
+}
+
+func rejectSkillPathSymlinks(skillsDir string) error {
+	for path := filepath.Clean(skillsDir); ; path = filepath.Dir(path) {
+		info, err := os.Lstat(path)
+		if err == nil {
+			if info.Mode()&os.ModeSymlink != 0 {
+				return fmt.Errorf("refusing to generate skills through symlink %s", path)
+			}
+		} else if !os.IsNotExist(err) {
+			return fmt.Errorf("inspect skills path %s: %w", path, err)
+		}
+
+		parent := filepath.Dir(path)
+		if parent == path {
+			break
+		}
+	}
+
+	info, err := os.Lstat(skillsDir)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("inspect skills path %s: %w", skillsDir, err)
+	}
+	if !info.IsDir() {
+		return nil
+	}
+
+	err = filepath.WalkDir(skillsDir, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return fmt.Errorf("inspect skills path %s: %w", path, walkErr)
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("refusing to generate skills through symlink %s", path)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

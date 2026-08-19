@@ -77,6 +77,15 @@ The `litespec update` command SHALL invoke `GenerateSkills` to write each genera
 - **WHEN** `litespec update` is run and `.agents/skills/` contains a stale `litespec-explore` directory
 - **THEN** that directory is removed
 
+### Requirement: Skill Generation Does Not Follow Symlinks
+
+Before generating skills, `GenerateSkills` SHALL reject symlinks in `.agents/skills/`, its skill directories, generated files, resource files, and every parent directory in those paths. It SHALL return an error identifying the refused symlink and SHALL NOT write through it.
+
+#### Scenario: Symlinked generated file is refused
+
+- **WHEN** `.agents/skills/litespec-plan/SKILL.md` is a symlink to a file outside the project
+- **THEN** `litespec update` returns an error refusing to generate through the symlink and leaves the target file unchanged
+
 ### Requirement: Adapter Auto-Detection Scans Symlinks
 
 The `DetectActiveAdapters` function SHALL scan each configured adapter skills directory for symlinks whose resolved target lies inside `.agents/skills/`. It SHALL return the IDs of adapters for which at least one such symlink exists. The `litespec update` command SHALL use `DetectActiveAdapters` when no `--tools` flag is provided.
