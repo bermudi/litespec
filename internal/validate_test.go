@@ -99,6 +99,53 @@ func TestValidateSpecNoRequirements(t *testing.T) {
 	}
 }
 
+func TestValidateSpecRequirementWithoutScenarioIsInvalid(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "auth", `# auth
+
+## Requirements
+
+### Requirement: Delete account
+The system SHALL delete an account.
+`)
+
+	result, err := ValidateSpec(root, "auth")
+	if err != nil {
+		t.Fatalf("ValidateSpec: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected scenario-less requirement to be invalid")
+	}
+	if !containsIssue(result.Errors, "has no scenarios") {
+		t.Fatalf("expected missing scenario error, got %+v", result.Errors)
+	}
+	if len(result.Warnings) != 0 {
+		t.Fatalf("expected missing scenario not to be a warning, got %+v", result.Warnings)
+	}
+}
+
+func TestValidateSpecsRequirementWithoutScenarioIsInvalid(t *testing.T) {
+	root := setupTestProject(t)
+	writeMainSpecFile(t, root, "auth", `# auth
+
+## Requirements
+
+### Requirement: Delete account
+The system SHALL delete an account.
+`)
+
+	result, err := ValidateSpecs(root)
+	if err != nil {
+		t.Fatalf("ValidateSpecs: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("expected scenario-less requirement to be invalid")
+	}
+	if !containsIssue(result.Errors, "has no scenarios") {
+		t.Fatalf("expected missing scenario error, got %+v", result.Errors)
+	}
+}
+
 func TestValidateDecisionValid(t *testing.T) {
 	root := setupTestProject(t)
 	decDir := DecisionsPath(root)

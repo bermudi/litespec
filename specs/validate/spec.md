@@ -11,6 +11,11 @@ The `litespec validate` command SHALL validate feature specs under `specs/<featu
 - **WHEN** `litespec validate <feature>` is run on a spec with SHALL/MUST requirements and WHEN/THEN scenarios
 - **THEN** validation succeeds with no errors
 
+#### Scenario: Requirement without scenario fails
+
+- **WHEN** `litespec validate <feature>` or `litespec validate --all` is run on a requirement with no `#### Scenario:`
+- **THEN** validation reports an error and exits non-zero, regardless of `--strict`
+
 #### Scenario: Decision missing a required section fails
 
 - **WHEN** a decision file lacks `## Consequences`

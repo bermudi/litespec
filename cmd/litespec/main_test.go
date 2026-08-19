@@ -126,6 +126,36 @@ func TestCLIVerifyPositionalSpec(t *testing.T) {
 	}
 }
 
+func TestCLIVerifyScenarioRequired(t *testing.T) {
+	bin, root := setupCLITest(t)
+	specDir := filepath.Join(root, "specs", "auth")
+	if err := os.MkdirAll(specDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(specDir, "spec.md"), []byte(`# auth
+
+## Requirements
+
+### Requirement: Delete account
+The system SHALL delete an account.
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, args := range [][]string{
+		{"validate", "auth"},
+		{"validate", "--all"},
+	} {
+		out, code := runCLI(t, bin, root, args...)
+		if code == 0 {
+			t.Errorf("%v unexpectedly passed:\n%s", args, out)
+		}
+		if !strings.Contains(out, "has no scenarios") {
+			t.Errorf("%v did not report the missing scenario:\n%s", args, out)
+		}
+	}
+}
+
 func TestCLIVerifyUnknownName(t *testing.T) {
 	bin, root := setupCLITest(t)
 	_, code := runCLI(t, bin, root, "validate", "nonexistent")

@@ -47,8 +47,8 @@ func ValidateSpec(root, name string) (*ValidationResult, error) {
 			})
 		}
 		if len(req.Scenarios) == 0 {
-			result.Warnings = append(result.Warnings, ValidationIssue{
-				Severity: SeverityWarning,
+			result.Errors = append(result.Errors, ValidationIssue{
+				Severity: SeverityError,
 				Message:  fmt.Sprintf("requirement %q in capability %q has no scenarios", req.Name, name),
 				File:     specPath,
 			})
@@ -136,8 +136,8 @@ func ValidateSpecs(root string) (*ValidationResult, error) {
 				})
 			}
 			if len(req.Scenarios) == 0 {
-				result.Warnings = append(result.Warnings, ValidationIssue{
-					Severity: SeverityWarning,
+				result.Errors = append(result.Errors, ValidationIssue{
+					Severity: SeverityError,
 					Message:  fmt.Sprintf("requirement %q in capability %q has no scenarios", req.Name, name),
 					File:     specPath,
 				})
