@@ -52,11 +52,13 @@ You report findings — you do not fix them. But you route each finding to the r
 
 - **SUGGESTION** → small fix lane, user's discretion. Not blocking.
 
-- **"needs decision: <question>"** → the user creates a decision in `specs/decisions/` first (`touch` + `litespec validate --decisions`), then routes the fix per the two rules above.
+- **"needs decision: <question>"** → the user creates a decision in `specs/decisions/` first (`touch` + `litespec validate --decisions`), then routes the fix per the rules above.
 
 - **Shape was wrong** (the unit's outcome doesn't match what the code needs to do) → `litespec-plan`, not a fix. State this explicitly.
 
-Do not invent units for findings that aren't units. Do not reopen the issue for small fixes. The issue closes when all its units pass — everything else is small fix lane.
+- **Non-small-fix finding outside any unit's contract** (needs real implementation work, not a trivial small fix, and the code shape is not fundamentally wrong) → draft a new unit and route it to a GH sub-issue. Write the unit with `## <outcome>`, `Done means:`, `Verify:`, and `Depends:` if it blocks on existing units. Create the sub-issue via `gh issue create --parent <N> --label litespec` with the new unit(s) as the body. GH natively tracks parent-child; the `litespec` label keeps `validate` aware of it. If `gh` is unavailable, write the new unit(s) to `specs/queues/<parent-name>-review.md`. Creating the sub-issue is routing, not code editing — do not implement the unit yourself.
+
+Do not invent units for trivial findings — those are small fix lane. Invent units only for findings that need a unit's worth of work and don't break an existing unit's contract. Do not reopen the issue for small fixes. The issue closes when all its units pass.
 
 ---
 

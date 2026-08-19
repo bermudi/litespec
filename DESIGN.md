@@ -58,7 +58,7 @@ you: "add X" -> plan[fuzzy] (read code, grill by default — references/fuzzy.md
           -> close GH issue
 ```
 
-Review triages findings structurally: CRITICAL breaking a unit's `Done means:`/`Verify:` → uncheck box, rebuild via `build` (scope expands — fix the pattern, not just the line). Everything else → small fix lane. No fix skill, no finding tracker — findings route to existing tracking (unit checkboxes) or get fixed immediately.
+Review triages findings structurally: does the finding break a unit's `Done means:`/`Verify:`? If yes → uncheck box, rebuild via `build` (scope expands — fix the pattern, not just the line). If no and it is trivial → small fix lane. If no and it needs real work outside any existing unit's contract → draft a new unit and create a GH sub-issue via `gh issue create --parent <N> --label litespec`, or write to `specs/queues/<parent-name>-review.md` if `gh` is unavailable. No fix skill, no finding tracker — findings route to existing tracking (unit checkboxes), get fixed immediately, or spawn a sub-issue.
 
 `grill-me` is a skill reference, not a CLI. `plan` owns spec drafting in clear mode: if the feature is load-bearing, it writes/updates `specs/<feature>/spec.md` alongside the issue.
 
