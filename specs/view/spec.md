@@ -2,187 +2,155 @@
 
 ## Requirements
 
-### Requirement: Dashboard Display
+### Requirement: Project Root Discovery
 
-The dashboard SHALL display a formatted dashboard with a title header, box-drawing separators (`══` for outer border, `──` for section underlines), and distinct sections for summary, active changes, draft changes, completed changes, specifications, and optionally a dependency graph. Each change entry in the active, draft, and completed sections SHALL display the change name, born date (formatted as `YYYY-MM-DD` from `.litespec.yaml` `created` field), and relative last-touched time (filesystem-derived mtime). The born and last-touched times SHALL be shown after the change name in parentheses, e.g. `◉ add-auth  (born 2026-04-01, touched 3d ago)`.
+The `litespec view` command SHALL require a project root by locating a `specs/` directory in the current directory or any ancestor. If no `specs/` directory is found, the command SHALL exit with an error.
 
-#### Scenario: Basic dashboard display
+#### Scenario: Outside a project
 
-- **WHEN** user runs `litespec view`
-- **THEN** system displays a formatted dashboard with sections for summary, active changes, draft changes, completed changes, and specifications, with born and last-touched timestamps per change
+- **WHEN** the user runs `litespec view` in a directory with no `specs/` directory in any ancestor
+- **THEN** the command prints an error and exits non-zero
 
-#### Scenario: No specs directory
+### Requirement: Output Flags
 
-- **WHEN** user runs `litespec view` in a directory without a specs directory
-- **THEN** system displays error message indicating no specs directory was found
+`litespec view` SHALL accept `--json` and `--minimal` flags. `--json` SHALL output structured JSON, `--minimal` SHALL output a compact tab-separated summary, and the two together SHALL output the minimal JSON summary.
 
-#### Scenario: Active change with timestamps
+#### Scenario: Default text output
 
-- **WHEN** user runs `litespec view` and an active change was created on 2026-04-01 and last modified 2 hours ago
-- **THEN** the change line shows progress bar and `(born 2026-04-01, touched 2h ago)`
+- **WHEN** the user runs `litespec view` with no flags
+- **THEN** the command prints the full text dashboard
 
-### Requirement: Dependency Graph Section
+#### Scenario: JSON output
 
-When any active change has a `dependsOn` field, the dashboard SHALL display a dependency graph section showing the DAG of active changes. The graph SHALL use tree-style indentation with box-drawing characters. Changes with no dependencies SHALL appear as roots. Changes with no `dependsOn` field and no dependents SHALL be listed separately as unrelated changes. Each node in the graph SHALL show the change name with born and last-touched timestamps.
+- **WHEN** the user runs `litespec view --json`
+- **THEN** the command prints the full JSON representation and no text dashboard
 
-#### Scenario: Simple dependency chain
+### Requirement: Minimal Text Output
 
-- **WHEN** change A has no dependencies and change B depends on A
-- **THEN** the graph section shows A as a root with B as its child, both with timestamps
+`litespec view --minimal` SHALL output a single tab-separated summary line formatted as `<N> specs<TAB><M> reqs<TAB><K> decisions<TAB><L> issues`, where `K` is the count of active (non-superseded) decisions.
 
-#### Scenario: Multiple roots
+#### Scenario: Minimal tab-separated summary
 
-- **WHEN** change A and change C have no dependencies and change B depends on A
-- **THEN** the graph shows A (with child B) and C as separate roots, all with timestamps
+- **WHEN** the user runs `litespec view --minimal` in a project with 3 specs, 7 requirements, 2 active decisions, and 1 open GH issue
+- **THEN** the output is a single line containing `3 specs`, `7 reqs`, `2 decisions`, and `1 issues` separated by tab characters
 
-#### Scenario: No dependencies at all
+### Requirement: Dashboard Header and Footer
 
-- **WHEN** no active change has `dependsOn` set
-- **THEN** the dependency graph section is omitted entirely
+The text dashboard SHALL print the title `Litespec Dashboard` followed by a 60-character outer border of `═` characters at the top, and SHALL close with the same 60-character `═` border.
+
+#### Scenario: Borders surround the dashboard
+
+- **WHEN** the user runs `litespec view`
+- **THEN** the output contains `Litespec Dashboard`, then a line of 60 `═` characters, and ends with a matching line of 60 `═` characters
+
+### Requirement: Product Section
+
+The text dashboard SHALL display a `Product:` section. When `specs/product.md` exists, it SHALL trim surrounding whitespace, truncate the file content to 400 characters (appending `…` if truncated), take the first line, and print `specs/product.md — <firstLine>` followed by `product: mental models + flows`. When `specs/product.md` is missing, it SHALL print `specs/product.md — missing (run litespec init to scaffold)` and `product: not yet initialized`.
+
+#### Scenario: Product file present
+
+- **WHEN** `specs/product.md` exists with first line `Widget Manager`
+- **THEN** the Product section shows `specs/product.md — Widget Manager` and `product: mental models + flows`
+
+#### Scenario: Product file missing
+
+- **WHEN** `specs/product.md` does not exist
+- **THEN** the Product section shows `specs/product.md — missing (run litespec init to scaffold)` and `product: not yet initialized`
 
 ### Requirement: Summary Section
 
-The dashboard SHALL display a summary section with key project metrics: total specification count and requirement count combined on one line, draft change count (no tasks), active change count (tasks in progress), completed change count (all tasks done), and overall task progress as completed/total with percentage.
+The text dashboard SHALL display a `Summary:` section containing `● Specifications: <N> specs, <M> requirements`. When decisions are loaded successfully and at least one exists, it SHALL also print `● Decisions: <active>/<total>`, where `active` is the count of non-superseded decisions. When GH issues are loaded successfully and at least one exists, it SHALL also print `● GH Issues: <N> open`.
 
-#### Scenario: Complete summary
+#### Scenario: Summary with all counts
 
-- **WHEN** dashboard is rendered with specs and changes
-- **THEN** system shows specifications count with requirement count, draft changes, active changes, completed changes, and task progress with percentage
+- **WHEN** the project has specs, active decisions, and open GH issues
+- **THEN** the Summary section shows the specifications, decisions, and GH issues counts
 
-#### Scenario: Empty project
+#### Scenario: Summary with only specifications
 
-- **WHEN** no specs or changes exist
-- **THEN** summary shows zero counts for all metrics
-
-### Requirement: Progress Bars
-
-For each active change (tasks in progress), the dashboard SHALL display a Unicode progress bar using `█` for filled segments and `░` for empty segments, enclosed in brackets, followed by the completion percentage. Changes SHALL be sorted by completion percentage ascending, then alphabetically.
-
-#### Scenario: Half-complete change
-
-- **WHEN** a change has 1 of 2 tasks completed
-- **THEN** the progress bar shows approximately half filled `[██████████████████░░] 50%`
-
-#### Scenario: Change categorization
-
-- **WHEN** changes exist with no tasks (draft), partial tasks (active), and all tasks complete
-- **THEN** draft changes appear in a Draft Changes section with `○` bullet, active changes appear in Active Changes section with `◉` bullet and progress bar, completed changes appear in Completed Changes section with `✓` bullet
+- **WHEN** the project has specs but no decisions and no open GH issues
+- **THEN** the Summary section shows only `● Specifications: <N> specs, <M> requirements`
 
 ### Requirement: Specifications Section
 
-The dashboard SHALL display specifications sorted by requirement count descending. Each spec SHALL show its name padded to 30 characters followed by the requirement count with appropriate singular/plural label.
+The text dashboard SHALL display a `Specifications` section underlined with 60 `─` characters. For each feature spec it SHALL list the spec name padded to 30 characters, its requirement count, the singular or plural label `requirement`/`requirements`, and the path `(specs/<name>/spec.md)`, sorted by requirement count descending and prefixed with a `▪` bullet. When no specs exist, it SHALL print the placeholder `(no feature specs yet — add specs/<feature>/spec.md)`.
 
-#### Scenario: Spec display
+#### Scenario: Specs sorted by requirement count
 
-- **WHEN** dashboard is rendered with specs
-- **THEN** specs are listed with `▪` bullet, sorted by requirement count descending, with padded names and requirement counts
+- **WHEN** `specs/auth/spec.md` has 1 requirement and `specs/view/spec.md` has 5 requirements
+- **THEN** the Specifications section lists `view` before `auth` with their counts and paths
 
-### Requirement: Dashboard Footer
+#### Scenario: No feature specs
 
-The dashboard SHALL display a closing `══` border and a hint line directing users to `litespec list --changes` or `litespec list --specs` for detailed views.
-
-#### Scenario: Footer display
-
-- **WHEN** dashboard is rendered
-- **THEN** output ends with `══` border and hint text about list commands
+- **WHEN** the `specs/` directory contains no feature spec directories
+- **THEN** the Specifications section shows the placeholder `(no feature specs yet — add specs/<feature>/spec.md)`
 
 ### Requirement: Decisions Section
 
-When `specs/decisions/` exists and contains at least one decision, the dashboard SHALL display a Decisions section between the Specifications section and the Dependency Graph section (or before the footer if no dependency graph is shown). Decisions SHALL be listed in two groups: active decisions (status `proposed` or `accepted`) shown individually with number, slug, and status, followed by a single summary line `superseded: N` if any superseded decisions exist. Active decisions SHALL be sorted by number ascending. The Decisions section SHALL be omitted entirely when no decisions exist.
+The text dashboard SHALL display a `Decisions` section underlined with 60 `─` characters when decisions are loaded successfully and at least one exists. It SHALL list active (non-superseded) decisions sorted by number ascending, printing `*` before the number when the decision has `spine: true`, then the four-digit zero-padded number, the slug padded to 30 characters, and the status. When superseded decisions exist, it SHALL print a single `superseded: <N>` line after the active list. If no decisions exist or loading fails, the section SHALL be omitted entirely.
 
-#### Scenario: Active decisions displayed
+#### Scenario: Active and superseded decisions
 
-- **WHEN** `litespec view` is run and three accepted decisions exist
-- **THEN** the Decisions section lists each with number, slug, and status
+- **WHEN** the project contains an accepted spine decision `0001-auth.md`, a proposed decision `0002-cache.md`, and a superseded decision `0003-old.md`
+- **THEN** the Decisions section contains a line starting with `  *0001` for the spine decision, a line starting with `   0002` for the proposed decision, and `superseded: 1`
 
-#### Scenario: Superseded decisions summarized
+#### Scenario: No decisions
 
-- **WHEN** `litespec view` is run and two decisions are `accepted` and three are `superseded`
-- **THEN** the Decisions section lists the two active decisions and shows `superseded: 3`
+- **WHEN** the project has no `specs/decisions/` directory
+- **THEN** the dashboard contains no Decisions section
 
-#### Scenario: No decisions omits section
+### Requirement: GH Issues Section
 
-- **WHEN** `litespec view` is run and `specs/decisions/` is absent or empty
-- **THEN** the Decisions section does not appear in the dashboard
+The text dashboard SHALL display a `GH Issues (open)` section underlined with 60 `─` characters when `gh` is available and at least one open issue is returned, printing each issue as `#<number> <title> <url>`. When `gh` is not on `PATH` and no issues are found, it SHALL display a `GH Issues` section with the notice `(gh not available — showing local specs only)`. When `gh` is present but returns no open issues, the section SHALL be omitted.
 
-### Requirement: Summary Includes Decision Count
+#### Scenario: Open issues listed
 
-The summary section of the dashboard SHALL include a decision count when any decisions exist. The count SHALL be formatted as `Decisions: <active>/<total>` where `active` excludes superseded entries.
+- **WHEN** `gh` is on `PATH`, the project is in a git work tree, and `gh issue list` returns one open issue titled `Fix auth`
+- **THEN** the GH Issues section lists the issue with `#<number>`, `Fix auth`, and its URL
 
-#### Scenario: Summary with decisions
+#### Scenario: gh not available
 
-- **WHEN** `litespec view` is run with 4 accepted and 2 superseded decisions
-- **THEN** the summary line shows `Decisions: 4/6`
+- **WHEN** `gh` is not installed on `PATH`
+- **THEN** the dashboard shows the `GH Issues` notice `gh not available — showing local specs only`
 
-#### Scenario: Summary without decisions
+### Requirement: GitHub Issue Fetch
 
-- **WHEN** `litespec view` is run and no decisions exist
-- **THEN** the summary omits the decisions line entirely
+`litespec view` SHALL fetch open GitHub issues by running `gh issue list --json number,title,state,url --state open --limit 50` from the project root. It SHALL require `gh` to be on `PATH` and the project to be in a git work tree; if the `.git` directory is absent, it SHALL fall back to `git rev-parse --is-inside-work-tree`. Any failure SHALL be silent and result in an empty issue list.
 
-### Requirement: Backlog Summary in Dashboard
+#### Scenario: gh invocation
 
-When `specs/backlog.md` exists, the dashboard summary section SHALL display a backlog line showing item counts per recognized category. The recognized H2 section names are `## Deferred`, `## Open Questions`, `## Future Versions` (case-insensitive; `## Future` is accepted as shorthand for `## Future Versions`), and `## Other` (case-insensitive). Items are counted as top-level lines starting with `- ` or `* ` (no leading whitespace) under each H2 section. Items under unrecognized H2 sections SHALL NOT be counted. The backlog line SHALL only include categories that have items (e.g., `● Backlog: 3 deferred, 2 open questions` when no future items exist). When `specs/backlog.md` does not exist, the backlog line SHALL be omitted entirely. `litespec validate` SHALL warn about unrecognized H2 section names.
+- **WHEN** the project has a `.git` directory and `gh` is installed
+- **THEN** the command invokes `gh issue list` with the exact JSON fields, `--state open`, and `--limit 50`
 
-#### Scenario: Backlog with all categories
+#### Scenario: Missing git work tree
 
-- **WHEN** `specs/backlog.md` exists with 2 items under `## Deferred`, 3 under `## Open Questions`, and 1 under `## Future Versions`
-- **THEN** the summary shows `● Backlog: 2 deferred, 3 open questions, 1 future`
+- **WHEN** the project has no `.git` directory and `git rev-parse` does not output `true`
+- **THEN** the GH Issues section is empty and no error is shown
 
-#### Scenario: Backlog with unknown sections
+### Requirement: JSON Output
 
-- **WHEN** `specs/backlog.md` exists with 1 item under `## Deferred` and 2 items under `## Nice-to-Have`
-- **THEN** the summary shows `● Backlog: 1 deferred` and `litespec validate` warns that `## Nice-to-Have` is not recognized
+With `--json`, `litespec view` SHALL output a JSON object containing `summary` (`specs`, `requirements`, optional `decisions` with `active` and `total`, and optional `ghIssues` count), `specs` (`name` and `requirementCount`), `decisions` (active decisions sorted by number ascending with `number`, `slug`, `status`, and `spine`), `product` (`path`, `exists`, and `preview` when the product file exists), and `ghIssues` (`number`, `title`, `state`, `url`). When `--minimal` is also supplied, only the `summary` object SHALL be returned.
 
-#### Scenario: Explicit Other section
+#### Scenario: Full JSON
 
-- **WHEN** `specs/backlog.md` exists with 1 item under `## Deferred` and 2 items under `## Other`
-- **THEN** the summary shows `● Backlog: 1 deferred — 2 other`
+- **WHEN** the user runs `litespec view --json` in a project with specs, decisions, a product, and GH issues
+- **THEN** the output contains `summary`, `specs`, `decisions`, `product`, and `ghIssues` fields
 
-#### Scenario: No backlog file
+#### Scenario: Minimal JSON
 
-- **WHEN** `specs/backlog.md` does not exist
-- **THEN** the backlog line is omitted from the summary
+- **WHEN** the user runs `litespec view --json --minimal`
+- **THEN** the output contains only `summary` with counts
 
-#### Scenario: Nested bullets not counted
+### Requirement: Data Loading
 
-- **WHEN** `specs/backlog.md` has a top-level `- ` item followed by indented `  - ` sub-items under `## Deferred`
-- **THEN** only the top-level item is counted
+`litespec view` SHALL load feature specs via `internal.ListSpecs` and sum their requirement counts for the summary. It SHALL load decisions via `internal.ListDecisions` and tolerate errors by omitting the Decisions section. It SHALL load `specs/product.md` and tolerate a missing file by showing the missing message.
 
-#### Scenario: Empty backlog file
+#### Scenario: Requirement count from specs
 
-- **WHEN** `specs/backlog.md` exists but contains no items (empty or only headings)
-- **THEN** the backlog line is omitted from the summary
+- **WHEN** the project contains `specs/auth/spec.md` with 2 requirements and `specs/view/spec.md` with 5 requirements
+- **THEN** the summary shows `7 requirements`
 
-#### Scenario: Future shorthand
+#### Scenario: Tolerate missing decisions
 
-- **WHEN** `specs/backlog.md` exists with 2 items under `## Future`
-- **THEN** the summary shows `● Backlog: 2 future`
-
-#### Scenario: Asterisk bullets
-
-- **WHEN** `specs/backlog.md` exists with 3 items under `## Deferred` using `* ` bullets
-- **THEN** the summary shows `● Backlog: 3 deferred`
-
-#### Scenario: Case-insensitive headers
-
-- **WHEN** `specs/backlog.md` exists with items under `## deferred`, `## open questions`, and `## future versions`
-- **THEN** items are counted in their respective categories
-
-### Requirement: Patch-Mode Changes In Dashboard
-
-The `litespec view` dashboard MUST display patch-mode changes (as defined by `IsPatchMode`) in a distinct category, separate from draft, active, and completed full-proposal changes. Patch-mode changes SHALL appear in a section labeled "Patch Changes" with a `◆` bullet (or another distinct marker), each line showing the change name, born date, and last-touched relative time. Progress bars SHALL NOT be displayed for patch-mode changes (they have no tasks). The summary section MUST include a "Patch Changes" count alongside draft, active, and completed counts. Patch-mode changes SHALL NOT be miscategorized as draft.
-
-#### Scenario: Patch change appears in Patch Changes section
-
-- **WHEN** `litespec view` is run and an active patch-mode change exists
-- **THEN** the dashboard contains a "Patch Changes" section listing the change with a `◆` bullet, born date, and touched time, and the change does not appear in the Draft, Active, or Completed sections
-
-#### Scenario: Summary includes patch count
-
-- **WHEN** `litespec view` is run and one patch-mode and two full-proposal changes exist
-- **THEN** the summary line(s) include a count of patch changes alongside other change-category counts
-
-#### Scenario: No patch changes omits section
-
-- **WHEN** `litespec view` is run and no patch-mode changes exist
-- **THEN** the "Patch Changes" section is omitted entirely from the dashboard
+- **WHEN** `specs/decisions/` cannot be read
+- **THEN** the dashboard omits the Decisions section and continues

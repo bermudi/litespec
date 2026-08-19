@@ -30,15 +30,7 @@ func setupCLITest(t *testing.T) (string, string) {
 	bin := buildBinary(t)
 	root := t.TempDir()
 	specsDir := filepath.Join(root, "specs")
-	changesDir := filepath.Join(root, "specs", "changes")
-	archiveDir := filepath.Join(root, "specs", "changes", "archive")
 	if err := os.MkdirAll(specsDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(changesDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	return bin, root
@@ -59,38 +51,6 @@ func runCLI(t *testing.T, bin, root string, args ...string) (string, int) {
 		}
 	}
 	return string(out), exitCode
-}
-
-func createChange(t *testing.T, root, name string) {
-	t.Helper()
-	changeDir := filepath.Join(root, "specs", "changes", name)
-	if err := os.MkdirAll(changeDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	meta := []byte("schema: spec-driven\n")
-	if err := os.WriteFile(filepath.Join(changeDir, ".litespec.yaml"), meta, 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func createChangeWithArtifacts(t *testing.T, root, name string) {
-	t.Helper()
-	createChange(t, root, name)
-	changeDir := filepath.Join(root, "specs", "changes", name)
-	os.WriteFile(filepath.Join(changeDir, "proposal.md"), []byte("# Proposal\n\n## Motivation\nSome motivation.\n\n## Scope\nSome scope."), 0o644)
-	os.WriteFile(filepath.Join(changeDir, "design.md"), []byte("# Design\n\n## Architecture\nLine one.\nLine two.\nLine three."), 0o644)
-	os.WriteFile(filepath.Join(changeDir, "tasks.md"), []byte("## Phase 1: Test\n\n- [ ] Task"), 0o644)
-	specsSubdir := filepath.Join(changeDir, "specs", "cap")
-	os.MkdirAll(specsSubdir, 0o755)
-	os.WriteFile(filepath.Join(specsSubdir, "spec.md"), []byte(`## ADDED Requirements
-
-### Requirement: R1
-The system SHALL work.
-
-#### Scenario: S1
-- **WHEN** triggered
-- **THEN** expected result
-`), 0o644)
 }
 
 func createSpec(t *testing.T, root, name string) {
@@ -478,15 +438,9 @@ func TestCLIUpdateUnknownTool(t *testing.T) {
 func setupDirectTest(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-	dirs := []string{
-		filepath.Join(root, "specs"),
-		filepath.Join(root, "specs", "changes"),
-		filepath.Join(root, "specs", "changes", "archive"),
-	}
-	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatal(err)
-		}
+	specsDir := filepath.Join(root, "specs")
+	if err := os.MkdirAll(specsDir, 0o755); err != nil {
+		t.Fatal(err)
 	}
 	t.Chdir(root)
 	return root
@@ -572,7 +526,6 @@ func TestCmdCompletionDirect_InvalidShell(t *testing.T) {
 func TestCmdViewDirect_HappyPath(t *testing.T) {
 	root := setupDirectTest(t)
 	createSpec(t, root, "auth")
-	createChangeWithArtifacts(t, root, "add-auth")
 	if err := cmdView([]string{}); err != nil {
 		t.Fatalf("cmdView: %v", err)
 	}
@@ -1430,3 +1383,23 @@ func TestValidateSummaryIncludesUnits(t *testing.T) {
 	})
 }
 
+func TestCmdUpgradeDirect_Help(t *testing.T) {
+	err := cmdUpgrade([]string{"--help"})
+	if err != nil {
+		t.Fatalf("cmdUpgrade --help: %v", err)
+	}
+}
+
+func TestCmdUpgradeDirect_NotGoInstall(t *testing.T) {
+	t.Setenv("GOBIN", "/nonexistent")
+	t.Setenv("GOPATH", "/nonexistent")
+	t.Setenv("HOME", t.TempDir())
+
+	err := cmdUpgrade([]string{})
+	if err == nil {
+		t.Fatal("expected error when not installed via go install")
+	}
+	if !strings.Contains(err.Error(), "go install") {
+		t.Errorf("expected 'go install' in error, got: %v", err)
+	}
+}

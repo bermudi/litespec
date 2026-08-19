@@ -2,97 +2,135 @@
 
 ## Requirements
 
-### Requirement: Context-Aware Review Mode
+### Requirement: Adversarial Review of Issue and Spec vs Implementation
 
-The review skill MUST detect the task completion state of the target change by reading `tasks.md` and distinguish three states: all unchecked, partially complete, and fully complete. When zero tasks are checked (including when tasks.md has no checkboxes at all), review SHALL operate in artifact review mode — evaluating proposal, specs, design, and tasks for quality, consistency, and implementation readiness without reading implementation code. When some but not all tasks are checked, review SHALL operate in implementation review mode — comparing implemented code against specs. When all tasks are checked, review SHALL operate in pre-archive review mode — reviewing both artifacts and implementation comprehensively before archiving.
+The `litespec-review` skill SHALL perform a context-aware, adversarial review by reading the GH issue body (its proposal, design, and units with `Done means:` and `Verify:`), any load-bearing `specs/<feature>/spec.md`, and relevant `specs/decisions/`, then comparing the stated intent and durable contracts against the implementation. The review SHALL probe for interaction bugs, state transitions, wiring gaps, and contract violations, not only syntax or surface compliance.
 
-#### Scenario: Artifact review on unplanned change
+#### Scenario: Review with GH issue and spec
 
-- **WHEN** `review` is invoked on a change where zero tasks are checked
-- **THEN** the skill reviews proposal, specs, design, and tasks for quality, consistency, and gaps without reading implementation code
+- **WHEN** `litespec-review` is invoked for a change with a GH issue and a load-bearing spec
+- **THEN** it reads the issue and spec and probes the implementation against them
 
-#### Scenario: Artifact review on empty tasks.md
+#### Scenario: Review for small fix without issue
 
-- **WHEN** `review` is invoked on a change where tasks.md has no checkbox lines
-- **THEN** the skill operates in artifact review mode (zero checked of zero total)
+- **WHEN** `litespec-review` is invoked on a small fix with no GH issue
+- **THEN** it reads the relevant `specs/<feature>/spec.md` and the changed code before reporting findings
 
-#### Scenario: Implementation review on partially implemented change
+### Requirement: Findings and Verdict
 
-- **WHEN** `review` is invoked on a change where some but not all tasks are checked
-- **THEN** the skill reviews implementation code against specs using the current behavior
+The `litespec-review` skill SHALL report each finding with a **Severity** (`CRITICAL`, `WARNING`, or `SUGGESTION`), a **Location** (`file:line` or unit), **Evidence** (excerpt or observation), and a **Fix direction** (one unambiguous instruction). The review SHALL conclude with a verdict of `PASS` or `CHANGES REQUESTED`.
 
-#### Scenario: Pre-archive review on fully implemented change
+#### Scenario: Pass verdict
 
-- **WHEN** `review` is invoked on a change where all tasks are checked
-- **THEN** the skill reviews both artifacts and implementation comprehensively, catching issues before archive
+- **WHEN** all units satisfy their `Done means:` and `Verify:` contracts and no CRITICAL or WARNING findings remain
+- **THEN** the review returns `PASS`
 
-### Requirement: Artifact Review Dimensions
+#### Scenario: Changes requested verdict
 
-When operating in artifact review mode, review MUST evaluate planning artifacts across three dimensions: completeness (all artifacts present, specs cover the scope, scenarios are testable), consistency (proposal scope matches specs, design matches specs, tasks cover design, non-goals are respected), and readiness (scenarios describe verifiable behavior, design is concrete with file paths, tasks are phased correctly with clear boundaries). Artifact review goes beyond structural validation — it applies judgment to catch gaps that `litespec validate` cannot detect, such as vague requirements, missing edge cases, or design decisions that contradict the proposal.
+- **WHEN** the review identifies a CRITICAL or WARNING finding
+- **THEN** it returns `CHANGES REQUESTED`
 
-#### Scenario: Proposal non-goal contradicted by spec
+### Requirement: Triage into Lanes
 
-- **WHEN** the proposal lists something as a non-goal but a spec requirement implements it
-- **THEN** the artifact review flags this as a consistency issue
+For each finding, `litespec-review` SHALL first determine whether the finding cites a unit's `Done means:` or `Verify:`, then route it into exactly one of the following lanes:
+- A finding that is **CRITICAL** and breaks a unit's `Done means:` or `Verify:` SHALL be routed to `litespec-build`: the unit's checkbox is unchecked, `references/build/review-fixing.md` is loaded, and the unit is rebuilt with expanded scope; the GH issue stays open until all units re-pass.
+- A finding that is **CRITICAL** or **WARNING** and lies outside any unit's contract (neighboring code, help text, stale decision, drive-by) SHALL be routed to the small fix lane; no unit is created and the issue is not reopened.
+- A **SUGGESTION** SHALL be routed to the small fix lane at the user's discretion and is not blocking.
+- A finding that is `"needs decision"` SHALL first create a decision in `specs/decisions/`, then be routed per the rules above.
+- A finding where the unit's outcome or shape is wrong SHALL be routed to `litespec-plan`, not a fix.
+- A non-trivial finding outside any unit's contract that needs real implementation work but is not a shape problem SHALL be routed to a new unit: draft `## <outcome>`, `Done means:`, `Verify:`, and `Depends:` if it blocks on existing units; create a GH sub-issue via `gh issue create --parent <N> --label litespec` or, if `gh` is unavailable, write the unit to `specs/queues/<parent-name>-review.md`.
 
-#### Scenario: Vague requirement with no verifiable scenario
+#### Scenario: Critical finding breaks a unit contract
 
-- **WHEN** a requirement's scenarios do not describe concrete WHEN/THEN conditions
-- **THEN** the artifact review flags this as a readiness issue
+- **WHEN** a CRITICAL finding cites a unit's `Done means:` or `Verify:` violation with direct evidence
+- **THEN** the finding routes to `litespec-build`, the unit checkbox is unchecked, and the issue stays open
 
-#### Scenario: Design decision contradicts proposal scope
+#### Scenario: Warning outside unit contract is a small fix
 
-- **WHEN** design.md introduces an approach that conflicts with the proposal's stated scope
-- **THEN** the artifact review flags this as a consistency issue
+- **WHEN** a WARNING finding concerns neighboring code or a stale decision and does not cite a unit contract
+- **THEN** it routes to the small fix lane and does not reopen the issue
 
-### Requirement: Updated Skill Description
+#### Scenario: Finding needs a decision first
 
-The review skill description in `internal/paths.go` MUST be updated to reflect the context-aware behavior. The description SHALL mention artifact review (pre-implementation), implementation review (during implementation), and pre-archive review (post-implementation).
+- **WHEN** a finding requires a durable architectural ruling before it can be fixed
+- **THEN** it is reported as `"needs decision"` and routed to `specs/decisions/` before any fix
 
-#### Scenario: Skill description mentions all modes
+#### Scenario: Shape was wrong
 
-- **WHEN** the review skill is listed or generated
-- **THEN** the description references artifact review, implementation review, and pre-archive review
+- **WHEN** a finding shows the implemented outcome does not match the intended shape of the unit
+- **THEN** the finding is routed to `litespec-plan`, not a fix
 
-### Requirement: Cross-Change Dependency Awareness
+#### Scenario: Non-trivial finding outside all units
 
-When reviewing a change that declares `dependsOn`, the review skill MUST read the dependency's specs and design artifacts in addition to the change's own artifacts. The review MAY consult `specs/glossary.md` as supplementary terminology context alongside dependency specs/design. The review SHALL cross-reference interface names, method signatures, config keys, and type names across the dependency boundary. Mismatches between the reviewed change's references and the dependency's exported terms SHALL be reported as WARNING findings — not CRITICAL. This applies to all three review modes (artifact, implementation, pre-archive).
+- **WHEN** a finding needs a unit's worth of work and does not break an existing unit's contract
+- **THEN** the review drafts a new unit and creates a GH sub-issue or local queue entry, but does not implement it
 
-#### Scenario: Artifact review with dependency
+### Requirement: Pure Review Role
 
-- **WHEN** artifact review is invoked on a change that depends on another change
-- **THEN** the review reads the dependency's specs and design, and cross-references shared terms
+The `litespec-review` skill MUST NOT write code, modify files, or implement fixes. It SHALL report findings and route them. Creating a GH sub-issue or a `specs/queues/<parent-name>-review.md` entry is routing, not implementation.
 
-#### Scenario: Mismatched interface name across dependency
+#### Scenario: Review does not edit code
 
-- **WHEN** change B depends on change A, A's spec defines an interface named "RPCAgent", and B's spec references "*RPCAgent" (pointer variant)
-- **THEN** the review reports a WARNING finding about the name mismatch
+- **WHEN** `litespec-review` runs
+- **THEN** it does not edit source files, check or uncheck checkboxes, or commit changes
 
-#### Scenario: Consistent references across dependency
+#### Scenario: Sub-issue creation is routing
 
-- **WHEN** change B depends on change A, and all of B's references to A's interfaces match exactly
-- **THEN** no cross-change findings are reported
+- **WHEN** review creates a GH sub-issue or local queue entry for a new unit
+- **THEN** it only drafts the unit in the issue or queue body and does not implement the code
 
-#### Scenario: Dependency has no specs
+### Requirement: Adversarial Scenario Reference
 
-- **WHEN** change B depends on archived change A and A's specs have been merged into canon
-- **THEN** the review reads the canonical specs for cross-referencing instead
+When the change contains stateful code paths, `litespec-review` SHALL load `references/review/adversarial-review.md` and construct worst-case scenarios from the specs before tracing implementation code. For each scenario it SHALL trace the code path, tag handling as `Handled`, `Missing`, or `Uncertain`, and report any confirmed or inferred gap as a finding.
 
-#### Scenario: Glossary provides supplementary context
+#### Scenario: Adversarial review for stateful code
 
-- **WHEN** `specs/glossary.md` exists and a change has `dependsOn`
-- **THEN** the review may consult the glossary for terminology context alongside dependency artifacts
+- **WHEN** the change contains state transitions, multi-entity operations, or concurrent access
+- **THEN** review loads `references/review/adversarial-review.md`, enumerates adversarial scenarios, and checks them against the implementation
 
-### Requirement: Fix Skill Handoff
+#### Scenario: Adversarial finding breaks a unit
 
-The review skill template SHALL direct users to the fix skill when findings need to be addressed. The ending section of the review template MUST reference `litespec-fix` as the appropriate skill for resolving review findings, replacing the current instruction to "use apply." The review skill SHALL remain pure review — it MUST NOT write code, modify files, or implement fixes.
+- **WHEN** an adversarial scenario confirms an interaction bug that breaks a unit's `Done means:` or `Verify:`
+- **THEN** the finding is CRITICAL and routes to `litespec-build` with the unit checkbox unchecked
 
-#### Scenario: Review directs users to fix skill
+### Requirement: No Unit for Trivial Findings
 
-- **WHEN** the review skill template is rendered
-- **THEN** the ending section instructs the user to use the fix skill for addressing review findings, not apply
+`litespec-review` SHALL NOT invent new units for trivial findings; those SHALL be routed to the small fix lane. A new unit SHALL be drafted only when a finding needs a unit's worth of work and does not break an existing unit's contract.
 
-#### Scenario: Review skill remains pure review
+#### Scenario: Typo in help text
 
-- **WHEN** the review skill template is rendered
-- **THEN** it states that review mode is pure review and must never write code or implement fixes
+- **WHEN** review finds a typo in help text or other trivial issue outside any unit contract
+- **THEN** it routes the finding to the small fix lane and does not create a unit
+
+#### Scenario: Missing contract for new work
+
+- **WHEN** a finding requires real implementation work that no existing unit covers
+- **THEN** the review may draft a new unit and route it to a sub-issue or queue entry
+
+### Requirement: Issue Closure Condition
+
+A GH issue SHALL remain open until all of its units pass their `Done means:` and `Verify:` contracts; it SHALL close when all units pass. Small fix findings outside any unit contract SHALL NOT reopen the issue.
+
+#### Scenario: All units pass
+
+- **WHEN** all unit checkboxes are checked and `litespec-review` returns `PASS`
+- **THEN** the GH issue may be closed
+
+#### Scenario: Small fix does not reopen issue
+
+- **WHEN** a small fix is applied for a WARNING or SUGGESTION outside any unit contract
+- **THEN** the issue is not reopened
+
+### Requirement: No Persistent Finding Tracker
+
+`litespec-review` findings SHALL be ephemeral. A finding SHALL route to an existing unit checkbox, be fixed immediately in the appropriate lane, or become a new queue issue. The review skill SHALL NOT maintain a finding tracker, task list, or persistent finding artifact.
+
+#### Scenario: Findings route or become queue issues
+
+- **WHEN** `litespec-review` finishes
+- **THEN** its findings are either resolved via `litespec-build`/small fix or recorded as a GH sub-issue or local queue entry; no finding tracker or task list is created
+
+#### Scenario: Re-review reads current state
+
+- **WHEN** `litespec-review` is re-run after fixes
+- **THEN** it evaluates the current state from the issue, spec, and code, not from a previous finding log

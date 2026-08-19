@@ -2,248 +2,138 @@
 
 ## Requirements
 
-### Requirement: Template Missing Error
+### Requirement: Skill Registry Contains Exactly Three Generated Skills
 
-The `GenerateSkills` function MUST return an error when a skill in the `Skills` list has no registered template. The error SHALL use the format `fmt.Errorf("skill %s: template not registered", skillID)`. If the `Skills` list is empty, the function SHALL succeed without error.
+The `Skills` slice in `internal/paths.go` SHALL contain exactly three `SkillInfo` entries with ID `plan` and name `litespec-plan`, ID `build` and name `litespec-build`, and ID `review` and name `litespec-review`. The `Skills` slice SHALL NOT contain a `think` skill, and it SHALL NOT contain the legacy skill IDs `explore`, `grill`, `propose`, `research`, `apply`, `adopt`, `workflow`, `glossary`, `patch`, or `fix`.
 
-#### Scenario: Skill with missing template produces error
+#### Scenario: Exactly three generated skills
+
+- **WHEN** the `Skills` variable is inspected
+- **THEN** it contains exactly three entries with IDs `plan`, `build`, and `review` and names `litespec-plan`, `litespec-build`, and `litespec-review`
+
+#### Scenario: No legacy or think skill IDs
+
+- **WHEN** the `Skills` variable is inspected
+- **THEN** it does not contain the IDs `think`, `explore`, `grill`, `propose`, `research`, `apply`, `adopt`, `workflow`, `glossary`, `patch`, or `fix`
+
+### Requirement: Skill Templates Are Loaded and Validated
+
+Each skill ID in the `Skills` slice SHALL have a corresponding template file at `internal/skill/templates/<id>.md` that is loaded from the `embed.FS` and registered by `loadTemplates()` during package `init()`. The `GenerateSkills` function MUST return an error formatted `skill %s: template not registered` when a skill has no registered template. An empty `Skills` slice SHALL cause `GenerateSkills` to succeed without generating files.
+
+#### Scenario: Missing skill template returns error
 
 - **WHEN** `GenerateSkills` is called and a skill in the `Skills` list has no registered template
-- **THEN** an error is returned in the format "skill <id>: template not registered"
+- **THEN** it returns an error in the format `skill <id>: template not registered`
 
-#### Scenario: All skills have templates
+#### Scenario: All skill templates registered
 
 - **WHEN** `GenerateSkills` is called and all skills have registered templates
-- **THEN** all skill files are generated in `.agents/skills/` without errors
+- **THEN** `.agents/skills/<name>/SKILL.md` is generated for each skill without errors
 
 #### Scenario: Empty skills list succeeds
 
-- **WHEN** `GenerateSkills` is called with an empty `Skills` list
+- **WHEN** the `Skills` slice is empty and `GenerateSkills` is called
 - **THEN** no error is returned and no files are generated
 
-### Requirement: Adapter Template Missing Error
+### Requirement: Adapter Commands Generate Symlinks
 
-The `GenerateAdapterCommands` function MUST return an error when a skill in the `Skills` list has no registered template. The error SHALL use the format `fmt.Errorf("skill %s: template not registered for adapter %s", skillID, toolID)`.
+The `Adapters` slice in `internal/paths.go` SHALL contain exactly one `ToolAdapter` with ID `claude` and skills directory `.claude/skills`. The `GenerateAdapterCommands` function MUST return an error formatted `skill %s: template not registered for adapter %s` when a skill lacks a registered template. When all skills are registered, `GenerateAdapterCommands` SHALL create a symlink in the adapter's skills directory for each generated skill, with the link pointing to the corresponding directory under `.agents/skills/`. Both `litespec init --tools claude` and `litespec update --tools claude` SHALL trigger adapter symlink generation.
 
 #### Scenario: Adapter generation with missing template
 
-- **WHEN** `GenerateAdapterCommands` is called and a skill has no registered template
-- **THEN** an error is returned in the format "skill <id>: template not registered for adapter <tool>"
+- **WHEN** `GenerateAdapterCommands` is called for `claude` and a skill has no registered template
+- **THEN** it returns an error in the format `skill <id>: template not registered for adapter claude`
 
-#### Scenario: Adapter generation succeeds for all skills
+#### Scenario: Adapter symlinks created on init and update
 
-- **WHEN** `GenerateAdapterCommands` is called and all skills have templates
-- **THEN** symlinks are created for all skills in the adapter skills directory
+- **WHEN** `litespec init --tools claude` or `litespec update --tools claude` is run
+- **THEN** `.claude/skills/litespec-plan`, `.claude/skills/litespec-build`, and `.claude/skills/litespec-review` are symlinks pointing to `.agents/skills/litespec-*`
 
-### Requirement: Template Registration Validation
+### Requirement: Reference Files Are Generated
 
-A `ValidateSkillTemplates` function MUST exist that checks every skill in the `Skills` list has a non-empty registered template. It SHALL return a slice of skill IDs that are missing templates (empty slice, not nil, when all are valid). This function MAY be called during `litespec validate` to catch registration issues early.
+A generated skill MAY include reference files under `internal/skill/templates/references/<id>/`. The `GenerateSkills` function SHALL copy each such reference file into `.agents/skills/<name>/references/<file>.md`. The `litespec-plan` skill SHALL have the five references `fuzzy.md`, `clear.md`, `grilling.md`, `codebase-design.md`, and `domain-modeling.md`. The `litespec-build` skill SHALL have the reference `review-fixing.md`. The `litespec-review` skill SHALL have the reference `adversarial-review.md`.
 
-#### Scenario: All templates registered
+#### Scenario: Plan references generated
 
-- **WHEN** `ValidateSkillTemplates` is called and all skills have templates
-- **THEN** an empty list is returned
+- **WHEN** `litespec update` is run
+- **THEN** `.agents/skills/litespec-plan/references/` contains `fuzzy.md`, `clear.md`, `grilling.md`, `codebase-design.md`, and `domain-modeling.md`
+
+#### Scenario: Build and review references generated
+
+- **WHEN** `litespec update` is run
+- **THEN** `.agents/skills/litespec-build/references/review-fixing.md` and `.agents/skills/litespec-review/references/adversarial-review.md` exist
+
+### Requirement: litespec update Generates Canonical Skills
+
+The `litespec update` command SHALL invoke `GenerateSkills` to write each generated skill to `.agents/skills/<name>/SKILL.md` from the skill's `SkillInfo` metadata and its registered template, with a YAML frontmatter block containing `name` and `description`. `.agents/skills/` SHALL be the canonical skills directory. `litespec update` SHALL also remove stale `litespec-*` directories under `.agents/skills/` that are not in the active `Skills` list.
+
+#### Scenario: Update generates canonical skill files
+
+- **WHEN** `litespec update` is run
+- **THEN** `.agents/skills/litespec-plan/SKILL.md`, `.agents/skills/litespec-build/SKILL.md`, and `.agents/skills/litespec-review/SKILL.md` are generated with frontmatter and template content
+
+#### Scenario: Update removes stale legacy directories
+
+- **WHEN** `litespec update` is run and `.agents/skills/` contains a stale `litespec-explore` directory
+- **THEN** that directory is removed
+
+### Requirement: Adapter Auto-Detection Scans Symlinks
+
+The `DetectActiveAdapters` function SHALL scan each configured adapter skills directory for symlinks whose resolved target lies inside `.agents/skills/`. It SHALL return the IDs of adapters for which at least one such symlink exists. The `litespec update` command SHALL use `DetectActiveAdapters` when no `--tools` flag is provided.
+
+#### Scenario: Active claude adapter detected
+
+- **WHEN** `.claude/skills/` contains a symlink whose target resolves inside `.agents/skills/`
+- **THEN** `DetectActiveAdapters` returns `claude` and `litespec update` recreates the symlinks
+
+#### Scenario: No adapter detected
+
+- **WHEN** no adapter skills directory contains a symlink pointing into `.agents/skills/`
+- **THEN** `DetectActiveAdapters` returns an empty list and `litespec update` creates no adapter symlinks
+
+### Requirement: Stale Skill Directories Are Detected
+
+The `CheckStaleSkills` function SHALL detect directories under `.agents/skills/` whose names begin with `litespec-` but are not in the active `Skills` list, and it SHALL return a warning message naming the stale directories and instructing the user to run `litespec update`. It SHALL ignore directories that do not begin with `litespec-`, such as `skill-creator`, `the-drill`, or `research-vision`.
+
+#### Scenario: Legacy litespec directories detected
+
+- **WHEN** `.agents/skills/` contains `litespec-explore`, `litespec-grill`, or `litespec-propose`
+- **THEN** `CheckStaleSkills` returns a message naming those directories and containing `litespec update`
+
+#### Scenario: Non-litespec directories ignored
+
+- **WHEN** `.agents/skills/` contains `skill-creator`, `the-drill`, or `research-vision`
+- **THEN** `CheckStaleSkills` returns an empty string
+
+#### Scenario: Current litespec skills not reported
+
+- **WHEN** `.agents/skills/` contains `litespec-plan`, `litespec-build`, and `litespec-review`
+- **THEN** `CheckStaleSkills` returns an empty string
+
+### Requirement: Project-Specific Skills Are Not Generated
+
+Project-specific skills, such as `the-drill`, SHALL live directly in `.agents/skills/` as tracked git files. They SHALL NOT appear in the `Skills` slice, and `litespec update` SHALL NOT generate or overwrite them. The `CheckStaleSkills` function SHALL ignore them.
+
+#### Scenario: Project-specific skill preserved
+
+- **WHEN** `litespec update` is run and `.agents/skills/the-drill/` is a tracked git directory
+- **THEN** `litespec update` does not overwrite or remove `the-drill`
+
+#### Scenario: Project-specific skill not in Skills slice
+
+- **WHEN** the `Skills` variable is inspected
+- **THEN** it does not contain `the-drill`
+
+### Requirement: ValidateSkillTemplates Reports Missing Templates
+
+The `ValidateSkillTemplates` function SHALL exist and SHALL return a slice of skill IDs from the supplied list that have no registered template. It SHALL return an empty slice, not `nil`, when every supplied skill ID has a registered template.
+
+#### Scenario: All templates valid
+
+- **WHEN** `ValidateSkillTemplates` is called with the current skill IDs and all templates are registered
+- **THEN** it returns an empty, non-nil slice
 
 #### Scenario: Missing template detected
 
-- **WHEN** `ValidateSkillTemplates` is called and skill "think" has no template
-- **THEN** the returned list contains "think"
-
-### Requirement: Skill Generation Tests
-
-The `internal/skill/` package SHALL have test coverage for template registration, frontmatter marshaling, and the skill-to-skill consistency of generated output. Tests SHALL use standard Go testing patterns. The expected skill list in tests MUST include exactly the four skills: think, plan, build, review. The expected skill list MUST NOT include legacy skill IDs (explore, grill, propose, research, apply, adopt, workflow, glossary, patch, fix).
-
-#### Scenario: Tests SHALL verify template registration
-
-- **WHEN** `go test ./internal/skill/` is run
-- **THEN** tests SHALL verify that `Get` returns non-empty content for all current skill IDs (think, plan, build, review)
-
-### Requirement: Skill Templates Reference Backlog
-
-The skill templates for think, plan, and review SHALL include a prompt instructing the AI to read `specs/backlog.md` if it exists. The prompt SHALL be a single directive within each skill template, not programmatic integration. The think skill SHALL read backlog for session context and SHALL read `specs/glossary.md` at session start to establish shared vocabulary, nudging the user when it encounters terms that should be defined. If no glossary exists, the think skill SHALL suggest creating one when stable terms emerge. The plan skill SHALL suggest graduating backlog items when a proposal materializes one and SHALL check whether new terms introduced in the proposal exist in the glossary, offering to update it. The review skill SHALL suggest adding deferred scope to the backlog.
-
-#### Scenario: Think skill reads backlog
-
-- **WHEN** the think skill template is rendered
-- **THEN** it contains a directive to read `specs/backlog.md` for context on parked items
-
-#### Scenario: Think skill reads glossary
-
-- **WHEN** the think skill template is rendered
-- **THEN** it contains a directive to read `specs/glossary.md` if it exists at session start and nudge when undefined terms are encountered
-
-#### Scenario: Think skill degrades without glossary
-
-- **WHEN** the think skill template is rendered
-- **THEN** it contains a directive to suggest creating `specs/glossary.md` when stable terms emerge and no glossary exists
-
-#### Scenario: Plan skill suggests graduation
-
-- **WHEN** the plan skill template is rendered
-- **THEN** it contains a directive to check if the proposal materializes a backlog item and suggest removing it
-
-#### Scenario: Plan skill checks glossary
-
-- **WHEN** the plan skill template is rendered
-- **THEN** it contains a directive to check whether new terms are in `specs/glossary.md` and offer to update it
-
-#### Scenario: Review skill suggests deferral
-
-- **WHEN** the review skill template is rendered
-- **THEN** it contains a directive to suggest adding deferred scope to `specs/backlog.md`
-
-### Requirement: Think Skill Contains Workflow Routing
-
-The think skill template SHALL include workflow phase detection: it SHALL run `litespec status <name> --json` (or equivalent) to determine the current phase and suggest the appropriate next action. When no active change exists, the think skill SHALL explain the litespec workflow and help the user decide whether to explore, grill, or create a new change.
-
-#### Scenario: Think skill detects current phase
-
-- **WHEN** the think skill template is rendered and an active change exists
-- **THEN** it contains a directive to run `litespec status` and suggest next steps based on the current phase
-
-#### Scenario: Think skill explains workflow when no change exists
-
-- **WHEN** the think skill template is rendered and no active change exists
-- **THEN** it contains a directive to explain the litespec workflow and help the user choose a starting point
-
-### Requirement: Plan Skill Contains Patch Mode
-
-The plan skill template SHALL detect patch mode from the `.litespec.yaml` file within the change directory. When mode is `patch`, the plan skill SHALL skip creation of `proposal.md`, `design.md`, and `tasks.md`, proceeding directly to delta spec creation and validation.
-
-#### Scenario: Plan skill detects patch mode
-
-- **WHEN** the plan skill template is rendered and the change's `.litespec.yaml` contains `mode: patch`
-- **THEN** it instructs the agent to skip proposal, design, and tasks creation and proceed directly to delta spec editing
-
-#### Scenario: Plan skill creates full artifacts in default mode
-
-- **WHEN** the plan skill template is rendered and the change has no `mode: patch` in `.litespec.yaml`
-- **THEN** it instructs the agent to create all planning artifacts (proposal, specs, design, tasks) as applicable
-
-### Requirement: Documentation Reflects Four Skills
-
-Project documentation files `AGENTS.md` and `DESIGN.md` SHALL reference only the four current skill IDs (think, plan, build, review) and SHALL NOT reference legacy skill IDs (explore, grill, propose, research, apply, adopt, workflow, glossary, patch, fix) as active skills.
-
-#### Scenario: AGENTS.md references only current skills
-
-- **WHEN** `AGENTS.md` is inspected
-- **THEN** it does not list explore, grill, propose, research, apply, adopt, workflow, glossary, patch, or fix as separate skills
-
-#### Scenario: DESIGN.md references only current skills
-
-- **WHEN** `DESIGN.md` is inspected
-- **THEN** the skill directory tree shows exactly four directories: litespec-think, litespec-plan, litespec-build, litespec-review
-
-### Requirement: Glossary Management In Plan Skill
-
-The `Skills` list in `internal/paths.go` MUST NOT include a standalone `glossary` skill. Glossary management SHALL be a section within the `plan` skill template (ID "plan", name "litespec-plan"). The plan skill template SHALL include instructions for the AI to read `specs/glossary.md`, propose new terms when it encounters undefined concepts, and maintain consistent formatting.
-
-#### Scenario: No standalone glossary skill
-
-- **WHEN** `litespec update` is run
-- **THEN** `.agents/skills/litespec-glossary/SKILL.md` does not exist
-
-#### Scenario: Glossary instructions in plan skill
-
-- **WHEN** the plan skill template is rendered
-- **THEN** it contains instructions for managing `specs/glossary.md` including reading, proposing terms, and formatting
-
-#### Scenario: Glossary section handles missing file
-
-- **WHEN** the plan skill is invoked and `specs/glossary.md` does not exist
-- **THEN** the skill offers to create and seed the glossary file
-
-### Requirement: Build Skill Contains Fix Workflow
-
-The build skill template SHALL include a structured workflow for addressing review findings. The workflow MUST include: loading the review report and change artifacts, grouping findings by file and priority, addressing CRITICAL findings first followed by WARNING then SUGGESTION, verifying each fix individually before moving to the next, running `litespec validate <name>` after all fixes to confirm no structural regressions, and committing only after all findings are resolved. The skill SHALL escalate unresolvable findings as a new warning rather than silently dropping them.
-
-#### Scenario: Build skill addresses findings in priority order
-
-- **WHEN** the build skill template is rendered
-- **THEN** it instructs the agent to address CRITICAL findings before WARNING before SUGGESTION
-
-#### Scenario: Build skill verifies per finding
-
-- **WHEN** the build skill template is rendered
-- **THEN** it instructs the agent to verify each fix individually before proceeding to the next finding
-
-#### Scenario: Build skill validates after all fixes
-
-- **WHEN** the build skill template is rendered
-- **THEN** it instructs the agent to run `litespec validate <name>` after all fixes are applied
-
-#### Scenario: Build skill escalates unresolvable findings
-
-- **WHEN** the build skill template is rendered
-- **THEN** it instructs the agent to surface unresolvable findings as an explicit warning rather than silently dropping them
-
-### Requirement: Build Skill Contains Research Pause
-
-The build skill template SHALL include a pause condition: when the agent encounters a knowledge gap during implementation (novel APIs, unfamiliar libraries, non-obvious authentication flows), it SHALL gather the relevant documentation and MAY produce a research skill file at `.agents/skills/research-<topic>/SKILL.md` for future reference. The research skill file, if produced, SHALL use the skill-creator format conventions and persist after archive as accumulated project knowledge. This replaces the former standalone research skill as an inline step within the build workflow.
-
-#### Scenario: Agent encounters knowledge gap during implementation
-
-- **WHEN** the build skill is active and the agent needs documentation for an unfamiliar API
-- **THEN** the agent pauses implementation, gathers docs, and optionally produces a research skill file
-
-#### Scenario: Research skill persists after archive
-
-- **WHEN** a research skill file was produced during build
-- **THEN** the file remains in `.agents/skills/research-<topic>/` after the change is archived
-
-### Requirement: Build Skill References Glossary
-
-The build skill template SHALL include a passive reference to `specs/glossary.md` in a references section. The agent MAY consult the glossary for terminology after completing a phase. No enforcement, no nudge — purely optional context.
-
-#### Scenario: Build skill references glossary
-
-- **WHEN** the build skill template is rendered
-- **THEN** it contains a reference to `specs/glossary.md` as optional terminology context, without enforcement directives
-
-### Requirement: Four Skill Registration
-
-The `Skills` list in `internal/paths.go` MUST contain exactly four entries with the following IDs and names:
-
-| ID | Name | Description (concise) |
-|----|------|----------------------|
-| `think` | `litespec-think` | Explore ideas and stress-test plans for litespec changes. |
-| `plan` | `litespec-plan` | Create or update litespec change proposals and patches. |
-| `build` | `litespec-build` | Implement litespec changes, fix review findings, and research knowledge gaps. |
-| `review` | `litespec-review` | Adversarial review of litespec artifacts or implementation. |
-
-A corresponding Go template MUST be registered in `internal/skill/` for each ID via `init()`. Legacy skill IDs (explore, grill, propose, research, apply, adopt, workflow, glossary, patch, fix) SHALL NOT appear in the `Skills` list. Legacy template Go files (explore.go, grill.go, propose.go, research.go, apply.go, adopt.go, workflow.go, glossary.go, patch.go, fix.go) SHALL be removed from `internal/skill/`.
-
-#### Scenario: Exactly four skills registered
-
-- **WHEN** the `Skills` variable is inspected
-- **THEN** it contains exactly four entries with IDs "think", "plan", "build", "review"
-
-#### Scenario: No legacy skill IDs
-
-- **WHEN** the `Skills` variable is inspected
-- **THEN** none of the following IDs appear: explore, grill, propose, research, apply, adopt, workflow, glossary, patch, fix
-
-#### Scenario: All four templates registered
-
-- **WHEN** `Get("think")`, `Get("plan")`, `Get("build")`, `Get("review")` are called
-- **THEN** non-empty template content is returned for each
-
-#### Scenario: Skills are generated by update
-
-- **WHEN** `litespec update` is run
-- **THEN** `.agents/skills/litespec-think/SKILL.md`, `.agents/skills/litespec-plan/SKILL.md`, `.agents/skills/litespec-build/SKILL.md`, and `.agents/skills/litespec-review/SKILL.md` are generated
-
-#### Scenario: Legacy skill directories are removed
-
-- **WHEN** `litespec update` is run
-- **THEN** directories for legacy skills (litespec-explore, litespec-grill, litespec-propose, litespec-research, litespec-apply, litespec-adopt, litespec-workflow, litespec-glossary, litespec-patch, litespec-fix) are removed from `.agents/skills/` if they exist
-
-#### Scenario: Adapter symlinks for legacy skills are removed
-
-- **WHEN** `litespec update` is run
-- **THEN** symlinks in adapter skill directories (e.g., `.claude/skills/`) that reference legacy skill IDs are removed
-
-#### Scenario: Legacy template Go files are removed
-
-- **WHEN** the change is implemented
-- **THEN** none of the following files exist in `internal/skill/`: explore.go, grill.go, propose.go, research.go, apply.go, adopt.go, workflow.go, glossary.go, patch.go, fix.go
+- **WHEN** `ValidateSkillTemplates` is called and a skill ID has no registered template
+- **THEN** the returned slice contains that skill ID

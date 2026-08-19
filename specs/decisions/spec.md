@@ -45,30 +45,6 @@ A decision file MUST contain an H1 title, a `## Status` section with a single-wo
 - **WHEN** a decision file contains `## Superseded-By` with item `0007-new-workspace-model`
 - **THEN** the parsed decision exposes `SupersededBy = ["0007-new-workspace-model"]`
 
-### Requirement: Decide Command
-
-The CLI SHALL provide a `litespec decide <slug>` command that creates a new decision file. The command SHALL determine the next available number by scanning `specs/decisions/` for existing files and incrementing the highest observed number (or starting at `0001` if empty). The command SHALL scaffold the file with the required sections populated with placeholders and status set to `proposed`. The command SHALL reject slugs containing whitespace, path separators, or characters outside `[a-z0-9-]`. If a decision with the same slug already exists (regardless of number), the command SHALL error without writing.
-
-#### Scenario: Create first decision
-
-- **WHEN** `litespec decide single-workspace` is run and `specs/decisions/` is empty or absent
-- **THEN** a file `specs/decisions/0001-single-workspace.md` is created with scaffolded sections and status `proposed`
-
-#### Scenario: Create subsequent decision
-
-- **WHEN** `litespec decide beta-tool-binding` is run and the highest existing number is `0003`
-- **THEN** a file `specs/decisions/0004-beta-tool-binding.md` is created
-
-#### Scenario: Duplicate slug rejected
-
-- **WHEN** `litespec decide foo` is run and `0002-foo.md` already exists
-- **THEN** an error is printed indicating the slug is already in use and no file is written
-
-#### Scenario: Invalid slug rejected
-
-- **WHEN** `litespec decide "My Decision"` is run
-- **THEN** an error is printed indicating the slug must be kebab-case lowercase and no file is written
-
 ### Requirement: Supersede Linking
 
 When a decision declares `## Superseded-By: <target-slug>`, the validator SHALL check that the target decision exists. When a decision declares `## Supersedes: <target-slug>`, the validator SHALL check that the target decision exists and has status `superseded`. A decision with status `superseded` SHALL have a `## Superseded-By` pointer to a non-superseded decision. These checks produce validation errors, not warnings.

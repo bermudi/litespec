@@ -34,7 +34,7 @@ If every invocation needs it, it belongs in this file, not a reference.
 
 Read `specs/product.md`, `specs/glossary.md` if present, relevant `specs/<feature>/spec.md`, `specs/decisions/` for context, and the code the change would touch. Don't speculate about behavior you haven't opened.
 
-Derive a kebab-case change name from the description. Check for active changes with `litespec list --json` or `gh issue list`.
+Derive a kebab-case change name from the description. Check for open queue issues with `gh issue list --label litespec --state open` or `litespec view`.
 
 ---
 

@@ -37,7 +37,7 @@ Each unit is one demo-able outcome `## <name>` with `Done means:` and `Verify:`.
 
 ## What Makes litespec Different
 
-- **GH issue is the queue** — proposal + design + queue live in the GH issue body, not `specs/changes/` or `QUEUE.md`. No offline fallback — `--issue` is required for `litespec new`.
+- **GH issue is the queue** — proposal + design + queue live in the GH issue body, not `specs/changes/` or `QUEUE.md`. Offline fallback via `specs/queues/<name>.md` when `gh` is unavailable; `--issue` required for `litespec new` to link to GH.
 - **Convention over configuration** — zero config files. All defaults.
 - **3 skills only** — `litespec-plan` (fuzzy/clear + grilling/codebase-design/domain-modeling), `litespec-build` (one unit), `litespec-review` (adversarial). Progressive disclosure via `references/`, lean tokens.
 - **Two lanes** — small fix (zero ceremony) vs new feature (plan fuzzy -> clear -> build -> review).
