@@ -101,11 +101,11 @@ The text dashboard SHALL display a `Decisions` section underlined with 60 `─` 
 
 ### Requirement: GH Issues Section
 
-The text dashboard SHALL display a `GH Issues (open)` section underlined with 60 `─` characters when `gh` is available and at least one open issue is returned, printing each issue as `#<number> <title> <url>`. When `gh` is not on `PATH` and no issues are found, it SHALL display a `GH Issues` section with the notice `(gh not available — showing local specs only)`. When `gh` is present but returns no open issues, the section SHALL be omitted.
+The text dashboard SHALL display a `GH Issues (open)` section underlined with 60 `─` characters when `gh` is available and at least one open issue labeled `litespec` is returned, printing each issue as `#<number> <title> <url>`. When `gh` is not on `PATH` and no issues are found, it SHALL display a `GH Issues` section with the notice `(gh not available — showing local specs only)`. When `gh` is present but returns no open labeled issues, the section SHALL be omitted.
 
 #### Scenario: Open issues listed
 
-- **WHEN** `gh` is on `PATH`, the project is in a git work tree, and `gh issue list` returns one open issue titled `Fix auth`
+- **WHEN** `gh` is on `PATH`, the project is in a git work tree, and `gh issue list` returns one open issue labeled `litespec` titled `Fix auth`
 - **THEN** the GH Issues section lists the issue with `#<number>`, `Fix auth`, and its URL
 
 #### Scenario: gh not available
@@ -115,12 +115,12 @@ The text dashboard SHALL display a `GH Issues (open)` section underlined with 60
 
 ### Requirement: GitHub Issue Fetch
 
-`litespec view` SHALL fetch open GitHub issues by running `gh issue list --json number,title,state,url --state open --limit 50` from the project root. It SHALL require `gh` to be on `PATH` and the project to be in a git work tree; if the `.git` directory is absent, it SHALL fall back to `git rev-parse --is-inside-work-tree`. Any failure SHALL be silent and result in an empty issue list.
+`litespec view` SHALL fetch open queue issues by running `gh issue list --label litespec --json number,title,state,url --state open --limit 10000` from the project root. It SHALL require `gh` to be on `PATH` and the project to be in a git work tree; if the `.git` directory is absent, it SHALL fall back to `git rev-parse --is-inside-work-tree`. Any failure SHALL be silent and result in an empty issue list.
 
 #### Scenario: gh invocation
 
 - **WHEN** the project has a `.git` directory and `gh` is installed
-- **THEN** the command invokes `gh issue list` with the exact JSON fields, `--state open`, and `--limit 50`
+- **THEN** the command invokes `gh issue list` with the `litespec` label, exact JSON fields, `--state open`, and `--limit 10000`
 
 #### Scenario: Missing git work tree
 

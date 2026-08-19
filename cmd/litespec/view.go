@@ -118,7 +118,7 @@ func fetchViewGHIssues(root string) []viewGHIssueJSON {
 			return nil
 		}
 	}
-	cmd := exec.Command("gh", "issue", "list", "--json", "number,title,state,url", "--state", "open", "--limit", "50")
+	cmd := exec.Command("gh", "issue", "list", "--label", "litespec", "--json", "number,title,state,url", "--state", "open", "--limit", "10000")
 	cmd.Dir = root
 	out, err := cmd.Output()
 	if err != nil {

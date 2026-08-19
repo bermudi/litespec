@@ -4,7 +4,7 @@
 
 **litespec** — a lean, AI-native spec-driven development CLI tool written in Go.
 
-It reimagines [OpenSpec](https://github.com/Fission-AI/OpenSpec) with stronger opinions: fewer concepts, leaner skills, unidirectional workflow, and proper dangling-delta validation.
+It reimagines [OpenSpec](https://github.com/Fission-AI/OpenSpec) with stronger opinions: fewer concepts, leaner skills, unidirectional workflow, and strict structural validation.
 
 Reference implementation lives at `reference/openspec/` for inspiration and grounding. Do not modify it.
 

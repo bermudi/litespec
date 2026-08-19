@@ -31,16 +31,13 @@ func ValidateAll(root string, strict bool) (*ValidationResult, error) {
 		})
 	}
 
-	decisions, decErr := ListDecisions(root)
-	if decErr == nil && len(decisions) > 0 {
-		decResult, decErr := ValidateDecisions(root)
-		if decErr != nil {
-			return nil, decErr
-		}
-		result.Errors = append(result.Errors, decResult.Errors...)
-		result.Warnings = append(result.Warnings, decResult.Warnings...)
-		result.DecisionsCount += decResult.DecisionsCount
+	decResult, err := ValidateDecisions(root)
+	if err != nil {
+		return nil, err
 	}
+	result.Errors = append(result.Errors, decResult.Errors...)
+	result.Warnings = append(result.Warnings, decResult.Warnings...)
+	result.DecisionsCount += decResult.DecisionsCount
 
 	queueResult, err := ValidateGHIssueQueues(root)
 	if err != nil {

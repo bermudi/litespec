@@ -561,13 +561,16 @@ func TestCmdUpdateDirect_WithTools(t *testing.T) {
 }
 
 func TestCmdUpdateDirect_UnknownTool(t *testing.T) {
-	root := setupDirectTest(t)
+	root := setupEmptyDir(t)
 	if err := internal.InitProject(root); err != nil {
 		t.Fatal(err)
 	}
 	err := cmdUpdate([]string{"--tools", "bogus"})
 	if err == nil {
 		t.Fatal("expected error for unknown tool")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".agents", "skills")); !os.IsNotExist(err) {
+		t.Error("expected unknown tool to leave generated skills untouched")
 	}
 }
 
@@ -670,10 +673,16 @@ func TestCmdInitDirect_WithTools(t *testing.T) {
 }
 
 func TestCmdInitDirect_UnknownTool(t *testing.T) {
-	setupEmptyDir(t)
+	root := setupEmptyDir(t)
 	err := cmdInit([]string{"--tools", "bogus"})
 	if err == nil {
 		t.Fatal("expected error for unknown tool")
+	}
+	if _, err := os.Stat(filepath.Join(root, "specs")); !os.IsNotExist(err) {
+		t.Error("expected unknown tool to leave specs untouched")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".agents")); !os.IsNotExist(err) {
+		t.Error("expected unknown tool to leave generated skills untouched")
 	}
 }
 

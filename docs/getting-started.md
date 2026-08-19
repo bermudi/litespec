@@ -243,11 +243,11 @@ Add `~/go/bin` to your PATH and reload your shell.
 
 ### `litespec new` says `--issue is required`
 
-Create the GH issue first, then run `litespec new <name> --issue N`. v2 has no offline queue.
+Create the GH issue first, apply the `litespec` label, then run `litespec new <name> --issue N`. Without `gh`, use the equivalent queue file under `specs/queues/`.
 
 ### `litespec view` doesn't show GH issues
 
-Check that `gh` is installed, authenticated, and that the repo has open issues. `view` runs `gh issue list --state open`.
+Check that `gh` is installed, authenticated, and that the repo has open issues labeled `litespec`. `view` runs `gh issue list --label litespec --state open`.
 
 ### `validate` reports errors
 

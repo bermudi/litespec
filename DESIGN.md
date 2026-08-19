@@ -151,7 +151,7 @@ Generated via `litespec update` from `internal/skill/templates/` (embed.FS). `.a
 | `litespec init` | scaffold `specs/` + skills |
 | `litespec new <name> [--issue N]` | link to GH issue (no folder in lean) |
 | `litespec validate [--decisions] [--issue N] [--queue <path>]` | lint specs + decisions + GH issue queue (labeled litespec) + local specs/queues/ fallback + Verify shell (bash -n) |
-| `litespec view` | product + features + open GH issues (via `gh` if present) + decisions (spine starred) |
+| `litespec view` | product + features + open `litespec` GH issues (via `gh` if present) + decisions (spine starred) |
 | `litespec update` | regenerate skills |
 
 No `patch`, `archive`, `decide`, `preview`, `import` until needed. Add when pain appears.

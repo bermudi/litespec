@@ -23,7 +23,7 @@ litespec init
 # New feature — link to GH issue
 litespec new add-feature --issue 42   # GH issue holds proposal + design + queue
 litespec validate
-litespec view                         # product + specs + open GH issues
+litespec view                         # product + specs + open litespec GH issues
 litespec update                       # regenerate 3 skills
 ```
 

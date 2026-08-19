@@ -4,7 +4,7 @@
 
 ### Requirement: Decisions Directory
 
-The project SHALL support an optional `specs/decisions/` directory containing architectural decision records. Each decision SHALL be a single markdown file named `NNNN-<kebab-name>.md` where `NNNN` is a zero-padded four-digit sequence number (e.g., `0001-single-shared-workspace.md`). The directory's absence SHALL NOT be an error — decisions are opt-in. Decision files SHALL NOT be moved, renamed, or deleted during archive or any other litespec operation.
+The project SHALL support an optional `specs/decisions/` directory containing architectural decision records. Each decision SHALL be a single markdown file named `NNNN-<kebab-name>.md` where `NNNN` is a zero-padded four-digit sequence number (e.g., `0001-single-shared-workspace.md`). The directory's absence SHALL NOT be an error — decisions are opt-in. Decision files SHALL NOT be moved, renamed, or deleted by any litespec operation.
 
 #### Scenario: Decisions directory is optional
 
@@ -16,9 +16,9 @@ The project SHALL support an optional `specs/decisions/` directory containing ar
 - **WHEN** a decision file is created with name `0003-beta-tools-session-bound.md`
 - **THEN** the number is parsed as `3` and the slug is `beta-tools-session-bound`
 
-#### Scenario: Decisions survive archive
+#### Scenario: Decisions survive other operations
 
-- **WHEN** a change citing a decision slug is archived
+- **WHEN** a user runs `litespec update`
 - **THEN** the decision file remains in `specs/decisions/` unchanged
 
 ### Requirement: Decision File Structure

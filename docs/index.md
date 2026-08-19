@@ -8,7 +8,7 @@ litespec keeps your codebase aligned with durable, load-bearing specs. One GitHu
 
 ## What makes litespec different
 
-**GitHub issue is the queue.** Proposal + design + implementation queue live in the issue body. No queue file. `litespec new <name> --issue N` links a feature to the issue.
+**GitHub issue is the queue.** Proposal + design + implementation queue normally live in the issue body. When `gh` is unavailable, `specs/queues/<name>.md` is the equivalent local queue. `litespec new <name> --issue N` links a feature to the issue.
 
 **Two lanes.** Small fix: zero ceremony, edit code and the one `specs/<feature>/spec.md` directly. New feature: plan fuzzy → clear → grill-me → build one unit at a time → review → close the issue.
 

@@ -194,9 +194,9 @@ litespec view [--json] [--minimal]
 
 Description:
 
-Display a dashboard overview of product, specs, decisions, and open GH issues.
+Display a dashboard overview of product, specs, decisions, and open `litespec` GH issues.
 
-If `gh` is installed and the project is a Git repository with a GitHub remote, `view` calls `gh issue list` and shows open issues. Otherwise it shows only local specs and decisions.
+If `gh` is installed and the project is a Git repository with a GitHub remote, `view` calls `gh issue list --label litespec` and shows open queue issues. Otherwise it shows only local specs and decisions.
 
 Flags:
 

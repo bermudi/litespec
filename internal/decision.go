@@ -47,6 +47,27 @@ func DecisionsPath(root string) string {
 	return filepath.Join(root, ProjectDirName, "decisions")
 }
 
+func decisionFiles(root string) ([]string, error) {
+	dir := DecisionsPath(root)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read decisions directory: %w", err)
+	}
+
+	var paths []string
+	for _, entry := range entries {
+		if entry.IsDir() || !decisionFileRe.MatchString(entry.Name()) {
+			continue
+		}
+		paths = append(paths, filepath.Join(dir, entry.Name()))
+	}
+	sort.Strings(paths)
+	return paths, nil
+}
+
 func ParseDecision(path string) (*Decision, error) {
 	base := filepath.Base(path)
 	m := decisionFileRe.FindStringSubmatch(base)
@@ -123,21 +144,12 @@ func ParseDecision(path string) (*Decision, error) {
 }
 
 func ListDecisions(root string) ([]*Decision, error) {
-	dir := DecisionsPath(root)
-	entries, err := os.ReadDir(dir)
+	paths, err := decisionFiles(root)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("read decisions directory: %w", err)
+		return nil, err
 	}
-
 	var result []*Decision
-	for _, entry := range entries {
-		if entry.IsDir() || !decisionFileRe.MatchString(entry.Name()) {
-			continue
-		}
-		path := filepath.Join(dir, entry.Name())
+	for _, path := range paths {
 		d, err := ParseDecision(path)
 		if err != nil {
 			continue

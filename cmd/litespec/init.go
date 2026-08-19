@@ -20,6 +20,14 @@ func cmdInit(args []string) error {
 		return err
 	}
 
+	var toolIDs []string
+	if tools != "" {
+		toolIDs = splitCSV(tools)
+		if err := validateToolIDs(toolIDs); err != nil {
+			return err
+		}
+	}
+
 	root, err := internal.FindProjectRoot()
 	if err != nil {
 		return err
@@ -40,13 +48,7 @@ func cmdInit(args []string) error {
 		fmt.Println("Generated .agents/skills/")
 	}
 
-	var toolIDs []string
-	if tools != "" {
-		toolIDs = splitCSV(tools)
-		if err := validateToolIDs(toolIDs); err != nil {
-			return err
-		}
-	} else {
+	if tools == "" {
 		toolIDs = internal.DetectActiveAdapters(root)
 	}
 

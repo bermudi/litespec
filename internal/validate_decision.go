@@ -27,13 +27,27 @@ func ValidateDecision(root, slug string) (*ValidationResult, error) {
 func ValidateDecisions(root string) (*ValidationResult, error) {
 	result := &ValidationResult{Valid: true}
 
-	decisions, err := ListDecisions(root)
+	paths, err := decisionFiles(root)
 	if err != nil {
 		return nil, err
 	}
-	if len(decisions) == 0 {
+	if len(paths) == 0 {
 		result.Valid = true
 		return result, nil
+	}
+
+	var decisions []*Decision
+	for _, path := range paths {
+		d, err := ParseDecision(path)
+		if err != nil {
+			result.Errors = append(result.Errors, ValidationIssue{
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("invalid decision: %v", err),
+				File:     path,
+			})
+			continue
+		}
+		decisions = append(decisions, d)
 	}
 
 	// Duplicate number detection

@@ -11,17 +11,19 @@ import (
 
 func GenerateAdapterCommands(root string, toolIDs []string) error {
 	for _, toolID := range toolIDs {
-		adapter := GetAdapter(toolID)
-		if adapter == nil {
+		if GetAdapter(toolID) == nil {
 			return fmt.Errorf("unknown tool: %s (supported: %s)", toolID, strings.Join(ValidToolIDs(), ", "))
 		}
+	}
 
+	for _, toolID := range toolIDs {
+		adapter := GetAdapter(toolID)
 		skillsDir := filepath.Join(root, adapter.SkillsDir)
 		if err := os.MkdirAll(skillsDir, 0o755); err != nil {
 			return fmt.Errorf("create %s: %w", adapter.SkillsDir, err)
 		}
 
-		if err := cleanStaleSymlinks(skillsDir); err != nil {
+		if err := cleanStaleSymlinks(skillsDir, filepath.Join(root, SkillsDir)); err != nil {
 			return fmt.Errorf("clean stale symlinks in %s: %w", adapter.SkillsDir, err)
 		}
 
@@ -45,7 +47,7 @@ func GenerateAdapterCommands(root string, toolIDs []string) error {
 	return nil
 }
 
-func cleanStaleSymlinks(dir string) error {
+func cleanStaleSymlinks(dir, canonicalSkills string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return fmt.Errorf("read adapter dir: %w", err)
@@ -59,6 +61,17 @@ func cleanStaleSymlinks(dir string) error {
 			continue
 		}
 		if entry.Type()&os.ModeSymlink == 0 {
+			continue
+		}
+		target, err := os.Readlink(filepath.Join(dir, entry.Name()))
+		if err != nil {
+			return fmt.Errorf("read symlink %s: %w", entry.Name(), err)
+		}
+		if !filepath.IsAbs(target) {
+			target = filepath.Join(dir, target)
+		}
+		relativeTarget, err := filepath.Rel(canonicalSkills, target)
+		if err != nil || relativeTarget == ".." || strings.HasPrefix(relativeTarget, ".."+string(os.PathSeparator)) {
 			continue
 		}
 		if err := os.Remove(filepath.Join(dir, entry.Name())); err != nil {

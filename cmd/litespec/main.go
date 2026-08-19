@@ -131,7 +131,7 @@ func maybeBackgroundUpgrade() {
 	}
 	_ = os.WriteFile(stampFile, nil, 0o644)
 
-	cmd := exec.Command("go", "install", modulePath+"@latest")
+	cmd := exec.Command("go", "install", modulePath+"/cmd/litespec@latest")
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	_ = cmd.Start()

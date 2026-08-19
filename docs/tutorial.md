@@ -80,12 +80,6 @@ Add rate limiting to the API to prevent abuse and ensure fair usage.
 
 Use an in-memory sliding window counter per IP. A middleware extracts the IP, increments the counter, and rejects requests over the limit with HTTP 429 and a `Retry-After` header. The limit is configurable via `RATE_LIMIT_PER_MINUTE` and defaults to 100.
 
-Files:
-- `internal/ratelimit/counter.go` — sliding window counter
-- `internal/ratelimit/limiter.go` — per-IP enforcement
-- `cmd/api/middleware.go` — HTTP middleware wrapper
-- `cmd/api/main.go` — wire up middleware and env var
-
 ## Unit 1: Sliding window counter
 Done means: `internal/ratelimit/counter.go` exists and counts requests in the last 60 seconds.
 

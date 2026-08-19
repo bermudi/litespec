@@ -106,7 +106,7 @@ nav:
   - Home: index.md
 ```
 
-This layout is intentionally minimal. The durable surface lives under `specs/`; the queue and conversation live in the GitHub issue, not on disk.
+This layout is intentionally minimal. The durable surface lives under `specs/`; the queue and conversation normally live in the GitHub issue. `specs/queues/<name>.md` is the local fallback when `gh` is unavailable.
 
 ## Two lanes
 
@@ -117,8 +117,8 @@ The same structure supports both speeds:
 
 - **New feature — plan fuzzy → clear:**
   ```
-  litespec new <name> --issue N
+  plan[fuzzy] → plan[clear] → litespec new <name> --issue N
   ```
-  `litespec-plan` writes proposal + design + units into the GH issue body. `litespec-build` implements one unit at a time, satisfies `Done means:` and `Verify:`, checks the box, commits, and stops. `litespec-review` checks spec vs. implementation. Close the issue when done.
+  `litespec-plan` writes proposal + design + units into the labeled GH issue body, or the equivalent local queue when offline. `litespec-build` implements one unit at a time, satisfies `Done means:` and `Verify:`, checks the box, commits, and stops. `litespec-review` checks spec vs. implementation. Close the issue when done.
 
-The queue lives in the GitHub issue, not in the file tree.
+The queue lives in the GitHub issue in the normal workflow; local queue files are the offline fallback.

@@ -46,7 +46,7 @@ Grill by default: load `references/grilling.md` and ask one question at a time t
 
 ## Clear work
 
-1. Write the GH issue body — one `## <outcome>` per unit, each with `Done means:` + `Verify:` + `- [ ]` checkbox. One unit = one demo + one Verify that fails without it.
+1. Write the GH issue body with the `litespec` label — one `## <outcome>` per unit, each with `Done means:` + `Verify:` + `- [ ]` checkbox. One unit = one demo + one Verify that fails without it. If `gh` is unavailable, write the same body to `specs/queues/<name>.md`.
 2. If load-bearing (CLI shape, API, file format that breaks things when wrong), edit `specs/<feature>/spec.md` directly — 3-5 SHALL requirements with WHEN/THEN scenarios.
 3. Run `litespec validate`. Fix formatting before handing off.
 

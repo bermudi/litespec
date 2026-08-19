@@ -20,14 +20,13 @@ No `litespec new`. No GH issue. No folder.
 
 For greenfield, API shape, CLI behavior, or anything that will outlast the issue.
 
-1. **Open a GH issue** (or use an existing one).
-2. Run `litespec new <name> --issue N`. `--issue` is required — it links the change name to the GH issue. Add the `litespec` label to the issue so `validate` discovers it.
-3. `litespec-plan` in **fuzzy** mode: read code, ask 2–3 questions, maybe spike, write no files. Use `references/fuzzy.md`.
-4. `litespec-plan` in **clear** mode: write the GH issue body with `## Proposal`, `## Design`, and `## Queue` (units with `Done means:` and `Verify:`). Draft `specs/<feature>/spec.md` if the feature is load-bearing. Use `references/clear.md`.
-5. **grill-me** (optional): adversarial shaping. Use `references/grilling.md`. Pull in `codebase-design` or `domain-modeling` when needed.
-6. `litespec-build`: implement one unit at a time. Each unit must satisfy `Done means:` and `Verify:` before the box is checked.
-7. `litespec-review`: adversarial check of the GH issue + spec against the implementation.
-8. Close the GH issue when all units are done.
+1. `litespec-plan` in **fuzzy** mode: read code, ask 2–3 questions, maybe spike, write no files. Use `references/fuzzy.md`.
+2. `litespec-plan` in **clear** mode: write the labeled GH issue body with `## Proposal`, `## Design`, and `## Queue` (units with `Done means:` and `Verify:`). If `gh` is unavailable, write the same body to `specs/queues/<name>.md`. Draft `specs/<feature>/spec.md` if the feature is load-bearing. Use `references/clear.md`.
+3. Run `litespec new <name> --issue N` for a GH-backed queue. `--issue` links the change name to the issue.
+4. **grill-me** (optional): adversarial shaping. Use `references/grilling.md`. Pull in `codebase-design` or `domain-modeling` when needed.
+5. `litespec-build`: implement one unit at a time. Each unit must satisfy `Done means:` and `Verify:` before the box is checked.
+6. `litespec-review`: adversarial check of the queue + spec against the implementation.
+7. Close the GH issue when all units are done.
 
 Unidirectional. If the plan shifts, rewrite the GH issue (disposable), not the durable spec.
 

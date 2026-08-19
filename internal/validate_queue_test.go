@@ -92,6 +92,22 @@ Verify:
 		}
 	})
 
+	t.Run("empty inline Verify command fails", func(t *testing.T) {
+		body := "## My outcome\nDone means: something\nVerify: ``\n- [ ] pending\n"
+		_, issues := ValidateQueueBody(body, source)
+		if !containsIssue(issues, "not followed by a command or fenced code block") {
+			t.Fatalf("expected error for empty inline Verify command, got %v", issues)
+		}
+	})
+
+	t.Run("unterminated Verify fence fails", func(t *testing.T) {
+		body := "## My outcome\nDone means: something\nVerify:\n```bash\necho hi\n- [ ] pending\n"
+		_, issues := ValidateQueueBody(body, source)
+		if !containsIssue(issues, "not followed by a command or fenced code block") {
+			t.Fatalf("expected error for unterminated Verify fence, got %v", issues)
+		}
+	})
+
 	t.Run("inline Verify without backtick command fails", func(t *testing.T) {
 		body := "## My outcome\nDone means: something\nVerify: TODO write this\n- [ ] pending\n"
 		_, issues := ValidateQueueBody(body, source)
@@ -104,6 +120,14 @@ Verify:
 		_, issues := ValidateQueueBody(missingCheckbox, source)
 		if !containsIssue(issues, "missing checkbox") {
 			t.Fatalf("expected error containing 'missing checkbox', got %v", issues)
+		}
+	})
+
+	t.Run("checkbox text in a Verify block does not count", func(t *testing.T) {
+		body := "## My outcome\nDone means: something\nVerify:\n```bash\necho '- [ ]'\n```\n"
+		_, issues := ValidateQueueBody(body, source)
+		if !containsIssue(issues, "missing checkbox") {
+			t.Fatalf("expected missing checkbox error, got %v", issues)
 		}
 	})
 

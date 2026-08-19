@@ -80,6 +80,20 @@ Body must contain SHALL or MUST.
 
 Each load-bearing requirement has a `SHALL` or `MUST` body and at least one named `WHEN`/`THEN` scenario.
 
+Good specs make an observable promise; bad specs leave the implementation to guess:
+
+```markdown
+Bad: The dashboard should be fast and intuitive.
+
+Good:
+### Requirement: Queue-only dashboard
+`litespec view` SHALL list only open issues labeled `litespec`.
+
+#### Scenario: Unlabeled issue
+- **WHEN** the repository has an unrelated open issue
+- **THEN** `litespec view` does not list it
+```
+
 ## Convention over configuration
 
 litespec has no config file. Conventions are enough:

@@ -2,7 +2,7 @@ Use when the idea is sharp and you need to nail the GH issue (+ spec if load-bea
 
 ## What to write — GH issue is proposal + design + queue
 
-1. **Proposal (why/what).** Top of issue body: what we're doing, why, what we're not doing.
+1. **Proposal (why/what).** Create the issue with the `litespec` label. Top of issue body: what we're doing, why, what we're not doing.
 2. **Design (how).** Directory, lanes, key decisions — concise, not an essay.
 3. **Queue — one `##` per unit.** Each unit:
    ```
@@ -10,7 +10,7 @@ Use when the idea is sharp and you need to nail the GH issue (+ spec if load-bea
    Depends: <other unit heading>, <another unit heading>
    Done means: <observable, human-checkable>
    Verify: `<command that fails without the outcome>`
-   Status: pending
+   - [ ] pending
    ```
    `Verify:` must fail for a plausible state where the outcome is missing. A `go test` that doesn't check output is not a Verify.
    `Depends:` is optional, references `##` headings in the same issue, comma-separated. A unit is unblocked when all its `Depends:` units are checked `- [x]`.

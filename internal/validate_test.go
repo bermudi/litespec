@@ -121,6 +121,32 @@ func TestValidateDecisionNotFound(t *testing.T) {
 	}
 }
 
+func TestValidateDecisionsRejectsMalformedFile(t *testing.T) {
+	root := setupTestProject(t)
+	decDir := DecisionsPath(root)
+	writeDecisionFile(t, decDir, "0001-broken.md", `# Broken
+
+## Status
+
+accepted
+
+## Context
+
+context
+`)
+
+	result, err := ValidateDecisions(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Valid {
+		t.Fatal("expected invalid result for malformed decision")
+	}
+	if !containsIssue(result.Errors, "invalid decision") {
+		t.Fatalf("expected malformed decision error, got %v", result.Errors)
+	}
+}
+
 func TestValidateDecisionsDuplicateNumber(t *testing.T) {
 	root := setupTestProject(t)
 	decDir := DecisionsPath(root)
@@ -304,6 +330,20 @@ func TestValidateAllIncludesDecisions(t *testing.T) {
 	}
 }
 
+func TestValidateAllRejectsMalformedDecision(t *testing.T) {
+	root := setupTestProject(t)
+	decDir := DecisionsPath(root)
+	writeDecisionFile(t, decDir, "0001-broken.md", "# Broken\n")
+
+	result, err := ValidateAll(root, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Valid || !containsIssue(result.Errors, "invalid decision") {
+		t.Fatalf("expected malformed decision error, got %+v", result)
+	}
+}
+
 func TestValidateDecisionsJSONShape(t *testing.T) {
 	root := setupTestProject(t)
 	decDir := DecisionsPath(root)
@@ -319,4 +359,3 @@ func TestValidateDecisionsJSONShape(t *testing.T) {
 		t.Errorf("Summary.Decisions = %d, want 1", json.Summary.Decisions)
 	}
 }
-

@@ -121,7 +121,7 @@ var ghIssueList = func(root string) ([]byte, error) {
 		"--label", "litespec",
 		"--state", "open",
 		"--json", "number,title,body,url",
-		"--limit", "50",
+		"--limit", "10000",
 	)
 	cmd.Dir = root
 	return cmd.Output()
@@ -162,6 +162,16 @@ func lintVerifyShell(block string, source string, unitHeading string) []Validati
 func isUnit(unit queueUnit) bool {
 	for _, line := range unit.Body {
 		if strings.HasPrefix(line, "Done means:") || strings.HasPrefix(line, "Verify:") {
+			return true
+		}
+	}
+	return false
+}
+
+func isCheckboxLine(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	for _, checkbox := range []string{"- [ ]", "- [x]", "- [X]"} {
+		if trimmed == checkbox || strings.HasPrefix(trimmed, checkbox+" ") {
 			return true
 		}
 	}
@@ -211,35 +221,46 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 		inlineVerify := false
 		hasFencedBlock := false
 		var verifyBlock string
+		inFencedBlock := false
 
 		for i, line := range unit.Body {
+			if strings.HasPrefix(strings.TrimSpace(line), "```") {
+				inFencedBlock = !inFencedBlock
+				continue
+			}
+			if inFencedBlock {
+				continue
+			}
 			if strings.HasPrefix(line, "Done means:") {
 				doneFound = true
 			}
 			if !verifyFound && strings.HasPrefix(line, "Verify:") {
 				verifyFound = true
 				rest := strings.TrimSpace(line[len("Verify:"):])
-				if rest != "" && strings.Contains(rest, "`") {
+				firstBacktick := strings.Index(rest, "`")
+				lastBacktick := strings.LastIndex(rest, "`")
+				if firstBacktick >= 0 && lastBacktick > firstBacktick &&
+					strings.TrimSpace(rest[firstBacktick+1:lastBacktick]) != "" {
 					inlineVerify = true
 				}
 				for j := i + 1; j < len(unit.Body); j++ {
 					if strings.HasPrefix(unit.Body[j], "```") {
-						hasFencedBlock = true
 						var blockLines []string
 						for k := j + 1; k < len(unit.Body); k++ {
 							if strings.HasPrefix(unit.Body[k], "```") {
+								hasFencedBlock = true
 								break
 							}
 							blockLines = append(blockLines, unit.Body[k])
 						}
-						verifyBlock = strings.Join(blockLines, "\n")
+						if hasFencedBlock {
+							verifyBlock = strings.Join(blockLines, "\n")
+						}
 						break
 					}
 				}
 			}
-			if strings.Contains(line, "- [ ]") ||
-				strings.Contains(line, "- [x]") ||
-				strings.Contains(line, "- [X]") {
+			if isCheckboxLine(line) {
 				checkboxFound = true
 			}
 		}
