@@ -26,7 +26,7 @@ No batching units. One unit, one commit, stop.
 
 ## Rebuilding a unit after review
 
-If the unit's box was unchecked by review (CRITICAL finding against its `Done means:` or `Verify:`), you are rebuilding — not starting fresh. The previous Verify failed to prove the outcome. Load `references/build/review-fixing.md` and follow its scope-expansion rules: find the abstract pattern behind the finding, fix all instances, not just the cited `file:line`. Then re-run Verify, re-check the box, commit.
+If the unit's box was unchecked by review (CRITICAL finding against its `Done means:` or `Verify:`), you are rebuilding — not starting fresh. The previous Verify failed to prove the outcome. Load `references/review-fixing.md` and follow its scope-expansion rules: find the abstract pattern behind the finding, fix all instances, not just the cited `file:line`. Then re-run Verify, re-check the box, commit.
 
 ---
 
@@ -55,5 +55,5 @@ When you hit a novel API or unfamiliar library, pause to gather docs. You MAY wr
 
 ## References
 
-`references/build/review-fixing.md` — load when rebuilding a unit that review reopened. Scope-expansion rules: fix the pattern, not just the cited line.
+`references/review-fixing.md` — load when rebuilding a unit that review reopened. Scope-expansion rules: fix the pattern, not just the cited line.
 `specs/glossary.md` — consult for terms after a unit. No enforcement.

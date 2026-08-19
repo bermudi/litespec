@@ -51,7 +51,7 @@ The `Adapters` slice in `internal/paths.go` SHALL contain exactly one `ToolAdapt
 
 ### Requirement: Reference Files Are Generated
 
-A generated skill MAY include reference files under `internal/skill/templates/references/<id>/`. The `GenerateSkills` function SHALL copy each such reference file into `.agents/skills/<name>/references/<file>.md`. The `litespec-plan` skill SHALL have the five references `fuzzy.md`, `clear.md`, `grilling.md`, `codebase-design.md`, and `domain-modeling.md`. The `litespec-build` skill SHALL have the reference `review-fixing.md`. The `litespec-review` skill SHALL have the reference `adversarial-review.md`.
+A generated skill MAY include reference files under `internal/skill/templates/references/<id>/`. The `GenerateSkills` function SHALL copy each such reference file into `.agents/skills/<name>/references/<file>.md`. Local `references/...` paths in a generated `SKILL.md` SHALL resolve to files in that skill's generated references directory. The `litespec-plan` skill SHALL have the five references `fuzzy.md`, `clear.md`, `grilling.md`, `codebase-design.md`, and `domain-modeling.md`. The `litespec-build` skill SHALL have the reference `review-fixing.md`. The `litespec-review` skill SHALL have the reference `adversarial-review.md`.
 
 #### Scenario: Plan references generated
 
@@ -62,6 +62,11 @@ A generated skill MAY include reference files under `internal/skill/templates/re
 
 - **WHEN** `litespec update` is run
 - **THEN** `.agents/skills/litespec-build/references/review-fixing.md` and `.agents/skills/litespec-review/references/adversarial-review.md` exist
+
+#### Scenario: Generated skill references resolve
+
+- **WHEN** all skills are generated
+- **THEN** every local `references/...` path in each generated `SKILL.md` resolves to a generated reference file
 
 ### Requirement: litespec update Generates Canonical Skills
 

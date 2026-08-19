@@ -46,7 +46,7 @@ You report findings — you do not fix them. But you route each finding to the r
 
 **CHANGES REQUESTED** — for each finding, state its lane:
 
-- **CRITICAL, breaks a unit's `Done means:` or `Verify:`** → that unit is not done. Name the unit. The user unchecks its box in the issue, then re-invokes `litespec-build` to rebuild it. The issue stays open until all units re-pass. Load `references/review/adversarial-review.md` if the finding stems from an interaction bug you constructed adversarially.
+- **CRITICAL, breaks a unit's `Done means:` or `Verify:`** → that unit is not done. Name the unit. The user unchecks its box in the issue, then re-invokes `litespec-build` to rebuild it. The issue stays open until all units re-pass. Load `references/adversarial-review.md` if the finding stems from an interaction bug you constructed adversarially.
 
 - **CRITICAL or WARNING, outside any unit's contract** (neighboring code, help text, stale decision, drive-by) → small fix lane. No unit, no issue reopen. The user fixes directly, updates `specs/<feature>/spec.md` if it was a contract change, commits.
 
@@ -64,4 +64,4 @@ Do not invent units for trivial findings — those are small fix lane. Invent un
 
 ## References
 
-`references/review/adversarial-review.md` — load when probing interaction bugs, state transitions, wiring gaps, or multi-entity scenarios. Suspends the "no speculation" rule: surface candidate bugs, let the user triage.
+`references/adversarial-review.md` — load when probing interaction bugs, state transitions, wiring gaps, or multi-entity scenarios. Suspends the "no speculation" rule: surface candidate bugs, let the user triage.
