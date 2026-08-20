@@ -11,7 +11,6 @@ Workflow (two lanes):
 
 Commands:
   init [--tools <ids>]              Initialize project structure
-  new <name> --issue N              Link to GH issue (required, no folder)
   validate [--all|--specs|--decisions] [--type T]   Validate specs and decisions
   view                              Dashboard overview
   update [--tools <ids>]            Regenerate skills and adapters
@@ -80,55 +79,6 @@ Examples:
 litespec init
 litespec init --tools claude
 litespec init --json
-```
-
-## `new`
-
-Usage:
-
-```bash
-litespec new <name> --issue N [--json] [--minimal]
-```
-
-Description:
-
-Link a change name to a GH issue. The GH issue is the queue; no local change folder is created. `--issue` is required — it links the change name to the GH issue. Add the `litespec` label to the issue so `validate` discovers it.
-
-Arguments:
-
-- `<name>` — Change name, e.g. `add-auth`
-
-Flags:
-
-| Flag | Description |
-|------|-------------|
-| `--issue <N>` | GH issue number (required) |
-| `--json` | Output as JSON |
-| `--minimal` | Minimal output |
-
-Examples:
-
-```bash
-litespec new add-auth --issue 42
-```
-
-The command validates the change name, prints the issue URL, and outputs a template for the GH issue body:
-
-```markdown
-## Proposal for add-auth
-...
-
-## Design
-...
-
-## Queue
-
-## <outcome>
-Done means: ...
-Verify: ```bash
-...
-```
-- [ ] pending
 ```
 
 ## `validate`

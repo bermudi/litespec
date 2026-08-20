@@ -37,18 +37,6 @@ var CommandSpecs = []CommandSpec{
 		},
 	},
 	{
-		Name:        "new",
-		Description: "Link to GH issue (required, no folder)",
-		Flags: []FlagSpec{
-			{Name: "--issue", Description: "Link to GH issue number", TakesValue: true},
-			{Name: "--json", Description: "Output as JSON", TakesValue: false},
-			{Name: "--minimal", Description: "Minimal output", TakesValue: false},
-		},
-		Positional: &PositionalSpec{
-			Description: "change name",
-		},
-	},
-	{
 		Name:        "validate",
 		Description: "Validate specs and decisions",
 		Flags: []FlagSpec{

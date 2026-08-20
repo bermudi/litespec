@@ -45,7 +45,7 @@ Test: if being stale would mislead a new person/agent, keep it. Else delete afte
 ## Two lanes
 
 **Small fix — zero ceremony:**
-You say "fix typo" -> agent reads product + relevant spec + decisions/glossary -> edits code -> updates the one `specs/<feature>/spec.md` if it was a contract change -> done. No `new`, no issue required.
+You say "fix typo" -> agent reads product + relevant spec + decisions/glossary -> edits code -> updates the one `specs/<feature>/spec.md` if it was a contract change -> done. No issue required.
 
 **New feature / greenfield (plan fuzzy -> clear):**
 ```
@@ -58,7 +58,7 @@ you: "add X" -> plan[fuzzy] (read code, grill by default — references/fuzzy.md
           -> close GH issue
 ```
 
-Review triages findings structurally: does the finding break a unit's `Done means:`/`Verify:`? If yes → uncheck box, rebuild via `build` (scope expands — fix the pattern, not just the line). If no and it is trivial → small fix lane. If no and it needs real work outside any existing unit's contract → draft a new unit and create a GH sub-issue via `gh issue create --parent <N> --label litespec`, or write to `specs/queues/<parent-name>-review.md` if `gh` is unavailable. No fix skill, no finding tracker — findings route to existing tracking (unit checkboxes), get fixed immediately, or spawn a sub-issue.
+Review triages findings structurally: does the finding break a unit's `Done means:`/`Verify:`? If yes → uncheck box, rebuild via `build` (scope expands — fix the pattern, not just the line). If no and it is trivial → small fix lane. If no and it needs real work outside any existing unit's contract → draft a new unit and create a GH sub-issue via `gh issue create --parent <N> --label litespec`, or write to `specs/queues/<parent-name>-review.md` (`<parent-name>` is the parent change name chosen during `plan[clear]`) if `gh` is unavailable. No fix skill, no finding tracker — findings route to existing tracking (unit checkboxes), get fixed immediately, or spawn a sub-issue.
 
 `grill-me` is a skill reference, not a CLI. `plan` owns spec drafting in clear mode: if the feature is load-bearing, it writes/updates `specs/<feature>/spec.md` alongside the issue.
 
@@ -149,7 +149,6 @@ Generated via `litespec update` from `internal/skill/templates/` (embed.FS). `.a
 | Command | Purpose |
 |---------|---------|
 | `litespec init` | scaffold `specs/` + skills |
-| `litespec new <name> [--issue N]` | link to GH issue (no folder in lean) |
 | `litespec validate [--decisions] [--issue N] [--queue <path>]` | lint specs + decisions + GH issue queue (labeled litespec) + local specs/queues/ fallback + Verify shell (bash -n) |
 | `litespec view` | product + features + open `litespec` GH issues (via `gh` if present) + decisions (spine starred) |
 | `litespec update` | regenerate skills |
@@ -162,11 +161,10 @@ GH issue is the queue — the GH issue body is proposal + design + queue (64k li
 
 - GH issue body is proposal + design + queue. 64k limit — no overflow design needed.
 - The `litespec` label marks queue issues. `validate` scans open issues with this label; `view` filters to it.
-- `litespec new <name> --issue N` links to a GH issue; when `gh` is unavailable, `specs/queues/<name>.md` is the local fallback.
+- `plan[clear]` creates the labeled GH issue; when `gh` is unavailable it writes `specs/queues/<name>.md`.
 - `view` auto-detects `gh` + GitHub remote. No config flag.
 
 ## Resolved for v2 lean
 
 - Local queue fallback at `specs/queues/<name>.md` when `gh` unavailable — mirrors the GH issue 1:1, handles multi-feature changes
 - Product flows: list explicitly in `product.md` (models + flows as lists).
-- `litespec new` starts as link only (`--issue N`), not auto-create. Add `gh issue create` later if needed.

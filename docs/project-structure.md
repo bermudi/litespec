@@ -113,12 +113,12 @@ This layout is intentionally minimal. The durable surface lives under `specs/`; 
 The same structure supports both speeds:
 
 - **Small fix — zero ceremony:**
-  No `litespec new`, no GH issue. Read `specs/product.md` + the relevant `specs/<feature>/spec.md` + `specs/decisions/` and `specs/glossary.md`, edit code and spec in place, stop.
+  No GH issue. Read `specs/product.md` + the relevant `specs/<feature>/spec.md` + `specs/decisions/` and `specs/glossary.md`, edit code and spec in place, stop.
 
 - **New feature — plan fuzzy → clear:**
   ```
-  plan[fuzzy] → plan[clear] → litespec new <name> --issue N
+  plan[fuzzy] → plan[clear]
   ```
-  `litespec-plan` writes proposal + design + units into the labeled GH issue body, or the equivalent local queue when offline. `litespec-build` implements one unit at a time, satisfies `Done means:` and `Verify:`, checks the box, commits, and stops. `litespec-review` checks spec vs. implementation. Close the issue when done.
+  `litespec-plan` writes proposal + design + units into the labeled GH issue body, or to `specs/queues/<name>.md` when offline (`<name>` is the change name chosen during `plan[clear]`). `litespec-build` implements one unit at a time, satisfies `Done means:` and `Verify:`, checks the box, commits, and stops. `litespec-review` checks spec vs. implementation. Close the issue when done.
 
 The queue lives in the GitHub issue in the normal workflow; local queue files are the offline fallback.

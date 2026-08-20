@@ -20,8 +20,7 @@ litespec init
 # Small fix — zero ceremony (no issue)
 # agent reads product + spec + decisions -> edits code -> updates spec if contract -> done
 
-# New feature — link to GH issue
-litespec new add-feature --issue 42   # GH issue holds proposal + design + queue
+# New feature — plan, then build
 litespec validate
 litespec view                         # product + specs + open litespec GH issues
 litespec update                       # regenerate 3 skills
@@ -29,7 +28,7 @@ litespec update                       # regenerate 3 skills
 
 ## Two Lanes
 
-**Small fix — zero ceremony:** You say "fix typo" -> agent reads product + relevant spec + decisions/glossary -> edits code -> updates the one `specs/<feature>/spec.md` if contract change -> done. No `new`, no issue required.
+**Small fix — zero ceremony:** You say "fix typo" -> agent reads product + relevant spec + decisions/glossary -> edits code -> updates the one `specs/<feature>/spec.md` if contract change -> done. No issue required.
 
 **New feature — plan fuzzy -> clear:** `plan[fuzzy]` (read code, ask 2-3 questions, no files) -> `plan[clear]` (write GH issue: proposal + design + units with Done means + Verify; also draft spec if load-bearing) -> you: "looks good" or "grill-me" -> `build` one unit at a time (Verify must fail without outcome) -> `review` adversarial -> close GH issue.
 
@@ -37,7 +36,7 @@ Each unit is one demo-able outcome `## <name>` with `Done means:` and `Verify:`.
 
 ## What Makes litespec Different
 
-- **GH issue is the queue** — proposal + design + queue live in the GH issue body, not `specs/changes/` or `QUEUE.md`. Offline fallback via `specs/queues/<name>.md` when `gh` is unavailable; `--issue` required for `litespec new` to link to GH.
+- **GH issue is the queue** — proposal + design + queue live in the GH issue body, not `specs/changes/` or `QUEUE.md`. `plan[clear]` creates the labeled GH issue; offline fallback is `specs/queues/<name>.md` when `gh` is unavailable.
 - **Convention over configuration** — zero config files. All defaults.
 - **3 skills only** — `litespec-plan` (fuzzy/clear + grilling/codebase-design/domain-modeling), `litespec-build` (one unit), `litespec-review` (adversarial). Progressive disclosure via `references/`, lean tokens.
 - **Two lanes** — small fix (zero ceremony) vs new feature (plan fuzzy -> clear -> build -> review).
@@ -49,7 +48,7 @@ Each unit is one demo-able outcome `## <name>` with `Done means:` and `Verify:`.
 
 - [Getting Started](https://bermudi.github.io/litespec/getting-started/) — Installation and setup
 - [Tutorial](https://bermudi.github.io/litespec/tutorial/) — Walkthrough via GH issue queue
-- [CLI Reference](https://bermudi.github.io/litespec/cli-reference/) — `init`, `new --issue`, `validate`, `view`, `update`
+- [CLI Reference](https://bermudi.github.io/litespec/cli-reference/) — `init`, `validate`, `view`, `update`, `upgrade`, `completion`
 - [Workflow](https://bermudi.github.io/litespec/workflow/) — Two lanes, GH issue queue, unit rule
 - [Concepts](https://bermudi.github.io/litespec/concepts/) — Load-bearing specs, decisions, glossary
 

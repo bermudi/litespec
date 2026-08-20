@@ -6,9 +6,9 @@ import (
 )
 
 const (
-	ProjectDirName     = "specs"
-	SkillsDir          = ".agents/skills"
-	ChangesDirName     = "changes"
+	ProjectDirName = "specs"
+	SkillsDir      = ".agents/skills"
+	ChangesDirName = "changes"
 )
 
 var Skills = []SkillInfo{

@@ -20,7 +20,7 @@ func TestCompleteCommandNames(t *testing.T) {
 		names[c.Candidate] = true
 	}
 
-	for _, cmd := range []string{"init", "new", "validate", "view", "update", "upgrade", "completion"} {
+	for _, cmd := range []string{"init", "validate", "view", "update", "upgrade", "completion"} {
 		if !names[cmd] {
 			t.Errorf("missing command %q in completions", cmd)
 		}
@@ -225,7 +225,6 @@ func TestCommandSpecsEveryFlagHasDescription(t *testing.T) {
 
 func TestCompleteJsonFlags(t *testing.T) {
 	tests := []struct{ cmd string }{
-		{"new"},
 		{"view"},
 		{"validate"},
 	}
@@ -309,5 +308,3 @@ func TestCommandSpecsMatchFlagSet(t *testing.T) {
 		}
 	}
 }
-
-

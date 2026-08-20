@@ -14,7 +14,7 @@ Work is either a small fix or a new feature. The lanes differ in ceremony, not r
 
 ### Small fix — zero ceremony
 
-"Fix the typo" or "rename this function." The agent reads `specs/product.md`, the relevant `specs/<feature>/spec.md`, and `specs/decisions/` / `specs/glossary.md`; edits the code; and updates the spec in place if the contract changed. No `litespec new`, no GitHub issue, no queue.
+"Fix the typo" or "rename this function." The agent reads `specs/product.md`, the relevant `specs/<feature>/spec.md`, and `specs/decisions/` / `specs/glossary.md`; edits the code; and updates the spec in place if the contract changed. No GitHub issue, no queue.
 
 ### New feature — plan, then build
 
@@ -40,7 +40,7 @@ Verify: `go test ./...` and view output contains "->"
 - [ ] pending
 ```
 
-`litespec new <name> --issue N` links the feature to the issue. `--issue` is required. Add the `litespec` label to the issue so `validate` discovers it.
+`plan[clear]` creates the labeled GH issue. If `gh` is unavailable, it writes the same body to `specs/queues/<name>.md`, where `<name>` is the change name chosen during planning.
 
 The 64 KiB issue limit is enough because the queue contains only units, not full designs. Durable design and reasoning live in `specs/product.md`, `specs/<feature>/spec.md`, and `specs/decisions/`.
 

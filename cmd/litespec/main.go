@@ -50,8 +50,6 @@ func run() error {
 		return nil
 	case "init":
 		return cmdInit(os.Args[2:])
-	case "new":
-		return cmdNew(os.Args[2:])
 	case "validate":
 		return cmdValidate(os.Args[2:])
 	case "view":
@@ -80,7 +78,6 @@ Workflow (two lanes):
 
 Commands:
   init [--tools <ids>]              Initialize project structure
-  new <name> --issue N              Link to GH issue (required, no folder)
   validate [--all|--specs|--decisions|--issue N|--queue <path>] [--type T]   Validate specs, decisions, and queue
   view                              Dashboard overview
   update [--tools <ids>]            Regenerate skills and adapters

@@ -116,26 +116,6 @@ Examples:
 `)
 }
 
-func printNewHelp() {
-	fmt.Print(`Usage: litespec new <name> --issue N [--json] [--minimal]
-
-Link a change name to a GH issue. GH issue is the queue — no folder created.
-Add the ` + "`litespec`" + ` label to the issue so ` + "`validate`" + ` discovers it.
-
-Arguments:
-  <name>            Change name (e.g., add-auth)
-
-Flags:
-  --issue <N>       GH issue number (required — links the change name to the GH issue)
-  --json            Output as JSON
-  --minimal         Minimal output
-
-Examples:
-  litespec new add-auth --issue 42
-  litespec new add-auth --issue 42 --json
-`)
-}
-
 func printValidateHelp() {
 	fmt.Print(`Usage: litespec validate [<name>|--all|--specs|--decisions|--issue N|--queue <path>] [--type T] [--strict] [--json] [--minimal]
 
@@ -203,30 +183,6 @@ func splitCSV(s string) []string {
 		parts[i] = strings.TrimSpace(parts[i])
 	}
 	return parts
-}
-
-func validateChangeName(name string) error {
-	if name == "" {
-		return fmt.Errorf("change name cannot be empty")
-	}
-	if strings.Contains(name, "/") || strings.Contains(name, "\\") {
-		return fmt.Errorf("change name cannot contain path separators")
-	}
-	if strings.Contains(name, "..") {
-		return fmt.Errorf("change name cannot contain path traversal (..)")
-	}
-	if name != strings.TrimSpace(name) {
-		return fmt.Errorf("change name cannot have leading or trailing whitespace")
-	}
-	if len(name) > 100 {
-		return fmt.Errorf("change name cannot exceed 100 characters (got %d)", len(name))
-	}
-	for _, reserved := range []string{"decisions"} {
-		if name == reserved {
-			return fmt.Errorf("change name %q is reserved", name)
-		}
-	}
-	return nil
 }
 
 func validateToolIDs(toolIDs []string) error {

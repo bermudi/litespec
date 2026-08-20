@@ -291,18 +291,6 @@ func TestCLIUpdateHelp(t *testing.T) {
 	}
 }
 
-func TestCLINewHelp(t *testing.T) {
-	bin := buildBinary(t)
-	root := t.TempDir()
-	out, code := runCLI(t, bin, root, "new", "--help")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-	if !strings.Contains(out, "Usage: litespec new") {
-		t.Error("expected new usage in help output")
-	}
-}
-
 func TestCLIValidateHelp(t *testing.T) {
 	bin := buildBinary(t)
 	root := t.TempDir()
@@ -312,14 +300,6 @@ func TestCLIValidateHelp(t *testing.T) {
 	}
 	if !strings.Contains(out, "Usage: litespec validate") {
 		t.Error("expected validate usage in help output")
-	}
-}
-
-func TestCLINewExtraArgs(t *testing.T) {
-	bin, root := setupCLITest(t)
-	_, code := runCLI(t, bin, root, "new", "foo", "bar")
-	if code != 1 {
-		t.Fatalf("expected exit 1 for extra args, got %d", code)
 	}
 }
 
@@ -381,61 +361,6 @@ func TestCLIViewUnknownFlag(t *testing.T) {
 	}
 }
 
-func TestValidateChangeName(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		wantErr bool
-	}{
-		{"empty", "", true},
-		{"path separator slash", "foo/bar", true},
-		{"path separator backslash", "foo\\bar", true},
-		{"traversal double dot", "..", true},
-		{"traversal embedded", "foo..bar", true},
-		{"leading whitespace", " foo", true},
-		{"trailing whitespace", "foo ", true},
-		{"reserved decisions", "decisions", true},
-		{"too long", strings.Repeat("a", 101), true},
-		{"valid simple", "add-auth", false},
-		{"valid with numbers", "fix-123-issue", false},
-		{"valid at limit", strings.Repeat("a", 100), false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validateChangeName(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("validateChangeName(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestCLINewInvalidName(t *testing.T) {
-	bin, root := setupCLITest(t)
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{"empty", ""},
-		{"path separator", "foo/bar"},
-		{"traversal", ".."},
-		{"reserved", "decisions"},
-		{"whitespace padded", " foo "},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			args := []string{"new"}
-			if tt.input != "" {
-				args = append(args, tt.input)
-			}
-			_, code := runCLI(t, bin, root, args...)
-			if code != 1 {
-				t.Errorf("expected exit 1 for name %q, got %d", tt.input, code)
-			}
-		})
-	}
-}
-
 func TestCLIInitUnknownTool(t *testing.T) {
 	bin := buildBinary(t)
 	root := t.TempDir()
@@ -474,38 +399,6 @@ func setupDirectTest(t *testing.T) string {
 	}
 	t.Chdir(root)
 	return root
-}
-
-func TestCmdNewDirect_HappyPath(t *testing.T) {
-	setupDirectTest(t)
-	err := cmdNew([]string{"my-change", "--issue", "42"})
-	if err != nil {
-		t.Fatalf("cmdNew: %v", err)
-	}
-}
-
-func TestCmdNewDirect_MissingName(t *testing.T) {
-	setupDirectTest(t)
-	err := cmdNew([]string{})
-	if err == nil {
-		t.Fatal("expected error for missing name")
-	}
-}
-
-func TestCmdNewDirect_MissingIssue(t *testing.T) {
-	setupDirectTest(t)
-	err := cmdNew([]string{"my-change"})
-	if err == nil {
-		t.Fatal("expected error for missing --issue")
-	}
-}
-
-func TestCmdNewDirect_InvalidName(t *testing.T) {
-	setupDirectTest(t)
-	err := cmdNew([]string{"foo/bar", "--issue", "1"})
-	if err == nil {
-		t.Fatal("expected error for invalid name")
-	}
 }
 
 func TestCmdValidateDirect_InvalidType(t *testing.T) {
@@ -1325,41 +1218,6 @@ func TestCLIViewMinimalJSON(t *testing.T) {
 	}
 	if result["summary"] == nil {
 		t.Error("minimal JSON should contain summary")
-	}
-}
-
-func TestCLINewMinimalText(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	out, code := runCLI(t, bin, root, "new", "test-change", "--issue", "7", "--minimal")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-	if !strings.Contains(out, "test-change") {
-		t.Errorf("expected change name, got: %s", out)
-	}
-	if !strings.Contains(out, "#7") {
-		t.Errorf("expected issue number, got: %s", out)
-	}
-}
-
-func TestCLINewMinimalJSON(t *testing.T) {
-	bin, root := setupCLITest(t)
-
-	out, code := runCLI(t, bin, root, "new", "test-change", "--issue", "7", "--minimal", "--json")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, out)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(out), &result); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	if result["changeName"] == nil {
-		t.Error("minimal JSON should contain changeName")
-	}
-	if result["issue"] == nil {
-		t.Error("minimal JSON should contain issue")
 	}
 }
 

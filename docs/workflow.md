@@ -14,19 +14,18 @@ For typos, bugs, one-offs, and trivial refactors.
 4. If the fix changed a load-bearing contract, the agent edits the one `specs/<feature>/spec.md` directly. Preserve `SHALL`/`MUST` and `WHEN`/`THEN`.
 5. Done.
 
-No `litespec new`. No GH issue. No folder.
+No GH issue. No folder.
 
 ### New feature — plan fuzzy to clear
 
 For greenfield, API shape, CLI behavior, or anything that will outlast the issue.
 
 1. `litespec-plan` in **fuzzy** mode: read code, ask 2–3 questions, maybe spike, write no files. Use `references/fuzzy.md`.
-2. `litespec-plan` in **clear** mode: write the labeled GH issue body with `## Proposal`, `## Design`, and `## Queue` (units with `Done means:` and `Verify:`). If `gh` is unavailable, write the same body to `specs/queues/<name>.md`. Draft `specs/<feature>/spec.md` if the feature is load-bearing. Use `references/clear.md`.
-3. Run `litespec new <name> --issue N` for a GH-backed queue. `--issue` links the change name to the issue.
-4. **grill-me** (optional): adversarial shaping. Use `references/grilling.md`. Pull in `codebase-design` or `domain-modeling` when needed.
-5. `litespec-build`: implement one unit at a time. Each unit must satisfy `Done means:` and `Verify:` before the box is checked.
-6. `litespec-review`: adversarial check of the queue + spec against the implementation.
-7. Close the GH issue when all units are done.
+2. `litespec-plan` in **clear** mode: write the labeled GH issue body with `## Proposal`, `## Design`, and `## Queue` (units with `Done means:` and `Verify:`). If `gh` is unavailable, write the same body to `specs/queues/<name>.md` (`<name>` is the change name chosen in this step). Draft `specs/<feature>/spec.md` if the feature is load-bearing. Use `references/clear.md`.
+3. **grill-me** (optional): adversarial shaping. Use `references/grilling.md`. Pull in `codebase-design` or `domain-modeling` when needed.
+4. `litespec-build`: implement one unit at a time. Each unit must satisfy `Done means:` and `Verify:` before the box is checked.
+5. `litespec-review`: adversarial check of the queue + spec against the implementation.
+6. Close the GH issue when all units are done.
 
 Unidirectional. If the plan shifts, rewrite the GH issue (disposable), not the durable spec.
 

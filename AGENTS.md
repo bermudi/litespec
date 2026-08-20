@@ -27,7 +27,7 @@ The design emerged from a structured grilling session — question by question, 
 - **Specs** live in `specs/<feature>/spec.md` — only load-bearing contracts (SHALL/MUST + WHEN/THEN). No `canon/` — edit the file directly
 - **Decisions** live in `specs/decisions/` as `NNNN-<slug>.md` — durable rulings with `spine: true` for load-bearing. Created via `touch` + `validate`, not a CLI
 - **Glossary** lives in `specs/glossary.md` — ubiquitous language, curated, optional but recommended. Managed via plan skill, graceful degradation if absent
-- **GH issues are the change/queue** — GH issue body holds proposal + design + queue (units with Done means + Verify). GH issue is the queue, 64k limit, no overflow. Offline fallback via `specs/queues/<name>.md` when `gh` unavailable; `--issue` required for `litespec new` to link to GH
+- **GH issues are the change/queue** — GH issue body holds proposal + design + queue (units with Done means + Verify). GH issue is the queue, 64k limit, no overflow. The `plan` skill creates the labeled GH issue; offline fallback is `specs/queues/<name>.md` when `gh` is unavailable.
 - **Units** — one demo-able outcome per `##` with `Done means:` and `Verify:` that must fail without the outcome. Built one at a time, ticked via checkbox. No `tasks.md`
 - **Two lanes** — small fix (zero ceremony, no issue required) vs new feature (plan fuzzy (grill by default) -> clear -> build -> review -> close issue)
 - **Skills** are generated into `.agents/skills/` (canonical). Only three: `litespec-plan` (fuzzy/grill/clear + codebase-design/domain-modeling), `litespec-build` (one unit at a time), `litespec-review` (adversarial). Nearly all agents discover `.agents/skills/` natively; Claude Code via symlink in `.claude/skills/`. `litespec-plan` has fuzzy mode (grill by default) for half-baked ideas and clear mode to nail the GH issue. Project-specific skills (`the-drill`) are tracked directly in git — NOT generated
@@ -38,7 +38,7 @@ The design emerged from a structured grilling session — question by question, 
 Two lanes — lean cut. Unidirectional, no backward flow.
 
 **Small fix — zero ceremony:**
-You say "fix typo" -> agent reads product + relevant spec + decisions/glossary -> edits code -> updates the one `specs/<feature>/spec.md` if it was a contract change -> done. No `new`, no issue required.
+You say "fix typo" -> agent reads product + relevant spec + decisions/glossary -> edits code -> updates the one `specs/<feature>/spec.md` if it was a contract change -> done. No issue required.
 
 **New feature / greenfield (plan fuzzy -> clear):**
 ```
@@ -65,7 +65,7 @@ Review reports findings + verdict (`PASS` | `CHANGES REQUESTED`), then routes ea
 - **SUGGESTION** → small fix lane, user's discretion. Not blocking.
 - **"needs decision"** → create decision in `specs/decisions/` first, then route the fix per the rules above.
 - **Shape was wrong** → `plan`, not a fix.
-- **Non-small-fix finding outside any unit's contract** (needs real implementation work, not a trivial small fix, and the code shape is not fundamentally wrong) → draft a new unit with `## <outcome>`, `Done means:`, `Verify:`, and `Depends:` if it blocks on existing units; create a GH sub-issue via `gh issue create --parent <N> --label litespec` with the new unit(s) as the body, or write to `specs/queues/<parent-name>-review.md` if `gh` is unavailable. Creating the sub-issue is routing, not code editing — do not implement the unit yourself.
+- **Non-small-fix finding outside any unit's contract** (needs real implementation work, not a trivial small fix, and the code shape is not fundamentally wrong) → draft a new unit with `## <outcome>`, `Done means:`, `Verify:`, and `Depends:` if it blocks on existing units; create a GH sub-issue via `gh issue create --parent <N> --label litespec` with the new unit(s) as the body, or write to `specs/queues/<parent-name>-review.md` (`<parent-name>` is the parent change name chosen during `plan[clear]`) if `gh` is unavailable. Creating the sub-issue is routing, not code editing — do not implement the unit yourself.
 
 Do not invent units for trivial findings — those are small fix lane. Invent units only for findings that need a unit's worth of work and don't break an existing unit's contract. Do not reopen the issue for small fixes. The issue closes when all its units pass.
 
@@ -78,7 +78,7 @@ These came from deliberate debate. Respect the reasoning:
 - **Lean skills** — minimal token usage. Each skill is focused instructions, not pages of boilerplate. 3 skills only: plan (fuzzy/grill/clear), build (one unit), review (adversarial). Progressive disclosure via `references/` — detail lives there only when branch applies
 - **GH issue is the queue/change** — proposal + design + queue live in the issue body, not `QUEUE.md`. Keeps what doesn't rot, drops ceremony. Small fix needs no issue at all
 - **`litespec` label marks queue issues** — hardcoded convention, no config. `validate` scans open issues with this label; `view` filters to it. `plan[clear]` instructs adding the label when creating the issue
-- **Local queue fallback** — `specs/queues/<name>.md` mirrors the GH issue 1:1 when `gh` is unavailable. `<name>` comes from `litespec new <name> --issue N`. Handles multi-feature changes
+- **Local queue fallback** — `specs/queues/<name>.md` mirrors the GH issue 1:1 when `gh` is unavailable. `<name>` is the change name chosen during `plan[clear]`. Handles multi-feature changes
 - **Unit = demo + failing Verify** — one thing you can demo + one Verify that would fail if missing. `build` must satisfy Verify before claiming done
 - **Direct spec edits** — no ADDED/MODIFIED delta flow. Edit `specs/<feature>/spec.md` directly. Preserve SHALL/MUST + WHEN/THEN but drop delta merge complexity
 - **No `canon/`, `backlog.md` in lean** — GH issues is the backlog, `specs/<feature>/spec.md` is the durable spec when needed

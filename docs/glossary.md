@@ -1,6 +1,6 @@
 # Glossary
 
-The **ubiquitous language** is a concept from Domain-Driven Design — a shared, precise vocabulary that keeps humans and AI agents aligned when they talk, spec, and code. In litespec, that vocabulary lives in [`specs/glossary.md`](../specs/glossary.md) and is read by the planning and review skills.
+The **ubiquitous language** is a concept from Domain-Driven Design — a shared, precise vocabulary that keeps humans and AI agents aligned when they talk, spec, and code. In litespec, that vocabulary lives in `specs/glossary.md` and is read by the planning and review skills.
 
 ## Why it matters
 
@@ -10,7 +10,7 @@ It is not a dictionary of every domain noun. It is a curated list of terms whose
 
 ## How litespec uses it
 
-The glossary lives in the repo as [`specs/glossary.md`](../specs/glossary.md). It is optional, but litespec works better when it exists.
+The glossary lives in the repo as `specs/glossary.md`. It is optional, but litespec works better when it exists.
 
 | Skill | How it uses the glossary |
 |-------|--------------------------|
@@ -41,5 +41,5 @@ Each entry is one line: a bold term, a colon and a space, then a concise definit
 
 ## Source of truth
 
-The terms themselves live in [`specs/glossary.md`](../specs/glossary.md). This page explains the concept and the workflow — it does not duplicate or inline the terms.
+The terms themselves live in `specs/glossary.md`. This page explains the concept and the workflow — it does not duplicate or inline the terms.
 

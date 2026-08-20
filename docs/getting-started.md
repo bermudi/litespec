@@ -55,7 +55,6 @@ Workflow (two lanes):
 
 Commands:
   init [--tools <ids>]              Initialize project structure
-  new <name> --issue N              Link to GH issue (required, no folder)
   validate [--all|--specs|--decisions] [--type T]   Validate specs and decisions
   view                              Dashboard overview
   update [--tools <ids>]            Regenerate skills and adapters
@@ -184,32 +183,9 @@ If `gh` is installed and authenticated, open issues appear under `GH Issues (ope
 
 ## Start a feature
 
-In v2, `litespec new` links a feature to a GH issue. `--issue` is required — it links the change name to the GH issue. Add the `litespec` label to the issue so `validate` discovers it.
+In v2, `litespec-plan` in `clear` mode creates the GH issue with the `litespec` label. The issue body is proposal + design + queue (64k limit). No folder is created — the GH issue is the queue.
 
-````text
-$ litespec new add-feature --issue 1
-Linked: add-feature -> GH issue #1
-Issue: https://github.com/your-org/your-project/issues/1
-
-GH issue body is proposal + design + queue (64k limit).
-No folder created — GH issue is the queue.
-
-Template for GH issue body:
-## Proposal for add-feature
-...
-
-## Design
-...
-
-## Queue
-
-## <outcome>
-Done means: ...
-Verify: ```bash
-...
-```
-- [ ] pending
-````
+If `gh` is unavailable, `plan[clear]` writes the same body to `specs/queues/<name>.md`, where `<name>` is the change name chosen during planning.
 
 The issue body is the plan. The `litespec-build` skill works through it one unit at a time.
 
@@ -240,10 +216,6 @@ ok: 0 capabilities, 0 requirements, 0 scenarios
 ### `litespec: command not found`
 
 Add `~/go/bin` to your PATH and reload your shell.
-
-### `litespec new` says `--issue is required`
-
-Create the GH issue first, apply the `litespec` label, then run `litespec new <name> --issue N`. Without `gh`, use the equivalent queue file under `specs/queues/`.
 
 ### `litespec view` doesn't show GH issues
 

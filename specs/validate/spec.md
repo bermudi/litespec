@@ -108,7 +108,7 @@ For each unit's `Verify:` fenced code block, validate SHALL run `bash -n` on the
 
 ### Requirement: Local Queue Fallback
 
-When `gh` is not on `PATH` or `gh issue list` fails (e.g. no GitHub remote is configured), validate SHALL auto-discover files at `specs/queues/<name>.md` and apply the same unit format and Verify shell lint rules as for GH issue bodies. `<name>` mirrors the change name supplied to `litespec new <name> --issue N`. The `--queue <path>` flag SHALL validate a single local queue file. The `--issue N` flag SHALL fetch and validate a single GH issue by number. When `gh` is available and `gh issue list` succeeds, both GH issues labeled `litespec` and local `specs/queues/*.md` files SHALL be validated. A `gh issue list` failure SHALL produce a warning and skip GH queue validation without failing the command.
+When `gh` is not on `PATH` or `gh issue list` fails (e.g. no GitHub remote is configured), validate SHALL auto-discover files at `specs/queues/<name>.md` and apply the same unit format and Verify shell lint rules as for GH issue bodies. `<name>` is the change name chosen during `plan[clear]`. The `--queue <path>` flag SHALL validate a single local queue file. The `--issue N` flag SHALL fetch and validate a single GH issue by number. When `gh` is available and `gh issue list` succeeds, both GH issues labeled `litespec` and local `specs/queues/*.md` files SHALL be validated. A `gh issue list` failure SHALL produce a warning and skip GH queue validation without failing the command.
 
 #### Scenario: Local queue validated when gh absent
 

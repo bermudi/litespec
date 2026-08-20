@@ -8,7 +8,7 @@ litespec keeps your codebase aligned with durable, load-bearing specs. One GitHu
 
 ## What makes litespec different
 
-**GitHub issue is the queue.** Proposal + design + implementation queue normally live in the issue body. When `gh` is unavailable, `specs/queues/<name>.md` is the equivalent local queue. `litespec new <name> --issue N` links a feature to the issue.
+**GitHub issue is the queue.** Proposal + design + implementation queue normally live in the issue body. When `gh` is unavailable, `specs/queues/<name>.md` is the equivalent local queue. `plan[clear]` creates the labeled GH issue, or the local queue file when offline.
 
 **Two lanes.** Small fix: zero ceremony, edit code and the one `specs/<feature>/spec.md` directly. New feature: plan fuzzy → clear → grill-me → build one unit at a time → review → close the issue.
 
@@ -27,12 +27,9 @@ go install github.com/bermudi/litespec/cmd/litespec@latest
 # Set up a project
 litespec init
 litespec init --tools claude   # optional Claude Code symlinks
-
-# Start a feature tied to a GitHub issue
-litespec new rate-limit --issue 42
 ```
 
-Seven commands: `init`, `new <name> --issue N`, `validate`, `view`, `update`, `upgrade`, `completion`.
+Six commands: `init`, `validate`, `view`, `update`, `upgrade`, `completion`.
 
 ---
 

@@ -72,4 +72,3 @@ func TestBuildValidationResultJSON_NilSlicesProduceEmpty(t *testing.T) {
 		t.Error("Warnings should not be nil")
 	}
 }
-

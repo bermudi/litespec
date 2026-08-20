@@ -14,34 +14,11 @@ Generated adapter commands for: claude
 Project initialized.
 ```
 
-Link the feature to a GH issue:
+Create the GH issue:
 
-````text
-$ litespec new add-rate-limiting --issue 42
-Linked: add-rate-limiting -> GH issue #42
-Issue: https://github.com/your-org/your-project/issues/42
+`litespec-plan` in `clear` mode writes the issue body below and creates a labeled GH issue. If `gh` is unavailable, it writes the same body to `specs/queues/<name>.md`, where `<name>` is the change name chosen during planning.
 
-GH issue body is proposal + design + queue (64k limit).
-No folder created — GH issue is the queue.
-
-Template for GH issue body:
-## Proposal for add-rate-limiting
-...
-
-## Design
-...
-
-## Queue
-
-## <outcome>
-Done means: ...
-Verify: ```bash
-...
-```
-- [ ] pending
-````
-
-Create or edit the GH issue with the body below, then come back here.
+No folder is created — the GH issue is the queue. Create it with `gh issue create --label litespec --body-file issue.md`, then come back here.
 
 ## Two lanes, one workflow
 
@@ -249,13 +226,12 @@ The queue is closed. The durable spec remains in `specs/rate-limit/spec.md`.
 
 You completed a v2 feature cycle:
 
-1. `litespec new add-rate-limiting --issue 42` linked the feature to the issue.
-2. `litespec-plan` clarified the idea in fuzzy mode and wrote the issue in clear mode.
-3. `litespec-plan` drafted `specs/rate-limit/spec.md` with `SHALL`/`MUST` and `WHEN`/`THEN`.
-4. `litespec-build` implemented one unit at a time, satisfying `Done means:` and `Verify` for each.
-5. `litespec validate` confirmed the spec format.
-6. `litespec-review` checked the implementation against the issue and spec.
-7. `gh issue close 42` closed the queue.
+1. `litespec-plan` clarified the idea in fuzzy mode and wrote the issue in clear mode, creating the labeled GH issue (or `specs/queues/<name>.md` when offline).
+2. `litespec-plan` drafted `specs/rate-limit/spec.md` with `SHALL`/`MUST` and `WHEN`/`THEN`.
+3. `litespec-build` implemented one unit at a time, satisfying `Done means:` and `Verify` for each.
+4. `litespec validate` confirmed the spec format.
+5. `litespec-review` checked the implementation against the issue and spec.
+6. `gh issue close 42` closed the queue.
 
 The spec is the durable source of truth. The issue is disposable.
 

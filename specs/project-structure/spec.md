@@ -4,12 +4,12 @@
 
 ### Requirement: CLI Entry Point Split
 
-The CLI entry point MUST be split into separate source files, one per command, under `cmd/litespec/`. The command files `init.go`, `new.go`, `validate.go`, `view.go`, `update.go`, `upgrade.go`, and `completion.go` SHALL each define one command function at package level. Shared rendering, flag parsing, and project-root helpers SHALL live in `render.go`, `helpers.go`, and `project.go` respectively. The `main.go` file SHALL contain only `main()`, the command dispatcher, and shared helpers.
+The CLI entry point MUST be split into separate source files, one per command, under `cmd/litespec/`. The command files `init.go`, `validate.go`, `view.go`, `update.go`, `upgrade.go`, and `completion.go` SHALL each define one command function at package level. Shared rendering, flag parsing, and project-root helpers SHALL live in `render.go`, `helpers.go`, and `project.go` respectively. The `main.go` file SHALL contain only `main()`, the command dispatcher, and shared helpers.
 
 #### Scenario: Command files exist
 
 - **WHEN** the `cmd/litespec/` directory is listed
-- **THEN** `main.go`, `init.go`, `new.go`, `validate.go`, `view.go`, `update.go`, `upgrade.go`, `completion.go`, `render.go`, `helpers.go`, `project.go`, and `main_test.go` are present
+- **THEN** `main.go`, `init.go`, `validate.go`, `view.go`, `update.go`, `upgrade.go`, `completion.go`, `render.go`, `helpers.go`, `project.go`, and `main_test.go` are present
 
 #### Scenario: main.go dispatches without command logic
 
@@ -22,7 +22,7 @@ Command functions MUST NOT call `os.Exit()` directly. Each command function SHAL
 
 #### Scenario: Error path returns an error
 
-- **WHEN** a command function encounters an error (e.g., `cmdNew` is called without a name)
+- **WHEN** a command function encounters an error (e.g., `cmdValidate` is called with an invalid `--type` value)
 - **THEN** it returns a non-nil error and `main()` prints it to stderr and exits with code 1
 
 #### Scenario: Happy path returns nil
@@ -71,11 +71,6 @@ The project SHALL follow the standard Go layout: the `litespec` binary source li
 
 Each command in `cmd/litespec/` MUST have happy-path and error-path test coverage in `cmd/litespec/main_test.go`. Tests SHALL invoke the command functions directly (not via `os/exec`) using their exit-free `func([]string) error` signatures.
 
-#### Scenario: New command has happy and error paths
-
-- **WHEN** `TestCmdNewDirect_HappyPath` and `TestCmdNewDirect_MissingName` are run
-- **THEN** the happy path links the change to a GH issue and the error path returns a missing-name error
-
 #### Scenario: Init command has happy and error paths
 
 - **WHEN** `TestCmdInitDirect_HappyPath` and `TestCmdInitDirect_UnknownTool` are run
@@ -88,5 +83,5 @@ Each command in `cmd/litespec/` MUST have happy-path and error-path test coverag
 
 #### Scenario: Every command function is tested directly
 
-- **WHEN** `cmdInit`, `cmdNew`, `cmdValidate`, `cmdView`, `cmdUpdate`, `cmdUpgrade`, and `cmdCompletion` are called from `cmd/litespec/main_test.go`
+- **WHEN** `cmdInit`, `cmdValidate`, `cmdView`, `cmdUpdate`, `cmdUpgrade`, and `cmdCompletion` are called from `cmd/litespec/main_test.go`
 - **THEN** each command has at least one happy-path and one error-path direct test

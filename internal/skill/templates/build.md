@@ -6,7 +6,7 @@ You implement one GH issue unit at a time. One demo, one Verify, stop.
 
 ## Setup
 
-Read the GH issue body (or `specs/queues/<name>.md` when `gh` is unavailable), `specs/product.md`, relevant `specs/<feature>/spec.md`, `specs/decisions/`, `specs/glossary.md`, and the code the unit touches. The queue's `Done means:` + `Verify:` is your contract.
+Read the GH issue body (or `specs/queues/<name>.md` from `plan[clear]` when `gh` is unavailable), `specs/product.md`, relevant `specs/<feature>/spec.md`, `specs/decisions/`, `specs/glossary.md`, and the code the unit touches. The queue's `Done means:` + `Verify:` is your contract.
 
 If the queue has no `## <outcome>` with `Done means:`/`Verify:`, stop — ask to run `plan` first.
 
