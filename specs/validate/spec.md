@@ -28,12 +28,22 @@ The `litespec validate` command SHALL validate feature specs under `specs/<featu
 
 ### Requirement: GH Issue Queue Validation
 
-The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec` via `gh issue list` and lint each issue body as a queue. A `##` section is treated as a unit only when its body contains a `Done means:` or `Verify:` line; prose sections such as `## Proposal`, `## Design`, `## Not doing`, `## Queue`, and `## Spec draft` SHALL be skipped. Each unit SHALL have a non-empty heading, a `Done means:` line, a `Verify:` line carrying either an inline backtick command on the same line or a fenced code block within the unit body, and a `- [ ]` or `- [x]` checkbox. Missing or malformed elements SHALL produce an error identifying the issue number and unit heading. Issues without the `litespec` label SHALL NOT be scanned. The `litespec` label is a hardcoded convention; no config file governs it.
+The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec` via `gh issue list` and lint each issue body as a queue. Before the first `##` heading, each queue SHALL contain exactly one `Base:` line with a full 40- or 64-character hexadecimal commit ID and exactly one `Branch:` line matching `litespec/<kebab-change-name>`. A `##` section is treated as a unit only when its body contains a `Done means:` or `Verify:` line; prose sections SHALL be skipped. Each unit SHALL have a non-empty heading, a `Done means:` line, a `Verify:` line carrying either an inline backtick command on the same line or a fenced code block within the unit body, and a checkbox. Missing or malformed ownership or unit elements SHALL produce an error. Issues without the `litespec` label SHALL NOT be scanned.
 
 #### Scenario: Well-formed queue passes
 
-- **WHEN** `litespec validate` scans an open issue labeled `litespec` whose body has `## <outcome>` with `Done means:`, `Verify:` + fenced block, and `- [ ]`
+- **WHEN** `litespec validate` scans an open issue labeled `litespec` whose body has valid `Base:` and `Branch:` ownership lines plus a valid unit
 - **THEN** validation succeeds for that issue
+
+#### Scenario: Missing ownership metadata fails
+
+- **WHEN** a labeled queue issue omits `Base:` or `Branch:` before its first `##` heading
+- **THEN** validation reports an ownership error
+
+#### Scenario: Duplicate or malformed ownership metadata fails
+
+- **WHEN** a queue repeats an ownership line or uses a short Base or non-`litespec/` Branch
+- **THEN** validation reports an ownership error
 
 #### Scenario: Unit missing Done means fails
 

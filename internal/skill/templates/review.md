@@ -6,9 +6,14 @@ You are a reviewer, not an implementer. Read the GH issue + spec + code, find ga
 
 Read the GH issue body, relevant `specs/<feature>/spec.md`, `specs/decisions/`, and the implementation diff.
 
-**Review diff — exact base.** The issue body records `Base: <sha>` (captured by `plan[clear]` at issue creation). The implementation diff is `git diff <base>` — from that commit to the current working tree, uncommitted changes included. Findings inside it are in scope; findings outside it route. If `Base:` is missing, say so and decide the verdict from unit contracts alone — every other finding is out of scope and routed.
+**Review scope — exact ownership.** The issue body records immutable `Base: <sha>` and `Branch: <branch>` lines. Before reviewing:
+1. Compare `git branch --show-current` with `Branch:`. If either ownership line is missing, the branch differs, or `Base:` is not an ancestor of `HEAD`, stop without a verdict. Do not infer scope.
+2. Run `git diff <base>` for tracked changes from the base to the current working tree.
+3. Run `git status --porcelain=v1 --untracked-files=all`. Every `??` path is wholly inside review scope; read each one because `git diff` omits it.
 
-If no GH issue exists (small fix), the review diff is the fix's own changes (`git diff HEAD` if uncommitted, `git show` if committed). Read the changed `specs/<feature>/spec.md` + code.
+All commits and working-tree changes on the recorded branch belong to this issue. Findings outside that scope route. If unrelated work appears on the branch, it is still issue-owned and must be removed or fixed before closure.
+
+If no GH issue exists (small fix), require the user to identify the fix commit and review `git show <sha>`; do not infer a small fix from an arbitrary dirty tree. Read the changed `specs/<feature>/spec.md` + code.
 
 No `reviewMode` — one mode: does the code satisfy `Done means:` and `Verify:` and not contradict durable specs/decisions?
 
@@ -38,38 +43,42 @@ If a fix needs a new decision, report "needs decision: <question>" instead of in
 - Flag Verify that would pass without the outcome.
 
 ### Verdict
-`PASS` or `CHANGES REQUESTED`. The verdict is about the issue's units, not the whole repo. Severity says how confident you are it's wrong; scope says whose problem it is. Only scope blocks.
+`PASS` or `CHANGES REQUESTED`. The verdict is about the issue-owned branch, not the whole repo. Severity says how confident you are it is wrong; scope says whether this issue owns it.
 
 A finding **blocks** — forces `CHANGES REQUESTED`, keeps the issue open — when it is CRITICAL or WARNING **and** at least one of:
 - breaks one of this issue's units' `Done means:` or `Verify:`
 - the change's code contradicts a durable spec or decision
-- its location is inside the review diff
+- its location is inside review scope
 
-Everything else **routes without affecting the verdict**: SUGGESTIONs anywhere, and CRITICAL/WARNING outside the review diff and outside every unit's contract (neighboring code, stale decisions the change didn't trip, drive-bys, unconfirmed adversarial candidates). `PASS` may carry routed findings — list them with their lanes; the verdict stands and the issue can close.
+Everything else **routes without affecting the verdict**: SUGGESTIONs anywhere, and CRITICAL/WARNING outside review scope and outside every unit's contract (neighboring code, stale decisions the change did not trip, drive-bys, unconfirmed adversarial candidates). `PASS` may carry routed findings — list them with their lanes; the verdict stands only when every unit is checked.
 
 ---
 
 ## Triage
 
-You report findings — you do not fix them. But you route each finding to the right lane so the user knows what to do next. The fork is structural: does the finding cite a unit's `Done means:` or `Verify:`?
+You report findings — you do not fix them. Route in this order; the first matching rule wins:
 
-**PASS** — no blocking findings: all units satisfy their contracts. Routed findings (SUGGESTIONs, out-of-scope findings of any severity) may be listed with their lanes — they are the user's business, not this issue's. The issue can close.
+1. **SUGGESTION** → non-blocking small fix lane, user's discretion.
+2. **CRITICAL or WARNING that breaks a unit's `Done means:` or `Verify:`** → blocking rebuild. Name the unit. The user unchecks it and invokes `litespec-build`; WARNINGs route here too.
+3. **CRITICAL or WARNING inside review scope, outside every unit** → blocking issue-owned fix:
+   - trivial → direct fix on the issue branch;
+   - non-trivial but correctly shaped → draft and append a new unchecked unit to the parent queue, then build it on the same branch;
+   - wrong shape → `litespec-plan`.
+   The parent remains open until the fix lands and fresh review returns `PASS`.
+4. **CRITICAL or WARNING outside review scope and every unit** → non-blocking route:
+   - trivial → small fix lane;
+   - non-trivial → draft a unit for a later `litespec-plan` invocation, which creates its own queue and isolated branch;
+   - wrong shape → `litespec-plan`.
 
-**CHANGES REQUESTED** — for each finding, state its lane:
+If a finding needs a decision, report `needs decision: <question>` before applying the matching route. A decision does not change whether the finding blocks.
 
-- **CRITICAL, breaks a unit's `Done means:` or `Verify:`** → that unit is not done. Name the unit. The user unchecks its box in the issue, then re-invokes `litespec-build` to rebuild it. The issue stays open until all units re-pass. Load `references/adversarial-review.md` if the finding stems from an interaction bug you constructed adversarially.
+**PASS** — every unit checkbox is checked and no blocking finding remains. Routed findings may accompany it.
 
-- **CRITICAL or WARNING, outside any unit's contract** (neighboring code, help text, stale decision, drive-by) → small fix lane. Non-blocking: it does not affect the verdict. No unit, no issue reopen. The user fixes directly, updates `specs/<feature>/spec.md` if it was a contract change, commits.
+**CHANGES REQUESTED** — at least one blocking finding remains, even if every unit is checked.
 
-- **SUGGESTION** → small fix lane, user's discretion. Not blocking.
+Appending a unit to the parent queue is a permitted routing mutation; do not change source, specs, decisions, existing units, or checkboxes. Write `## <outcome>`, `Done means:`, `Verify:`, and `Depends:` if needed. Do not invent units for trivial findings.
 
-- **"needs decision: <question>"** → the user creates a decision in `specs/decisions/` first (`touch` + `litespec validate --decisions`), then routes the fix per the rules above.
-
-- **Shape was wrong** (the unit's outcome doesn't match what the code needs to do) → `litespec-plan`, not a fix. State this explicitly.
-
-- **Non-small-fix finding outside any unit's contract** (needs real implementation work, not a trivial small fix, and the code shape is not fundamentally wrong) → draft a new unit and route it to a GH sub-issue. Write the unit with `## <outcome>`, `Done means:`, `Verify:`, and `Depends:` if it blocks on existing units. Create the sub-issue via `gh issue create --parent <N> --label litespec` with the new unit(s) as the body. GH natively tracks parent-child; the `litespec` label keeps `validate` aware of it. If `gh` is unavailable, write the new unit(s) to `specs/queues/<parent-name>-review.md` (`<parent-name>` is the parent change name chosen during `plan[clear]`). Creating the sub-issue is routing, not code editing — do not implement the unit yourself.
-
-Do not invent units for trivial findings — those are small fix lane. Invent units only for findings that need a unit's worth of work and don't break an existing unit's contract. Do not reopen the issue for small fixes. The issue closes when all its units pass — routed findings never block closure.
+The issue closes only when every unit checkbox is checked **and** review returns `PASS`. Routed non-blocking findings never block closure.
 
 ---
 

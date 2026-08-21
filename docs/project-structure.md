@@ -119,6 +119,6 @@ The same structure supports both speeds:
   ```
   plan[fuzzy] → plan[clear]
   ```
-  `litespec-plan` writes proposal + design + units into the labeled GH issue body, or to `specs/queues/<name>.md` when offline (`<name>` is the change name chosen during `plan[clear]`). `litespec-build` implements one unit at a time, satisfies `Done means:` and `Verify:`, checks the box, commits, and stops. `litespec-review` checks spec vs. implementation. Close the issue when done.
+  `litespec-plan` starts from a clean tree, creates `litespec/<change-name>`, and records `Base:` + `Branch:` with proposal, design, and units in the labeled GH issue body (or local queue). `litespec-build` implements one unit at a time on that branch. `litespec-review` checks tracked and untracked issue-owned work. Close only when every unit is checked and review returns `PASS`.
 
 The queue lives in the GitHub issue in the normal workflow; local queue files are the offline fallback.

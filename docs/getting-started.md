@@ -55,7 +55,7 @@ Workflow (two lanes):
 
 Commands:
   init [--tools <ids>]              Initialize project structure
-  validate [--all|--specs|--decisions] [--type T]   Validate specs and decisions
+  validate [--all|--specs|--decisions|--issue N|--queue PATH] [--type T]   Validate specs, decisions, and queues
   view                              Dashboard overview
   update [--tools <ids>]            Regenerate skills and adapters
   upgrade                           Check for and install the latest version
@@ -69,9 +69,11 @@ Flags:
    --help       Print this help message
    --json       Output structured JSON (validate, view)
    --strict     Treat warnings as errors (validate)
-   --all        Validate all specs and decisions
+   --all        Validate all specs, decisions, and queues
    --specs      Validate all specs only
    --decisions  Validate all decisions only
+   --issue      Fetch and validate one GH queue issue
+   --queue      Validate one local queue file
    --type       Disambiguate name type: spec|decision (validate)
 ```
 
@@ -183,11 +185,11 @@ If `gh` is installed and authenticated, open issues appear under `GH Issues (ope
 
 ## Start a feature
 
-In v2, `litespec-plan` in `clear` mode creates the GH issue with the `litespec` label. The issue body is proposal + design + queue (64k limit). No folder is created — the GH issue is the queue.
+In v2, `litespec-plan` in `clear` mode requires a clean tree, records the current commit as `Base:`, creates `litespec/<change-name>`, and records it as `Branch:` in the labeled GH issue. Proposal + design + queue follow those ownership lines.
 
 If `gh` is unavailable, `plan[clear]` writes the same body to `specs/queues/<name>.md`, where `<name>` is the change name chosen during planning.
 
-The issue body is the plan. The `litespec-build` skill works through it one unit at a time.
+The issue body is the plan. `litespec-build` works through it one unit at a time on the recorded branch; unrelated work uses another branch or worktree.
 
 ## Validate your specs
 
@@ -196,6 +198,7 @@ The issue body is the plan. The `litespec-build` skill works through it one unit
 - each requirement body contains `SHALL` or `MUST`
 - each load-bearing requirement has at least one `#### Scenario:` with `WHEN` and `THEN`
 - decisions follow the `NNNN-<slug>.md` format
+- queue issues contain valid `Base:` and `Branch:` ownership lines
 
 Before you add specs:
 

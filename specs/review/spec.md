@@ -4,164 +4,168 @@
 
 ### Requirement: Adversarial Review of Issue and Spec vs Implementation
 
-The `litespec-review` skill SHALL perform a context-aware, adversarial review by reading the GH issue body (its proposal, design, and units with `Done means:` and `Verify:`), any load-bearing `specs/<feature>/spec.md`, and relevant `specs/decisions/`, then comparing the stated intent and durable contracts against the implementation. The review SHALL probe for interaction bugs, state transitions, wiring gaps, and contract violations, not only syntax or surface compliance.
+The `litespec-review` skill SHALL perform a context-aware, adversarial review by reading the GH issue body, its units with `Done means:` and `Verify:`, any load-bearing `specs/<feature>/spec.md`, relevant `specs/decisions/`, and the exact issue-owned review scope. It SHALL probe for interaction bugs, state transitions, wiring gaps, and contract violations, not only syntax or surface compliance.
 
 #### Scenario: Review with GH issue and spec
 
 - **WHEN** `litespec-review` is invoked for a change with a GH issue and a load-bearing spec
-- **THEN** it reads the issue and spec and probes the implementation against them
+- **THEN** it reads the issue, spec, decisions, and issue-owned changes before probing the implementation
 
 #### Scenario: Review for small fix without issue
 
 - **WHEN** `litespec-review` is invoked on a small fix with no GH issue
-- **THEN** it reads the relevant `specs/<feature>/spec.md` and the changed code before reporting findings
+- **THEN** it requires the user to identify the fix commit and reviews that commit rather than inferring scope from a dirty tree
 
-### Requirement: Exact Review Base
+### Requirement: Isolated Issue Branch
 
-The GH issue body (and its local queue mirror in `specs/queues/<name>.md`) SHALL record a `Base: <sha>` line — the commit `litespec-plan` in clear mode captured via `git rev-parse HEAD` at issue creation, before any unit is built. The `litespec-review` skill SHALL derive the implementation diff from `Base:` to the current working tree (uncommitted changes included) and SHALL use that diff to determine which findings are in scope. If `Base:` is absent, review SHALL decide the verdict from unit contracts alone and SHALL report the absence; all other findings are treated as out of scope and routed.
+The `litespec-plan` skill in clear mode SHALL start from a clean working tree, capture `Base: <sha>`, create and switch to a dedicated `litespec/<change-name>` branch, and record it as `Branch: <branch>` in the GH issue body or local queue mirror. All commits and working-tree changes on that branch SHALL belong exclusively to the issue. Unrelated work MUST use another branch or worktree.
 
-#### Scenario: Diff derived from recorded base
+#### Scenario: Clear planning starts clean
 
-- **WHEN** the issue body records `Base: <sha>`
-- **THEN** review diffs from that commit to the working tree and scopes findings as inside or outside that diff
+- **WHEN** `litespec-plan` in clear mode finds output from `git status --porcelain`
+- **THEN** it stops before creating the issue or branch and asks the user to commit, stash, or move the existing work
 
-#### Scenario: Missing base degrades gracefully
+#### Scenario: Dedicated branch records ownership
 
-- **WHEN** the issue body has no `Base:` line
-- **THEN** review reports the absence, decides the verdict from unit contracts only, and routes every other finding as out of scope
+- **WHEN** clear planning starts from a clean tree for change name `add-search`
+- **THEN** it records the current HEAD as `Base:`, creates `litespec/add-search`, and records `Branch: litespec/add-search`
 
-#### Scenario: Small fix review base
+#### Scenario: Existing branch is not reused
 
-- **WHEN** review runs on a small fix with no GH issue
-- **THEN** the review diff is the fix's own changes (uncommitted changes or the fix commit)
+- **WHEN** the intended `litespec/<change-name>` branch already exists
+- **THEN** clear planning stops instead of mixing another issue into that branch
+
+### Requirement: Exact Review Scope
+
+Before reviewing a queue issue, `litespec-review` SHALL verify that `Base:` and `Branch:` exist, that the current branch matches `Branch:`, and that `Base:` is an ancestor of `HEAD`. Review scope SHALL contain the tracked diff from `Base:` to the current working tree plus every untracked path reported by `git status --porcelain=v1 --untracked-files=all`; each untracked file is wholly in scope. Review SHALL stop without a verdict when ownership cannot be proved.
+
+#### Scenario: Scope includes tracked and untracked work
+
+- **WHEN** the ownership checks pass and the issue branch contains tracked changes and `??` paths
+- **THEN** review examines `git diff <base>` and reads every untracked path as issue-owned work
+
+#### Scenario: Branch mismatch stops review
+
+- **WHEN** the current branch differs from the issue's `Branch:` line
+- **THEN** review stops without a verdict and does not infer another scope
+
+#### Scenario: Missing ownership metadata stops review
+
+- **WHEN** `Base:` or `Branch:` is absent or Base is not an ancestor of HEAD
+- **THEN** review stops without a verdict
 
 ### Requirement: Findings and Verdict
 
-The `litespec-review` skill SHALL report each finding with a **Severity** (`CRITICAL`, `WARNING`, or `SUGGESTION`), a **Location** (`file:line` or unit), **Evidence** (excerpt or observation), and a **Fix direction** (one unambiguous instruction). The review SHALL conclude with a verdict of `PASS` or `CHANGES REQUESTED`.
+The `litespec-review` skill SHALL report each finding with a **Severity** (`CRITICAL`, `WARNING`, or `SUGGESTION`), a **Location** (`file:line` or unit), **Evidence** (excerpt or observation), and a **Fix direction** (one unambiguous instruction). It SHALL conclude with `PASS` or `CHANGES REQUESTED` after ownership checks pass.
 
-The verdict SHALL be decided by blocking findings only. A finding is **blocking** when it is CRITICAL or WARNING **and** at least one of: it breaks one of the issue's units' `Done means:` or `Verify:`, the change's code contradicts a durable spec or decision, or its location lies inside the review diff. SUGGESTIONs and findings outside the review diff and outside every unit's contract SHALL be routed without affecting the verdict.
+A finding is blocking when it is CRITICAL or WARNING and at least one of: it breaks a unit's `Done means:` or `Verify:`, the issue-owned change contradicts a durable spec or decision, or its location lies inside review scope. SUGGESTIONs and findings outside review scope and every unit contract SHALL be routed without affecting the verdict.
 
 #### Scenario: Pass verdict
 
-- **WHEN** all units satisfy their `Done means:` and `Verify:` contracts and no blocking finding remains
-- **THEN** the review returns `PASS`, even if routed findings accompany it
+- **WHEN** every unit checkbox is checked and no blocking finding remains
+- **THEN** review returns `PASS`, even if routed findings accompany it
 
 #### Scenario: Changes requested verdict
 
-- **WHEN** the review identifies a blocking finding
-- **THEN** it returns `CHANGES REQUESTED`
+- **WHEN** at least one blocking finding remains
+- **THEN** review returns `CHANGES REQUESTED`, even if every unit checkbox is checked
 
 #### Scenario: Out-of-scope finding does not block
 
-- **WHEN** a CRITICAL or WARNING finding lies outside the review diff and outside every unit's contract
-- **THEN** it is routed to its lane and `PASS` remains possible
+- **WHEN** a CRITICAL or WARNING lies outside review scope and every unit contract
+- **THEN** it is routed and does not affect the verdict
 
-### Requirement: Triage into Lanes
+### Requirement: Exhaustive Finding Routing
 
-For each finding, `litespec-review` SHALL first determine whether the finding cites a unit's `Done means:` or `Verify:`, then route it into exactly one of the following lanes:
-- A finding that is **CRITICAL** and breaks a unit's `Done means:` or `Verify:` SHALL be routed to `litespec-build`: the unit's checkbox is unchecked, `references/build/review-fixing.md` is loaded, and the unit is rebuilt with expanded scope; the GH issue stays open until all units re-pass.
-- A finding that is **CRITICAL** or **WARNING** and lies outside every unit's contract and the review diff (neighboring code, help text, stale decision, drive-by) SHALL be routed to the small fix lane; it is non-blocking, no unit is created, and the issue is not reopened.
-- A **SUGGESTION** SHALL be routed to the small fix lane at the user's discretion and is not blocking.
-- A finding that is `"needs decision"` SHALL first create a decision in `specs/decisions/`, then be routed per the rules above.
-- A finding where the unit's outcome or shape is wrong SHALL be routed to `litespec-plan`, not a fix.
-- A non-trivial finding outside any unit's contract that needs real implementation work but is not a shape problem SHALL be routed to a new unit: draft `## <outcome>`, `Done means:`, `Verify:`, and `Depends:` if it blocks on existing units; create a GH sub-issue via `gh issue create --parent <N> --label litespec` or, if `gh` is unavailable, write the unit to `specs/queues/<parent-name>-review.md`.
+For each finding, `litespec-review` SHALL apply the first matching rule:
+1. A SUGGESTION SHALL be routed to the non-blocking small fix lane at the user's discretion.
+2. A CRITICAL or WARNING that breaks a unit's `Done means:` or `Verify:` SHALL be a blocking rebuild: the unit is unchecked and rebuilt with `litespec-build`.
+3. A CRITICAL or WARNING inside review scope but outside every unit SHALL be blocking. A trivial finding SHALL route to a direct fix on the issue branch; a non-trivial, correctly shaped finding SHALL be appended as a new unchecked unit on the parent queue and built on the same branch; a shape problem SHALL route to `litespec-plan`.
+4. A CRITICAL or WARNING outside review scope and every unit SHALL be non-blocking. A trivial finding SHALL route to the small fix lane; a non-trivial finding SHALL be drafted for a later `litespec-plan` invocation that creates its own queue and isolated branch; a shape problem SHALL route to `litespec-plan`.
 
-#### Scenario: Critical finding breaks a unit contract
+A finding that needs a durable ruling SHALL be reported as `"needs decision: <question>"` before applying the matching route. The need for a decision SHALL NOT alter whether the finding blocks.
 
-- **WHEN** a CRITICAL finding cites a unit's `Done means:` or `Verify:` violation with direct evidence
-- **THEN** the finding routes to `litespec-build`, the unit checkbox is unchecked, and the issue stays open
+#### Scenario: Warning breaks a unit
 
-#### Scenario: Warning outside unit contract is a small fix
+- **WHEN** a WARNING shows that a unit's contract is not satisfied
+- **THEN** the unit is unchecked and routed to `litespec-build` as a blocking rebuild
 
-- **WHEN** a WARNING finding concerns neighboring code or a stale decision and lies outside the review diff and every unit contract
-- **THEN** it routes to the small fix lane, is non-blocking, and does not reopen the issue
+#### Scenario: In-scope finding outside units blocks
 
-#### Scenario: Finding needs a decision first
+- **WHEN** a CRITICAL or WARNING lies inside review scope but breaks no existing unit
+- **THEN** it routes to a direct issue-branch fix, a new parent unit, or plan according to its size and shape, and the parent stays open
 
-- **WHEN** a finding requires a durable architectural ruling before it can be fixed
-- **THEN** it is reported as `"needs decision"` and routed to `specs/decisions/` before any fix
+#### Scenario: Out-of-scope finding routes without blocking
 
-#### Scenario: Shape was wrong
+- **WHEN** a CRITICAL or WARNING lies outside review scope and every unit
+- **THEN** it routes to the appropriate lane and may coexist with `PASS`
 
-- **WHEN** a finding shows the implemented outcome does not match the intended shape of the unit
-- **THEN** the finding is routed to `litespec-plan`, not a fix
+#### Scenario: Finding needs a decision
 
-#### Scenario: Non-trivial finding outside all units
-
-- **WHEN** a finding needs a unit's worth of work and does not break an existing unit's contract
-- **THEN** the review drafts a new unit and creates a GH sub-issue or local queue entry, but does not implement it
+- **WHEN** a finding requires a durable architectural ruling
+- **THEN** review reports `"needs decision"` and preserves the finding's blocking status while the decision is made
 
 ### Requirement: Pure Review Role
 
-The `litespec-review` skill MUST NOT write code, modify files, or implement fixes. It SHALL report findings and route them. Creating a GH sub-issue or a `specs/queues/<parent-name>-review.md` entry is routing, not implementation.
+The `litespec-review` skill MUST NOT write code, modify files, check or uncheck existing checkboxes, or implement fixes. It SHALL report and route findings. Appending a new unchecked unit to the parent GH issue body or local queue is a permitted routing mutation; review MUST NOT otherwise modify the queue.
 
-#### Scenario: Review does not edit code
+#### Scenario: Review does not implement
 
 - **WHEN** `litespec-review` runs
-- **THEN** it does not edit source files, check or uncheck checkboxes, or commit changes
+- **THEN** it makes no implementation changes
 
-#### Scenario: Sub-issue creation is routing
+#### Scenario: Parent unit append is routing
 
-- **WHEN** review creates a GH sub-issue or local queue entry for a new unit
-- **THEN** it only drafts the unit in the issue or queue body and does not implement the code
+- **WHEN** review finds non-trivial, correctly shaped work inside review scope but outside existing units
+- **THEN** it appends an unchecked unit to the parent queue without implementing it or changing existing units
 
 ### Requirement: Adversarial Scenario Reference
 
-When the change contains stateful code paths, `litespec-review` SHALL load `references/review/adversarial-review.md` and construct worst-case scenarios from the specs before tracing implementation code. For each scenario it SHALL trace the code path, tag handling as `Handled`, `Missing`, or `Uncertain`, and report any confirmed or inferred gap as a finding. Unconfirmed adversarial candidates (`Uncertain`) SHALL NOT block; only confirmed findings inside the review diff or against a unit's contract or durable spec can block.
+When the change contains stateful code paths, `litespec-review` SHALL load `references/review/adversarial-review.md`, construct worst-case scenarios from the specs, and trace them through implementation. Unconfirmed candidates tagged `Uncertain` SHALL NOT block; confirmed CRITICAL or WARNING findings follow the normal scope and routing rules.
 
 #### Scenario: Adversarial review for stateful code
 
 - **WHEN** the change contains state transitions, multi-entity operations, or concurrent access
-- **THEN** review loads `references/review/adversarial-review.md`, enumerates adversarial scenarios, and checks them against the implementation
-
-#### Scenario: Adversarial finding breaks a unit
-
-- **WHEN** an adversarial scenario confirms an interaction bug that breaks a unit's `Done means:` or `Verify:`
-- **THEN** the finding is CRITICAL and routes to `litespec-build` with the unit checkbox unchecked
+- **THEN** review enumerates adversarial scenarios and checks them against the implementation
 
 #### Scenario: Unconfirmed candidate does not block
 
-- **WHEN** an adversarial scenario is tagged `Uncertain` and confirms no unit contract or durable spec violation inside the review diff
-- **THEN** the candidate is reported for human triage and does not affect the verdict
+- **WHEN** an adversarial scenario remains `Uncertain`
+- **THEN** it is reported for human triage without affecting the verdict
 
 ### Requirement: No Unit for Trivial Findings
 
-`litespec-review` SHALL NOT invent new units for trivial findings; those SHALL be routed to the small fix lane. A new unit SHALL be drafted only when a finding needs a unit's worth of work and does not break an existing unit's contract.
+`litespec-review` SHALL NOT invent units for trivial findings. A new unit SHALL be drafted only when a finding needs a unit's worth of work and does not break an existing unit contract.
 
-#### Scenario: Typo in help text
+#### Scenario: Trivial in-scope finding
 
-- **WHEN** review finds a typo in help text or other trivial issue outside any unit contract
-- **THEN** it routes the finding to the small fix lane and does not create a unit
+- **WHEN** review finds a trivial issue inside review scope but outside every unit
+- **THEN** it routes to a blocking direct fix without creating a unit
 
-#### Scenario: Missing contract for new work
+#### Scenario: Non-trivial work outside units
 
-- **WHEN** a finding requires real implementation work that no existing unit covers
-- **THEN** the review may draft a new unit and route it to a sub-issue or queue entry
+- **WHEN** an in-scope finding requires real implementation work that no existing unit covers
+- **THEN** review may append an unchecked unit to the parent queue without implementing it
 
 ### Requirement: Issue Closure Condition
 
-A GH issue SHALL remain open until all of its units pass their `Done means:` and `Verify:` contracts and review returns `PASS`; it SHALL close when all units pass. Routed findings — those outside the review diff and outside every unit contract — SHALL NOT prevent closure or reopen the issue, regardless of severity.
+A GH issue SHALL close only when every unit checkbox is checked and `litespec-review` returns `PASS`. Routed non-blocking findings SHALL NOT prevent closure or reopen the issue.
 
-#### Scenario: All units pass
+#### Scenario: Checked units and pass permit closure
 
-- **WHEN** all unit checkboxes are checked and `litespec-review` returns `PASS`
-- **THEN** the GH issue may be closed
+- **WHEN** every unit checkbox is checked and review returns `PASS`
+- **THEN** the issue may close
 
-#### Scenario: Routed finding does not block closure
+#### Scenario: Checked units with blocking finding stay open
 
-- **WHEN** review returns `PASS` while listing routed findings outside the review diff and every unit contract
-- **THEN** the issue may still be closed and is not reopened by those findings
+- **WHEN** every unit checkbox is checked but review returns `CHANGES REQUESTED`
+- **THEN** the issue remains open
 
 ### Requirement: No Persistent Finding Tracker
 
-`litespec-review` findings SHALL be ephemeral. A finding SHALL route to an existing unit checkbox, be fixed immediately in the appropriate lane, or become a new queue issue. The review skill SHALL NOT maintain a finding tracker, task list, or persistent finding artifact.
-
-#### Scenario: Findings route or become queue issues
-
-- **WHEN** `litespec-review` finishes
-- **THEN** its findings are either resolved via `litespec-build`/small fix or recorded as a GH sub-issue or local queue entry; no finding tracker or task list is created
+`litespec-review` findings SHALL be ephemeral. A finding SHALL route to an existing unit checkbox, be fixed directly, or become a new queue issue. The review skill SHALL NOT maintain a finding tracker, task list, or persistent finding artifact.
 
 #### Scenario: Re-review reads current state
 
 - **WHEN** `litespec-review` is re-run after fixes
-- **THEN** it evaluates the current state from the issue, spec, and code — not from a previous finding log — and recomputes the verdict by the same blocking rule
+- **THEN** it evaluates the current issue-owned branch, specs, and code and recomputes the verdict without a previous finding log

@@ -119,13 +119,13 @@ Examples:
 func printValidateHelp() {
 	fmt.Print(`Usage: litespec validate [<name>|--all|--specs|--decisions|--issue N|--queue <path>] [--type T] [--strict] [--json] [--minimal]
 
-Validate specs, decisions, and queue.
+Validate specs, decisions, and queues.
 
 Arguments:
   <name>            Validate a specific spec or decision by name
 
 Flags:
-  --all             Validate all specs and decisions
+  --all             Validate all specs, decisions, and queues
   --specs           Validate all specs only
   --decisions       Validate all decisions only
   --issue <N>       Fetch and validate a single GH issue by number

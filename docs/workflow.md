@@ -21,11 +21,11 @@ No GH issue. No folder.
 For greenfield, API shape, CLI behavior, or anything that will outlast the issue.
 
 1. `litespec-plan` in **fuzzy** mode: read code, ask 2–3 questions, maybe spike, write no files. Use `references/fuzzy.md`.
-2. `litespec-plan` in **clear** mode: write the labeled GH issue body with `## Proposal`, `## Design`, and `## Queue` (units with `Done means:` and `Verify:`). If `gh` is unavailable, write the same body to `specs/queues/<name>.md` (`<name>` is the change name chosen in this step). Draft `specs/<feature>/spec.md` if the feature is load-bearing. Use `references/clear.md`.
+2. `litespec-plan` in **clear** mode: require a clean tree, capture `Base:`, create `litespec/<change-name>`, and record `Branch:` in the labeled GH issue body before its proposal, design, and units. If `gh` is unavailable, write the same body to `specs/queues/<name>.md`. Draft a spec if load-bearing.
 3. **grill-me** (optional): adversarial shaping. Use `references/grilling.md`. Pull in `codebase-design` or `domain-modeling` when needed.
 4. `litespec-build`: implement one unit at a time. Each unit must satisfy `Done means:` and `Verify:` before the box is checked.
-5. `litespec-review`: adversarial check of the queue + spec against the implementation.
-6. Close the GH issue when all units are done.
+5. `litespec-review`: verify the recorded branch, review tracked and untracked issue-owned work, then route findings.
+6. Close the GH issue only when all units are checked and review returns `PASS`.
 
 Unidirectional. If the plan shifts, rewrite the GH issue (disposable), not the durable spec.
 
@@ -36,6 +36,9 @@ A unit is one demo-able outcome with a `Verify:` that must fail without the outc
 In the GH issue body:
 
 ```markdown
+Base: <full commit ID>
+Branch: litespec/show-dependency-graph
+
 ## Queue
 
 ## Show dependency graph in `view`
@@ -52,6 +55,9 @@ Verify: `litespec view | grep "Specifications"` shows the spec name and count
 - Build one unit per session.
 - `Verify:` must be a concrete command or assertion. If it would pass without the outcome, the unit is too big.
 - Tick the checkbox when `Verify:` passes, then commit and stop.
+- Put unrelated work on another branch or worktree.
+
+Review routes findings in order: suggestions are non-blocking; unit violations rebuild the unit; CRITICAL/WARNING inside issue scope blocks as a direct fix or new parent unit; findings outside issue scope route without blocking. Review scope includes every untracked file, not only `git diff`.
 
 ## When to Write a Spec
 

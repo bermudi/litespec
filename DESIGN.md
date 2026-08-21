@@ -50,7 +50,7 @@ You say "fix typo" -> agent reads product + relevant spec + decisions/glossary -
 **New feature / greenfield (plan fuzzy -> clear):**
 ```
 you: "add X" -> plan[fuzzy] (read code, grill by default — references/fuzzy.md loads references/grilling.md; no files)
-          -> plan[clear] (write GH issue: proposal + design + units with Verify; also draft spec if load-bearing — references/clear.md)
+          -> plan[clear] (start clean, create isolated branch, write GH issue + units; draft spec if load-bearing)
           -> you: "looks good" (grilling happened in fuzzy) or "grill-me" (more grilling with references/grilling.md)
           -> build: one unit at a time (see unit rule)
           -> review: triage findings into lanes
@@ -58,9 +58,9 @@ you: "add X" -> plan[fuzzy] (read code, grill by default — references/fuzzy.md
           -> close GH issue
 ```
 
-Review triages findings structurally: does the finding break a unit's `Done means:`/`Verify:`? If yes → uncheck box, rebuild via `build` (scope expands — fix the pattern, not just the line). If no and it is trivial → small fix lane. If no and it needs real work outside any existing unit's contract → draft a new unit and create a GH sub-issue via `gh issue create --parent <N> --label litespec`, or write to `specs/queues/<parent-name>-review.md` (`<parent-name>` is the parent change name chosen during `plan[clear]`) if `gh` is unavailable. No fix skill, no finding tracker — findings route to existing tracking (unit checkboxes), get fixed immediately, or spawn a sub-issue.
+Each queue issue owns a dedicated `litespec/<change-name>` branch. `plan[clear]` requires a clean tree, captures `Base:`, creates the branch, and records `Branch:`. Review refuses a mismatch, scopes tracked work with `git diff <base>`, and includes every untracked `??` path. Unrelated work uses another branch or worktree.
 
-The verdict is scoped, not severity-blind: a finding blocks (`CHANGES REQUESTED`) only when it is CRITICAL or WARNING **and** breaks a unit's contract, contradicts a durable spec/decision, or lies inside the review diff. `plan[clear]` records `Base: <sha>` in the issue body at creation; review diffs from it to the working tree, so "implementation diff" is exact. Everything else routes — SUGGESTIONs, out-of-diff findings, unconfirmed adversarial candidates — and can coexist with `PASS`. A fresh adversarial re-review can surface new out-of-scope noise without wedging the issue open.
+Review routing is ordered: suggestion; unit violation; in-scope finding outside units; out-of-scope finding. CRITICAL/WARNING inside issue scope blocks even when no unit covers it. Out-of-scope findings route without blocking. The issue closes only when every unit is checked and review returns `PASS`.
 
 `grill-me` is a skill reference, not a CLI. `plan` owns spec drafting in clear mode: if the feature is load-bearing, it writes/updates `specs/<feature>/spec.md` alongside the issue.
 
@@ -68,7 +68,7 @@ The verdict is scoped, not severity-blind: a finding blocks (`CHANGES REQUESTED`
 
 One unit = one thing you can demo + one `Verify:` that would fail if it's missing.
 
-In GH issue body — a `Base: <sha>` line (review base, from `git rev-parse HEAD` at `plan[clear]` time) above the units, then:
+In GH issue body — immutable `Base: <sha>` and `Branch: litespec/<change-name>` ownership lines above the units, then:
 ```markdown
 ## Show graph for 2 changes
 Done means: `litespec view` shows arrows between deps

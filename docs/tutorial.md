@@ -14,11 +14,15 @@ Generated adapter commands for: claude
 Project initialized.
 ```
 
-Create the GH issue:
+Start the queue issue from a clean tree and dedicated branch:
 
-`litespec-plan` in `clear` mode writes the issue body below and creates a labeled GH issue. If `gh` is unavailable, it writes the same body to `specs/queues/<name>.md`, where `<name>` is the change name chosen during planning.
+```bash
+git status --porcelain  # must print nothing
+git rev-parse HEAD      # record this as Base:
+git switch -c litespec/add-rate-limiting
+```
 
-No folder is created — the GH issue is the queue. Create it with `gh issue create --label litespec --body-file issue.md`, then come back here.
+`litespec-plan` in `clear` mode performs those checks, records `Base:` and `Branch:`, and creates the labeled issue. If `gh` is unavailable, it writes the same body to `specs/queues/add-rate-limiting.md`.
 
 ## Two lanes, one workflow
 
@@ -46,9 +50,12 @@ Fuzzy mode is ephemeral. When the scope is clear, move to `clear` mode.
 
 ## Plan (clear)
 
-`litespec-plan` (clear mode) writes the GH issue body. It has three sections: **Proposal**, **Design**, and the queue of units. Each unit is an `## <outcome>` with `Done means:` and a `Verify:` that must fail without the outcome.
+`litespec-plan` (clear mode) writes ownership metadata followed by the proposal, design, and queue. Each unit is an `## <outcome>` with `Done means:` and a `Verify:` that must fail without the outcome.
 
 ````markdown
+Base: <full commit ID printed before branch creation>
+Branch: litespec/add-rate-limiting
+
 ## Proposal
 
 Add rate limiting to the API to prevent abuse and ensure fair usage.
@@ -200,7 +207,7 @@ GH Issues (open)
 
 ## Review
 
-When all units are done, invoke `litespec-review`.
+When all units are done, invoke `litespec-review`. It verifies `Branch:`, reviews `git diff <base>`, and separately reads every untracked file reported by `git status --porcelain=v1 --untracked-files=all`.
 
 > **You:** review
 >
@@ -210,11 +217,16 @@ When all units are done, invoke `litespec-review`.
 > - Does `RATE_LIMIT_PER_MINUTE` default to 100?
 > - Are edge cases (empty header, window reset, concurrent access) tested?
 
-If it finds gaps, `litespec-build` fixes them. If not, the implementation is clean.
+Routing is ordered:
+
+1. Suggestions are non-blocking.
+2. Unit violations, including WARNINGs, reopen that unit for `litespec-build`.
+3. CRITICAL/WARNING findings inside issue scope but outside units block as a direct fix or a new unit on this issue.
+4. Findings outside issue scope route without blocking; non-trivial work gets its own later `plan[clear]` and branch.
 
 ## Close the issue
 
-When the spec, code, and review are clean, close the GH issue:
+When every unit is checked and review returns `PASS`, close the GH issue:
 
 ```bash
 gh issue close 42
@@ -226,7 +238,7 @@ The queue is closed. The durable spec remains in `specs/rate-limit/spec.md`.
 
 You completed a v2 feature cycle:
 
-1. `litespec-plan` clarified the idea in fuzzy mode and wrote the issue in clear mode, creating the labeled GH issue (or `specs/queues/<name>.md` when offline).
+1. `litespec-plan` clarified the idea, started from a clean tree, created the isolated branch, and wrote `Base:`/`Branch:` into the queue issue.
 2. `litespec-plan` drafted `specs/rate-limit/spec.md` with `SHALL`/`MUST` and `WHEN`/`THEN`.
 3. `litespec-build` implemented one unit at a time, satisfying `Done means:` and `Verify` for each.
 4. `litespec validate` confirmed the spec format.

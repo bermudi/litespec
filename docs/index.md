@@ -8,7 +8,7 @@ litespec keeps your codebase aligned with durable, load-bearing specs. One GitHu
 
 ## What makes litespec different
 
-**GitHub issue is the queue.** Proposal + design + implementation queue normally live in the issue body. When `gh` is unavailable, `specs/queues/<name>.md` is the equivalent local queue. `plan[clear]` creates the labeled GH issue, or the local queue file when offline.
+**GitHub issue is the queue.** Proposal + design + implementation queue live in the issue body with `Base:` and `Branch:` ownership metadata. `plan[clear]` starts clean and creates a dedicated branch. When `gh` is unavailable, `specs/queues/<name>.md` is the equivalent local queue.
 
 **Two lanes.** Small fix: zero ceremony, edit code and the one `specs/<feature>/spec.md` directly. New feature: plan fuzzy → clear → grill-me → build one unit at a time → review → close the issue.
 

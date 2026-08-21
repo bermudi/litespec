@@ -38,9 +38,9 @@ var CommandSpecs = []CommandSpec{
 	},
 	{
 		Name:        "validate",
-		Description: "Validate specs and decisions",
+		Description: "Validate specs, decisions, and queues",
 		Flags: []FlagSpec{
-			{Name: "--all", Description: "Validate all specs and decisions", TakesValue: false},
+			{Name: "--all", Description: "Validate all specs, decisions, and queues", TakesValue: false},
 			{Name: "--specs", Description: "Validate all specs only", TakesValue: false},
 			{Name: "--decisions", Description: "Validate all decisions only", TakesValue: false},
 			{Name: "--issue", Description: "Fetch and validate a single GH issue by number", TakesValue: true},

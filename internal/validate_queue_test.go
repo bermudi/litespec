@@ -9,6 +9,10 @@ import (
 	"testing"
 )
 
+func ownedQueue(body string) string {
+	return "Base: 1111111111111111111111111111111111111111\nBranch: litespec/test-change\n\n" + body
+}
+
 func TestValidateGHIssueQueue(t *testing.T) {
 	source := "GH issue #1"
 
@@ -46,28 +50,60 @@ Verify:
 `
 
 	t.Run("well-formed fixture passes", func(t *testing.T) {
-		_, issues := ValidateQueueBody(wellFormed, source)
+		_, issues := ValidateQueueBody(ownedQueue(wellFormed), source)
 		if len(issues) > 0 {
 			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
 		}
 	})
 
+	t.Run("missing ownership lines fail", func(t *testing.T) {
+		_, issues := ValidateQueueBody(wellFormed, source)
+		if !containsIssue(issues, "exactly one Base:") || !containsIssue(issues, "exactly one Branch:") {
+			t.Fatalf("expected missing ownership errors, got %v", issues)
+		}
+	})
+
+	t.Run("duplicate ownership lines fail", func(t *testing.T) {
+		body := ownedQueue(wellFormed)
+		body = "Base: 2222222222222222222222222222222222222222\nBranch: litespec/other-change\n" + body
+		_, issues := ValidateQueueBody(body, source)
+		if !containsIssue(issues, "exactly one Base:") || !containsIssue(issues, "exactly one Branch:") {
+			t.Fatalf("expected duplicate ownership errors, got %v", issues)
+		}
+	})
+
+	t.Run("malformed ownership lines fail", func(t *testing.T) {
+		body := "Base: short\nBranch: feature/not-litespec\n\n" + wellFormed
+		_, issues := ValidateQueueBody(body, source)
+		if !containsIssue(issues, "full 40- or 64-character") || !containsIssue(issues, "litespec/<kebab-change-name>") {
+			t.Fatalf("expected malformed ownership errors, got %v", issues)
+		}
+	})
+
+	t.Run("ownership after a heading fails", func(t *testing.T) {
+		body := "## Proposal\n\nBase: 1111111111111111111111111111111111111111\nBranch: litespec/test-change\n\n" + wellFormed
+		_, issues := ValidateQueueBody(body, source)
+		if !containsIssue(issues, "exactly one Base:") || !containsIssue(issues, "exactly one Branch:") {
+			t.Fatalf("expected ownership placement errors, got %v", issues)
+		}
+	})
+
 	t.Run("missing Done means", func(t *testing.T) {
-		_, issues := ValidateQueueBody(missingDoneMeans, source)
+		_, issues := ValidateQueueBody(ownedQueue(missingDoneMeans), source)
 		if !containsIssue(issues, "missing Done means:") {
 			t.Fatalf("expected error containing 'missing Done means:', got %v", issues)
 		}
 	})
 
 	t.Run("missing Verify", func(t *testing.T) {
-		_, issues := ValidateQueueBody(missingVerify, source)
+		_, issues := ValidateQueueBody(ownedQueue(missingVerify), source)
 		if !containsIssue(issues, "missing Verify:") {
 			t.Fatalf("expected error containing 'missing Verify:', got %v", issues)
 		}
 	})
 
 	t.Run("Verify without fenced block", func(t *testing.T) {
-		_, issues := ValidateQueueBody(missingFence, source)
+		_, issues := ValidateQueueBody(ownedQueue(missingFence), source)
 		if !containsIssue(issues, "not followed by a command or fenced code block") {
 			t.Fatalf("expected error containing 'not followed by a command or fenced code block', got %v", issues)
 		}
@@ -75,7 +111,7 @@ Verify:
 
 	t.Run("inline Verify command passes", func(t *testing.T) {
 		body := "## My outcome\nDone means: something\nVerify: `go test ./internal/ -run TestX` and a fixture asserts errors\n- [ ] pending\n"
-		units, issues := ValidateQueueBody(body, source)
+		units, issues := ValidateQueueBody(ownedQueue(body), source)
 		if len(issues) > 0 {
 			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
 		}
@@ -86,7 +122,7 @@ Verify:
 
 	t.Run("inline Verify with empty content fails", func(t *testing.T) {
 		body := "## My outcome\nDone means: something\nVerify:   \n- [ ] pending\n"
-		_, issues := ValidateQueueBody(body, source)
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
 		if !containsIssue(issues, "not followed by a command or fenced code block") {
 			t.Fatalf("expected error for empty Verify content, got %v", issues)
 		}
@@ -94,7 +130,7 @@ Verify:
 
 	t.Run("empty inline Verify command fails", func(t *testing.T) {
 		body := "## My outcome\nDone means: something\nVerify: ``\n- [ ] pending\n"
-		_, issues := ValidateQueueBody(body, source)
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
 		if !containsIssue(issues, "not followed by a command or fenced code block") {
 			t.Fatalf("expected error for empty inline Verify command, got %v", issues)
 		}
@@ -102,7 +138,7 @@ Verify:
 
 	t.Run("unterminated Verify fence fails", func(t *testing.T) {
 		body := "## My outcome\nDone means: something\nVerify:\n```bash\necho hi\n- [ ] pending\n"
-		_, issues := ValidateQueueBody(body, source)
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
 		if !containsIssue(issues, "not followed by a command or fenced code block") {
 			t.Fatalf("expected error for unterminated Verify fence, got %v", issues)
 		}
@@ -110,14 +146,14 @@ Verify:
 
 	t.Run("inline Verify without backtick command fails", func(t *testing.T) {
 		body := "## My outcome\nDone means: something\nVerify: TODO write this\n- [ ] pending\n"
-		_, issues := ValidateQueueBody(body, source)
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
 		if !containsIssue(issues, "not followed by a command or fenced code block") {
 			t.Fatalf("expected error for non-backtick Verify content, got %v", issues)
 		}
 	})
 
 	t.Run("missing checkbox", func(t *testing.T) {
-		_, issues := ValidateQueueBody(missingCheckbox, source)
+		_, issues := ValidateQueueBody(ownedQueue(missingCheckbox), source)
 		if !containsIssue(issues, "missing checkbox") {
 			t.Fatalf("expected error containing 'missing checkbox', got %v", issues)
 		}
@@ -125,14 +161,14 @@ Verify:
 
 	t.Run("checkbox text in a Verify block does not count", func(t *testing.T) {
 		body := "## My outcome\nDone means: something\nVerify:\n```bash\necho '- [ ]'\n```\n"
-		_, issues := ValidateQueueBody(body, source)
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
 		if !containsIssue(issues, "missing checkbox") {
 			t.Fatalf("expected missing checkbox error, got %v", issues)
 		}
 	})
 
 	t.Run("empty heading", func(t *testing.T) {
-		_, issues := ValidateQueueBody(emptyHeading, source)
+		_, issues := ValidateQueueBody(ownedQueue(emptyHeading), source)
 		if !containsIssue(issues, "empty unit heading") {
 			t.Fatalf("expected error containing 'empty unit heading', got %v", issues)
 		}
@@ -153,7 +189,7 @@ Verify:
 Verify:
 ` + "```\necho bad\n```\n" + `- [ ] pending
 `
-		_, issues := ValidateQueueBody(body, source)
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
 		if len(issues) != 1 {
 			t.Fatalf("expected 1 error for the malformed unit, got %d: %v", len(issues), issues)
 		}
@@ -167,7 +203,7 @@ Verify:
 More design text.
 
 ` + wellFormed
-		_, issues := ValidateQueueBody(body, source)
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
 		if len(issues) > 0 {
 			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
 		}
@@ -198,7 +234,7 @@ Verify:
 
 The spec goes here. It mentions ` + "`Verify:`" + ` inline but no line starts with it.
 `
-		units, issues := ValidateQueueBody(body, source)
+		units, issues := ValidateQueueBody(ownedQueue(body), source)
 		if len(issues) > 0 {
 			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
 		}
@@ -216,7 +252,7 @@ The spec goes here. It mentions ` + "`Verify:`" + ` inline but no line starts wi
 - [ ] a todo in the proposal, not a unit
 
 ` + wellFormed
-		units, issues := ValidateQueueBody(body, source)
+		units, issues := ValidateQueueBody(ownedQueue(body), source)
 		if len(issues) > 0 {
 			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
 		}
@@ -235,7 +271,7 @@ Done means: something works
 Verify:
 ` + "```bash\necho \"unclosed\n```\n" + `- [ ] pending
 `
-		_, issues := ValidateQueueBody(body, source)
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
 		if len(issues) == 0 {
 			t.Fatalf("expected an error, got none")
 		}
@@ -259,7 +295,7 @@ Done means: something works
 Verify:
 ` + "```bash\necho hello\n```\n" + `- [ ] pending
 `
-		_, issues := ValidateQueueBody(body, source)
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
 		if len(issues) > 0 {
 			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
 		}
@@ -275,7 +311,7 @@ Done means: something works
 Verify:
 ` + "```bash\necho hello\n```\n" + `- [ ] pending
 `
-		_, issues := ValidateQueueBody(body, source)
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
 		if len(issues) == 0 {
 			t.Fatalf("expected a warning, got none")
 		}
@@ -297,7 +333,7 @@ Done means: something works
 Verify:
 ` + "```bash\n```\n" + `- [ ] pending
 `
-		_, issues = ValidateQueueBody(emptyBody, source)
+		_, issues = ValidateQueueBody(ownedQueue(emptyBody), source)
 		if len(issues) == 0 {
 			t.Fatalf("expected an error for empty block, got none")
 		}
@@ -327,6 +363,8 @@ Verify:
 Verify:
 ` + "```bash\necho ok\n```\n" + `- [ ] pending
 `
+	wellFormed = ownedQueue(wellFormed)
+	missingDoneMeans = ownedQueue(missingDoneMeans)
 
 	t.Run("local queue validated when gh absent", func(t *testing.T) {
 		root := t.TempDir()
@@ -603,7 +641,7 @@ func TestQueueDepends(t *testing.T) {
 		body := unit("Unit A", "Foo, Bar", "something") + "\n" +
 			unit("Foo", "", "foo works") + "\n" +
 			unit("Bar", "", "bar works")
-		units, issues := ValidateQueueBody(body, source)
+		units, issues := ValidateQueueBody(ownedQueue(body), source)
 		if len(issues) > 0 {
 			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
 		}
@@ -617,7 +655,7 @@ func TestQueueDepends(t *testing.T) {
 
 	t.Run("dangling reference", func(t *testing.T) {
 		body := unit("Unit A", "Nonexistent", "something") + "\n" + unit("Real Unit", "", "real works")
-		_, issues := ValidateQueueBody(body, source)
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
 		if !containsIssue(issues, "depends on non-existent unit") {
 			t.Fatalf("expected error for dangling dependency, got %v", issues)
 		}
@@ -625,14 +663,14 @@ func TestQueueDepends(t *testing.T) {
 
 	t.Run("valid reference", func(t *testing.T) {
 		body := unit("Unit A", "Existing Unit", "something") + "\n" + unit("Existing Unit", "", "existing works")
-		_, issues := ValidateQueueBody(body, source)
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
 		if len(issues) > 0 {
 			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
 		}
 	})
 
 	t.Run("no Depends passes", func(t *testing.T) {
-		_, issues := ValidateQueueBody(unit("Unit A", "", "something"), source)
+		_, issues := ValidateQueueBody(ownedQueue(unit("Unit A", "", "something")), source)
 		if len(issues) > 0 {
 			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
 		}
@@ -642,7 +680,7 @@ func TestQueueDepends(t *testing.T) {
 		body := unit("Unit A", "First Unit, Second Unit", "something") + "\n" +
 			unit("First Unit", "", "first works") + "\n" +
 			unit("Second Unit", "", "second works")
-		_, issues := ValidateQueueBody(body, source)
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
 		if len(issues) > 0 {
 			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
 		}

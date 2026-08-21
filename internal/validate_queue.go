@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -108,6 +109,8 @@ func parseQueueUnits(body string) []queueUnit {
 
 var lookPathBash = exec.LookPath
 var lookPathGh = exec.LookPath
+var queueBasePattern = regexp.MustCompile(`^[0-9a-fA-F]{40}([0-9a-fA-F]{24})?$`)
+var queueBranchPattern = regexp.MustCompile(`^litespec/[a-z0-9]+(?:-[a-z0-9]+)*$`)
 
 var ghIssueView = func(root string, number int) ([]byte, error) {
 	cmd := exec.Command("gh", "issue", "view", strconv.Itoa(number),
@@ -196,6 +199,53 @@ func parseDepends(body []string) []string {
 	return deps
 }
 
+func validateQueueOwnership(body string, source string) []ValidationIssue {
+	var bases []string
+	var branches []string
+	for _, line := range strings.Split(body, "\n") {
+		if strings.HasPrefix(line, "## ") {
+			break
+		}
+		if strings.HasPrefix(line, "Base:") {
+			bases = append(bases, strings.TrimSpace(strings.TrimPrefix(line, "Base:")))
+		}
+		if strings.HasPrefix(line, "Branch:") {
+			branches = append(branches, strings.TrimSpace(strings.TrimPrefix(line, "Branch:")))
+		}
+	}
+
+	var issues []ValidationIssue
+	if len(bases) != 1 {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: expected exactly one Base: ownership line before the first ## heading", source),
+			File:     source,
+		})
+	} else if !queueBasePattern.MatchString(bases[0]) {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: Base: must contain a full 40- or 64-character hexadecimal commit ID", source),
+			File:     source,
+		})
+	}
+
+	if len(branches) != 1 {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: expected exactly one Branch: ownership line before the first ## heading", source),
+			File:     source,
+		})
+	} else if !queueBranchPattern.MatchString(branches[0]) {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: Branch: must match litespec/<kebab-change-name>", source),
+			File:     source,
+		})
+	}
+
+	return issues
+}
+
 func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIssue) {
 	all := parseQueueUnits(body)
 	units := make([]queueUnit, 0, len(all))
@@ -204,7 +254,7 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 			units = append(units, u)
 		}
 	}
-	var issues []ValidationIssue
+	issues := validateQueueOwnership(body, source)
 
 	for _, unit := range units {
 		if strings.TrimSpace(unit.Heading) == "" {

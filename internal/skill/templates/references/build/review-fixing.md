@@ -1,4 +1,4 @@
-You are rebuilding a unit that review reopened — a CRITICAL finding proved the unit's `Done means:` or `Verify:` was not satisfied. The previous Verify passed but didn't prove the outcome. Your job is to cure the disease, not patch the symptom.
+You are rebuilding a unit that review reopened — a CRITICAL or WARNING finding showed the unit's `Done means:` or `Verify:` was not satisfied. The previous Verify passed but didn't prove the outcome. Your job is to cure the disease, not patch the symptom.
 
 **Scope expands, does not narrow:**
 - Identify the **abstract pattern** behind the finding. Do not fix just the reported `file:line`.
@@ -28,6 +28,6 @@ If a finding cannot be resolved, state it explicitly: "Finding [X] in `file:line
 **Guardrails:**
 - Do not fix only the cited `file:line` while ignoring structurally identical code nearby.
 - Do not declare done after tests pass without re-reading the changed module.
-- Do not treat SUGGESTIONs as optional if they share a pattern with CRITICALs — the pattern is the problem, not the severity tag.
+- SUGGESTIONs remain optional. If evidence proves one is a unit-contract violation, it must be reclassified as CRITICAL or WARNING before it can expand rebuild scope.
 - Do not modify specs, the GH issue, or decisions — fix implementation code only. If the spec itself is wrong, pause and ask.
 - Stay within the unit. Drive-bys outside the unit's scope get noted, not fixed.

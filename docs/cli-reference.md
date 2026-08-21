@@ -11,7 +11,7 @@ Workflow (two lanes):
 
 Commands:
   init [--tools <ids>]              Initialize project structure
-  validate [--all|--specs|--decisions] [--type T]   Validate specs and decisions
+  validate [--all|--specs|--decisions|--issue N|--queue PATH] [--type T]   Validate specs, decisions, and queues
   view                              Dashboard overview
   update [--tools <ids>]            Regenerate skills and adapters
   upgrade                           Check for and install the latest version
@@ -25,9 +25,11 @@ Flags:
    --help       Print this help message
    --json       Output structured JSON (validate, view)
    --strict     Treat warnings as errors (validate)
-   --all        Validate all specs and decisions
+   --all        Validate all specs, decisions, and queues
    --specs      Validate all specs only
    --decisions  Validate all decisions only
+   --issue N    Fetch and validate one GH queue issue
+   --queue PATH Validate one local queue file
    --type       Disambiguate name type: spec|decision (validate)
 ```
 
@@ -41,9 +43,11 @@ The flags above are the top-level defaults. Each command also supports its own f
 | `--help` | Print help message |
 | `--json` | Output structured JSON where supported |
 | `--strict` | Treat warnings as errors (`validate` only) |
-| `--all` | Validate all specs and decisions (`validate` only) |
+| `--all` | Validate all specs, decisions, and queues (`validate` only) |
 | `--specs` | Validate all specs only (`validate` only) |
 | `--decisions` | Validate all decisions only (`validate` only) |
+| `--issue N` | Fetch and validate one GH queue issue (`validate` only) |
+| `--queue <path>` | Validate one local queue file (`validate` only) |
 | `--type <T>` | Disambiguate name type: `spec` or `decision` (`validate` only) |
 
 ## `init`
@@ -91,7 +95,7 @@ litespec validate [<name>|--all|--specs|--decisions|--issue N|--queue <path>] [-
 
 Description:
 
-Validate the structure of specs and decisions.
+Validate the structure of specs, decisions, and queue issues/files.
 
 Spec checks:
 
@@ -107,14 +111,23 @@ Decision checks:
 - Supersede pointers resolve and point to `superseded` decisions.
 - No supersede cycles.
 
+Queue checks:
+
+- Exactly one `Base:` and `Branch:` ownership line before the first `##` heading.
+- `Base:` is a full commit ID and `Branch:` matches `litespec/<change-name>`.
+- Every unit has `Done means:`, an executable `Verify:`, and a checkbox.
+- `Depends:` references resolve to units in the same queue.
+
 Flags:
 
 | Flag | Description |
 |------|-------------|
 | `<name>` | Validate a specific spec or decision by name |
-| `--all` | Validate all specs and decisions |
+| `--all` | Validate all specs, decisions, and queues |
 | `--specs` | Validate all specs only |
 | `--decisions` | Validate all decisions only |
+| `--issue N` | Fetch and validate one GH queue issue |
+| `--queue <path>` | Validate one local queue file |
 | `--type <T>` | Disambiguate name: `spec` or `decision` |
 | `--strict` | Treat warnings as errors |
 | `--json` | Output as JSON |

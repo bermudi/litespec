@@ -46,9 +46,11 @@ Grill by default: load `references/grilling.md` and ask one question at a time t
 
 ## Clear work
 
-1. Write the GH issue body with the `litespec` label — a `Base: <sha>` line (`git rev-parse HEAD`, the review base) near the top, then one `## <outcome>` per unit, each with `Done means:` + `Verify:` + `- [ ]` checkbox. One unit = one demo + one Verify that fails without it. If `gh` is unavailable, write the same body to `specs/queues/<name>.md`, where `<name>` is the change name chosen during `plan[clear]`.
-2. If load-bearing (CLI shape, API, file format that breaks things when wrong), edit `specs/<feature>/spec.md` directly — 3-5 SHALL requirements with WHEN/THEN scenarios.
-3. Run `litespec validate`. Fix formatting before handing off.
+1. Run `git status --porcelain`. If it is not empty, stop: planning must start from a clean tree so pre-existing work cannot enter the issue.
+2. Record `Base:` from `git rev-parse HEAD`, create and switch to the dedicated `litespec/<change-name>` branch, and record it as `Branch:`. Stop if that branch already exists; do not reuse it.
+3. Write the GH issue body with the `litespec` label — `Base: <sha>` and `Branch: <branch>` near the top, then one `## <outcome>` per unit, each with `Done means:` + `Verify:` + `- [ ]` checkbox. One unit = one demo + one Verify that fails without it. If `gh` is unavailable, write the same body to `specs/queues/<name>.md`, where `<name>` is the change name chosen during `plan[clear]`.
+4. If load-bearing (CLI shape, API, file format that breaks things when wrong), edit `specs/<feature>/spec.md` directly — 3-5 SHALL requirements with WHEN/THEN scenarios.
+5. Run `litespec validate`. Fix formatting before handing off.
 
 ---
 
@@ -63,3 +65,4 @@ After writing, check if you introduced a term not in `specs/glossary.md`. Offer 
 - Don't prescribe files to edit in the GH issue — scope is outcome + constraints.
 - Don't create files for a small fix. Small fix = edit code + update `specs/<feature>/spec.md` directly, no issue required.
 - Don't invent Verify that doesn't fail without the outcome.
+- Don't put unrelated work on a queue issue's branch. Use another branch or worktree.

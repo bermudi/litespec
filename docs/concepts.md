@@ -40,7 +40,7 @@ Verify: `go test ./...` and view output contains "->"
 - [ ] pending
 ```
 
-`plan[clear]` creates the labeled GH issue. If `gh` is unavailable, it writes the same body to `specs/queues/<name>.md`, where `<name>` is the change name chosen during planning.
+`plan[clear]` requires a clean tree, records `Base:`, creates `litespec/<change-name>`, and records `Branch:` in the labeled GH issue. If `gh` is unavailable, it writes the same body to `specs/queues/<name>.md`. All work on that branch belongs to the issue.
 
 The 64 KiB issue limit is enough because the queue contains only units, not full designs. Durable design and reasoning live in `specs/product.md`, `specs/<feature>/spec.md`, and `specs/decisions/`.
 

@@ -1229,7 +1229,7 @@ func TestValidateSummaryIncludesUnits(t *testing.T) {
 	if err := os.MkdirAll(queueDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	queueContent := "## Add auth\nDone means: authentication is wired\nVerify:\n```bash\necho ok\n```\n- [ ] pending\n"
+	queueContent := "Base: 1111111111111111111111111111111111111111\nBranch: litespec/add-auth\n\n## Add auth\nDone means: authentication is wired\nVerify:\n```bash\necho ok\n```\n- [ ] pending\n"
 	if err := os.WriteFile(filepath.Join(queueDir, "test.md"), []byte(queueContent), 0o644); err != nil {
 		t.Fatal(err)
 	}

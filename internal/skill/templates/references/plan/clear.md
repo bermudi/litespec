@@ -2,7 +2,16 @@ Use when the idea is sharp and you need to nail the GH issue (+ spec if load-bea
 
 ## What to write — GH issue is proposal + design + queue
 
-1. **Proposal (why/what).** Create the issue with the `litespec` label. Top of issue body: what we're doing, why, what we're not doing. Then a `Base: <sha>` line — run `git rev-parse HEAD` and paste the SHA. This is the review base: `litespec-review` diffs from it to scope findings. Set it once, never edit it after build starts.
+Before writing, run `git status --porcelain`. If the output is not empty, stop and ask the user to commit, stash, or move that work. Do not create a queue issue from a dirty tree.
+
+Record the output of `git rev-parse HEAD` as the base. Create and switch to `litespec/<change-name>` with `git switch -c`; stop if it already exists rather than reusing it. This branch belongs exclusively to this issue. Concurrent or unrelated work uses another branch or worktree.
+
+1. **Proposal (why/what).** Create the issue with the `litespec` label. Top of issue body: what we're doing, why, what we're not doing. Then record both immutable ownership lines:
+   ```
+   Base: <sha>
+   Branch: litespec/<change-name>
+   ```
+   `litespec-review` checks the branch and derives review scope from the base.
 2. **Design (how).** Directory, lanes, key decisions — concise, not an essay.
 3. **Queue — one `##` per unit.** Each unit:
    ```

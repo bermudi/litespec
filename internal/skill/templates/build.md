@@ -10,6 +10,8 @@ Read the GH issue body (or `specs/queues/<name>.md` from `plan[clear]` when `gh`
 
 If the queue has no `## <outcome>` with `Done means:`/`Verify:`, stop — ask to run `plan` first.
 
+Read the queue's `Branch:` line and compare it with `git branch --show-current`. If either is missing or they differ, stop — never build a queue issue on another branch. Every commit and working-tree change on the recorded branch belongs to this issue; unrelated work uses another branch or worktree.
+
 ---
 
 ## One unit per session
@@ -26,7 +28,7 @@ No batching units. One unit, one commit, stop.
 
 ## Rebuilding a unit after review
 
-If the unit's box was unchecked by review (CRITICAL finding against its `Done means:` or `Verify:`), you are rebuilding — not starting fresh. The previous Verify failed to prove the outcome. Load `references/review-fixing.md` and follow its scope-expansion rules: find the abstract pattern behind the finding, fix all instances, not just the cited `file:line`. Then re-run Verify, re-check the box, commit.
+If the unit's box was unchecked by the user after review reported a CRITICAL or WARNING against its `Done means:` or `Verify:`, you are rebuilding — not starting fresh. The previous Verify failed to prove the outcome. Load `references/review-fixing.md` and follow its scope-expansion rules: find the abstract pattern behind the finding, fix all instances, not just the cited `file:line`. Then re-run Verify, re-check the box, commit.
 
 ---
 
