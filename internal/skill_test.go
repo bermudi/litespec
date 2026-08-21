@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bermudi/litespec/internal/skill"
+	"github.com/bermudi/litespec/v2/internal/skill"
 )
 
 func registerAllTemplates(t *testing.T) {

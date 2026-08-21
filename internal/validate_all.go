@@ -3,7 +3,7 @@ package internal
 import (
 	"fmt"
 
-	"github.com/bermudi/litespec/internal/skill"
+	"github.com/bermudi/litespec/v2/internal/skill"
 )
 
 func ValidateAll(root string, strict bool) (*ValidationResult, error) {

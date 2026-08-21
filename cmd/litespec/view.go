@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/bermudi/litespec/internal"
+	"github.com/bermudi/litespec/v2/internal"
 )
 
 func cmdView(args []string) error {

@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/bermudi/litespec/internal"
+	"github.com/bermudi/litespec/v2/internal"
 )
 
 func newFlagSet(name string, usage func()) *flag.FlagSet {

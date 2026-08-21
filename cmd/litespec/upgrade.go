@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bermudi/litespec/internal"
+	"github.com/bermudi/litespec/v2/internal"
 )
 
 func cmdUpgrade(args []string) error {

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bermudi/litespec/internal/skill"
+	"github.com/bermudi/litespec/v2/internal/skill"
 	"gopkg.in/yaml.v3"
 )
 

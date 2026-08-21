@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/bermudi/litespec/internal"
+	"github.com/bermudi/litespec/v2/internal"
 )
 
 func TestGeneratedSkillReferencesExist(t *testing.T) {

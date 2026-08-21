@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bermudi/litespec/internal"
+	"github.com/bermudi/litespec/v2/internal"
 )
 
 func buildBinary(t *testing.T) string {
@@ -859,8 +859,8 @@ func TestGetModulePath(t *testing.T) {
 	if path == "" {
 		t.Error("expected non-empty module path")
 	}
-	if !strings.HasPrefix(path, "github.com/bermudi/litespec") {
-		t.Errorf("got %q, want path starting with github.com/bermudi/litespec", path)
+	if !strings.HasPrefix(path, "github.com/bermudi/litespec/v2") {
+		t.Errorf("got %q, want path starting with github.com/bermudi/litespec/v2", path)
 	}
 }
 
