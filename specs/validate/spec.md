@@ -28,7 +28,7 @@ The `litespec validate` command SHALL validate feature specs under `specs/<featu
 
 ### Requirement: GH Issue Queue Validation
 
-The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec` via `gh issue list` and lint each issue body as a queue. Before the first `##` heading, each queue SHALL contain exactly one `Base:` line with a full 40- or 64-character hexadecimal commit ID and exactly one `Branch:` line matching `litespec/<kebab-change-name>`. A `##` section is treated as a unit only when its body contains a `Done means:` or `Verify:` line; prose sections SHALL be skipped. Each unit SHALL have a non-empty heading, a `Done means:` line, a `Verify:` line carrying either an inline backtick command on the same line or a fenced code block within the unit body, and a checkbox. Missing or malformed ownership or unit elements SHALL produce an error. Issues without the `litespec` label SHALL NOT be scanned.
+The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec` via `gh issue list` and lint each issue body as a queue. Across the entire queue body there SHALL be exactly one `Base:` line and exactly one `Branch:` line, and both SHALL occur before the first `##` heading. `Base:` SHALL contain a full 40- or 64-character hexadecimal commit ID; `Branch:` SHALL match `litespec/<kebab-change-name>`. A `##` section is treated as a unit only when its body contains a `Done means:` or `Verify:` line; prose sections SHALL be skipped. Each unit SHALL have a non-empty heading, a `Done means:` line, a `Verify:` line carrying either an inline backtick command on the same line or a fenced code block within the unit body, and a checkbox. Missing or malformed ownership or unit elements SHALL produce an error. Issues without the `litespec` label SHALL NOT be scanned.
 
 #### Scenario: Well-formed queue passes
 
@@ -42,7 +42,7 @@ The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec
 
 #### Scenario: Duplicate or malformed ownership metadata fails
 
-- **WHEN** a queue repeats an ownership line or uses a short Base or non-`litespec/` Branch
+- **WHEN** a queue repeats an ownership line anywhere in its body or uses a short Base or non-`litespec/` Branch
 - **THEN** validation reports an ownership error
 
 #### Scenario: Unit missing Done means fails

@@ -14,7 +14,7 @@ The `litespec-review` skill SHALL perform a context-aware, adversarial review by
 #### Scenario: Review for small fix without issue
 
 - **WHEN** `litespec-review` is invoked on a small fix with no GH issue
-- **THEN** it requires the user to identify the fix commit and reviews that commit rather than inferring scope from a dirty tree
+- **THEN** it requires the user to identify the fix commit, screens that commit's paths before content access, and reviews approved per-path changes rather than inferring scope from a dirty tree
 
 ### Requirement: Isolated Issue Branch
 
@@ -37,12 +37,12 @@ The `litespec-plan` skill in clear mode SHALL start from a clean working tree, c
 
 ### Requirement: Exact Review Scope
 
-Before reviewing a queue issue, `litespec-review` SHALL verify that `Base:` and `Branch:` exist, that the current branch matches `Branch:`, and that `Base:` is an ancestor of `HEAD`. Review scope SHALL contain the tracked diff from `Base:` to the current working tree plus every untracked path reported by `git status --porcelain=v1 --untracked-files=all`; each untracked file is wholly in scope. Review SHALL stop without a verdict when ownership cannot be proved.
+Before reviewing a queue issue, `litespec-review` SHALL verify that `Base:` and `Branch:` exist, that the current branch matches `Branch:`, and that `Base:` is an ancestor of `HEAD`. Review SHALL enumerate tracked and untracked path names without reading contents, using NUL-delimited Git output. It SHALL reject paths outside the repository, known secret-like names, symlinks, and non-regular files before content inspection. File-type inspection MUST NOT follow symlinks. After every path passes screening, review scope SHALL contain each tracked diff and each untracked regular file. Review SHALL stop without a verdict when ownership or safe inspection cannot be proved.
 
 #### Scenario: Scope includes tracked and untracked work
 
 - **WHEN** the ownership checks pass and the issue branch contains tracked changes and `??` paths
-- **THEN** review examines `git diff <base>` and reads every untracked path as issue-owned work
+- **THEN** review screens all path names and file types first, then examines each safe tracked diff and untracked regular file as issue-owned work
 
 #### Scenario: Branch mismatch stops review
 
@@ -53,6 +53,11 @@ Before reviewing a queue issue, `litespec-review` SHALL verify that `Base:` and 
 
 - **WHEN** `Base:` or `Branch:` is absent or Base is not an ancestor of HEAD
 - **THEN** review stops without a verdict
+
+#### Scenario: Unsafe path stops before content access
+
+- **WHEN** review scope contains a secret-like path, symlink, path outside the repository, or non-regular file
+- **THEN** review stops without a verdict, reports only the path and reason, and does not read contents or follow a link target
 
 ### Requirement: Findings and Verdict
 

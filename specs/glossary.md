@@ -7,7 +7,7 @@ Project-wide ubiquitous language. Curated, optional but recommended. Read this b
 - **GH Issue is the queue**: The GH issue body holds proposal + design + queue, plus immutable `Base: <sha>` and `Branch: litespec/<change-name>` ownership lines. Each unit is `## <outcome>` with `Done means:` and `Verify:` that must fail without the outcome. Offline fallback: `specs/queues/<name>.md`.
 - **Glossary**: `specs/glossary.md` — curated terms. Managed via plan skill, graceful degradation if absent.
 - **Product**: `specs/product.md` — mental models + 2-3 flows (human + agent, agent-maintained).
-- **Review scope**: All tracked changes from a queue issue's `Base:` to its dedicated `Branch:` working tree, plus every untracked path. All work on the branch belongs to the issue.
+- **Review scope**: All safely inspectable tracked changes and untracked regular files from a queue issue's `Base:` to its dedicated `Branch:` working tree. Paths are screened before content access; unsafe paths stop review.
 - **Scenario**: A named example under a requirement using `WHEN`/`THEN` format. Load-bearing requirements must have at least one scenario. Body text must contain SHALL or MUST.
 - **Skill**: Generated agent instructions in `.agents/skills/<name>/SKILL.md` via `litespec update`. Only three: `litespec-plan` (fuzzy/clear + grilling/codebase-design/domain-modeling), `litespec-build` (one unit), `litespec-review` (adversarial).
 - **Spec**: A load-bearing contract in `specs/<feature>/spec.md` with SHALL/MUST and WHEN/THEN scenarios. No `canon/` — edit the file directly.

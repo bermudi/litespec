@@ -83,8 +83,16 @@ Verify:
 	t.Run("ownership after a heading fails", func(t *testing.T) {
 		body := "## Proposal\n\nBase: 1111111111111111111111111111111111111111\nBranch: litespec/test-change\n\n" + wellFormed
 		_, issues := ValidateQueueBody(body, source)
-		if !containsIssue(issues, "exactly one Base:") || !containsIssue(issues, "exactly one Branch:") {
+		if !containsIssue(issues, "Base: ownership line must appear before") || !containsIssue(issues, "Branch: ownership line must appear before") {
 			t.Fatalf("expected ownership placement errors, got %v", issues)
+		}
+	})
+
+	t.Run("duplicate ownership after a heading fails", func(t *testing.T) {
+		body := ownedQueue(wellFormed) + "\n## Notes\nBase: 2222222222222222222222222222222222222222\nBranch: litespec/other-change\n"
+		_, issues := ValidateQueueBody(body, source)
+		if !containsIssue(issues, "exactly one Base:") || !containsIssue(issues, "exactly one Branch:") {
+			t.Fatalf("expected duplicate ownership errors, got %v", issues)
 		}
 	})
 

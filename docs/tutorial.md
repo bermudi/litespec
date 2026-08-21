@@ -207,7 +207,7 @@ GH Issues (open)
 
 ## Review
 
-When all units are done, invoke `litespec-review`. It verifies `Branch:`, reviews `git diff <base>`, and separately reads every untracked file reported by `git status --porcelain=v1 --untracked-files=all`.
+When all units are done, invoke `litespec-review`. It verifies `Branch:`, enumerates tracked and untracked paths without reading contents, and rejects secret-like paths, symlinks, and non-regular files. Only safely screened paths are reviewed.
 
 > **You:** review
 >

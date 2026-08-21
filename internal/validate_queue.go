@@ -200,17 +200,29 @@ func parseDepends(body []string) []string {
 }
 
 func validateQueueOwnership(body string, source string) []ValidationIssue {
-	var bases []string
-	var branches []string
+	type ownershipLine struct {
+		value         string
+		beforeHeading bool
+	}
+
+	var bases []ownershipLine
+	var branches []ownershipLine
+	beforeHeading := true
 	for _, line := range strings.Split(body, "\n") {
 		if strings.HasPrefix(line, "## ") {
-			break
+			beforeHeading = false
 		}
 		if strings.HasPrefix(line, "Base:") {
-			bases = append(bases, strings.TrimSpace(strings.TrimPrefix(line, "Base:")))
+			bases = append(bases, ownershipLine{
+				value:         strings.TrimSpace(strings.TrimPrefix(line, "Base:")),
+				beforeHeading: beforeHeading,
+			})
 		}
 		if strings.HasPrefix(line, "Branch:") {
-			branches = append(branches, strings.TrimSpace(strings.TrimPrefix(line, "Branch:")))
+			branches = append(branches, ownershipLine{
+				value:         strings.TrimSpace(strings.TrimPrefix(line, "Branch:")),
+				beforeHeading: beforeHeading,
+			})
 		}
 	}
 
@@ -218,10 +230,16 @@ func validateQueueOwnership(body string, source string) []ValidationIssue {
 	if len(bases) != 1 {
 		issues = append(issues, ValidationIssue{
 			Severity: SeverityError,
-			Message:  fmt.Sprintf("%s: expected exactly one Base: ownership line before the first ## heading", source),
+			Message:  fmt.Sprintf("%s: expected exactly one Base: ownership line in the queue", source),
 			File:     source,
 		})
-	} else if !queueBasePattern.MatchString(bases[0]) {
+	} else if !bases[0].beforeHeading {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: Base: ownership line must appear before the first ## heading", source),
+			File:     source,
+		})
+	} else if !queueBasePattern.MatchString(bases[0].value) {
 		issues = append(issues, ValidationIssue{
 			Severity: SeverityError,
 			Message:  fmt.Sprintf("%s: Base: must contain a full 40- or 64-character hexadecimal commit ID", source),
@@ -232,10 +250,16 @@ func validateQueueOwnership(body string, source string) []ValidationIssue {
 	if len(branches) != 1 {
 		issues = append(issues, ValidationIssue{
 			Severity: SeverityError,
-			Message:  fmt.Sprintf("%s: expected exactly one Branch: ownership line before the first ## heading", source),
+			Message:  fmt.Sprintf("%s: expected exactly one Branch: ownership line in the queue", source),
 			File:     source,
 		})
-	} else if !queueBranchPattern.MatchString(branches[0]) {
+	} else if !branches[0].beforeHeading {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: Branch: ownership line must appear before the first ## heading", source),
+			File:     source,
+		})
+	} else if !queueBranchPattern.MatchString(branches[0].value) {
 		issues = append(issues, ValidationIssue{
 			Severity: SeverityError,
 			Message:  fmt.Sprintf("%s: Branch: must match litespec/<kebab-change-name>", source),

@@ -14,7 +14,7 @@ Each queue issue SHALL own a dedicated `litespec/<change-name>` branch created f
 
 All commits and working-tree changes on that branch SHALL belong to the issue. Unrelated work MUST use another branch or worktree. Build and review SHALL stop when the current branch does not match the recorded branch.
 
-Review scope SHALL contain the tracked diff from `Base:` to the current working tree plus every untracked path reported by `git status --porcelain=v1 --untracked-files=all`. An untracked file is wholly inside review scope.
+Review scope SHALL contain the tracked diff from `Base:` to the current working tree plus every untracked path reported by NUL-delimited Git status. Before reading contents, review screens every path and file type without following symlinks; secret-like paths, symlinks, and non-regular files stop review without a verdict.
 
 ## Consequences
 
