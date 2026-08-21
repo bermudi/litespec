@@ -78,7 +78,7 @@ After trusted bootstrap and skill activation, `litespec-review` SHALL read only 
 - **WHEN** any selected local path is secret-like or outside the repository, any component is a symlink, a parent is not a directory, an existing leaf is not a regular file, or a deleted path was not a regular file at Base
 - **THEN** review stops without a verdict, reports only the path and reason, and does not read contents or follow a link target
 
-#### Scenario: Local queue is screened before bootstrap
+#### Scenario: Local queue is screened before ownership metadata
 
 - **WHEN** review uses `specs/queues/<name>.md` instead of a remote GH issue
 - **THEN** it screens the queue path and every parent component before reading its Base, Branch, or units
