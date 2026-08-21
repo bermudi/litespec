@@ -27,7 +27,7 @@ The design emerged from a structured grilling session — question by question, 
 - **Specs** live in `specs/<feature>/spec.md` — only load-bearing contracts (SHALL/MUST + WHEN/THEN). No `canon/` — edit the file directly
 - **Decisions** live in `specs/decisions/` as `NNNN-<slug>.md` — durable rulings with `spine: true` for load-bearing. Created via `touch` + `validate`, not a CLI
 - **Glossary** lives in `specs/glossary.md` — ubiquitous language, curated, optional but recommended. Managed via plan skill, graceful degradation if absent
-- **GH issues are the change/queue** — GH issue body holds proposal + design + queue (units with Done means + Verify). GH issue is the queue, 64k limit, no overflow. The `plan` skill creates the labeled GH issue; offline fallback is `specs/queues/<name>.md` when `gh` is unavailable.
+- **GH issues are the change/queue** — GH issue body holds proposal + design + queue (units with Done means + Verify) + a `Base: <sha>` line (review base, captured at issue creation). GH issue is the queue, 64k limit, no overflow. The `plan` skill creates the labeled GH issue; offline fallback is `specs/queues/<name>.md` when `gh` is unavailable.
 - **Units** — one demo-able outcome per `##` with `Done means:` and `Verify:` that must fail without the outcome. Built one at a time, ticked via checkbox. No `tasks.md`
 - **Two lanes** — small fix (zero ceremony, no issue required) vs new feature (plan fuzzy (grill by default) -> clear -> build -> review -> close issue)
 - **Skills** are generated into `.agents/skills/` (canonical). Only three: `litespec-plan` (fuzzy/grill/clear + codebase-design/domain-modeling), `litespec-build` (one unit at a time), `litespec-review` (adversarial). Nearly all agents discover `.agents/skills/` natively; Claude Code via symlink in `.claude/skills/`. `litespec-plan` has fuzzy mode (grill by default) for half-baked ideas and clear mode to nail the GH issue. Project-specific skills (`the-drill`) are tracked directly in git — NOT generated
@@ -59,15 +59,15 @@ you: "add X" -> plan[fuzzy] (read code, grill by default — references/fuzzy.md
 - GH issue is the queue: each unit is `## <outcome>` with `Done means:` and `Verify:` and status checkbox
 
 **Review triage — routing findings to lanes:**
-Review reports findings + verdict (`PASS` | `CHANGES REQUESTED`), then routes each finding:
+Review reports findings + verdict (`PASS` | `CHANGES REQUESTED`), then routes each finding. The verdict is scoped to the issue's units, not the repo: a finding blocks (forces `CHANGES REQUESTED`) only when it is CRITICAL or WARNING **and** breaks a unit's `Done means:`/`Verify:`, contradicts a durable spec/decision, or lies inside the review diff (`git diff` from the issue's `Base:` line to the working tree). Everything else routes and can coexist with `PASS` — fresh adversarial re-review cannot wedge the issue open with out-of-scope noise.
 - **CRITICAL breaking a unit's `Done means:`/`Verify:`** → unit is not done. Uncheck its box, rebuild via `build` (loads `references/build/review-fixing.md` — scope expands, fix the pattern not just the line). Issue stays open until all units re-pass.
-- **CRITICAL or WARNING outside any unit's contract** (neighboring code, help text, stale decision, drive-by) → small fix lane. No unit, no issue reopen.
+- **CRITICAL or WARNING outside the review diff and every unit's contract** (neighboring code, help text, stale decision, drive-by) → small fix lane. Non-blocking: does not affect the verdict, no unit, no issue reopen.
 - **SUGGESTION** → small fix lane, user's discretion. Not blocking.
 - **"needs decision"** → create decision in `specs/decisions/` first, then route the fix per the rules above.
 - **Shape was wrong** → `plan`, not a fix.
 - **Non-small-fix finding outside any unit's contract** (needs real implementation work, not a trivial small fix, and the code shape is not fundamentally wrong) → draft a new unit with `## <outcome>`, `Done means:`, `Verify:`, and `Depends:` if it blocks on existing units; create a GH sub-issue via `gh issue create --parent <N> --label litespec` with the new unit(s) as the body, or write to `specs/queues/<parent-name>-review.md` (`<parent-name>` is the parent change name chosen during `plan[clear]`) if `gh` is unavailable. Creating the sub-issue is routing, not code editing — do not implement the unit yourself.
 
-Do not invent units for trivial findings — those are small fix lane. Invent units only for findings that need a unit's worth of work and don't break an existing unit's contract. Do not reopen the issue for small fixes. The issue closes when all its units pass.
+Do not invent units for trivial findings — those are small fix lane. Invent units only for findings that need a unit's worth of work and don't break an existing unit's contract. Do not reopen the issue for small fixes. The issue closes when all its units pass — routed findings never block closure.
 
 ## Key Design Decisions
 
@@ -83,7 +83,8 @@ These came from deliberate debate. Respect the reasoning:
 - **Direct spec edits** — no ADDED/MODIFIED delta flow. Edit `specs/<feature>/spec.md` directly. Preserve SHALL/MUST + WHEN/THEN but drop delta merge complexity
 - **No `canon/`, `backlog.md` in lean** — GH issues is the backlog, `specs/<feature>/spec.md` is the durable spec when needed
 - **Validate structure, not semantics** — the CLI validates structural contracts (syntax, references, spec format). Do not encode heuristic checks that compensate for model limitations. If a model gap bites repeatedly, fix the prompt in the relevant skill — that scales with model capability
-- **Review triages into existing lanes or spawns sub-issues** — no fix skill. Review routes each finding structurally: does it cite a unit's `Done means:`/`Verify:`? If yes → rebuild that unit (uncheck box, `build` with scope expansion). If no and it is trivial → small fix lane. If no and it needs real work → draft a new unit and create a GH sub-issue via `gh issue create --parent <N> --label litespec`, falling back to `specs/queues/<parent-name>-review.md` if `gh` is unavailable. Findings are ephemeral — they route to existing tracking (unit checkboxes), get fixed immediately, or become a new queue issue. No finding tracker, no `tasks.md`
+- **Review triages into existing lanes or spawns sub-issues** — no fix skill. The verdict is scoped: blocking = CRITICAL/WARNING inside the review diff or breaking a unit's contract / durable spec; everything else routes and can coexist with `PASS`. Review routes each finding structurally: does it cite a unit's `Done means:`/`Verify:`? If yes → rebuild that unit (uncheck box, `build` with scope expansion). If no and it is trivial → small fix lane. If no and it needs real work → draft a new unit and create a GH sub-issue via `gh issue create --parent <N> --label litespec`, falling back to `specs/queues/<parent-name>-review.md` if `gh` is unavailable. Findings are ephemeral — they route to existing tracking (unit checkboxes), get fixed immediately, or become a new queue issue. No finding tracker, no `tasks.md`
+- **Exact review base** — `plan[clear]` records `Base: <sha>` in the issue body (and queue mirror) at creation. Review diffs from it to the working tree; findings outside that diff route and never block. No branch mandate, no tags, no CLI surface — the issue body is the source of truth
 
 ## Working Conventions
 

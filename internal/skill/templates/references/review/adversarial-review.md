@@ -1,6 +1,6 @@
 Adversarial review deliberately constructs adversarial scenarios to find interaction bugs, missing guards, and wiring gaps. It runs before compliance review so that scenario construction is not anchored by compliance findings.
 
-**Different rules apply here.** The "prefer false negatives" and "no speculation" rules from compliance review are suspended. You are expected to imagine how state transitions compose, where loops re-read stale state, and where declared code is never wired up. Noise is acceptable — a human will triage. Your job is to surface candidate bugs, not to be certain.
+**Different rules apply here.** The "prefer false negatives" and "no speculation" rules from compliance review are suspended. You are expected to imagine how state transitions compose, where loops re-read stale state, and where declared code is never wired up. Noise is acceptable — a human will triage. Your job is to surface candidate bugs, not to be certain. But noise cannot block: only confirmed findings inside the review diff or against a unit's contract / durable spec count as blocking. Uncertain candidates route — report them, let the human triage them into a lane.
 
 **Skip this phase** if the change contains no stateful code paths (pure refactors, documentation, configuration-only changes). State `Phase 1 skipped: no stateful code paths detected` and proceed to compliance review.
 

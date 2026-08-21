@@ -16,25 +16,51 @@ The `litespec-review` skill SHALL perform a context-aware, adversarial review by
 - **WHEN** `litespec-review` is invoked on a small fix with no GH issue
 - **THEN** it reads the relevant `specs/<feature>/spec.md` and the changed code before reporting findings
 
+### Requirement: Exact Review Base
+
+The GH issue body (and its local queue mirror in `specs/queues/<name>.md`) SHALL record a `Base: <sha>` line — the commit `litespec-plan` in clear mode captured via `git rev-parse HEAD` at issue creation, before any unit is built. The `litespec-review` skill SHALL derive the implementation diff from `Base:` to the current working tree (uncommitted changes included) and SHALL use that diff to determine which findings are in scope. If `Base:` is absent, review SHALL decide the verdict from unit contracts alone and SHALL report the absence; all other findings are treated as out of scope and routed.
+
+#### Scenario: Diff derived from recorded base
+
+- **WHEN** the issue body records `Base: <sha>`
+- **THEN** review diffs from that commit to the working tree and scopes findings as inside or outside that diff
+
+#### Scenario: Missing base degrades gracefully
+
+- **WHEN** the issue body has no `Base:` line
+- **THEN** review reports the absence, decides the verdict from unit contracts only, and routes every other finding as out of scope
+
+#### Scenario: Small fix review base
+
+- **WHEN** review runs on a small fix with no GH issue
+- **THEN** the review diff is the fix's own changes (uncommitted changes or the fix commit)
+
 ### Requirement: Findings and Verdict
 
 The `litespec-review` skill SHALL report each finding with a **Severity** (`CRITICAL`, `WARNING`, or `SUGGESTION`), a **Location** (`file:line` or unit), **Evidence** (excerpt or observation), and a **Fix direction** (one unambiguous instruction). The review SHALL conclude with a verdict of `PASS` or `CHANGES REQUESTED`.
 
+The verdict SHALL be decided by blocking findings only. A finding is **blocking** when it is CRITICAL or WARNING **and** at least one of: it breaks one of the issue's units' `Done means:` or `Verify:`, the change's code contradicts a durable spec or decision, or its location lies inside the review diff. SUGGESTIONs and findings outside the review diff and outside every unit's contract SHALL be routed without affecting the verdict.
+
 #### Scenario: Pass verdict
 
-- **WHEN** all units satisfy their `Done means:` and `Verify:` contracts and no CRITICAL or WARNING findings remain
-- **THEN** the review returns `PASS`
+- **WHEN** all units satisfy their `Done means:` and `Verify:` contracts and no blocking finding remains
+- **THEN** the review returns `PASS`, even if routed findings accompany it
 
 #### Scenario: Changes requested verdict
 
-- **WHEN** the review identifies a CRITICAL or WARNING finding
+- **WHEN** the review identifies a blocking finding
 - **THEN** it returns `CHANGES REQUESTED`
+
+#### Scenario: Out-of-scope finding does not block
+
+- **WHEN** a CRITICAL or WARNING finding lies outside the review diff and outside every unit's contract
+- **THEN** it is routed to its lane and `PASS` remains possible
 
 ### Requirement: Triage into Lanes
 
 For each finding, `litespec-review` SHALL first determine whether the finding cites a unit's `Done means:` or `Verify:`, then route it into exactly one of the following lanes:
 - A finding that is **CRITICAL** and breaks a unit's `Done means:` or `Verify:` SHALL be routed to `litespec-build`: the unit's checkbox is unchecked, `references/build/review-fixing.md` is loaded, and the unit is rebuilt with expanded scope; the GH issue stays open until all units re-pass.
-- A finding that is **CRITICAL** or **WARNING** and lies outside any unit's contract (neighboring code, help text, stale decision, drive-by) SHALL be routed to the small fix lane; no unit is created and the issue is not reopened.
+- A finding that is **CRITICAL** or **WARNING** and lies outside every unit's contract and the review diff (neighboring code, help text, stale decision, drive-by) SHALL be routed to the small fix lane; it is non-blocking, no unit is created, and the issue is not reopened.
 - A **SUGGESTION** SHALL be routed to the small fix lane at the user's discretion and is not blocking.
 - A finding that is `"needs decision"` SHALL first create a decision in `specs/decisions/`, then be routed per the rules above.
 - A finding where the unit's outcome or shape is wrong SHALL be routed to `litespec-plan`, not a fix.
@@ -47,8 +73,8 @@ For each finding, `litespec-review` SHALL first determine whether the finding ci
 
 #### Scenario: Warning outside unit contract is a small fix
 
-- **WHEN** a WARNING finding concerns neighboring code or a stale decision and does not cite a unit contract
-- **THEN** it routes to the small fix lane and does not reopen the issue
+- **WHEN** a WARNING finding concerns neighboring code or a stale decision and lies outside the review diff and every unit contract
+- **THEN** it routes to the small fix lane, is non-blocking, and does not reopen the issue
 
 #### Scenario: Finding needs a decision first
 
@@ -81,7 +107,7 @@ The `litespec-review` skill MUST NOT write code, modify files, or implement fixe
 
 ### Requirement: Adversarial Scenario Reference
 
-When the change contains stateful code paths, `litespec-review` SHALL load `references/review/adversarial-review.md` and construct worst-case scenarios from the specs before tracing implementation code. For each scenario it SHALL trace the code path, tag handling as `Handled`, `Missing`, or `Uncertain`, and report any confirmed or inferred gap as a finding.
+When the change contains stateful code paths, `litespec-review` SHALL load `references/review/adversarial-review.md` and construct worst-case scenarios from the specs before tracing implementation code. For each scenario it SHALL trace the code path, tag handling as `Handled`, `Missing`, or `Uncertain`, and report any confirmed or inferred gap as a finding. Unconfirmed adversarial candidates (`Uncertain`) SHALL NOT block; only confirmed findings inside the review diff or against a unit's contract or durable spec can block.
 
 #### Scenario: Adversarial review for stateful code
 
@@ -92,6 +118,11 @@ When the change contains stateful code paths, `litespec-review` SHALL load `refe
 
 - **WHEN** an adversarial scenario confirms an interaction bug that breaks a unit's `Done means:` or `Verify:`
 - **THEN** the finding is CRITICAL and routes to `litespec-build` with the unit checkbox unchecked
+
+#### Scenario: Unconfirmed candidate does not block
+
+- **WHEN** an adversarial scenario is tagged `Uncertain` and confirms no unit contract or durable spec violation inside the review diff
+- **THEN** the candidate is reported for human triage and does not affect the verdict
 
 ### Requirement: No Unit for Trivial Findings
 
@@ -109,17 +140,17 @@ When the change contains stateful code paths, `litespec-review` SHALL load `refe
 
 ### Requirement: Issue Closure Condition
 
-A GH issue SHALL remain open until all of its units pass their `Done means:` and `Verify:` contracts; it SHALL close when all units pass. Small fix findings outside any unit contract SHALL NOT reopen the issue.
+A GH issue SHALL remain open until all of its units pass their `Done means:` and `Verify:` contracts and review returns `PASS`; it SHALL close when all units pass. Routed findings — those outside the review diff and outside every unit contract — SHALL NOT prevent closure or reopen the issue, regardless of severity.
 
 #### Scenario: All units pass
 
 - **WHEN** all unit checkboxes are checked and `litespec-review` returns `PASS`
 - **THEN** the GH issue may be closed
 
-#### Scenario: Small fix does not reopen issue
+#### Scenario: Routed finding does not block closure
 
-- **WHEN** a small fix is applied for a WARNING or SUGGESTION outside any unit contract
-- **THEN** the issue is not reopened
+- **WHEN** review returns `PASS` while listing routed findings outside the review diff and every unit contract
+- **THEN** the issue may still be closed and is not reopened by those findings
 
 ### Requirement: No Persistent Finding Tracker
 
@@ -133,4 +164,4 @@ A GH issue SHALL remain open until all of its units pass their `Done means:` and
 #### Scenario: Re-review reads current state
 
 - **WHEN** `litespec-review` is re-run after fixes
-- **THEN** it evaluates the current state from the issue, spec, and code, not from a previous finding log
+- **THEN** it evaluates the current state from the issue, spec, and code — not from a previous finding log — and recomputes the verdict by the same blocking rule

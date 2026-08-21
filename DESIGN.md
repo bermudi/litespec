@@ -60,13 +60,15 @@ you: "add X" -> plan[fuzzy] (read code, grill by default — references/fuzzy.md
 
 Review triages findings structurally: does the finding break a unit's `Done means:`/`Verify:`? If yes → uncheck box, rebuild via `build` (scope expands — fix the pattern, not just the line). If no and it is trivial → small fix lane. If no and it needs real work outside any existing unit's contract → draft a new unit and create a GH sub-issue via `gh issue create --parent <N> --label litespec`, or write to `specs/queues/<parent-name>-review.md` (`<parent-name>` is the parent change name chosen during `plan[clear]`) if `gh` is unavailable. No fix skill, no finding tracker — findings route to existing tracking (unit checkboxes), get fixed immediately, or spawn a sub-issue.
 
+The verdict is scoped, not severity-blind: a finding blocks (`CHANGES REQUESTED`) only when it is CRITICAL or WARNING **and** breaks a unit's contract, contradicts a durable spec/decision, or lies inside the review diff. `plan[clear]` records `Base: <sha>` in the issue body at creation; review diffs from it to the working tree, so "implementation diff" is exact. Everything else routes — SUGGESTIONs, out-of-diff findings, unconfirmed adversarial candidates — and can coexist with `PASS`. A fresh adversarial re-review can surface new out-of-scope noise without wedging the issue open.
+
 `grill-me` is a skill reference, not a CLI. `plan` owns spec drafting in clear mode: if the feature is load-bearing, it writes/updates `specs/<feature>/spec.md` alongside the issue.
 
 ## Unit rule
 
 One unit = one thing you can demo + one `Verify:` that would fail if it's missing.
 
-In GH issue body:
+In GH issue body — a `Base: <sha>` line (review base, from `git rev-parse HEAD` at `plan[clear]` time) above the units, then:
 ```markdown
 ## Show graph for 2 changes
 Done means: `litespec view` shows arrows between deps
