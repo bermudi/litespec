@@ -4,17 +4,22 @@
 
 ### Requirement: Adversarial Review of Issue and Spec vs Implementation
 
-The `litespec-review` skill SHALL perform a context-aware, adversarial review by reading the GH issue body, its units with `Done means:` and `Verify:`, any load-bearing `specs/<feature>/spec.md`, relevant `specs/decisions/`, and the exact issue-owned review scope. It SHALL probe for interaction bugs, state transitions, wiring gaps, and contract violations, not only syntax or surface compliance.
+The `litespec-review` skill SHALL perform a context-aware, adversarial review by first reading only the remote GH issue body, then safely screening every local path before reading its contents. Safely approved content includes the queue units, load-bearing specs, relevant decisions, and exact issue-owned review scope. It SHALL probe for interaction bugs, state transitions, wiring gaps, and contract violations, not only syntax or surface compliance.
 
 #### Scenario: Review with GH issue and spec
 
 - **WHEN** `litespec-review` is invoked for a change with a GH issue and a load-bearing spec
-- **THEN** it reads the issue, spec, decisions, and issue-owned changes before probing the implementation
+- **THEN** it reads the remote issue, screens all selected local paths, then reads approved specs, decisions, and issue-owned changes before probing the implementation
 
 #### Scenario: Review for small fix without issue
 
 - **WHEN** `litespec-review` is invoked on a small fix with no GH issue
-- **THEN** it requires the user to identify the fix commit, screens that commit's paths before content access, and reviews approved per-path changes rather than inferring scope from a dirty tree
+- **THEN** it requires a single-parent fix commit, uses the parent as the screening base, enumerates changed paths with NUL-delimited Git output, screens all selected paths before content access, and reviews approved per-path changes rather than inferring scope from a dirty tree
+
+#### Scenario: Root or merge commit is not inferred as a small fix
+
+- **WHEN** the identified small-fix commit has zero or multiple parents
+- **THEN** review stops without a verdict because deleted-path preimage ownership is ambiguous
 
 ### Requirement: Isolated Issue Branch
 
@@ -37,12 +42,12 @@ The `litespec-plan` skill in clear mode SHALL start from a clean working tree, c
 
 ### Requirement: Exact Review Scope
 
-Before reviewing a queue issue, `litespec-review` SHALL verify that `Base:` and `Branch:` exist, that the current branch matches `Branch:`, and that `Base:` is an ancestor of `HEAD`. Review SHALL enumerate tracked and untracked path names without reading contents, using NUL-delimited Git output. It SHALL reject paths outside the repository, known secret-like names, symlinks, and non-regular files before content inspection. File-type inspection MUST NOT follow symlinks. After every path passes screening, review scope SHALL contain each tracked diff and each untracked regular file. Review SHALL stop without a verdict when ownership or safe inspection cannot be proved.
+Before reviewing local content, `litespec-review` SHALL read only the remote GH issue body. A local queue fallback SHALL itself be screened before being read for ownership metadata. Review SHALL then verify `Base:` and `Branch:`, current branch identity, and Base ancestry. It SHALL enumerate tracked and untracked path names without contents and add every local contract or reference selected for review. Every selected local path and every parent component SHALL be inspected without following links before content access. Review SHALL reject paths outside the repository and known secret-like names; every parent component MUST be a real directory and every existing leaf MUST be a regular file. A deleted tracked path MUST have regular-file mode at Base and remain absent in the working tree. After a path passes screening, review may read that approved path; newly discovered paths MUST be screened before reading. Review SHALL stop without a verdict when ownership or safe inspection cannot be proved.
 
 #### Scenario: Scope includes tracked and untracked work
 
 - **WHEN** the ownership checks pass and the issue branch contains tracked changes and `??` paths
-- **THEN** review screens all path names and file types first, then examines each safe tracked diff and untracked regular file as issue-owned work
+- **THEN** review screens all selected implementation and contract paths plus their parent components, then examines approved tracked diffs, untracked regular files, specs, and decisions
 
 #### Scenario: Branch mismatch stops review
 
@@ -56,8 +61,13 @@ Before reviewing a queue issue, `litespec-review` SHALL verify that `Base:` and 
 
 #### Scenario: Unsafe path stops before content access
 
-- **WHEN** review scope contains a secret-like path, symlink, path outside the repository, or non-regular file
+- **WHEN** any selected local path is secret-like or outside the repository, any component is a symlink, a parent is not a directory, an existing leaf is not a regular file, or a deleted path was not a regular file at Base
 - **THEN** review stops without a verdict, reports only the path and reason, and does not read contents or follow a link target
+
+#### Scenario: Local queue is screened before bootstrap
+
+- **WHEN** review uses `specs/queues/<name>.md` instead of a remote GH issue
+- **THEN** it screens the queue path and every parent component before reading its Base, Branch, or units
 
 ### Requirement: Findings and Verdict
 

@@ -207,7 +207,7 @@ GH Issues (open)
 
 ## Review
 
-When all units are done, invoke `litespec-review`. It verifies `Branch:`, enumerates tracked and untracked paths without reading contents, and rejects secret-like paths, symlinks, and non-regular files. Only safely screened paths are reviewed.
+When all units are done, invoke `litespec-review`. It reads only the remote issue first, then screens every local queue, contract, implementation, and reference path before reading it. Unsafe paths or parent components stop review.
 
 > **You:** review
 >

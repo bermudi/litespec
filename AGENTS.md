@@ -59,7 +59,7 @@ you: "add X" -> plan[fuzzy] (read code, grill by default — references/fuzzy.md
 - GH issue is the queue: each unit is `## <outcome>` with `Done means:` and `Verify:` and status checkbox
 
 **Review triage — first matching rule wins:**
-Review verifies the recorded branch, enumerates tracked and untracked paths without contents, and screens names and file types before reading. Secret-like paths, symlinks, paths outside the repo, and non-regular files stop review without a verdict.
+Review reads only the remote GH issue before screening. Every local path—including a queue fallback, specs, decisions, tracked/untracked work, and later references—is screened with all parent components before reading. Unsafe paths stop review without a verdict.
 1. **SUGGESTION** → non-blocking small fix lane.
 2. **CRITICAL or WARNING breaking a unit contract** → blocking rebuild via `build`; WARNINGs route here too.
 3. **CRITICAL or WARNING inside review scope, outside units** → blocking direct fix if trivial, append a blocking unit to the parent if non-trivial, or `plan` if the shape is wrong.
