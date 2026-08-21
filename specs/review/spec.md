@@ -2,9 +2,23 @@
 
 ## Requirements
 
+### Requirement: Trusted Review Bootstrap
+
+The `litespec-review` safety contract SHALL treat harness/system instructions and repository instruction files auto-loaded by the harness to activate review—including applicable `AGENTS.md` files and the selected review `SKILL.md`—as trusted bootstrap inputs outside litespec's screening guarantee. Local-path screening SHALL begin after skill activation. Litespec MUST NOT claim to secure content loaded before activation.
+
+#### Scenario: Harness auto-loads review instructions
+
+- **WHEN** the harness reads system instructions, applicable `AGENTS.md` files, or the review `SKILL.md` before activating review
+- **THEN** those inputs are treated as trusted bootstrap rather than screened local review content
+
+#### Scenario: Bootstrap instructions are not trusted
+
+- **WHEN** the user cannot trust repository instructions auto-loaded by the harness
+- **THEN** litespec review stops and directs the user to a harness-level sandbox or pre-load policy
+
 ### Requirement: Adversarial Review of Issue and Spec vs Implementation
 
-The `litespec-review` skill SHALL perform a context-aware, adversarial review by first reading only the remote GH issue body, then safely screening every local path before reading its contents. Safely approved content includes the queue units, load-bearing specs, relevant decisions, and exact issue-owned review scope. It SHALL probe for interaction bugs, state transitions, wiring gaps, and contract violations, not only syntax or surface compliance.
+After trusted bootstrap and skill activation, `litespec-review` SHALL perform a context-aware, adversarial review by first reading only the remote GH issue body, then safely screening every additional local path before reading its contents. Safely approved content includes the queue units, load-bearing specs, relevant decisions, and exact issue-owned review scope. It SHALL probe for interaction bugs, state transitions, wiring gaps, and contract violations, not only syntax or surface compliance.
 
 #### Scenario: Review with GH issue and spec
 
@@ -42,7 +56,7 @@ The `litespec-plan` skill in clear mode SHALL start from a clean working tree, c
 
 ### Requirement: Exact Review Scope
 
-Before reviewing local content, `litespec-review` SHALL read only the remote GH issue body. A local queue fallback SHALL itself be screened before being read for ownership metadata. Review SHALL then verify `Base:` and `Branch:`, current branch identity, and Base ancestry. It SHALL enumerate tracked and untracked path names without contents and add every local contract or reference selected for review. Every selected local path and every parent component SHALL be inspected without following links before content access. Review SHALL reject paths outside the repository and known secret-like names; every parent component MUST be a real directory and every existing leaf MUST be a regular file. A deleted tracked path MUST have regular-file mode at Base and remain absent in the working tree. After a path passes screening, review may read that approved path; newly discovered paths MUST be screened before reading. Review SHALL stop without a verdict when ownership or safe inspection cannot be proved.
+After trusted bootstrap and skill activation, `litespec-review` SHALL read only the remote GH issue body before screening additional local content. A local queue fallback SHALL itself be screened before being read for ownership metadata. Review SHALL then verify `Base:` and `Branch:`, current branch identity, and Base ancestry. It SHALL enumerate tracked and untracked path names without contents and add every local contract or reference selected for review. Every selected local path and every parent component SHALL be inspected without following links before content access. Review SHALL reject paths outside the repository and known secret-like names; every parent component MUST be a real directory and every existing leaf MUST be a regular file. A deleted tracked path MUST have regular-file mode at Base and remain absent in the working tree. After a path passes screening, review may read that approved path; newly discovered paths MUST be screened before reading. Review SHALL stop without a verdict when ownership or safe inspection cannot be proved.
 
 #### Scenario: Scope includes tracked and untracked work
 

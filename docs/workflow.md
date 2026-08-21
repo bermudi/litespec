@@ -57,7 +57,7 @@ Verify: `litespec view | grep "Specifications"` shows the spec name and count
 - Tick the checkbox when `Verify:` passes, then commit and stop.
 - Put unrelated work on another branch or worktree.
 
-Review routes findings in order: suggestions are non-blocking; unit violations rebuild the unit; CRITICAL/WARNING inside issue scope blocks as a direct fix or new parent unit; findings outside issue scope route without blocking. Only the remote issue is read initially; every local queue, contract, implementation, or reference path is screened before content access.
+Review routes findings in order: suggestions are non-blocking; unit violations rebuild the unit; CRITICAL/WARNING inside issue scope blocks as a direct fix or new parent unit; findings outside issue scope route without blocking. Auto-loaded instructions are trusted bootstrap inputs. After skill activation, only the remote issue is read initially; every additional local queue, contract, implementation, or reference path is screened before content access.
 
 ## When to Write a Spec
 

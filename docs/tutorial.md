@@ -207,7 +207,7 @@ GH Issues (open)
 
 ## Review
 
-When all units are done, invoke `litespec-review`. It reads only the remote issue first, then screens every local queue, contract, implementation, and reference path before reading it. Unsafe paths or parent components stop review.
+When all units are done, invoke `litespec-review`. Harness/system instructions and auto-loaded repository instructions are its trusted bootstrap. After activation it reads only the remote issue first, then screens every additional local queue, contract, implementation, and reference path before reading it. Unsafe paths or parent components stop review.
 
 > **You:** review
 >

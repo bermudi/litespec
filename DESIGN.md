@@ -58,7 +58,7 @@ you: "add X" -> plan[fuzzy] (read code, grill by default — references/fuzzy.md
           -> close GH issue
 ```
 
-Each queue issue owns a dedicated `litespec/<change-name>` branch. `plan[clear]` requires a clean tree, captures `Base:`, creates the branch, and records `Branch:`. Review initially reads only the remote issue; every local queue, contract, implementation, and reference path is screened with its parent components before content access. Unsafe paths stop review. Unrelated work uses another branch or worktree.
+Each queue issue owns a dedicated `litespec/<change-name>` branch. `plan[clear]` requires a clean tree, captures `Base:`, creates the branch, and records `Branch:`. Auto-loaded harness/repository instructions are review's trusted bootstrap boundary. After activation, review initially reads only the remote issue; every additional local queue, contract, implementation, and reference path is screened with its parent components before content access. Unsafe paths stop review. Unrelated work uses another branch or worktree.
 
 Review routing is ordered: suggestion; unit violation; in-scope finding outside units; out-of-scope finding. CRITICAL/WARNING inside issue scope blocks even when no unit covers it. Out-of-scope findings route without blocking. The issue closes only when every unit is checked and review returns `PASS`.
 

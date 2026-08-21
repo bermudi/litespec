@@ -59,7 +59,7 @@ you: "add X" -> plan[fuzzy] (read code, grill by default — references/fuzzy.md
 - GH issue is the queue: each unit is `## <outcome>` with `Done means:` and `Verify:` and status checkbox
 
 **Review triage — first matching rule wins:**
-Review reads only the remote GH issue before screening. Every local path—including a queue fallback, specs, decisions, tracked/untracked work, and later references—is screened with all parent components before reading. Unsafe paths stop review without a verdict.
+Review's auto-loaded harness/system instructions, `AGENTS.md`, and review `SKILL.md` are a trusted bootstrap boundary. After activation, review reads only the remote GH issue before screening every additional local path—including a queue fallback, specs, decisions, tracked/untracked work, and later references. Unsafe paths stop review without a verdict.
 1. **SUGGESTION** → non-blocking small fix lane.
 2. **CRITICAL or WARNING breaking a unit contract** → blocking rebuild via `build`; WARNINGs route here too.
 3. **CRITICAL or WARNING inside review scope, outside units** → blocking direct fix if trivial, append a blocking unit to the parent if non-trivial, or `plan` if the shape is wrong.

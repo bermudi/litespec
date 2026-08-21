@@ -14,7 +14,7 @@ Each queue issue SHALL own a dedicated `litespec/<change-name>` branch created f
 
 All commits and working-tree changes on that branch SHALL belong to the issue. Unrelated work MUST use another branch or worktree. Build and review SHALL stop when the current branch does not match the recorded branch.
 
-Review scope SHALL contain the tracked diff from `Base:` to the current working tree plus every untracked path reported by NUL-delimited Git status. Before reading any local content—including a queue fallback, specs, decisions, implementation, and later references—review screens the path and every parent component without following symlinks. Unsafe paths stop review without a verdict.
+Review scope SHALL contain the tracked diff from `Base:` to the current working tree plus every untracked path reported by NUL-delimited Git status. After the trusted bootstrap defined by decision 0003, review screens every additional local path—including a queue fallback, specs, decisions, implementation, and later references—and each parent component without following symlinks. Unsafe paths stop review without a verdict.
 
 ## Consequences
 
