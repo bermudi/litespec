@@ -19,9 +19,14 @@ Read the queue's `Branch:` line and compare it with `git branch --show-current`.
 1. Pick the first unchecked AND unblocked unit in the queue (top to bottom). A unit is unblocked when all its `Depends:` units are checked `- [x]`. Units without `Depends:` are always unblocked.
 2. Implement it — smallest coherent change. Extend the existing path, don't add a parallel one. No speculative abstraction.
 3. Run its `Verify:` yourself. It must pass. If it doesn't fail without the outcome, strengthen it before claiming done.
-4. Post evidence before ticking the box (evidence is verbatim, not interpretive — see Verification):
-   - GH issue queue: post an issue comment containing (a) the unit heading, (b) the exact `Verify:` command verbatim, (c) `HEAD` sha at run time (`git rev-parse HEAD`), (d) exit status, (e) the raw command output in a fence — unedited, no summarizing, (f) the scope line: `Evidence scope: this command exited <status> at <sha>; nothing else is inferred.`
-   - Local queue file (`specs/queues/<name>.md`): append the same content as an `Evidence:` block under the unit (after `Verify:`, before the status checkbox).
+4. Post a complete evidence receipt before ticking the box (verbatim, not interpretive — see Verification). Required fields, in this order:
+   - unit heading
+   - exact `Verify:` command
+   - `sha: <40- or 64-char hex from git rev-parse HEAD>`
+   - `exit status: <integer>`
+   - a nonempty fenced block of raw command output, unedited
+   - `Evidence scope: this command exited <status> at <sha>; nothing else is inferred.`
+   GH issue queue: post that as an issue comment. Local queue file (`specs/queues/<name>.md`): append it as an `Evidence:` block under the unit (after `Verify:`, before the status checkbox). A nonempty `Evidence:` label is not a receipt. Validate rejects missing fields, a short sha, an empty fence, or a command that does not match `Verify:` verbatim.
 5. Check the box in the issue or local queue file (`- [x]`) only after evidence is posted. Commit with the Verify output and evidence location (comment URL or queue file path) in the message.
 6. Stop. Tell the user this unit is done and they can re-invoke build for the next.
 
@@ -39,7 +44,7 @@ If the unit's box was unchecked by the user after review reported a CRITICAL or 
 
 - Run the narrowest credible Verify first, then `go vet`/`go test ./...` if relevant.
 - Report exactly what passed and what remains unverified. A passing command proves only what it exercises.
-- Evidence protocol (adopted from nospec ADR-0023): the worker that ticks a unit box must first record verbatim evidence it cannot improve by interpretation — exact command, raw output, and a conservative scope claim, nothing more. NEVER narrate what the command "proves" in prose. After running Verify and before ticking, post the evidence as described in step 4, with the scope line as the ceiling: `Evidence scope: this command exited <status> at <sha>; nothing else is inferred.` Evidence never claims beyond that line; review probes beyond it.
+- Evidence protocol (adopted from nospec ADR-0023): the worker that ticks a unit box must first record a verbatim receipt it cannot improve by interpretation — exact command, labeled sha, labeled exit status, raw fenced output, and a conservative scope claim, nothing more. NEVER narrate what the command "proves" in prose. After running Verify and before ticking, post the receipt as described in step 4. Evidence never claims beyond the scope line; review probes beyond it.
 - If the unit is a contract change, update `specs/<feature>/spec.md` in the same commit — don't force wrong code to match a stale spec.
 
 ---

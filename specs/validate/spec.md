@@ -28,7 +28,7 @@ The `litespec validate` command SHALL validate feature specs under `specs/<featu
 
 ### Requirement: GH Issue Queue Validation
 
-The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec` via `gh issue list` and lint each issue body as a queue. Across the entire queue body there SHALL be exactly one `Base:` line and exactly one `Branch:` line, and both SHALL occur before the first `##` heading. `Base:` SHALL contain a full 40- or 64-character hexadecimal commit ID; `Branch:` SHALL match `litespec/<kebab-change-name>`. A `##` section is treated as a unit only when its body contains a `Done means:` or `Verify:` line; prose sections SHALL be skipped. Each unit SHALL have a non-empty heading, a `Done means:` line, a `Verify:` line carrying either an inline backtick command on the same line or a fenced code block within the unit body, and a checkbox. Each unit MAY include at most one `Read first:` line and at most one `Constraints:` line; both are optional, unique, and nonempty when present. `Read first:` is context, not scope — prefer areas and rulings over long file lists. `Constraints:` states what must stay true or what is out of bounds — it never says what to edit; the worker owns the implementation path. Omit either field rather than writing a placeholder. Missing or malformed ownership or unit elements, duplicate or empty optional fields SHALL produce an error. Issues without the `litespec` label SHALL NOT be scanned.
+The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec` via `gh issue list` and lint each issue body as a queue. Across the entire queue body there SHALL be exactly one `Base:` line and exactly one `Branch:` line, and both SHALL occur before the first `##` heading. `Base:` SHALL contain a full 40- or 64-character hexadecimal commit ID; `Branch:` SHALL match `litespec/<kebab-change-name>`. A `##` section is treated as a unit only when its body contains a `Done means:` or `Verify:` line; prose sections SHALL be skipped. Each unit SHALL have a non-empty heading, a `Done means:` line, a `Verify:` line carrying either an inline backtick command on the same line or a fenced code block within the unit body, and a checkbox. Each unit MAY include at most one `Read first:` line and at most one `Constraints:` line; both are optional, unique, and nonempty when present. `Read first:` is context, not scope — prefer areas and rulings over long file lists. `Constraints:` states what must stay true or what is out of bounds — it never says what to edit; the worker owns the implementation path. Omit either field rather than writing a placeholder. A checked unit SHALL carry a complete evidence receipt (see Checked Unit Evidence Receipt). Missing or malformed ownership or unit elements, duplicate or empty optional fields, or a checked unit without a complete receipt SHALL produce an error. Issues without the `litespec` label SHALL NOT be scanned.
 
 #### Scenario: Well-formed queue passes
 
@@ -84,6 +84,40 @@ The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec
 
 - **WHEN** a unit has `Read first:` or `Constraints:` empty or with a placeholder like `-` or `none` or `n/a`
 - **THEN** validation reports a nonempty error
+
+### Requirement: Checked Unit Evidence Receipt
+
+When a unit checkbox is checked, `litespec validate` SHALL require a verbatim evidence receipt for that unit. A complete receipt MUST include all of: the unit's `Verify:` command quoted verbatim, a labeled `sha:` (or `HEAD sha:`) line with a full 40- or 64-character hexadecimal commit ID, a labeled `exit status:` line with an integer, a fenced block whose body is nonempty, and the exact scope line `Evidence scope: this command exited <status> at <sha>; nothing else is inferred.` The scope line's status and sha MUST match the labeled fields. Unchecked units SHALL NOT require a receipt. Local queues and issue-body receipts SHALL live in an `Evidence:` block after `Verify:` and before the checkbox. On a GitHub issue, a comment that names the unit heading and carries a complete receipt SHALL satisfy the check. A nonempty `Evidence:` label or a comment that only mentions `Evidence:` SHALL NOT satisfy. Validate SHALL check receipt structure only; it MUST NOT execute the recorded command or interpret the fenced output.
+
+#### Scenario: Unchecked unit without receipt passes
+
+- **WHEN** a unit checkbox is unchecked and the unit has no `Evidence:` block
+- **THEN** validation succeeds for that unit
+
+#### Scenario: Checked unit with complete receipt passes
+
+- **WHEN** a checked unit has an `Evidence:` block quoting the Verify command, a full sha, exit status, nonempty fenced output, and a matching scope line
+- **THEN** validation succeeds for that unit
+
+#### Scenario: Prose sticker fails
+
+- **WHEN** a checked unit has `Evidence: verified at abc123` or any other prose that lacks the required receipt fields
+- **THEN** validation reports an error identifying the incomplete receipt
+
+#### Scenario: GH comment sticker fails
+
+- **WHEN** a checked GH issue unit has no body receipt and a comment that names the heading and contains `Evidence:` but lacks the required receipt fields
+- **THEN** validation reports an error identifying the incomplete receipt
+
+#### Scenario: GH comment complete receipt passes
+
+- **WHEN** a checked GH issue unit has no body receipt and a comment that names the heading and carries a complete receipt
+- **THEN** validation succeeds for that unit
+
+#### Scenario: Edited command or empty fence fails
+
+- **WHEN** a checked unit receipt omits the Verify command, quotes a different command, or includes only an empty fence
+- **THEN** validation reports an error identifying the incomplete receipt
 
 ### Requirement: Queue Unit Depends Validation
 

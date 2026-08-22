@@ -12,10 +12,10 @@ import (
 )
 
 type ghIssue struct {
-	Number int    `json:"number"`
-	Title  string `json:"title"`
-	Body   string `json:"body"`
-	URL    string `json:"url"`
+	Number   int    `json:"number"`
+	Title    string `json:"title"`
+	Body     string `json:"body"`
+	URL      string `json:"url"`
 	Comments []struct {
 		Body string `json:"body"`
 	} `json:"comments"`
@@ -74,25 +74,7 @@ func ValidateGHIssueQueues(root string) (*ValidationResult, error) {
 			for _, c := range issue.Comments {
 				commentBodies = append(commentBodies, c.Body)
 			}
-			for _, iss := range unitIssues {
-				if strings.Contains(iss.Message, "missing Evidence block") && len(commentBodies) > 0 {
-					skipped := false
-					for _, u := range units {
-						if strings.Contains(iss.Message, fmt.Sprintf("%q", u.Heading)) && evidenceInComments(u.Heading, commentBodies) {
-							skipped = true
-							break
-						}
-					}
-					if skipped {
-						continue
-					}
-				}
-				if iss.Severity == SeverityWarning {
-					result.Warnings = append(result.Warnings, iss)
-				} else {
-					result.Errors = append(result.Errors, iss)
-				}
-			}
+			applyQueueIssues(result, units, unitIssues, commentBodies)
 		}
 	}
 
@@ -211,6 +193,12 @@ func validateOptionalField(body []string, fieldName string, count int, idx int, 
 	return nil
 }
 
+var (
+	evidenceSHAPattern    = regexp.MustCompile(`(?im)^(?:HEAD\s+)?sha(?:\s+at\s+run\s+time)?\s*[:=]\s*([0-9a-f]{40}(?:[0-9a-f]{24})?)\s*$`)
+	evidenceStatusPattern = regexp.MustCompile(`(?im)^exit status\s*[:=]\s*(-?\d+)\s*$`)
+	evidenceScopePattern  = regexp.MustCompile(`(?im)^Evidence scope:\s*this command exited\s+(-?\d+)\s+at\s+([0-9a-f]{40}(?:[0-9a-f]{24})?);\s*nothing else is inferred\.\s*$`)
+)
+
 func isCheckedLine(trimmed string) bool {
 	for _, cb := range []string{"- [x]", "- [X]"} {
 		if trimmed == cb || strings.HasPrefix(trimmed, cb+" ") {
@@ -229,37 +217,168 @@ func isCheckedUnit(body []string) bool {
 	return false
 }
 
-func hasEvidenceBlock(body []string) bool {
+func unitVerifyCommand(body []string) string {
+	for i, line := range body {
+		if !strings.HasPrefix(line, "Verify:") {
+			continue
+		}
+		rest := strings.TrimSpace(line[len("Verify:"):])
+		firstBacktick := strings.Index(rest, "`")
+		lastBacktick := strings.LastIndex(rest, "`")
+		inline := ""
+		if firstBacktick >= 0 && lastBacktick > firstBacktick {
+			inline = strings.TrimSpace(rest[firstBacktick+1 : lastBacktick])
+		}
+		for j := i + 1; j < len(body); j++ {
+			if !strings.HasPrefix(body[j], "```") {
+				continue
+			}
+			var blockLines []string
+			for k := j + 1; k < len(body); k++ {
+				if strings.HasPrefix(body[k], "```") {
+					return strings.Join(blockLines, "\n")
+				}
+				blockLines = append(blockLines, body[k])
+			}
+			break
+		}
+		return inline
+	}
+	return ""
+}
+
+func extractEvidenceText(body []string) string {
 	for i, line := range body {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "Evidence:") {
-			rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "Evidence:"))
-			if rest != "" {
-				return true
+		if !strings.HasPrefix(trimmed, "Evidence:") {
+			continue
+		}
+		var parts []string
+		if rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "Evidence:")); rest != "" {
+			parts = append(parts, rest)
+		}
+		for j := i + 1; j < len(body); j++ {
+			t := strings.TrimSpace(body[j])
+			if isCheckboxLine(t) {
+				break
 			}
-			for j := i + 1; j < len(body); j++ {
-				t := strings.TrimSpace(body[j])
-				if t == "" {
-					continue
+			parts = append(parts, body[j])
+		}
+		return strings.Join(parts, "\n")
+	}
+	return ""
+}
+
+func hasFencedOutput(text string) bool {
+	inFence := false
+	var inner []string
+	for _, line := range strings.Split(text, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "```") {
+			if inFence {
+				for _, l := range inner {
+					if strings.TrimSpace(l) != "" {
+						return true
+					}
 				}
-				if isCheckboxLine(t) {
-					break
-				}
-				return true
+				inner = nil
+				inFence = false
+				continue
 			}
-			return false
+			inFence = true
+			continue
+		}
+		if inFence {
+			inner = append(inner, line)
 		}
 	}
 	return false
 }
 
-func evidenceInComments(heading string, comments []string) bool {
+func evidenceReceiptIssues(text, verifyCmd, source, heading string) []ValidationIssue {
+	if strings.TrimSpace(text) == "" {
+		return []ValidationIssue{{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: checked unit %q missing Evidence receipt", source, heading),
+			File:     source,
+		}}
+	}
+
+	var issues []ValidationIssue
+	fail := func(reason string) {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: checked unit %q Evidence receipt %s", source, heading, reason),
+			File:     source,
+		})
+	}
+
+	if verifyCmd != "" && !strings.Contains(text, verifyCmd) {
+		fail("must quote the Verify command verbatim")
+	}
+	shaMatch := evidenceSHAPattern.FindStringSubmatch(text)
+	if shaMatch == nil {
+		fail("must record HEAD sha as a full 40- or 64-character hexadecimal commit ID")
+	}
+	statusMatch := evidenceStatusPattern.FindStringSubmatch(text)
+	if statusMatch == nil {
+		fail("must record exit status")
+	}
+	if !hasFencedOutput(text) {
+		fail("must include raw command output in a fenced block")
+	}
+	scopeMatch := evidenceScopePattern.FindStringSubmatch(text)
+	if scopeMatch == nil {
+		fail("must include scope line `Evidence scope: this command exited <status> at <sha>; nothing else is inferred.`")
+	} else {
+		if statusMatch != nil && scopeMatch[1] != statusMatch[1] {
+			fail("scope line status must match recorded exit status")
+		}
+		if shaMatch != nil && !strings.EqualFold(scopeMatch[2], shaMatch[1]) {
+			fail("scope line sha must match recorded HEAD sha")
+		}
+	}
+	return issues
+}
+
+func validateCheckedUnitEvidence(unit queueUnit, source string) []ValidationIssue {
+	if !isCheckedUnit(unit.Body) {
+		return nil
+	}
+	return evidenceReceiptIssues(extractEvidenceText(unit.Body), unitVerifyCommand(unit.Body), source, unit.Heading)
+}
+
+func commentSatisfiesEvidence(heading, verifyCmd string, comments []string) bool {
 	for _, c := range comments {
-		if strings.Contains(c, heading) && strings.Contains(c, "Evidence:") {
+		if !strings.Contains(c, heading) {
+			continue
+		}
+		if len(evidenceReceiptIssues(c, verifyCmd, "comment", heading)) == 0 {
 			return true
 		}
 	}
 	return false
+}
+
+func applyQueueIssues(result *ValidationResult, units []queueUnit, unitIssues []ValidationIssue, comments []string) {
+	for _, iss := range unitIssues {
+		if strings.Contains(iss.Message, "Evidence receipt") && len(comments) > 0 {
+			skipped := false
+			for _, u := range units {
+				if strings.Contains(iss.Message, fmt.Sprintf("%q", u.Heading)) && commentSatisfiesEvidence(u.Heading, unitVerifyCommand(u.Body), comments) {
+					skipped = true
+					break
+				}
+			}
+			if skipped {
+				continue
+			}
+		}
+		if iss.Severity == SeverityWarning {
+			result.Warnings = append(result.Warnings, iss)
+		} else {
+			result.Errors = append(result.Errors, iss)
+		}
+	}
 }
 
 var ghIssueView = func(root string, number int) ([]byte, error) {
@@ -563,13 +682,7 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 				File:     source,
 			})
 		}
-		if isCheckedUnit(unit.Body) && !hasEvidenceBlock(unit.Body) {
-			issues = append(issues, ValidationIssue{
-				Severity: SeverityError,
-				Message:  fmt.Sprintf("%s: checked unit %q missing Evidence block", source, unit.Heading),
-				File:     source,
-			})
-		}
+		issues = append(issues, validateCheckedUnitEvidence(unit, source)...)
 	}
 
 	headings := make(map[string]bool, len(units))
@@ -623,25 +736,7 @@ func ValidateGHIssueByNumber(root string, number int) (*ValidationResult, error)
 	for _, c := range issue.Comments {
 		commentBodies = append(commentBodies, c.Body)
 	}
-	for _, iss := range unitIssues {
-		if strings.Contains(iss.Message, "missing Evidence block") && len(commentBodies) > 0 {
-			skipped := false
-			for _, u := range units {
-				if strings.Contains(iss.Message, fmt.Sprintf("%q", u.Heading)) && evidenceInComments(u.Heading, commentBodies) {
-					skipped = true
-					break
-				}
-			}
-			if skipped {
-				continue
-			}
-		}
-		if iss.Severity == SeverityWarning {
-			result.Warnings = append(result.Warnings, iss)
-		} else {
-			result.Errors = append(result.Errors, iss)
-		}
-	}
+	applyQueueIssues(result, units, unitIssues, commentBodies)
 	result.Valid = len(result.Errors) == 0
 	return result, nil
 }

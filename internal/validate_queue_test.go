@@ -13,6 +13,19 @@ func ownedQueue(body string) string {
 	return "Base: 1111111111111111111111111111111111111111\nBranch: litespec/test-change\n\n" + body
 }
 
+const evidenceTestSHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+func evidenceReceipt(verifyCmd string) string {
+	return "Evidence:\n" +
+		verifyCmd + "\n" +
+		"sha: " + evidenceTestSHA + "\n" +
+		"exit status: 0\n" +
+		"```\n" +
+		verifyCmd + " output\n" +
+		"```\n" +
+		"Evidence scope: this command exited 0 at " + evidenceTestSHA + "; nothing else is inferred.\n"
+}
+
 func TestValidateGHIssueQueue(t *testing.T) {
 	source := "GH issue #1"
 
@@ -191,8 +204,7 @@ Verify:
 ## Good Two
 Done means: two
 Verify:
-` + "```\necho two\n```\n" + `Evidence: verified at abc123
-- [x] done
+` + "```\necho two\n```\n" + evidenceReceipt("echo two") + `- [x] done
 
 ## Bad One
 Verify:
@@ -576,6 +588,180 @@ func containsIssue(issues []ValidationIssue, substr string) bool {
 		}
 	}
 	return false
+}
+
+func checkedUnit(verify, evidence string) string {
+	return "## My outcome\nDone means: something\nVerify:\n```\n" + verify + "\n```\n" + evidence + "- [x] done\n"
+}
+
+func TestCheckedUnitEvidence(t *testing.T) {
+	source := "GH issue #1"
+
+	t.Run("unchecked unit needs no evidence", func(t *testing.T) {
+		body := "## My outcome\nDone means: something\nVerify:\n```\necho hi\n```\n- [ ] pending\n"
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
+		if len(issues) > 0 {
+			t.Fatalf("expected no issues, got %v", issues)
+		}
+	})
+
+	t.Run("checked unit with full receipt passes", func(t *testing.T) {
+		body := checkedUnit("echo hi", evidenceReceipt("echo hi"))
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
+		if len(issues) > 0 {
+			t.Fatalf("expected no issues, got %v", issues)
+		}
+	})
+
+	t.Run("checked unit missing evidence fails", func(t *testing.T) {
+		body := checkedUnit("echo hi", "")
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
+		if !containsIssue(issues, "missing Evidence receipt") {
+			t.Fatalf("expected missing Evidence receipt, got %v", issues)
+		}
+	})
+
+	t.Run("prose sticker fails", func(t *testing.T) {
+		body := checkedUnit("echo hi", "Evidence: verified at abc123\n")
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
+		if !containsIssue(issues, "must quote the Verify command verbatim") {
+			t.Fatalf("expected verbatim command error, got %v", issues)
+		}
+		if !containsIssue(issues, "must record HEAD sha") {
+			t.Fatalf("expected sha error, got %v", issues)
+		}
+		if !containsIssue(issues, "must record exit status") {
+			t.Fatalf("expected exit status error, got %v", issues)
+		}
+		if !containsIssue(issues, "must include raw command output in a fenced block") {
+			t.Fatalf("expected fenced output error, got %v", issues)
+		}
+		if !containsIssue(issues, "must include scope line") {
+			t.Fatalf("expected scope line error, got %v", issues)
+		}
+	})
+
+	t.Run("short sha fails", func(t *testing.T) {
+		body := checkedUnit("echo hi", "Evidence:\necho hi\nsha: abc123\nexit status: 0\n```\nhi\n```\nEvidence scope: this command exited 0 at abc123; nothing else is inferred.\n")
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
+		if !containsIssue(issues, "must record HEAD sha") {
+			t.Fatalf("expected sha error, got %v", issues)
+		}
+	})
+
+	t.Run("empty fence fails", func(t *testing.T) {
+		body := checkedUnit("echo hi", "Evidence:\necho hi\nsha: "+evidenceTestSHA+"\nexit status: 0\n```\n```\nEvidence scope: this command exited 0 at "+evidenceTestSHA+"; nothing else is inferred.\n")
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
+		if !containsIssue(issues, "must include raw command output in a fenced block") {
+			t.Fatalf("expected empty fence error, got %v", issues)
+		}
+	})
+
+	t.Run("edited command fails", func(t *testing.T) {
+		body := checkedUnit("echo hi", evidenceReceipt("echo other"))
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
+		if !containsIssue(issues, "must quote the Verify command verbatim") {
+			t.Fatalf("expected verbatim command error, got %v", issues)
+		}
+	})
+
+	t.Run("scope sha mismatch fails", func(t *testing.T) {
+		other := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+		body := checkedUnit("echo hi", "Evidence:\necho hi\nsha: "+evidenceTestSHA+"\nexit status: 0\n```\nhi\n```\nEvidence scope: this command exited 0 at "+other+"; nothing else is inferred.\n")
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
+		if !containsIssue(issues, "scope line sha must match recorded HEAD sha") {
+			t.Fatalf("expected sha mismatch, got %v", issues)
+		}
+	})
+
+	t.Run("scope status mismatch fails", func(t *testing.T) {
+		body := checkedUnit("echo hi", "Evidence:\necho hi\nsha: "+evidenceTestSHA+"\nexit status: 0\n```\nhi\n```\nEvidence scope: this command exited 1 at "+evidenceTestSHA+"; nothing else is inferred.\n")
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
+		if !containsIssue(issues, "scope line status must match recorded exit status") {
+			t.Fatalf("expected status mismatch, got %v", issues)
+		}
+	})
+
+	t.Run("inline verify quoted in receipt passes", func(t *testing.T) {
+		body := "## My outcome\nDone means: something\nVerify: `go test ./internal/ -run TestX`\n" + evidenceReceipt("go test ./internal/ -run TestX") + "- [x] done\n"
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
+		if len(issues) > 0 {
+			t.Fatalf("expected no issues, got %v", issues)
+		}
+	})
+}
+
+func TestGHCommentEvidenceReceipt(t *testing.T) {
+	root := t.TempDir()
+	body := ownedQueue("## My outcome\nDone means: something\nVerify:\n```\necho hi\n```\n- [x] done\n")
+
+	t.Run("sticker comment does not satisfy", func(t *testing.T) {
+		issue := ghIssue{
+			Number: 9,
+			Title:  "Add auth",
+			Body:   body,
+			URL:    "https://github.com/bermudi/litespec/issues/9",
+			Comments: []struct {
+				Body string `json:"body"`
+			}{{Body: "My outcome\nEvidence: verified at abc123"}},
+		}
+		data, err := json.Marshal(issue)
+		if err != nil {
+			t.Fatalf("marshal issue: %v", err)
+		}
+
+		oldLook := lookPathGh
+		lookPathGh = func(string) (string, error) { return "gh", nil }
+		defer func() { lookPathGh = oldLook }()
+
+		oldView := ghIssueView
+		ghIssueView = func(string, int) ([]byte, error) { return data, nil }
+		defer func() { ghIssueView = oldView }()
+
+		result, err := ValidateGHIssueByNumber(root, 9)
+		if err != nil {
+			t.Fatalf("ValidateGHIssueByNumber: %v", err)
+		}
+		if result.Valid {
+			t.Fatalf("expected Valid false, got true")
+		}
+		if !containsIssue(result.Errors, "missing Evidence receipt") && !containsIssue(result.Errors, "Evidence receipt") {
+			t.Fatalf("expected receipt error, got %v", result.Errors)
+		}
+	})
+
+	t.Run("full receipt comment satisfies", func(t *testing.T) {
+		comment := "My outcome\n" + evidenceReceipt("echo hi")
+		issue := ghIssue{
+			Number: 9,
+			Title:  "Add auth",
+			Body:   body,
+			URL:    "https://github.com/bermudi/litespec/issues/9",
+			Comments: []struct {
+				Body string `json:"body"`
+			}{{Body: comment}},
+		}
+		data, err := json.Marshal(issue)
+		if err != nil {
+			t.Fatalf("marshal issue: %v", err)
+		}
+
+		oldLook := lookPathGh
+		lookPathGh = func(string) (string, error) { return "gh", nil }
+		defer func() { lookPathGh = oldLook }()
+
+		oldView := ghIssueView
+		ghIssueView = func(string, int) ([]byte, error) { return data, nil }
+		defer func() { ghIssueView = oldView }()
+
+		result, err := ValidateGHIssueByNumber(root, 9)
+		if err != nil {
+			t.Fatalf("ValidateGHIssueByNumber: %v", err)
+		}
+		if !result.Valid {
+			t.Fatalf("expected Valid true, got false: %v", result.Errors)
+		}
+	})
 }
 
 func TestValidateGHIssueQueues_NoGitHubRemote(t *testing.T) {

@@ -54,7 +54,7 @@ If a fix needs a new decision, report "needs decision: <question>" instead of in
 - Flag Verify that would pass without the outcome.
 
 #### Evidence
-For every checked unit: evidence block/comment exists; the recorded command matches the unit's `Verify:` verbatim; the recorded sha is an ancestor of `HEAD`; re-run the verify at `HEAD` and compare the outcome. Missing evidence, edited command, or a re-run that no longer exits 0 is a CRITICAL finding breaking that unit's contract (triage rule 2 applies). The evidence scope line is the ceiling: review probes beyond it, evidence never claims beyond it.
+For every checked unit: a complete receipt exists (verbatim command, labeled `sha:`, labeled `exit status:`, nonempty fence, matching scope line); the recorded command matches the unit's `Verify:` verbatim; the recorded sha is an ancestor of `HEAD`; re-run the verify at `HEAD` and compare the outcome. A nonempty `Evidence:` label is not a receipt. Missing receipt, edited command, or a re-run that no longer exits 0 is a CRITICAL finding breaking that unit's contract (triage rule 2 applies). The evidence scope line is the ceiling: review probes beyond it, evidence never claims beyond it.
 
 ### Verdict
 `PASS` or `CHANGES REQUESTED`. The verdict is about the issue-owned branch, not the whole repo. Severity says how confident you are it is wrong; scope says whether this issue owns it.
