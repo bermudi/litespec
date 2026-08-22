@@ -16,6 +16,9 @@ type ghIssue struct {
 	Title  string `json:"title"`
 	Body   string `json:"body"`
 	URL    string `json:"url"`
+	Comments []struct {
+		Body string `json:"body"`
+	} `json:"comments"`
 }
 
 type queueUnit struct {
@@ -67,7 +70,23 @@ func ValidateGHIssueQueues(root string) (*ValidationResult, error) {
 			source := fmt.Sprintf("GH issue #%d", issue.Number)
 			units, unitIssues := ValidateQueueBody(issue.Body, source)
 			result.UnitsCount += len(units)
+			var commentBodies []string
+			for _, c := range issue.Comments {
+				commentBodies = append(commentBodies, c.Body)
+			}
 			for _, iss := range unitIssues {
+				if strings.Contains(iss.Message, "missing Evidence block") && len(commentBodies) > 0 {
+					skipped := false
+					for _, u := range units {
+						if strings.Contains(iss.Message, fmt.Sprintf("%q", u.Heading)) && evidenceInComments(u.Heading, commentBodies) {
+							skipped = true
+							break
+						}
+					}
+					if skipped {
+						continue
+					}
+				}
 				if iss.Severity == SeverityWarning {
 					result.Warnings = append(result.Warnings, iss)
 				} else {
@@ -192,9 +211,60 @@ func validateOptionalField(body []string, fieldName string, count int, idx int, 
 	return nil
 }
 
+func isCheckedLine(trimmed string) bool {
+	for _, cb := range []string{"- [x]", "- [X]"} {
+		if trimmed == cb || strings.HasPrefix(trimmed, cb+" ") {
+			return true
+		}
+	}
+	return false
+}
+
+func isCheckedUnit(body []string) bool {
+	for _, line := range body {
+		if isCheckedLine(strings.TrimSpace(line)) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasEvidenceBlock(body []string) bool {
+	for i, line := range body {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "Evidence:") {
+			rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "Evidence:"))
+			if rest != "" {
+				return true
+			}
+			for j := i + 1; j < len(body); j++ {
+				t := strings.TrimSpace(body[j])
+				if t == "" {
+					continue
+				}
+				if isCheckboxLine(t) {
+					break
+				}
+				return true
+			}
+			return false
+		}
+	}
+	return false
+}
+
+func evidenceInComments(heading string, comments []string) bool {
+	for _, c := range comments {
+		if strings.Contains(c, heading) && strings.Contains(c, "Evidence:") {
+			return true
+		}
+	}
+	return false
+}
+
 var ghIssueView = func(root string, number int) ([]byte, error) {
 	cmd := exec.Command("gh", "issue", "view", strconv.Itoa(number),
-		"--json", "number,title,body,url")
+		"--json", "number,title,body,url,comments")
 	cmd.Dir = root
 	return cmd.Output()
 }
@@ -203,7 +273,7 @@ var ghIssueList = func(root string) ([]byte, error) {
 	cmd := exec.Command("gh", "issue", "list",
 		"--label", "litespec",
 		"--state", "open",
-		"--json", "number,title,body,url",
+		"--json", "number,title,body,url,comments",
 		"--limit", "10000",
 	)
 	cmd.Dir = root
@@ -493,6 +563,13 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 				File:     source,
 			})
 		}
+		if isCheckedUnit(unit.Body) && !hasEvidenceBlock(unit.Body) {
+			issues = append(issues, ValidationIssue{
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("%s: checked unit %q missing Evidence block", source, unit.Heading),
+				File:     source,
+			})
+		}
 	}
 
 	headings := make(map[string]bool, len(units))
@@ -542,7 +619,23 @@ func ValidateGHIssueByNumber(root string, number int) (*ValidationResult, error)
 	source := fmt.Sprintf("GH issue #%d", issue.Number)
 	units, unitIssues := ValidateQueueBody(issue.Body, source)
 	result.UnitsCount += len(units)
+	var commentBodies []string
+	for _, c := range issue.Comments {
+		commentBodies = append(commentBodies, c.Body)
+	}
 	for _, iss := range unitIssues {
+		if strings.Contains(iss.Message, "missing Evidence block") && len(commentBodies) > 0 {
+			skipped := false
+			for _, u := range units {
+				if strings.Contains(iss.Message, fmt.Sprintf("%q", u.Heading)) && evidenceInComments(u.Heading, commentBodies) {
+					skipped = true
+					break
+				}
+			}
+			if skipped {
+				continue
+			}
+		}
 		if iss.Severity == SeverityWarning {
 			result.Warnings = append(result.Warnings, iss)
 		} else {

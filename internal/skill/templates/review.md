@@ -41,12 +41,20 @@ Each finding: **Severity**, **Location** (`file:line`), **Evidence** (excerpt), 
 - **WARNING** — likely wrong, needs judgment.
 - **SUGGESTION** — polish, not required.
 
+Patch size does not decide severity. (a one-character inversion can be CRITICAL; a sprawling refactor can be a SUGGESTION.)
+
+### DISPUTED
+A probed adversarial candidate that repository authority explicitly rejects. Format: location, concern, and the rejecting citation (decision number, spec clause, test, or quoted counter-evidence). DISPUTED is terminal: it never blocks, never routes, generates no unit. Citation bar: no authority on either side means NOT disputed — promote to a finding or drop it. Reviewer judgment alone never qualifies.
+
 If a fix needs a new decision, report "needs decision: <question>" instead of inventing one.
 
 ### Cross-check
 - Flag specs/decisions that contradict the change or each other.
 - Flag code that reimplements existing machinery instead of extending it.
 - Flag Verify that would pass without the outcome.
+
+#### Evidence
+For every checked unit: evidence block/comment exists; the recorded command matches the unit's `Verify:` verbatim; the recorded sha is an ancestor of `HEAD`; re-run the verify at `HEAD` and compare the outcome. Missing evidence, edited command, or a re-run that no longer exits 0 is a CRITICAL finding breaking that unit's contract (triage rule 2 applies). The evidence scope line is the ceiling: review probes beyond it, evidence never claims beyond it.
 
 ### Verdict
 `PASS` or `CHANGES REQUESTED`. The verdict is about the issue-owned branch, not the whole repo. Severity says how confident you are it is wrong; scope says whether this issue owns it.

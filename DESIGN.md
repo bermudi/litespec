@@ -60,7 +60,7 @@ you: "add X" -> plan[fuzzy] (read code, grill by default — references/fuzzy.md
 
 Each queue issue owns a dedicated `litespec/<change-name>` branch. `plan[clear]` requires a clean tree, captures `Base:`, creates the branch, and records `Branch:`. Auto-loaded harness/repository instructions are review's trusted bootstrap boundary. After activation, review initially reads only the remote issue; every additional local queue, contract, implementation, and reference path is screened with its parent components before content access. Unsafe paths stop review. Unrelated work uses another branch or worktree.
 
-Review routing is ordered: suggestion; unit violation; in-scope finding outside units; out-of-scope finding. CRITICAL/WARNING inside issue scope blocks even when no unit covers it. Out-of-scope findings route without blocking. The issue closes only when every unit is checked and review returns `PASS`.
+Review routing is ordered: suggestion; unit violation; in-scope finding outside units; out-of-scope finding. DISPUTED is terminal non-blocking (never routes, never blocks, generates no unit) and sits outside the blocking chain. CRITICAL/WARNING inside issue scope blocks even when no unit covers it. Out-of-scope findings route without blocking. Evidence cross-check (checked units: block exists, command verbatim, sha ancestor, re-run) and DISPUTED citation bar (rejecting authority required) are part of review. The issue closes only when every unit is checked and review returns `PASS`.
 
 `grill-me` is a skill reference, not a CLI. `plan` owns spec drafting in clear mode: if the feature is load-bearing, it writes/updates `specs/<feature>/spec.md` alongside the issue.
 
@@ -69,6 +69,8 @@ Review routing is ordered: suggestion; unit violation; in-scope finding outside 
 One unit = one thing you can demo + one `Verify:` that would fail if it's missing.
 
 Optional per-unit fields: `Read first:` (context, not scope — areas and rulings, not file lists) and `Constraints:` (boundaries — what must stay true or is out of bounds, never what to edit). Both are unique and nonempty when present; omit rather than placeholder. `Depends:` lists other unit headings. The worker owns the implementation path.
+
+Evidence protocol: the worker that ticks a unit's checkbox must first post verbatim evidence it cannot improve by interpretation (exact `Verify:` command, `HEAD` sha, exit status, raw output fence, and `Evidence scope: this command exited <status> at <sha>; nothing else is inferred.`). GH issue evidence lives as a comment (heading + command verbatim + sha + status + fenced output + scope line) or in the issue body `Evidence:` block; local queue evidence is an `Evidence:` block appended under the unit after `Verify:` and before the checkbox. Checked units SHALL carry a nonempty `Evidence:` block scoped to that unit (GH body or comments satisfy); unchecked units are unaffected. Validate enforces this structurally; validate does not parse, run, or interpret the command or output. Review cross-checks for every checked unit that evidence exists, the command matches verbatim, the sha is an ancestor of `HEAD`, and a re-run matches; missing evidence, edited command, or a re-run that no longer exits 0 is a CRITICAL finding breaking that unit's contract (triage rule 2). Patch size does not decide severity.
 
 In GH issue body — immutable `Base: <sha>` and `Branch: litespec/<change-name>` ownership lines above the units, then:
 ```markdown

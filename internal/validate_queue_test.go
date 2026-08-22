@@ -191,7 +191,8 @@ Verify:
 ## Good Two
 Done means: two
 Verify:
-` + "```\necho two\n```\n" + `- [x] done
+` + "```\necho two\n```\n" + `Evidence: verified at abc123
+- [x] done
 
 ## Bad One
 Verify:
