@@ -20,7 +20,7 @@ Read the queue's `Branch:` line and compare it with `git branch --show-current`.
 2. Require a clean tree: `git status --porcelain` must print nothing. Run the exact `Verify:` command on the clean starting commit before implementation.
    - If the verifier already exists, use the starting commit as pre.
    - If Verify cannot run because the verifier is part of the unit, create one verifier-only commit, require a clean tree, and use that commit as pre. It may contain only the test or other verifier, never the outcome.
-   - The pre run must exit non-zero and Verify must fail because the unit outcome is absent. If it exits 0, or fails because of an unrelated command, dependency, or environment error, stop. Do not implement or check the unit.
+   - The pre run must exit non-zero; Verify fails because the unit outcome is absent. If it exits 0, or fails because of an unrelated command, dependency, or environment error, stop. Do not implement or check the unit.
    - Save the full pre SHA, integer exit status, and raw output exactly as emitted.
 3. Implement the unit — the smallest coherent change. Extend the existing path, don't add a parallel one. No speculative abstraction. If the unit is a contract change, update `specs/<feature>/spec.md` now.
 4. Commit the implementation — exactly one implementation commit per unit. Do not amend the pre commit.

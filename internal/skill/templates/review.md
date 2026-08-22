@@ -61,7 +61,7 @@ Replay the exact command at all three trees:
 2. Create a detached temporary Git worktree at post. Run Verify there; it must exit 0 with the outcome present. Remove the worktree afterward even when Verify fails.
 3. Run the exact `Verify:` command again at `HEAD` and confirm it still exits 0 with the outcome present.
 
-Use cleanup that runs on every path, such as a shell trap or the harness equivalent. Never check out an evidence SHA in the reviewer's current worktree. A green pre run, irrelevant pre failure, failed post or `HEAD`, missing/malformed receipt, edited command, or invalid ancestry is a CRITICAL finding breaking that unit's contract (triage rule 2).
+Use cleanup that runs on every path, such as a shell trap or the harness equivalent, and never check out an evidence SHA in the reviewer's current worktree. A green pre run, irrelevant pre failure, failed post or `HEAD`, missing/malformed receipt, edited command, or invalid ancestry is a CRITICAL finding breaking that unit's contract (triage rule 2).
 
 Red-green evidence proves only that Verify discriminates the recorded trees. It does not prove that Verify targets the correct behavior. Probe the command and outcome adversarially beyond the receipt. The scope lines are the ceiling: evidence never claims beyond them.
 
