@@ -407,7 +407,9 @@ func TestGeneratedSkillsUseRedGreenEvidence(t *testing.T) {
 		"pre is an ancestor of post and post is an ancestor of `HEAD`",
 		"detached temporary Git worktree at pre",
 		"detached temporary Git worktree at post",
+		"detached temporary Git worktree at `HEAD`",
 		"Run the exact `Verify:` command again at `HEAD`",
+		"Remove the `HEAD` worktree afterward even when Verify fails.",
 		"must fail because the outcome is absent",
 		"must exit 0 with the outcome present",
 		"never check out an evidence SHA in the reviewer's current worktree",
@@ -421,6 +423,8 @@ func TestGeneratedSkillsUseRedGreenEvidence(t *testing.T) {
 			"post",
 			"verifier-only commit",
 			"detached temporary worktree",
+			"detached temporary worktree at `HEAD`",
+			"removed even when Verify fails",
 			"does not prove",
 		)
 	}
