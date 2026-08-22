@@ -50,7 +50,7 @@ No batching units. At most one verifier-only commit, then one or more implementa
 
 ## Rebuilding a unit after review
 
-If the unit's box was unchecked by the user after review reported a CRITICAL or WARNING against its `Done means:` or `Verify:`, you are rebuilding — not starting fresh. The previous Verify failed to prove the outcome. Load `references/review-fixing.md` and follow its scope-expansion rules: find the abstract pattern behind the finding, fix all instances, not just the cited `file:line`. Then follow the same red-green order as above. The exact Verify must fail for the missing fix at a clean pre commit before you create one or more implementation/fix commits. Record a fresh pre/post receipt, post it, and re-check the box. Never amend a prior evidence commit.
+If the unit's box was unchecked by review after a CRITICAL or WARNING against its `Done means:` or `Verify:`, you are rebuilding — not starting fresh. Review owns that routing mutation. Do not ask the user to uncheck it. The previous Verify failed to prove the outcome. Load `references/review-fixing.md` and follow its scope-expansion rules: find the abstract pattern behind the finding, fix all instances, not just the cited `file:line`. Then follow the same red-green order as above. The exact Verify must fail for the missing fix at a clean pre commit before you create one or more implementation/fix commits. Record a fresh pre/post receipt, post it, and re-check the box. Never amend a prior evidence commit.
 
 ---
 
