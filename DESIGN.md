@@ -4,7 +4,7 @@
 
 ## Stack
 
-- Go, `github.com/bermudi/litespec`, binary `litespec`
+- Go 1.26.1+, `github.com/bermudi/litespec/v2`, binary `litespec`
 - No config file. Convention over config.
 
 ## Directory
@@ -70,7 +70,7 @@ One unit = one thing you can demo + one `Verify:` that would fail if it's missin
 
 Optional per-unit fields: `Read first:` (context, not scope — areas and rulings, not file lists) and `Constraints:` (boundaries — what must stay true or is out of bounds, never what to edit). Both are unique and nonempty when present; omit rather than placeholder. `Depends:` lists other unit headings. The worker owns the implementation path.
 
-Evidence protocol: the worker that ticks a unit's checkbox must first post a verbatim receipt it cannot improve by interpretation. Required fields: the exact `Verify:` command, a labeled `sha:` / `HEAD sha:` line with a full 40- or 64-character hex commit ID, a labeled `exit status: 0` line, a fenced raw output block containing the command output or literal `<no output>`, and `Evidence scope: this command exited <status> at <sha>; nothing else is inferred.` (status and sha on that line must match the labeled fields). GH issue evidence lives as a comment (heading + those fields) or in the issue body `Evidence:` block; local queue evidence is an `Evidence:` block after `Verify:` and before the checkbox. Unchecked units need no receipt. Validate checks receipt structure only — it does not run the command or interpret the output. A nonempty `Evidence:` label is not a receipt. Review re-runs the command, checks the sha is an ancestor of `HEAD`, and treats a missing/edited receipt or a re-run that no longer exits 0 as a CRITICAL unit-contract break (triage rule 2). Patch size does not decide severity.
+Evidence protocol: the worker that ticks a unit's checkbox must first post a verbatim receipt it cannot improve by interpretation. The order is fixed — commit the implementation, require a clean tree, run `Verify:` against that committed tree, then record `git rev-parse HEAD` as the sha so the receipt describes the exact tree Verify ran against, then post the receipt and tick the box, and never amend that implementation commit afterward. Recording the sha before committing (or amending the commit after) detaches the receipt from the tree it claims to describe. Required fields: the exact `Verify:` command, a labeled `sha:` / `HEAD sha:` line with a full 40- or 64-character hex commit ID, a labeled `exit status: 0` line, a fenced raw output block containing the command output or literal `<no output>`, and `Evidence scope: this command exited <status> at <sha>; nothing else is inferred.` (status and sha on that line must match the labeled fields). GH issue evidence lives as a comment (heading + those fields) or in the issue body `Evidence:` block; local queue evidence is an `Evidence:` block after `Verify:` and before the checkbox, committed as a separate metadata commit (it records the implementation commit's sha, so it cannot be folded into that commit, which must never be amended). Unchecked units need no receipt. Validate checks receipt structure only — it does not run the command or interpret the output. A nonempty `Evidence:` label is not a receipt. Review re-runs the command, checks the sha is an ancestor of `HEAD` and is the implementation commit (not `Base:`), and treats a missing/edited receipt or a re-run that no longer exits 0 as a CRITICAL unit-contract break (triage rule 2). Patch size does not decide severity.
 
 In GH issue body — immutable `Base: <sha>` and `Branch: litespec/<change-name>` ownership lines above the units, then:
 ```markdown
@@ -157,12 +157,12 @@ Generated via `litespec update` from `internal/skill/templates/` (embed.FS). `.a
 
 | Command | Purpose |
 |---------|---------|
-| `litespec init` | scaffold `specs/` + skills |
-| `litespec validate [--decisions] [--issue N] [--queue <path>]` | lint specs + decisions + GH issue queue (labeled litespec) + local specs/queues/ fallback + Verify shell (bash -n) |
+| `litespec init [--tools <ids>]` | scaffold `specs/` + skills |
+| `litespec validate [--all\|--specs\|--decisions\|--issue N\|--queue <path>] [--type T]` | lint specs + decisions + GH issue queue (labeled litespec) + local specs/queues/ fallback + Verify shell (bash -n) |
 | `litespec view` | product + features + open `litespec` GH issues (via `gh` if present) + decisions (spine starred) |
-| `litespec update` | regenerate skills |
-
-No `patch`, `archive`, `decide`, `preview`, `import` until needed. Add when pain appears.
+| `litespec update [--tools <ids>]` | regenerate skills and adapters |
+| `litespec upgrade` | check for and install the latest version via `go install` |
+| `litespec completion <shell>` | generate shell completion script (bash, zsh, fish) |
 
 ## GH issues as the change
 

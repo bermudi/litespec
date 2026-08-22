@@ -17,7 +17,7 @@ The design emerged from a structured grilling session — question by question, 
 ## Architecture
 
 - **Language:** Go
-- **Module:** `github.com/bermudi/litespec`
+- **Module:** `github.com/bermudi/litespec/v2`
 - **Binary:** `litespec`
 - **Design doc:** `DESIGN.md` — read it first (lean v2: GH issue is the queue)
 
@@ -54,7 +54,7 @@ you: "add X" -> plan[fuzzy] (read code, grill by default — references/fuzzy.md
 - `plan[fuzzy]` is ephemeral — no files, grill/spike only
 - `plan[clear]` requires a clean tree, creates `litespec/<change-name>`, and materializes the GH issue (Base + Branch + proposal + design + queue) + draft spec if load-bearing
 - `grill-me` is a skill reference, not a CLI. `references/fuzzy.md` loads `references/grilling.md` by default
-- `build` implements one unit per session, satisfies Done means + Verify (Verify must fail without outcome), posts verbatim evidence (GH comment or local `Evidence:` block with `Evidence scope:` line) before ticking, checks box only after evidence, commits referencing evidence location, stops
+- `build` implements one unit per session: commits the implementation, requires a clean tree, runs `Verify:` against the committed tree, records `git rev-parse HEAD` + raw output as a verbatim receipt (GH comment or local `Evidence:` block with `Evidence scope:` line), ticks the box only after evidence, and never amends the implementation commit. Local-queue bookkeeping (Evidence block + checkbox) is a separate metadata commit. Stops
 - `review` is adversarial — context-aware check of GH issue + spec vs implementation, cross-checks evidence for every checked unit (command verbatim, sha ancestor, re-run), then triages findings into lanes (DISPUTED is terminal non-blocking) (see below)
 - GH issue is the queue: each unit is `## <outcome>` with `Done means:` and `Verify:` and status checkbox, plus optional `Read first:` / `Constraints:` (both unique/nonempty, omit rather than placeholder) and `Depends:` and a complete evidence receipt when checked (body or comments for GH, `Evidence:` block for local)
 

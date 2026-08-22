@@ -85,16 +85,21 @@ After trusted bootstrap and skill activation, `litespec-review` SHALL read only 
 
 ### Requirement: Evidence Receipt Cross-Check
 
-For every checked unit, `litespec-review` SHALL verify that a complete evidence receipt exists (verbatim `Verify:` command, labeled `sha:`, labeled `exit status:`, nonempty fenced output, matching scope line), that the recorded command matches the unit's `Verify:` verbatim, that the recorded sha is an ancestor of `HEAD`, and that a re-run of the verify command at `HEAD` exits 0. A nonempty `Evidence:` label SHALL NOT satisfy. Missing receipt, edited command, or a re-run that no longer exits 0 SHALL be a CRITICAL finding that breaks that unit's contract.
+For every checked unit, `litespec-review` SHALL verify that a complete evidence receipt exists (verbatim `Verify:` command, labeled `sha:`, labeled `exit status:`, nonempty fenced output, matching scope line), that the recorded command matches the unit's `Verify:` verbatim, that the recorded sha is an ancestor of `HEAD`, and that a re-run of the verify command at `HEAD` exits 0. The recorded sha SHALL be the implementation commit whose tree Verify ran against: `litespec-build` commits the implementation before running Verify and never amends that commit, so a sha equal to `Base:` (no implementation commit on the branch) or a sha whose tree lacks the unit outcome SHALL be a CRITICAL finding. A nonempty `Evidence:` label SHALL NOT satisfy. Missing receipt, edited command, or a re-run that no longer exits 0 SHALL be a CRITICAL finding that breaks that unit's contract.
 
 #### Scenario: Complete receipt and passing re-run
 
-- **WHEN** a checked unit has a complete receipt whose sha is an ancestor of `HEAD` and the verify command exits 0 at `HEAD`
+- **WHEN** a checked unit has a complete receipt whose sha is the implementation commit (an ancestor of `HEAD`, distinct from `Base:`) and the verify command exits 0 at `HEAD`
 - **THEN** review does not report a receipt-contract finding for that unit
 
 #### Scenario: Sticker or failed re-run is critical
 
 - **WHEN** a checked unit has only `Evidence: verified at abc123`, an edited command, a missing receipt, or a re-run that does not exit 0
+- **THEN** review reports a CRITICAL finding that breaks that unit's contract
+
+#### Scenario: Recorded sha is the base, not the implementation commit
+
+- **WHEN** a checked unit's receipt records a sha equal to `Base:` (no implementation commit on the branch) or a sha whose tree lacks the unit outcome
 - **THEN** review reports a CRITICAL finding that breaks that unit's contract
 
 ### Requirement: Findings and Verdict
