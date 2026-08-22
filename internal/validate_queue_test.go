@@ -671,6 +671,25 @@ func TestValidateQueueRedGreenReceipt(t *testing.T) {
 		}
 	})
 
+	t.Run("longer fences preserve shorter fence and checkbox output", func(t *testing.T) {
+		evidence := strings.Replace(
+			valid,
+			"```\nmissing outcome\n```",
+			"````text\nbefore\n```\n- [x] pre raw output\n```\nafter\n````",
+			1,
+		)
+		evidence = strings.Replace(
+			evidence,
+			"```\nhi\n```",
+			"````text\nbefore\n```\n- [x] post raw output\n```\nafter\n````",
+			1,
+		)
+		_, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", evidence)), source)
+		if len(issues) > 0 {
+			t.Fatalf("expected no issues, got %v", issues)
+		}
+	})
+
 	t.Run("fenced Verify takes precedence over inline Verify", func(t *testing.T) {
 		body := "## My outcome\nDone means: something\nVerify: `echo inline`\n```\necho fenced\n```\n" +
 			evidenceReceipt("echo fenced") +
