@@ -155,7 +155,7 @@ A finding that needs a durable ruling SHALL be reported as `"needs decision: <qu
 #### Scenario: Warning breaks a unit
 
 - **WHEN** a WARNING shows that a unit's contract is not satisfied
-- **THEN** the unit is unchecked and routed to `litespec-build` as a blocking rebuild
+- **THEN** review unchecks the unit itself and routes it to `litespec-build` as a blocking rebuild
 
 #### Scenario: In-scope finding outside units blocks
 
@@ -172,9 +172,33 @@ A finding that needs a durable ruling SHALL be reported as `"needs decision: <qu
 - **WHEN** a finding requires a durable architectural ruling
 - **THEN** review reports `"needs decision"` and preserves the finding's blocking status while the decision is made
 
+### Requirement: Automatic Unit Reopening
+
+After applying finding triage, `litespec-review` SHALL automatically change every checked unit routed by rule 2 from checked to unchecked before returning `CHANGES REQUESTED`. It SHALL preserve prior evidence and every unaffected unit. For a GitHub queue, review SHALL edit the issue body and verify the affected headings are unchecked. For a local queue, review SHALL edit only the affected status lines and create a separate metadata commit so the next build starts from a clean tree. Review SHALL NOT require the user to perform this mechanical routing mutation. If the queue update cannot be persisted safely, review SHALL report the boundary failure and MUST NOT claim the rebuild is ready.
+
+#### Scenario: GitHub unit is reopened automatically
+
+- **WHEN** a checked GitHub issue unit receives a CRITICAL or WARNING that breaks its `Done means:` or `Verify:`
+- **THEN** review unchecks that unit in the issue body before returning `CHANGES REQUESTED`, and the next build can select it without user queue edits
+
+#### Scenario: Local unit is reopened in metadata commit
+
+- **WHEN** a checked local queue unit receives a CRITICAL or WARNING that breaks its contract
+- **THEN** review unchecks only that unit, preserves its evidence, and commits the queue mutation separately before returning `CHANGES REQUESTED`
+
+#### Scenario: Non-rebuild findings preserve unit status
+
+- **WHEN** a finding is a SUGGESTION, DISPUTED, outside every unit contract, or otherwise routes outside rule 2
+- **THEN** review does not change any existing unit checkbox for that finding
+
+#### Scenario: Queue mutation failure is visible
+
+- **WHEN** review lacks permission or cannot safely persist an automatic unit reopening
+- **THEN** it reports the failure with `CHANGES REQUESTED` and does not tell the user that build is ready
+
 ### Requirement: Pure Review Role
 
-The `litespec-review` skill MUST NOT write code, modify files, check or uncheck existing checkboxes, or implement fixes. It SHALL report and route findings. Appending a new unchecked unit to the parent GH issue body or local queue is a permitted routing mutation; review MUST NOT otherwise modify the queue.
+The `litespec-review` skill MUST NOT write code, check units, remove evidence, alter unaffected units, or implement fixes. It SHALL report and route findings. Unchecking units routed to blocking rebuild and appending a new unchecked unit to the parent GH issue body or local queue are permitted routing mutations; review MUST NOT otherwise modify the queue.
 
 #### Scenario: Review does not implement
 
@@ -185,6 +209,11 @@ The `litespec-review` skill MUST NOT write code, modify files, check or uncheck 
 
 - **WHEN** review finds non-trivial, correctly shaped work inside review scope but outside existing units
 - **THEN** it appends an unchecked unit to the parent queue without implementing it or changing existing units
+
+#### Scenario: Unit reopening is routing
+
+- **WHEN** review unchecks a unit because a blocking finding breaks that unit's contract
+- **THEN** the checkbox change is treated as routing rather than implementation
 
 ### Requirement: Adversarial Scenario Reference
 
