@@ -212,7 +212,7 @@ When all units are done, invoke `litespec-review`. Harness/system instructions a
 > **You:** review
 >
 > **litespec-review:** Adversarial review of the GH issue + `specs/rate-limit/spec.md` vs the implementation. It checks:
-> - Does the exact Verify fail for the absent outcome at pre, pass with it at post, and still pass at `HEAD`? These runs use detached temporary worktrees for pre and post, never the current worktree.
+> - Does the exact Verify fail for the absent outcome at pre, pass with it at post, and still pass at `HEAD`? All three runs use detached temporary worktrees with guaranteed cleanup, never the current worktree.
 > - Does the code enforce 100 requests per minute per IP?
 > - Does the 101st request return 429 with `Retry-After`?
 > - Does `RATE_LIMIT_PER_MINUTE` default to 100?

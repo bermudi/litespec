@@ -24,7 +24,7 @@ A fuzzy idea becomes a clear issue, then a demo-able unit at a time:
 2. **Plan clear** — `litespec-plan` writes the GitHub issue body: proposal, design, and queue of units. It also drafts `specs/<feature>/spec.md` if the feature is load-bearing.
 3. **Grill-me** — stress-test the plan with `litespec-plan`, pulling in codebase-design and domain-modeling references when needed.
 4. **Build one unit** — `litespec-build` records the exact `Verify:` failing for the absent outcome at a clean pre commit, implements one `## <outcome>`, records the same command passing at the implementation post commit, posts the receipt, ticks the checkbox, and stops.
-5. **Review** — `litespec-review` replays Verify at pre, post, and `HEAD`, then adversarially checks the issue + spec against the implementation. Red-green evidence does not prove the command targets the right behavior.
+5. **Review** — `litespec-review` replays Verify at pre, post, and `HEAD` in detached temporary worktrees with guaranteed cleanup, then adversarially checks the issue + spec against the implementation. Red-green evidence does not prove the command targets the right behavior.
 6. **Close the issue** — the issue is disposable. Durable specs, decisions, and glossary stay.
 
 Unidirectional. One unit per session.
