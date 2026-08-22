@@ -700,6 +700,39 @@ func TestValidateQueueRedGreenReceipt(t *testing.T) {
 		}
 	})
 
+	t.Run("one comment receipt satisfies only one unit with the same Verify", func(t *testing.T) {
+		body := ownedQueue(
+			"## First outcome\nDone means: first thing\nVerify:\n```\necho hi\n```\n- [x] done\n\n" +
+				"## Second outcome\nDone means: second thing\nVerify:\n```\necho hi\n```\n- [x] done\n",
+		)
+		units, issues := ValidateQueueBody(body, source)
+		comment := "First outcome\nSecond outcome\n" + evidenceReceipt("echo hi")
+		result := &ValidationResult{Valid: true}
+		applyQueueIssues(result, units, issues, []string{comment})
+		if len(result.Errors) != 1 {
+			t.Fatalf("expected one unmatched unit receipt, got %v", result.Errors)
+		}
+	})
+
+	t.Run("receipt output structural tokens are ignored", func(t *testing.T) {
+		evidence := redGreenEvidenceReceipt(
+			"echo hi",
+			evidenceTestSHA,
+			"1",
+			"## Phantom unit\nDone means: phantom\nVerify:\nBase: 2222222222222222222222222222222222222222\nBranch: litespec/phantom\n- [x] done",
+			evidencePostTestSHA,
+			"0",
+			"## Another phantom\nDepends: Missing outcome\nBase: 3333333333333333333333333333333333333333\nBranch: litespec/another-phantom",
+		)
+		units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", evidence)), source)
+		if len(units) != 1 {
+			t.Fatalf("expected one unit, got %d: %v", len(units), units)
+		}
+		if len(issues) > 0 {
+			t.Fatalf("expected no issues, got %v", issues)
+		}
+	})
+
 	tests := []struct {
 		name        string
 		evidence    string
