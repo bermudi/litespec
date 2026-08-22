@@ -28,7 +28,7 @@ The `litespec validate` command SHALL validate feature specs under `specs/<featu
 
 ### Requirement: GH Issue Queue Validation
 
-The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec` via `gh issue list` and lint each issue body as a queue. Across the entire queue body there SHALL be exactly one `Base:` line and exactly one `Branch:` line, and both SHALL occur before the first `##` heading. `Base:` SHALL contain a full 40- or 64-character hexadecimal commit ID; `Branch:` SHALL match `litespec/<kebab-change-name>`. A `##` section is treated as a unit only when its body contains a `Done means:` or `Verify:` line; prose sections SHALL be skipped. Each unit SHALL have a non-empty heading, a `Done means:` line, a `Verify:` line carrying either an inline backtick command on the same line or a fenced code block within the unit body, and a checkbox. Missing or malformed ownership or unit elements SHALL produce an error. Issues without the `litespec` label SHALL NOT be scanned.
+The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec` via `gh issue list` and lint each issue body as a queue. Across the entire queue body there SHALL be exactly one `Base:` line and exactly one `Branch:` line, and both SHALL occur before the first `##` heading. `Base:` SHALL contain a full 40- or 64-character hexadecimal commit ID; `Branch:` SHALL match `litespec/<kebab-change-name>`. A `##` section is treated as a unit only when its body contains a `Done means:` or `Verify:` line; prose sections SHALL be skipped. Each unit SHALL have a non-empty heading, a `Done means:` line, a `Verify:` line carrying either an inline backtick command on the same line or a fenced code block within the unit body, and a checkbox. Each unit MAY include at most one `Read first:` line and at most one `Constraints:` line; both are optional, unique, and nonempty when present. `Read first:` is context, not scope — prefer areas and rulings over long file lists. `Constraints:` states what must stay true or what is out of bounds — it never says what to edit; the worker owns the implementation path. Omit either field rather than writing a placeholder. Missing or malformed ownership or unit elements, duplicate or empty optional fields SHALL produce an error. Issues without the `litespec` label SHALL NOT be scanned.
 
 #### Scenario: Well-formed queue passes
 
@@ -70,6 +70,21 @@ The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec
 - **WHEN** a labeled issue body contains `## Proposal`, `## Design`, and `## Spec draft` sections alongside `## <outcome>` units
 - **THEN** validate lints only the units and reports no errors for the prose sections
 
+#### Scenario: Valid Read first and Constraints pass
+
+- **WHEN** a unit has `Read first:` with context areas and `Constraints:` with boundary text (inline or bulleted)
+- **THEN** validation succeeds for those fields
+
+#### Scenario: Duplicate Read first or Constraints fails
+
+- **WHEN** a unit repeats `Read first:` or `Constraints:`
+- **THEN** validation reports a duplicate-field error
+
+#### Scenario: Empty Read first or Constraints fails
+
+- **WHEN** a unit has `Read first:` or `Constraints:` empty or with a placeholder like `-` or `none` or `n/a`
+- **THEN** validation reports a nonempty error
+
 ### Requirement: Queue Unit Depends Validation
 
 A unit MAY include a `Depends:` line listing comma-separated `##` heading references.
@@ -99,7 +114,7 @@ A dangling reference (heading not found) SHALL produce an error naming the unit 
 
 ### Requirement: Verify Shell Syntax Lint
 
-For each unit's `Verify:` fenced code block, validate SHALL run `bash -n` on the block contents and report any syntax error as a validation error identifying the issue number, unit heading, and shell error text. An inline `Verify:` command (backtick command on the `Verify:` line) SHALL be accepted as non-empty content and is not shell-linted, since inline Verify lines may mix commands with prose code references. If `bash` is not on `PATH`, validate SHALL emit a warning per fenced block (not an error) and check only that the block is non-empty. Validate SHALL NOT execute the Verify command.
+For each unit's `Verify:` fenced code block, validate SHALL run `bash -n` on the block contents and report any syntax error as a validation error identifying the issue number, unit heading, and shell error text. An inline `Verify:` command (backtick command on the `Verify:` line extracted as first→last `` ` `` span) SHALL be accepted as non-empty content. If `bash` is not on `PATH`, validate SHALL emit a warning per fenced block (not an error) and check only that the block is non-empty. Validate SHALL reject obviously vacuous Verify commands — a fenced block or inline span that is comment-only or a single `true`, `:`, or `exit 0` optionally followed by `;` and/or `# comment` — reporting `Verify command is obviously vacuous; assert the unit outcome` (a blank/whitespace-only block is reported as `Verify block is empty`). When both an inline span and a fenced block are present on the same unit, only the fenced block SHALL be linted. Lint does not claim to understand whether an otherwise valid command discriminates the outcome. Validate SHALL NOT execute the Verify command.
 
 #### Scenario: Valid shell passes
 
@@ -115,6 +130,26 @@ For each unit's `Verify:` fenced code block, validate SHALL run `bash -n` on the
 
 - **WHEN** `bash` is not on `PATH` and a Verify block is non-empty
 - **THEN** validation emits a warning, not an error, for that block
+
+#### Scenario: Vacuous fenced Verify fails
+
+- **WHEN** a Verify fenced block is `true`, `:`, `exit 0`, or comment-only
+- **THEN** validation reports `Verify command is obviously vacuous; assert the unit outcome`
+
+#### Scenario: Vacuous inline Verify fails
+
+- **WHEN** a unit's `Verify:` line carries an inline backtick span `true` (or `:`, `exit 0`) and no fenced block
+- **THEN** validation reports `Verify command is obviously vacuous; assert the unit outcome`
+
+#### Scenario: Non-vacuous Verify passes
+
+- **WHEN** a Verify block or inline span is `go test ./...` or `echo ok` or multi-line, or `returns true` prose-contaminated span `true` and `go test` (first→last extraction)
+- **THEN** validation does not report vacuous
+
+#### Scenario: Both spellings present — fence wins
+
+- **WHEN** a unit has both an inline `true` vacuous span and a fenced `go test` block, or vice versa with fenced `true` and inline `go test`
+- **THEN** only the fenced block is linted; the first case passes, the second fails for the fence
 
 ### Requirement: Local Queue Fallback
 

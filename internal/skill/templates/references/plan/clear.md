@@ -16,6 +16,8 @@ Record the output of `git rev-parse HEAD` as the base. Create and switch to `lit
 3. **Queue — one `##` per unit.** Each unit:
    ```
    ## <one demo-able outcome>
+   Read first: <areas and rulings, not a file list — optional>
+   Constraints: <what must stay true or is out of bounds — never what to edit — optional>
    Depends: <other unit heading>, <another unit heading>
    Done means: <observable, human-checkable>
    Verify: `<command that fails without the outcome>`
@@ -23,6 +25,8 @@ Record the output of `git rev-parse HEAD` as the base. Create and switch to `lit
    ```
    `Verify:` must fail for a plausible state where the outcome is missing. A `go test` that doesn't check output is not a Verify.
    `Depends:` is optional, references `##` headings in the same issue, comma-separated. A unit is unblocked when all its `Depends:` units are checked `- [x]`.
+   `Read first:` is optional, unique, nonempty when present. Context, not scope — prefer areas and rulings over long file lists. Omit rather than placeholder.
+   `Constraints:` is optional, unique, nonempty when present. Boundaries: what must stay true or is out of bounds — never what to edit. Omit rather than placeholder. The worker owns the implementation path; don't smuggle in an edit script via Constraints.
 
 4. **Spec if load-bearing.** If the feature is a promise that breaks things when wrong (CLI shape, API, file format), edit `specs/<feature>/spec.md` directly in the same change — not a delta. Keep to 3-5 SHALL requirements, each with a WHEN/THEN scenario.
 

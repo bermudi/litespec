@@ -27,8 +27,8 @@ The design emerged from a structured grilling session — question by question, 
 - **Specs** live in `specs/<feature>/spec.md` — only load-bearing contracts (SHALL/MUST + WHEN/THEN). No `canon/` — edit the file directly
 - **Decisions** live in `specs/decisions/` as `NNNN-<slug>.md` — durable rulings with `spine: true` for load-bearing. Created via `touch` + `validate`, not a CLI
 - **Glossary** lives in `specs/glossary.md` — ubiquitous language, curated, optional but recommended. Managed via plan skill, graceful degradation if absent
-- **GH issues are the change/queue** — GH issue body holds proposal + design + queue (units with Done means + Verify) + immutable `Base: <sha>` and `Branch: litespec/<change-name>` ownership lines. `plan[clear]` starts clean and creates the dedicated branch; all work on it belongs to the issue. Offline fallback is `specs/queues/<name>.md`.
-- **Units** — one demo-able outcome per `##` with `Done means:` and `Verify:` that must fail without the outcome. Built one at a time, ticked via checkbox. No `tasks.md`
+- **GH issues are the change/queue** — GH issue body holds proposal + design + queue (units with Done means + Verify + optional Read first / Constraints / Depends) + immutable `Base: <sha>` and `Branch: litespec/<change-name>` ownership lines. `plan[clear]` starts clean and creates the dedicated branch; all work on it belongs to the issue. Offline fallback is `specs/queues/<name>.md`.
+- **Units** — one demo-able outcome per `##` with `Done means:` and `Verify:` that must fail without the outcome, plus optional `Read first:` (context, not scope — areas/rulings, not file lists) and `Constraints:` (boundaries: what must stay true or out of bounds — never what to edit; omit rather than placeholder). Built one at a time, ticked via checkbox. No `tasks.md`
 - **Two lanes** — small fix (zero ceremony, no issue required) vs new feature (plan fuzzy (grill by default) -> clear -> build -> review -> close issue)
 - **Skills** are generated into `.agents/skills/` (canonical). Only three: `litespec-plan` (fuzzy/grill/clear + codebase-design/domain-modeling), `litespec-build` (one unit at a time), `litespec-review` (adversarial). Nearly all agents discover `.agents/skills/` natively; Claude Code via symlink in `.claude/skills/`. `litespec-plan` has fuzzy mode (grill by default) for half-baked ideas and clear mode to nail the GH issue. Project-specific skills (`the-drill`) are tracked directly in git — NOT generated
 - **Scenarios** — each requirement has named scenarios (`#### Scenario: <name>`) with WHEN/THEN format. Load-bearing requirements must have at least one scenario. Body text must contain SHALL or MUST
@@ -56,7 +56,7 @@ you: "add X" -> plan[fuzzy] (read code, grill by default — references/fuzzy.md
 - `grill-me` is a skill reference, not a CLI. `references/fuzzy.md` loads `references/grilling.md` by default
 - `build` implements one unit per session, satisfies Done means + Verify (Verify must fail without outcome), checks box, commits, stops
 - `review` is adversarial — context-aware check of GH issue + spec vs implementation, then triages findings into lanes (see below)
-- GH issue is the queue: each unit is `## <outcome>` with `Done means:` and `Verify:` and status checkbox
+- GH issue is the queue: each unit is `## <outcome>` with `Done means:` and `Verify:` and status checkbox, plus optional `Read first:` / `Constraints:` (both unique/nonempty, omit rather than placeholder) and `Depends:`
 
 **Review triage — first matching rule wins:**
 Review's auto-loaded harness/system instructions, `AGENTS.md`, and review `SKILL.md` are a trusted bootstrap boundary. After activation, review reads only the remote GH issue before screening every additional local path—including a queue fallback, specs, decisions, tracked/untracked work, and later references. Unsafe paths stop review without a verdict.

@@ -54,7 +54,7 @@ const productTemplate = `# Product
 2. **Flow 2**: describe here
 `
 
-const glossaryTemplate = "# Glossary\n\nProject-wide ubiquitous language. Curated, optional but recommended.\n\n- **Spec**: A load-bearing contract in specs/<feature>/spec.md with SHALL/MUST and WHEN/THEN scenarios.\n- **Decision**: A durable ruling in specs/decisions/NNNN-slug.md with spine: true for load-bearing.\n- **Unit**: One demo-able outcome per labeled GH issue ## with Done means:, a Verify: that fails without the outcome, and a - [ ] checkbox. Offline, it lives in specs/queues/<name>.md.\n"
+const glossaryTemplate = "# Glossary\n\nProject-wide ubiquitous language. Curated, optional but recommended.\n\n- **Spec**: A load-bearing contract in specs/<feature>/spec.md with SHALL/MUST and WHEN/THEN scenarios.\n- **Decision**: A durable ruling in specs/decisions/NNNN-slug.md with spine: true for load-bearing.\n- **Unit**: One demo-able outcome per labeled GH issue ## with Done means:, a Verify: that fails without the outcome, and a - [ ] checkbox; optional Read first: (context) and Constraints: (boundaries, never an edit list). Offline, it lives in specs/queues/<name>.md.\n"
 
 func ListSpecs(root string) ([]SpecInfo, error) {
 	var result []SpecInfo

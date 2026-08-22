@@ -111,6 +111,86 @@ var lookPathBash = exec.LookPath
 var lookPathGh = exec.LookPath
 var queueBasePattern = regexp.MustCompile(`^[0-9a-fA-F]{40}([0-9a-fA-F]{24})?$`)
 var queueBranchPattern = regexp.MustCompile(`^litespec/[a-z0-9]+(?:-[a-z0-9]+)*$`)
+var vacuousVerifyPattern = regexp.MustCompile(`^(?:true|:|exit[ \t]+0)[ \t]*;?[ \t]*(?:#.*)?$`)
+
+func isObviouslyVacuous(command string) bool {
+	lines := strings.Split(command, "\n")
+	var meaningful []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if strings.HasPrefix(strings.TrimLeft(line, " \t"), "#") {
+			continue
+		}
+		meaningful = append(meaningful, trimmed)
+	}
+	if len(meaningful) == 0 {
+		return true
+	}
+	if len(meaningful) != 1 {
+		return false
+	}
+	return vacuousVerifyPattern.MatchString(meaningful[0])
+}
+
+var placeholderSet = map[string]bool{
+	"-": true, "--": true, "n/a": true, "na": true,
+	"none": true, "tbd": true, "todo": true, "null": true, "nil": true,
+}
+
+func isPlaceholderValue(s string) bool {
+	return placeholderSet[strings.ToLower(strings.TrimSpace(s))]
+}
+
+func hasBulletAfter(body []string, idx int) bool {
+	for j := idx + 1; j < len(body); j++ {
+		t := strings.TrimSpace(body[j])
+		if t == "" {
+			continue
+		}
+		if strings.HasPrefix(t, "```") {
+			break
+		}
+		if strings.HasPrefix(t, "Done means:") || strings.HasPrefix(t, "Verify:") || strings.HasPrefix(t, "Depends:") || strings.HasPrefix(t, "Read first:") || strings.HasPrefix(t, "Constraints:") || isCheckboxLine(t) {
+			break
+		}
+		if strings.HasPrefix(t, "- ") || strings.HasPrefix(t, "* ") {
+			return true
+		}
+		break
+	}
+	return false
+}
+
+func validateOptionalField(body []string, fieldName string, count int, idx int, rest string, source, heading string) []ValidationIssue {
+	if count > 1 {
+		return []ValidationIssue{{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: unit %q has duplicate %s: (only one allowed)", source, heading, fieldName),
+			File:     source,
+		}}
+	}
+	if count == 1 {
+		trimmed := strings.TrimSpace(rest)
+		if isPlaceholderValue(trimmed) {
+			return []ValidationIssue{{
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("%s: unit %q %s: must be nonempty — omit rather than placeholder %q", source, heading, fieldName, trimmed),
+				File:     source,
+			}}
+		}
+		if trimmed == "" && !hasBulletAfter(body, idx) {
+			return []ValidationIssue{{
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("%s: unit %q %s: must be nonempty — omit rather than placeholder", source, heading, fieldName),
+				File:     source,
+			}}
+		}
+	}
+	return nil
+}
 
 var ghIssueView = func(root string, number int) ([]byte, error) {
 	cmd := exec.Command("gh", "issue", "view", strconv.Itoa(number),
@@ -131,10 +211,19 @@ var ghIssueList = func(root string) ([]byte, error) {
 }
 
 func lintVerifyShell(block string, source string, unitHeading string) []ValidationIssue {
+	// Blank is "Verify block is empty" (existing contract, tested); isObviouslyVacuous handles comment-only and single true/: /exit 0.
 	if strings.TrimSpace(block) == "" {
 		return []ValidationIssue{{
 			Severity: SeverityError,
 			Message:  fmt.Sprintf("%s: unit %q Verify block is empty", source, unitHeading),
+			File:     source,
+		}}
+	}
+
+	if isObviouslyVacuous(block) {
+		return []ValidationIssue{{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: unit %q Verify command is obviously vacuous; assert the unit outcome", source, unitHeading),
 			File:     source,
 		}}
 	}
@@ -293,9 +382,16 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 		verifyFound := false
 		checkboxFound := false
 		inlineVerify := false
+		inlineVerifyContent := ""
 		hasFencedBlock := false
 		var verifyBlock string
 		inFencedBlock := false
+		constraintsCount := 0
+		readFirstCount := 0
+		constraintsIdx := -1
+		readFirstIdx := -1
+		constraintsRest := ""
+		readFirstRest := ""
 
 		for i, line := range unit.Body {
 			if strings.HasPrefix(strings.TrimSpace(line), "```") {
@@ -305,6 +401,21 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 			if inFencedBlock {
 				continue
 			}
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "Constraints:") {
+				constraintsCount++
+				if constraintsIdx == -1 {
+					constraintsIdx = i
+					constraintsRest = strings.TrimSpace(strings.TrimPrefix(trimmed, "Constraints:"))
+				}
+			}
+			if strings.HasPrefix(trimmed, "Read first:") {
+				readFirstCount++
+				if readFirstIdx == -1 {
+					readFirstIdx = i
+					readFirstRest = strings.TrimSpace(strings.TrimPrefix(trimmed, "Read first:"))
+				}
+			}
 			if strings.HasPrefix(line, "Done means:") {
 				doneFound = true
 			}
@@ -313,9 +424,12 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 				rest := strings.TrimSpace(line[len("Verify:"):])
 				firstBacktick := strings.Index(rest, "`")
 				lastBacktick := strings.LastIndex(rest, "`")
-				if firstBacktick >= 0 && lastBacktick > firstBacktick &&
-					strings.TrimSpace(rest[firstBacktick+1:lastBacktick]) != "" {
-					inlineVerify = true
+				if firstBacktick >= 0 && lastBacktick > firstBacktick {
+					span := strings.TrimSpace(rest[firstBacktick+1 : lastBacktick])
+					if span != "" {
+						inlineVerify = true
+						inlineVerifyContent = span
+					}
 				}
 				for j := i + 1; j < len(unit.Body); j++ {
 					if strings.HasPrefix(unit.Body[j], "```") {
@@ -339,6 +453,9 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 			}
 		}
 
+		issues = append(issues, validateOptionalField(unit.Body, "Constraints", constraintsCount, constraintsIdx, constraintsRest, source, unit.Heading)...)
+		issues = append(issues, validateOptionalField(unit.Body, "Read first", readFirstCount, readFirstIdx, readFirstRest, source, unit.Heading)...)
+
 		if !doneFound {
 			issues = append(issues, ValidationIssue{
 				Severity: SeverityError,
@@ -360,6 +477,14 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 			})
 		} else if hasFencedBlock {
 			issues = append(issues, lintVerifyShell(verifyBlock, source, unit.Heading)...)
+		} else if inlineVerify {
+			if isObviouslyVacuous(inlineVerifyContent) {
+				issues = append(issues, ValidationIssue{
+					Severity: SeverityError,
+					Message:  fmt.Sprintf("%s: unit %q Verify command is obviously vacuous; assert the unit outcome", source, unit.Heading),
+					File:     source,
+				})
+			}
 		}
 		if !checkboxFound {
 			issues = append(issues, ValidationIssue{

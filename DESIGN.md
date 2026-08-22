@@ -68,9 +68,14 @@ Review routing is ordered: suggestion; unit violation; in-scope finding outside 
 
 One unit = one thing you can demo + one `Verify:` that would fail if it's missing.
 
+Optional per-unit fields: `Read first:` (context, not scope — areas and rulings, not file lists) and `Constraints:` (boundaries — what must stay true or is out of bounds, never what to edit). Both are unique and nonempty when present; omit rather than placeholder. `Depends:` lists other unit headings. The worker owns the implementation path.
+
 In GH issue body — immutable `Base: <sha>` and `Branch: litespec/<change-name>` ownership lines above the units, then:
 ```markdown
 ## Show graph for 2 changes
+Read first: litespec view, specs/product.md
+Constraints: API remains backward compatible; no new config files
+Depends: Show graph for 1 change
 Done means: `litespec view` shows arrows between deps
 Verify: `go test ./...` and view output contains "->"
 - [ ] pending
