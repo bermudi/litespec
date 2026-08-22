@@ -83,23 +83,42 @@ After trusted bootstrap and skill activation, `litespec-review` SHALL read only 
 - **WHEN** review uses `specs/queues/<name>.md` instead of a remote GH issue
 - **THEN** it screens the queue path and every parent component before reading its Base, Branch, or units
 
+### Requirement: Red-Green Build Evidence
+
+For every unit, `litespec-build` SHALL run the exact `Verify:` command against a clean pre-outcome commit and require a non-zero exit attributable to the missing unit outcome before implementing it. If the verifier does not yet exist, build MAY create one verifier-only commit and use that clean commit for the pre run. A pre run that exits 0, or fails for an unrelated command, dependency, or environment error, SHALL stop the unit. Build SHALL then create exactly one implementation commit, require a clean tree, run the same command with exit status 0, and record both runs verbatim in one receipt. Neither recorded commit SHALL be amended. Invariant and hygiene commands MAY supplement Verify but MUST NOT replace a Verify that discriminates the unit outcome.
+
+#### Scenario: Existing verifier goes red then green
+
+- **WHEN** the exact Verify command already runs on the clean starting commit and fails because the unit outcome is absent
+- **THEN** build records that commit as pre, creates the implementation commit, and records the passing implementation commit as post
+
+#### Scenario: Unit introduces its verifier
+
+- **WHEN** the exact Verify command requires a verifier introduced by the unit
+- **THEN** build may commit only the verifier, require a meaningful red run at that commit, then create exactly one implementation commit and require a green run
+
+#### Scenario: Pre run is green or fails for the wrong reason
+
+- **WHEN** Verify exits 0 before implementation or exits non-zero because of an unrelated command, dependency, or environment failure
+- **THEN** build stops without implementing or checking the unit
+
 ### Requirement: Evidence Receipt Cross-Check
 
-For every checked unit, `litespec-review` SHALL verify that a complete evidence receipt exists (verbatim `Verify:` command, labeled `sha:`, labeled `exit status:`, nonempty fenced output, matching scope line), that the recorded command matches the unit's `Verify:` verbatim, that the recorded sha is an ancestor of `HEAD`, and that a re-run of the verify command at `HEAD` exits 0. The recorded sha SHALL be the implementation commit whose tree Verify ran against: `litespec-build` commits the implementation before running Verify and never amends that commit, so a sha equal to `Base:` (no implementation commit on the branch) or a sha whose tree lacks the unit outcome SHALL be a CRITICAL finding. A nonempty `Evidence:` label SHALL NOT satisfy. Missing receipt, edited command, or a re-run that no longer exits 0 SHALL be a CRITICAL finding that breaks that unit's contract.
+For every checked unit, `litespec-review` SHALL verify that a complete red-green evidence receipt exists for the unit's exact `Verify:` command and that its pre and post SHAs are distinct commits with pre an ancestor of post and post an ancestor of `HEAD`. Review SHALL run the exact command in detached temporary worktrees at pre and post, remove each temporary worktree even when Verify fails, and never check out an evidence SHA in the reviewer's current worktree. The pre run MUST exit non-zero because the unit outcome is absent; the post run and a further run at `HEAD` MUST exit 0 with the outcome present. A green pre run, an unrelated pre failure, a failed post or HEAD run, a missing or malformed receipt, or an edited command SHALL be a CRITICAL finding that breaks the unit's contract. Red-green evidence proves that Verify distinguishes the two recorded trees; it SHALL NOT by itself establish that Verify targets the correct behavior, which remains an adversarial review judgment.
 
-#### Scenario: Complete receipt and passing re-run
+#### Scenario: Reproducible red-green receipt
 
-- **WHEN** a checked unit has a complete receipt whose sha is the implementation commit (an ancestor of `HEAD`, distinct from `Base:`) and the verify command exits 0 at `HEAD`
+- **WHEN** a checked unit has a complete receipt whose exact Verify fails for the absent outcome at pre, passes with the outcome at post, and still passes at `HEAD`
 - **THEN** review does not report a receipt-contract finding for that unit
 
-#### Scenario: Sticker or failed re-run is critical
+#### Scenario: Green or irrelevant pre run is critical
 
-- **WHEN** a checked unit has only `Evidence: verified at abc123`, an edited command, a missing receipt, or a re-run that does not exit 0
-- **THEN** review reports a CRITICAL finding that breaks that unit's contract
+- **WHEN** Verify passes at pre or fails there because of an unrelated command, dependency, or environment error
+- **THEN** review reports a CRITICAL finding that the Verify does not provide meaningful negative evidence
 
-#### Scenario: Recorded sha is the base, not the implementation commit
+#### Scenario: Sticker or failed green re-run is critical
 
-- **WHEN** a checked unit's receipt records a sha equal to `Base:` (no implementation commit on the branch) or a sha whose tree lacks the unit outcome
+- **WHEN** a checked unit has only a prose sticker, an edited command, a missing receipt, or Verify fails at post or `HEAD`
 - **THEN** review reports a CRITICAL finding that breaks that unit's contract
 
 ### Requirement: Findings and Verdict
