@@ -806,11 +806,12 @@ func TestParseSemver_Valid(t *testing.T) {
 		{"v1.2.3-beta.1+build", 1, 2, 3},
 	}
 	for _, tt := range tests {
-		major, minor, patch, err := parseSemver(tt.input)
+		v, err := parseSemver(tt.input)
 		if err != nil {
 			t.Errorf("parseSemver(%q): %v", tt.input, err)
 			continue
 		}
+		major, minor, patch := v.major, v.minor, v.patch
 		if major != tt.majorExp || minor != tt.minorExp || patch != tt.patchExp {
 			t.Errorf("parseSemver(%q) = %d.%d.%d, want %d.%d.%d", tt.input, major, minor, patch, tt.majorExp, tt.minorExp, tt.patchExp)
 		}
@@ -820,7 +821,7 @@ func TestParseSemver_Valid(t *testing.T) {
 func TestParseSemver_Invalid(t *testing.T) {
 	tests := []string{"", "1", "1.2", "a.b.c", "v1.2.x"}
 	for _, input := range tests {
-		_, _, _, err := parseSemver(input)
+		_, err := parseSemver(input)
 		if err == nil {
 			t.Errorf("parseSemver(%q): expected error", input)
 		}
@@ -867,11 +868,15 @@ func TestGetModulePath(t *testing.T) {
 func TestFetchLatestVersion_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"tag_name": "v0.2.0"}`)
+		fmt.Fprintf(w, `[{"name": "v0.2.0"}]`)
 	}))
 	defer server.Close()
 
-	tag, err := fetchLatestVersionFromURL(server.URL)
+	tags, err := fetchTagNames(server.URL)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	tag, err := selectLatestStable(tags)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -886,7 +891,7 @@ func TestFetchLatestVersion_Non200(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := fetchLatestVersionFromURL(server.URL)
+	_, err := fetchTagNames(server.URL)
 	if err == nil {
 		t.Error("expected error for non-200 response")
 	}
@@ -899,7 +904,7 @@ func TestFetchLatestVersion_MalformedJSON(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := fetchLatestVersionFromURL(server.URL)
+	_, err := fetchTagNames(server.URL)
 	if err == nil {
 		t.Error("expected error for malformed JSON")
 	}
@@ -908,11 +913,15 @@ func TestFetchLatestVersion_MalformedJSON(t *testing.T) {
 func TestFetchLatestVersion_EmptyTag(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"tag_name": ""}`)
+		fmt.Fprintf(w, `[{"name": ""}]`)
 	}))
 	defer server.Close()
 
-	_, err := fetchLatestVersionFromURL(server.URL)
+	tags, err := fetchTagNames(server.URL)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = selectLatestStable(tags)
 	if err == nil {
 		t.Error("expected error for empty tag")
 	}

@@ -4,21 +4,21 @@
 
 ### Requirement: explicit upgrade command
 
-litespec SHALL provide an `upgrade` command that checks for the latest version and installs it via `go install` when the binary was installed via `go install`.
+litespec SHALL provide an `upgrade` command that checks for the latest stable version and installs it via `go install` when the binary was installed via `go install`. `upgrade` SHALL only consider stable tags (tags without a `-` prerelease suffix, e.g. `v0.20.2`); prerelease tags such as `v2.0.0-beta.2` SHALL be ignored.
 
 #### Scenario: upgrade available
 
-- **WHEN** the user runs `litespec upgrade` and the binary is in `$GOBIN` or `$GOPATH/bin` and a newer version exists on GitHub Releases
-- **THEN** litespec SHALL run `go install <module>@latest`, stream the output to the user, and print the new version
+- **WHEN** the user runs `litespec upgrade` and the binary is in `$GOBIN` or `$GOPATH/bin` and a newer stable version exists on GitHub
+- **THEN** litespec SHALL run `go install <module>@<latest stable tag>`, stream the output to the user, and print the new version
 
 #### Scenario: already up to date
 
-- **WHEN** the user runs `litespec upgrade` and the installed version matches the latest GitHub release
+- **WHEN** the user runs `litespec upgrade` and the installed version matches the latest stable tag
 - **THEN** litespec SHALL print "Already up to date" and exit without running `go install`
 
 #### Scenario: local version newer than remote
 
-- **WHEN** the user runs `litespec upgrade` and the local version is greater than the latest GitHub release
+- **WHEN** the user runs `litespec upgrade` and the local version is greater than or equal to the latest stable tag, or the local prerelease (e.g. `v2.0.0-beta.2`) is newer by major than the latest stable (`v0.20.2`)
 - **THEN** litespec SHALL treat the installation as up to date and exit without running `go install`
 
 #### Scenario: not installed via go install
@@ -33,7 +33,7 @@ litespec SHALL provide an `upgrade` command that checks for the latest version a
 
 #### Scenario: network error fetching latest version
 
-- **WHEN** the user runs `litespec upgrade` and the HTTP request to GitHub Releases API fails
+- **WHEN** the user runs `litespec upgrade` and the HTTP request to the GitHub Tags API fails
 - **THEN** litespec SHALL print an error describing the failure and exit with a non-zero status
 
 ### Requirement: go install detection
@@ -71,22 +71,37 @@ litespec SHALL derive its module path from `runtime/debug.ReadBuildInfo()` to co
 
 ### Requirement: version comparison
 
-litespec SHALL fetch the latest release tag from `api.github.com/repos/bermudi/litespec/releases/latest`, parse both the remote tag and the local `version` const as semver, and compare them to determine if an upgrade is available.
+litespec SHALL fetch the list of tags from `api.github.com/repos/bermudi/litespec/tags`, exclude prerelease tags (those containing `-` after the `v` prefix, e.g. `v2.0.0-beta.2`), parse the remaining stable tags and the local `version` const as semver including prerelease identifiers, and compare per semver precedence (a stable version is newer than its prerelease; a higher major wins across lines) to determine if an upgrade is available.
 
-#### Scenario: newer version on remote
+#### Scenario: newer stable version on remote
 
-- **WHEN** the remote semver is greater than the local version const
+- **WHEN** the latest stable semver is greater than the local version const
 - **THEN** litespec SHALL proceed with `go install`
 
 #### Scenario: equal versions
 
-- **WHEN** the remote semver equals the local version const
+- **WHEN** the latest stable semver equals the local version const
 - **THEN** litespec SHALL report that the installation is already up to date
 
 #### Scenario: local version greater than remote
 
-- **WHEN** the local semver is greater than the remote semver
+- **WHEN** the local semver is greater than the latest stable semver
 - **THEN** litespec SHALL report that the installation is already up to date
+
+#### Scenario: prerelease tags are ignored
+
+- **WHEN** the tag list contains `v2.0.0-beta.4` alongside `v0.20.2`
+- **THEN** `upgrade` SHALL consider only `v0.20.2` as the latest stable and ignore the beta
+
+#### Scenario: prerelease local versus stable remote
+
+- **WHEN** the local version is `v2.0.0-beta.2` and the latest stable is `v0.20.2` (lower major)
+- **THEN** the local version is considered newer, so `upgrade` reports already up to date
+
+#### Scenario: prerelease local versus its stable
+
+- **WHEN** the local version is `v2.0.0-beta.2` and the latest stable is `v2.0.0`
+- **THEN** the stable is newer, so `upgrade` proceeds with `go install`
 
 ### Requirement: post-upgrade hint
 
@@ -103,8 +118,8 @@ litespec SHALL perform a silent background `go install` at most once every 7 day
 
 #### Scenario: check interval elapsed
 
-- **WHEN** the timestamp file in `os.UserCacheDir()/litespec/last-update-check` has an mtime older than 7 days and the binary is a `go install` installation
-- **THEN** litespec SHALL start `go install <module>@latest` as a background process via `cmd.Start()`, suppress all output, update the timestamp file, and continue normal command execution without blocking
+- **WHEN** the timestamp file in `os.UserCacheDir()/litespec/last-update-check` has an mtime older than 7 days and the binary is a `go install` installation and the latest stable tag is newer than the local version
+- **THEN** litespec SHALL start `go install <module>@<latest stable tag>` as a background process via `cmd.Start()`, suppress all output, update the timestamp file, and continue normal command execution without blocking
 
 #### Scenario: check interval not elapsed
 

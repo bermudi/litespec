@@ -178,51 +178,94 @@ func getModulePath() (string, error) {
 	return info.Main.Path, nil
 }
 
-type githubRelease struct {
-	TagName string `json:"tag_name"`
+type semver struct {
+	major      int
+	minor      int
+	patch      int
+	prerelease string
+}
+
+type githubTag struct {
+	Name string `json:"name"`
 }
 
 func fetchLatestVersion() (string, error) {
-	return fetchLatestVersionFromURL("https://api.github.com/repos/bermudi/litespec/releases/latest")
+	tags, err := fetchTagNames("https://api.github.com/repos/bermudi/litespec/tags")
+	if err != nil {
+		return "", err
+	}
+	return selectLatestStable(tags)
 }
 
-func fetchLatestVersionFromURL(url string) (string, error) {
+func fetchTagNames(url string) ([]string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", fmt.Errorf("failed to check for updates: %w", err)
+		return nil, fmt.Errorf("failed to check for updates: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to check for updates: HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("failed to check for updates: HTTP %d", resp.StatusCode)
 	}
 
-	var release githubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return "", fmt.Errorf("failed to parse release info: %w", err)
+	var tags []githubTag
+	if err := json.NewDecoder(resp.Body).Decode(&tags); err != nil {
+		return nil, fmt.Errorf("failed to parse tag info: %w", err)
 	}
-	if release.TagName == "" {
-		return "", fmt.Errorf("release tag not found in response")
+	names := make([]string, 0, len(tags))
+	for _, t := range tags {
+		if t.Name != "" {
+			names = append(names, t.Name)
+		}
 	}
-	return release.TagName, nil
+	return names, nil
 }
 
-func parseSemver(tag string) (int, int, int, error) {
-	tag = strings.TrimPrefix(tag, "v")
-	parts := strings.SplitN(tag, ".", 3)
+func isPrerelease(tag string) bool {
+	v := strings.TrimPrefix(tag, "v")
+	return strings.Contains(v, "-")
+}
+
+func selectLatestStable(tags []string) (string, error) {
+	best := ""
+	var bestV semver
+	for _, t := range tags {
+		if isPrerelease(t) {
+			continue
+		}
+		v, err := parseSemver(t)
+		if err != nil {
+			continue
+		}
+		if best == "" || compareSemverVersions(v, bestV) > 0 {
+			best = t
+			bestV = v
+		}
+	}
+	if best == "" {
+		return "", fmt.Errorf("no stable release tag found")
+	}
+	return best, nil
+}
+
+func parseSemver(tag string) (semver, error) {
+	raw := strings.TrimPrefix(tag, "v")
+	parts := strings.SplitN(raw, ".", 3)
 	if len(parts) != 3 {
-		return 0, 0, 0, fmt.Errorf("invalid semver: %q", tag)
+		return semver{}, fmt.Errorf("invalid semver: %q", tag)
 	}
 	major, err := strconv.Atoi(parts[0])
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("invalid semver major: %q", parts[0])
+		return semver{}, fmt.Errorf("invalid semver major: %q", parts[0])
 	}
 	minor, err := strconv.Atoi(parts[1])
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("invalid semver minor: %q", parts[1])
+		return semver{}, fmt.Errorf("invalid semver minor: %q", parts[1])
 	}
 	patchStr := parts[2]
+	prerelease := ""
 	if idx := strings.IndexByte(patchStr, '-'); idx >= 0 {
+		prerelease = patchStr[idx+1:]
 		patchStr = patchStr[:idx]
 	}
 	if idx := strings.IndexByte(patchStr, '+'); idx >= 0 {
@@ -230,34 +273,90 @@ func parseSemver(tag string) (int, int, int, error) {
 	}
 	patch, err := strconv.Atoi(patchStr)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("invalid semver patch: %q", parts[2])
+		return semver{}, fmt.Errorf("invalid semver patch: %q", parts[2])
 	}
-	return major, minor, patch, nil
+	return semver{major, minor, patch, prerelease}, nil
 }
 
 func compareSemver(local, remote string) (int, error) {
-	lm, ln, lp, err := parseSemver(local)
+	ls, err := parseSemver(local)
 	if err != nil {
 		return 0, err
 	}
-	rm, rn, rp, err := parseSemver(remote)
+	rs, err := parseSemver(remote)
 	if err != nil {
 		return 0, err
+	}
+	return compareSemverVersions(ls, rs), nil
+}
+
+func compareSemverVersions(a, b semver) int {
+	switch {
+	case a.major != b.major:
+		if a.major > b.major {
+			return 1
+		}
+		return -1
+	case a.minor != b.minor:
+		if a.minor > b.minor {
+			return 1
+		}
+		return -1
+	case a.patch != b.patch:
+		if a.patch > b.patch {
+			return 1
+		}
+		return -1
 	}
 	switch {
-	case lm > rm:
-		return 1, nil
-	case lm < rm:
-		return -1, nil
-	case ln > rn:
-		return 1, nil
-	case ln < rn:
-		return -1, nil
-	case lp > rp:
-		return 1, nil
-	case lp < rp:
-		return -1, nil
+	case a.prerelease == "" && b.prerelease == "":
+		return 0
+	case a.prerelease == "":
+		return 1
+	case b.prerelease == "":
+		return -1
 	default:
-		return 0, nil
+		return comparePrerelease(a.prerelease, b.prerelease)
 	}
+}
+
+func comparePrerelease(a, b string) int {
+	as := strings.Split(a, ".")
+	bs := strings.Split(b, ".")
+	n := len(as)
+	if len(bs) < n {
+		n = len(bs)
+	}
+	for i := 0; i < n; i++ {
+		ai, errA := strconv.Atoi(as[i])
+		bi, errB := strconv.Atoi(bs[i])
+		if errA == nil && errB == nil {
+			if ai != bi {
+				if ai > bi {
+					return 1
+				}
+				return -1
+			}
+			continue
+		}
+		if errA == nil && errB != nil {
+			return -1
+		}
+		if errA != nil && errB == nil {
+			return 1
+		}
+		if as[i] != bs[i] {
+			if as[i] > bs[i] {
+				return 1
+			}
+			return -1
+		}
+	}
+	if len(as) != len(bs) {
+		if len(as) > len(bs) {
+			return 1
+		}
+		return -1
+	}
+	return 0
 }
