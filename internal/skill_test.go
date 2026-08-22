@@ -387,6 +387,21 @@ func TestGeneratedSkillsUseRedGreenEvidence(t *testing.T) {
 			}
 		}
 	}
+	requireOrdered := func(name, content string, phrases ...string) {
+		t.Helper()
+		previous := -1
+		for _, phrase := range phrases {
+			index := strings.Index(content, phrase)
+			if index == -1 {
+				t.Errorf("%s missing %q", name, phrase)
+				continue
+			}
+			if index <= previous {
+				t.Errorf("%s has %q out of order", name, phrase)
+			}
+			previous = index
+		}
+	}
 	requirePolicy := func(name, content string) {
 		t.Helper()
 		requireContains(name, content,
@@ -419,8 +434,19 @@ func TestGeneratedSkillsUseRedGreenEvidence(t *testing.T) {
 	)
 	requirePolicy(t.Name()+"/build", build)
 
+	reviewFixing := readFile(filepath.Join(root, SkillsDir, "litespec-build", "references", "review-fixing.md"))
+	requireOrdered(t.Name()+"/review-fixing", reviewFixing,
+		"Establish and record a clean pre commit where the exact `Verify:` fails because the fix is absent.",
+		"Only after recording that pre run, create one or more implementation/fix commits.",
+	)
+	requireContains(t.Name()+"/review-fixing", reviewFixing,
+		"Post a fresh evidence receipt and re-check only the affected unit in the GH issue or local queue.",
+		"Do not reshape the unit contract",
+	)
+
 	review := readFile(filepath.Join(root, SkillsDir, "litespec-review", "SKILL.md"))
 	requireContains(t.Name()+"/review", review,
+		"After that initial body-only safety step, fetch and inspect the issue comments",
 		"pre is an ancestor of post and post is an ancestor of `HEAD`",
 		"detached temporary Git worktree at pre",
 		"detached temporary Git worktree at post",
@@ -446,6 +472,12 @@ func TestGeneratedSkillsUseRedGreenEvidence(t *testing.T) {
 			"does not prove",
 		)
 	}
+
+	reviewSpec := readFile("../specs/review/spec.md")
+	requireContains("../specs/review/spec.md", reviewSpec,
+		"its own detached temporary worktree at `HEAD`",
+		"cleanup SHALL remove the `HEAD` worktree even when Verify fails",
+	)
 
 	for _, path := range []string{
 		"../AGENTS.md",
