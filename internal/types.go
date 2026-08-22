@@ -13,10 +13,11 @@ type Scenario struct {
 }
 
 type ValidationIssue struct {
-	Severity     Severity
-	Message      string
-	File         string
-	StrictExempt bool
+	Severity       Severity
+	Message        string
+	File           string
+	StrictExempt   bool
+	queueUnitIndex int
 }
 
 type ValidationResult struct {

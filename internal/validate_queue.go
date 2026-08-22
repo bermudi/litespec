@@ -577,8 +577,8 @@ func commentNamesUnit(comment, heading string) bool {
 
 func applyQueueIssues(result *ValidationResult, units []queueUnit, unitIssues []ValidationIssue, comments []string) {
 	usedComments := make(map[int]bool)
-	commentEvidence := make(map[string]bool)
-	for _, unit := range units {
+	commentEvidence := make(map[int]bool)
+	for unitIndex, unit := range units {
 		if !isCheckedUnit(unit.Body) {
 			continue
 		}
@@ -590,22 +590,12 @@ func applyQueueIssues(result *ValidationResult, units []queueUnit, unitIssues []
 			continue
 		}
 		usedComments[commentIndex] = true
-		commentEvidence[unit.Heading] = true
+		commentEvidence[unitIndex] = true
 	}
 
 	for _, iss := range unitIssues {
-		if strings.Contains(iss.Message, "Evidence receipt") && len(comments) > 0 {
-			skipped := false
-			for _, u := range units {
-				unitMessage := fmt.Sprintf("checked unit %q", u.Heading)
-				if strings.Contains(iss.Message, unitMessage) && commentEvidence[u.Heading] {
-					skipped = true
-					break
-				}
-			}
-			if skipped {
-				continue
-			}
+		if strings.Contains(iss.Message, "Evidence receipt") && commentEvidence[iss.queueUnitIndex] {
+			continue
 		}
 		if iss.Severity == SeverityWarning {
 			result.Warnings = append(result.Warnings, iss)
@@ -804,7 +794,7 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 	}
 	issues := validateQueueOwnership(body, source)
 
-	for _, unit := range units {
+	for unitIndex, unit := range units {
 		if strings.TrimSpace(unit.Heading) == "" {
 			issues = append(issues, ValidationIssue{
 				Severity: SeverityError,
@@ -925,7 +915,11 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 				File:     source,
 			})
 		}
-		issues = append(issues, validateCheckedUnitEvidence(unit, source)...)
+		evidenceIssues := validateCheckedUnitEvidence(unit, source)
+		for i := range evidenceIssues {
+			evidenceIssues[i].queueUnitIndex = unitIndex
+		}
+		issues = append(issues, evidenceIssues...)
 	}
 
 	headings := make(map[string]bool, len(units))
