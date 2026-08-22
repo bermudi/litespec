@@ -551,11 +551,30 @@ func matchingEvidenceComment(heading, verifyCmd string, comments []string, used 
 		if !commentNamesUnit(c, heading) {
 			continue
 		}
-		if len(evidenceReceiptIssues(c, verifyCmd, "comment", heading)) == 0 {
+		evidenceText := c
+		if afterHeading, ok := commentTextAfterUnitHeading(c, heading); ok {
+			evidenceText = afterHeading
+		}
+		if len(evidenceReceiptIssues(evidenceText, verifyCmd, "comment", heading)) == 0 {
 			return i, true
 		}
 	}
 	return 0, false
+}
+
+func commentTextAfterUnitHeading(comment, heading string) (string, bool) {
+	lines := strings.Split(strings.ReplaceAll(comment, "\r\n", "\n"), "\n")
+	openFence := ""
+	for i, line := range lines {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if trimmed == heading || trimmed == "## "+heading {
+			return strings.Join(lines[i+1:], "\n"), true
+		}
+	}
+	return "", false
 }
 
 func commentNamesUnit(comment, heading string) bool {
