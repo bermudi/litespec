@@ -49,6 +49,26 @@ func TestGeneratedReviewRoutesRebuildRequests(t *testing.T) {
 			}
 		}
 	}
+	for _, required := range []string{
+		"post exactly one separate comment",
+		"Unit occurrence: <positive 1-based occurrence>",
+		"Unit heading: <exact heading>",
+		"body to be byte-for-byte unchanged",
+		"create a separate clean routing metadata commit",
+	} {
+		if !strings.Contains(string(review), required) {
+			t.Errorf("review missing append-only routing rule %q", required)
+		}
+	}
+	for _, required := range []string{
+		"checked unit is also selectable when its latest request state is unresolved",
+		"One later complete receipt resolves all earlier requests for that identity",
+		"leave the issue body and prior comments unchanged",
+	} {
+		if !strings.Contains(string(build), required) {
+			t.Errorf("build missing request-selection rule %q", required)
+		}
+	}
 
 	var fixture rebuildRoutingFixture
 	data, err := os.ReadFile("testdata/rebuild-routing/github.json")
@@ -101,6 +121,21 @@ func TestGeneratedReviewRoutesRebuildRequests(t *testing.T) {
 		t.Errorf("selection errors = %d, want %d: %v", len(selectionErrors), fixture.Errors, selectionErrors)
 	}
 
+	const queueBody = "Base: 1111111111111111111111111111111111111111\n" +
+		"Branch: litespec/rebuild-fixture\n\n" +
+		"## Duplicate\nDone means: outcome\nVerify: `go test ./...`\n- [x] done\n"
+	receiptUnits, receiptIssues := ValidateQueueBody(queueBody, "fixture")
+	receiptResult := &ValidationResult{Valid: true}
+	applyQueueIssues(
+		receiptResult,
+		receiptUnits,
+		receiptIssues,
+		[]string{fixtureEvidenceComment(queueUnitIdentity{Occurrence: 1, Heading: "Duplicate"}, true)},
+	)
+	if len(receiptResult.Errors) != 0 {
+		t.Errorf("identity-bearing receipt did not satisfy queue validation: %v", receiptResult.Errors)
+	}
+
 	local, err := os.ReadFile("testdata/rebuild-routing/local.md")
 	if err != nil {
 		t.Fatalf("read local fixture: %v", err)
@@ -123,7 +158,7 @@ func TestGeneratedReviewRoutesRebuildRequests(t *testing.T) {
 	if !strings.Contains(updated, "old receipt remains byte-for-byte\n- [x] done") {
 		t.Error("local routing changed prior evidence or unaffected checked status")
 	}
-	if strings.Count(updated, "- [ ] pending rebuild") != 2 || strings.Count(updated, "- [x] done") != 2 {
+	if strings.Count(updated, "- [ ] done") != 2 || strings.Count(updated, "- [x] done") != 2 {
 		t.Errorf("local routing changed the wrong statuses:\n%s", updated)
 	}
 

@@ -87,7 +87,7 @@ The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec
 
 ### Requirement: Checked Unit Evidence Receipt
 
-When a unit checkbox is checked, `litespec validate` SHALL require one verbatim red-green evidence receipt for that unit. A complete receipt MUST contain, in order: the unit's `Verify:` command quoted verbatim; `pre sha:` with a full 40- or 64-character hexadecimal commit ID; `pre exit status:` with a non-zero integer; a nonempty fenced block containing raw pre output or literal `<no output>`; `Pre-evidence scope: this command exited <status> at <sha>; nothing else is inferred.` matching the pre fields; `post sha:` with a full commit ID; `post exit status: 0`; a nonempty fenced block containing raw post output or literal `<no output>`; and `Post-evidence scope: this command exited 0 at <sha>; nothing else is inferred.` matching the post fields. The pre and post SHAs MUST differ. Unchecked units SHALL NOT require a receipt. Local queues and issue-body receipts SHALL live in an `Evidence:` block after `Verify:` and before the checkbox. On a GitHub issue, a comment that names the unit heading and carries a complete receipt SHALL satisfy the check. A green-only legacy receipt, nonempty `Evidence:` label, or comment that only mentions `Evidence:` SHALL NOT satisfy. Validate SHALL check receipt structure only; it MUST NOT execute the recorded command, inspect Git ancestry, or interpret either fenced output.
+When a unit checkbox is checked, `litespec validate` SHALL require one verbatim red-green evidence receipt for that unit. A complete receipt MUST contain, in order: the unit's `Verify:` command quoted verbatim; `pre sha:` with a full 40- or 64-character hexadecimal commit ID; `pre exit status:` with a non-zero integer; a nonempty fenced block containing raw pre output or literal `<no output>`; `Pre-evidence scope: this command exited <status> at <sha>; nothing else is inferred.` matching the pre fields; `post sha:` with a full commit ID; `post exit status: 0`; a nonempty fenced block containing raw post output or literal `<no output>`; and `Post-evidence scope: this command exited 0 at <sha>; nothing else is inferred.` matching the post fields. The pre and post SHAs MUST differ. Unchecked units SHALL NOT require a receipt. Local queues and issue-body receipts SHALL live in an `Evidence:` block after `Verify:` and before the checkbox. On a GitHub issue, either a comment that names the unit heading or an identity-bearing comment with the unit's exact heading and positive 1-based same-heading occurrence SHALL satisfy the check when it carries a complete receipt. A green-only legacy receipt, nonempty `Evidence:` label, or comment that only mentions `Evidence:` SHALL NOT satisfy. Validate SHALL check receipt structure only; it MUST NOT execute the recorded command, inspect Git ancestry, or interpret either fenced output.
 
 #### Scenario: Unchecked unit without receipt passes
 
@@ -114,6 +114,11 @@ When a unit checkbox is checked, `litespec validate` SHALL require one verbatim 
 - **WHEN** a checked GH issue unit has no body receipt and a comment that names the heading and carries a complete red-green receipt
 - **THEN** validation succeeds for that unit
 
+#### Scenario: Identity-bearing rebuild receipt passes
+
+- **WHEN** a checked GH issue unit has no body receipt and a comment carries its exact heading, positive same-heading occurrence, and a complete red-green receipt
+- **THEN** validation associates the receipt with that exact unit, including when another unit has the same heading
+
 #### Scenario: Edited command, same sha, or empty fence fails
 
 - **WHEN** a checked unit receipt omits or edits Verify, records the same pre and post SHA, or includes an empty pre or post fence
@@ -133,6 +138,20 @@ When a unit checkbox is checked, `litespec validate` SHALL require one verbatim 
 
 - **WHEN** a checked unit carries the former single-sha, single-status receipt shape without pre evidence
 - **THEN** validation reports an incomplete red-green receipt
+
+### Requirement: GitHub Rebuild Request State
+
+`litespec validate` SHALL associate each structured GitHub rebuild request with exactly one unit by exact heading and positive 1-based occurrence among units with that heading. A later complete identity-bearing evidence receipt SHALL resolve every earlier request for that identity. An unresolved request, malformed request, malformed identity-bearing receipt, or identity that does not identify exactly one queue unit MUST produce a validation error.
+
+#### Scenario: Later receipt resolves repeated requests
+
+- **WHEN** two rebuild requests name the same unit identity and a later complete receipt names that identity
+- **THEN** both requests are resolved
+
+#### Scenario: Ambiguous rebuild metadata fails
+
+- **WHEN** rebuild metadata is malformed or its heading and occurrence do not identify exactly one unit
+- **THEN** validation reports an error rather than guessing
 
 ### Requirement: Queue Unit Depends Validation
 

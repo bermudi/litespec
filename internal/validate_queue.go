@@ -597,6 +597,7 @@ func commentNamesUnit(comment, heading string) bool {
 func applyQueueIssues(result *ValidationResult, units []queueUnit, unitIssues []ValidationIssue, comments []string) {
 	usedComments := make(map[int]bool)
 	commentEvidence := make(map[int]bool)
+	identities := queueUnitIdentities(units)
 	for unitIndex, unit := range units {
 		if !isCheckedUnit(unit.Body) {
 			continue
@@ -604,7 +605,13 @@ func applyQueueIssues(result *ValidationResult, units []queueUnit, unitIssues []
 		if len(validateCheckedUnitEvidence(unit, "queue")) == 0 {
 			continue
 		}
-		commentIndex, ok := matchingEvidenceComment(unit.Heading, unitVerifyCommand(unit.Body), comments, usedComments)
+		commentIndex, ok := matchingEvidenceCommentForUnit(
+			identities[unitIndex],
+			unit,
+			units,
+			comments,
+			usedComments,
+		)
 		if !ok {
 			continue
 		}
@@ -622,6 +629,45 @@ func applyQueueIssues(result *ValidationResult, units []queueUnit, unitIssues []
 			result.Errors = append(result.Errors, iss)
 		}
 	}
+
+	unresolved, requestErrors := unresolvedRebuildRequests(units, comments)
+	for _, err := range requestErrors {
+		result.Errors = append(result.Errors, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("GitHub rebuild routing: %v", err),
+			File:     "GitHub comments",
+		})
+	}
+	for _, identity := range unresolved {
+		result.Errors = append(result.Errors, ValidationIssue{
+			Severity: SeverityError,
+			Message: fmt.Sprintf(
+				"GitHub unit occurrence %d with heading %q has an unresolved rebuild request",
+				identity.Occurrence,
+				identity.Heading,
+			),
+			File: "GitHub comments",
+		})
+	}
+}
+
+func matchingEvidenceCommentForUnit(
+	identity queueUnitIdentity,
+	unit queueUnit,
+	units []queueUnit,
+	comments []string,
+	used map[int]bool,
+) (int, bool) {
+	for i, comment := range comments {
+		if used[i] {
+			continue
+		}
+		commentIdentity, kind, err := parseRebuildComment(comment, units)
+		if err == nil && kind == rebuildCommentEvidence && commentIdentity == identity {
+			return i, true
+		}
+	}
+	return matchingEvidenceComment(unit.Heading, unitVerifyCommand(unit.Body), comments, used)
 }
 
 var ghIssueView = func(root string, number int) ([]byte, error) {

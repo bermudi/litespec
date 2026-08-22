@@ -11,6 +11,7 @@
     {"kind": "request", "occurrence": 1, "heading": "Duplicate"},
     {"kind": "evidence", "occurrence": 1, "heading": "Duplicate"},
     {"kind": "malformed", "body": "Rebuild request:\nUnit occurrence: nope\nUnit heading: Duplicate"},
+    {"kind": "malformed", "body": "Rebuild request\nUnit occurrence: 2\nUnit heading: Duplicate"},
     {"kind": "request", "occurrence": 3, "heading": "Duplicate"},
     {"kind": "evidence", "occurrence": 1, "heading": "Unaffected", "complete": false}
   ],
@@ -21,5 +22,5 @@
     {"occurrence": 2, "heading": "Duplicate"},
     {"occurrence": 1, "heading": "Pending"}
   ],
-  "errors": 3
+  "errors": 4
 }

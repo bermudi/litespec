@@ -86,7 +86,7 @@ Everything else **routes without affecting the verdict**: SUGGESTIONs anywhere, 
 You report findings — you do not fix them. Route in this order; the first matching rule wins:
 
 1. **SUGGESTION** → non-blocking small fix lane, user's discretion.
-2. **CRITICAL or WARNING that breaks a unit's `Done means:` or `Verify:`** → blocking rebuild. Name the unit. Review reopens it using the procedure below, then routes it to `litespec-build`; WARNINGs route here too.
+2. **CRITICAL or WARNING that breaks a unit's `Done means:` or `Verify:`** → blocking rebuild. Name the unit. Review records queue-specific rebuild routing using the procedure below, then routes it to `litespec-build`; WARNINGs route here too.
 3. **CRITICAL or WARNING inside review scope, outside every unit** → blocking issue-owned fix:
    - trivial → direct fix on the issue branch;
    - non-trivial but correctly shaped → draft and append a new unchecked unit to the parent queue, then build it on the same branch;
@@ -99,22 +99,28 @@ You report findings — you do not fix them. Route in this order; the first matc
 
 If a finding needs a decision, report `needs decision: <question>` before applying the matching route. A decision does not change whether the finding blocks.
 
-### Reopen blocking rebuild units
+### Route blocking rebuild units
 
-After classification, collect every checked unit routed by rule 2, deduplicated by its exact heading. Before returning `CHANGES REQUESTED`, change only each affected `- [x]` status to `- [ ]` and preserve all prior evidence and every unaffected unit. Never reopen a unit for a SUGGESTION, DISPUTED finding, finding outside that unit's contract, or any route other than rule 2.
+After classification, collect every checked unit routed by rule 2, deduplicated by identity: its exact heading plus its positive 1-based occurrence among units with that exact heading. Preserve prior evidence and every unaffected unit. Never create rebuild routing for a SUGGESTION, DISPUTED finding, finding outside that unit's contract, or any route other than rule 2.
 
-- **GitHub queue:** Fetch the current issue body into a temporary file, change only the affected status lines under their exact headings, and edit the issue body remotely with `gh issue edit --body-file`. Fetch the body again and verify every affected heading is unchecked while every unaffected status and all evidence remain unchanged. Always remove the temporary file.
-- **Local queue:** Before editing, require `git status --porcelain` to print nothing. Change only the affected status lines, inspect the queue-file diff to confirm evidence and unaffected units are unchanged, then stage only that queue file and create a separate routing metadata commit named `review: reopen units for blocking rebuild`. Require `git status --porcelain` to print nothing afterward so the next build starts clean.
+- **GitHub queue:** Fetch and retain the current issue body without modifying it. For each affected identity, post exactly one separate comment with `gh issue comment --body-file` using this exact three-line form:
+  ```text
+  Rebuild request:
+  Unit occurrence: <positive 1-based occurrence>
+  Unit heading: <exact heading>
+  ```
+  Fetch the issue again. Require the body to be byte-for-byte unchanged and verify one new exact comment exists per affected identity. Never use `gh issue edit` for rule-2 routing. If duplicate headings or malformed existing request/evidence comments make an identity ambiguous, stop with a visible boundary failure instead of guessing.
+- **Local queue:** Before editing, require `git status --porcelain` to print nothing. Change only each affected status line from checked to unchecked, inspect the queue-file diff to confirm evidence and unaffected units are unchanged, then stage only that queue file and create a separate clean routing metadata commit named `review: route units for blocking rebuild`. Require `git status --porcelain` to print nothing afterward so the next build starts clean.
 
-If either mutation or verification fails, report the boundary failure and keep `CHANGES REQUESTED`, but do not claim the unit is reopened or that build is ready. Review never checks a unit, removes evidence, or implements the fix. These checked-to-unchecked transitions are routing metadata, not implementation.
+If comment posting, local mutation, commit, or verification fails, report the boundary failure and keep `CHANGES REQUESTED`, but do not claim the rebuild is ready. Review never checks a unit, removes evidence, edits a GitHub issue body for rule 2, or implements the fix. Rebuild requests and local checked-to-unchecked transitions are routing metadata, not implementation.
 
-**PASS** — every unit checkbox is checked and no blocking finding remains. Routed findings may accompany it.
+**PASS** — every unit checkbox is checked, every rebuild request is resolved by a later complete identity-matched evidence receipt, and no blocking finding remains. Routed findings may accompany it.
 
 **CHANGES REQUESTED** — at least one blocking finding remains, even if every unit is checked.
 
-Appending a unit to the parent queue and reopening rule-2 units are the only permitted routing mutations; do not change source, specs, decisions, existing unit contracts, evidence, or unaffected checkboxes. Write `## <outcome>`, `Done means:`, `Verify:`, and `Depends:` if needed. Do not invent units for trivial findings.
+Appending a unit to the parent queue and recording rule-2 rebuild routing are the only permitted routing mutations; do not change source, specs, decisions, existing unit contracts, evidence, or unaffected checkboxes. Write `## <outcome>`, `Done means:`, `Verify:`, and `Depends:` if needed. Do not invent units for trivial findings.
 
-The issue closes only when every unit checkbox is checked **and** review returns `PASS`. Routed non-blocking findings never block closure.
+The issue closes only when every unit checkbox is checked, no rebuild request is unresolved, **and** review returns `PASS`. Routed non-blocking findings never block closure.
 
 ---
 

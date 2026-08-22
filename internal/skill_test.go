@@ -440,7 +440,7 @@ func TestGeneratedSkillsUseRedGreenEvidence(t *testing.T) {
 		"Only after recording that pre run, create one or more implementation/fix commits.",
 	)
 	requireContains(t.Name()+"/review-fixing", reviewFixing,
-		"Post a fresh evidence receipt and re-check only the affected unit in the GH issue or local queue.",
+		"post a fresh evidence receipt with the GitHub request identity, or re-check only the affected local unit",
 		"Do not reshape the unit contract",
 	)
 
@@ -490,62 +490,5 @@ func TestGeneratedSkillsUseRedGreenEvidence(t *testing.T) {
 	} {
 		content := readFile(path)
 		requirePolicy(path, content)
-	}
-}
-
-func TestGeneratedReviewReopensUnits(t *testing.T) {
-	root := t.TempDir()
-	if err := GenerateSkills(root); err != nil {
-		t.Fatalf("GenerateSkills: %v", err)
-	}
-
-	readSkill := func(name string) string {
-		t.Helper()
-		path := filepath.Join(root, SkillsDir, name, "SKILL.md")
-		data, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatalf("read %s: %v", path, err)
-		}
-		return string(data)
-	}
-	requireContains := func(name, content string, phrases ...string) {
-		t.Helper()
-		for _, phrase := range phrases {
-			if !strings.Contains(content, phrase) {
-				t.Errorf("%s missing %q", name, phrase)
-			}
-		}
-	}
-
-	review := readSkill("litespec-review")
-	requireContains("review", review,
-		"every checked unit routed by rule 2",
-		"change only each affected `- [x]` status to `- [ ]`",
-		"preserve all prior evidence and every unaffected unit",
-		"edit the issue body remotely",
-		"verify every affected heading is unchecked",
-		"create a separate routing metadata commit",
-		"require `git status --porcelain` to print nothing",
-		"report the boundary failure",
-	)
-
-	build := readSkill("litespec-build")
-	requireContains("build", build,
-		"unit's box was unchecked by review",
-		"Do not ask the user to uncheck it.",
-	)
-
-	for name, content := range map[string]string{
-		"review": review,
-		"build":  build,
-	} {
-		for _, stale := range []string{
-			"The user unchecks it",
-			"unchecked by the user",
-		} {
-			if strings.Contains(content, stale) {
-				t.Errorf("%s still asks for manual reopening with %q", name, stale)
-			}
-		}
 	}
 }

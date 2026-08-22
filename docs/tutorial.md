@@ -223,13 +223,13 @@ Red-green evidence distinguishes the recorded trees; it does not prove that Veri
 Routing is ordered:
 
 1. Suggestions are non-blocking.
-2. Unit violations, including WARNINGs, reopen that unit for `litespec-build`.
+2. Unit violations, including WARNINGs, route that unit to `litespec-build`. GitHub review posts one append-only rebuild request carrying the exact heading and its same-heading occurrence; local review unchecks only the affected unit in a clean metadata commit.
 3. CRITICAL/WARNING findings inside issue scope but outside units block as a direct fix or a new unit on this issue.
 4. Findings outside issue scope route without blocking; non-trivial work gets its own later `plan[clear]` and branch.
 
 ## Close the issue
 
-When every unit is checked and review returns `PASS`, close the GH issue:
+When every unit is checked, every rebuild request has later complete evidence for the same identity, and review returns `PASS`, close the GH issue:
 
 ```bash
 gh issue close 42
