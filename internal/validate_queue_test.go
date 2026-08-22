@@ -14,6 +14,7 @@ func ownedQueue(body string) string {
 }
 
 const evidenceTestSHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+const evidencePostTestSHA = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
 func evidenceReceipt(verifyCmd string) string {
 	return "Evidence:\n" +
@@ -592,6 +593,132 @@ func containsIssue(issues []ValidationIssue, substr string) bool {
 
 func checkedUnit(verify, evidence string) string {
 	return "## My outcome\nDone means: something\nVerify:\n```\n" + verify + "\n```\n" + evidence + "- [x] done\n"
+}
+
+func redGreenEvidenceReceipt(verifyCmd, preSHA, preStatus, preOutput, postSHA, postStatus, postOutput string) string {
+	return "Evidence:\n" +
+		verifyCmd + "\n" +
+		"pre sha: " + preSHA + "\n" +
+		"pre exit status: " + preStatus + "\n" +
+		"```\n" + preOutput + "\n```\n" +
+		"Pre-evidence scope: this command exited " + preStatus + " at " + preSHA + "; nothing else is inferred.\n" +
+		"post sha: " + postSHA + "\n" +
+		"post exit status: " + postStatus + "\n" +
+		"```\n" + postOutput + "\n```\n" +
+		"Post-evidence scope: this command exited " + postStatus + " at " + postSHA + "; nothing else is inferred.\n"
+}
+
+func TestValidateQueueRedGreenReceipt(t *testing.T) {
+	source := "GH issue #1"
+	valid := redGreenEvidenceReceipt(
+		"echo hi",
+		evidenceTestSHA,
+		"1",
+		"missing outcome",
+		evidencePostTestSHA,
+		"0",
+		"hi",
+	)
+
+	t.Run("complete receipt passes", func(t *testing.T) {
+		_, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", valid)), source)
+		if len(issues) > 0 {
+			t.Fatalf("expected no issues, got %v", issues)
+		}
+	})
+
+	tests := []struct {
+		name        string
+		evidence    string
+		wantMessage string
+	}{
+		{
+			name:        "legacy green-only receipt fails",
+			evidence:    evidenceReceipt("echo hi"),
+			wantMessage: "pre sha",
+		},
+		{
+			name: "green pre fails",
+			evidence: redGreenEvidenceReceipt(
+				"echo hi", evidenceTestSHA, "0", "hi", evidencePostTestSHA, "0", "hi",
+			),
+			wantMessage: "pre exit status must be non-zero",
+		},
+		{
+			name: "failed post fails",
+			evidence: redGreenEvidenceReceipt(
+				"echo hi", evidenceTestSHA, "1", "missing", evidencePostTestSHA, "2", "broken",
+			),
+			wantMessage: "post exit status must be 0",
+		},
+		{
+			name: "same shas fail",
+			evidence: redGreenEvidenceReceipt(
+				"echo hi", evidenceTestSHA, "1", "missing", evidenceTestSHA, "0", "hi",
+			),
+			wantMessage: "pre and post sha must differ",
+		},
+		{
+			name: "edited command fails",
+			evidence: redGreenEvidenceReceipt(
+				"echo other", evidenceTestSHA, "1", "missing", evidencePostTestSHA, "0", "hi",
+			),
+			wantMessage: "quote the Verify command verbatim",
+		},
+		{
+			name: "empty pre output fails",
+			evidence: redGreenEvidenceReceipt(
+				"echo hi", evidenceTestSHA, "1", "", evidencePostTestSHA, "0", "hi",
+			),
+			wantMessage: "pre raw command output",
+		},
+		{
+			name: "empty post output fails",
+			evidence: redGreenEvidenceReceipt(
+				"echo hi", evidenceTestSHA, "1", "missing", evidencePostTestSHA, "0", "",
+			),
+			wantMessage: "post raw command output",
+		},
+		{
+			name: "pre scope mismatch fails",
+			evidence: strings.Replace(
+				valid,
+				"Pre-evidence scope: this command exited 1",
+				"Pre-evidence scope: this command exited 2",
+				1,
+			),
+			wantMessage: "pre scope line status must match",
+		},
+		{
+			name: "post scope mismatch fails",
+			evidence: strings.Replace(
+				valid,
+				"Post-evidence scope: this command exited 0 at "+evidencePostTestSHA,
+				"Post-evidence scope: this command exited 0 at "+evidenceTestSHA,
+				1,
+			),
+			wantMessage: "post scope line sha must match",
+		},
+		{
+			name: "out of order fields fail",
+			evidence: strings.Replace(
+				valid,
+				"pre sha: "+evidenceTestSHA+"\npre exit status: 1",
+				"pre exit status: 1\npre sha: "+evidenceTestSHA,
+				1,
+			),
+			wantMessage: "fields must appear in order",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", tt.evidence)), source)
+			if !containsIssue(issues, tt.wantMessage) {
+				t.Fatalf("expected %q error, got %v", tt.wantMessage, issues)
+			}
+		})
+	}
 }
 
 func TestCheckedUnitEvidence(t *testing.T) {
