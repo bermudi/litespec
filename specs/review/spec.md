@@ -85,7 +85,7 @@ After trusted bootstrap and skill activation, `litespec-review` SHALL read only 
 
 ### Requirement: Red-Green Build Evidence
 
-For every unit, `litespec-build` SHALL run the exact `Verify:` command against a clean pre-outcome commit and require a non-zero exit attributable to the missing unit outcome before implementing it. If the verifier does not yet exist, build MAY create one verifier-only commit and use that clean commit for the pre run. A pre run that exits 0, or fails for an unrelated command, dependency, or environment error, SHALL stop the unit. Build SHALL then create exactly one implementation commit, require a clean tree, run the same command with exit status 0, and record both runs verbatim in one receipt. Neither recorded commit SHALL be amended. Invariant and hygiene commands MAY supplement Verify but MUST NOT replace a Verify that discriminates the unit outcome.
+For every unit, `litespec-build` SHALL run the exact `Verify:` command against a clean pre-outcome commit and require a non-zero exit attributable to the missing unit outcome before implementing it. If the verifier does not yet exist, build MAY create at most one verifier-only commit and use that clean commit for the pre run. A pre run that exits 0, or fails for an unrelated command, dependency, or environment error, SHALL stop the unit. Build SHALL then create one or more implementation/fix commits; post is the final clean commit where `Verify:` passes with exit status 0. Build SHALL record the pre and post runs verbatim in one receipt. The recorded pre and every implementation/fix commit SHALL NOT be amended. Invariant and hygiene commands MAY supplement Verify but MUST NOT replace a Verify that discriminates the unit outcome.
 
 #### Scenario: Existing verifier goes red then green
 
@@ -95,7 +95,7 @@ For every unit, `litespec-build` SHALL run the exact `Verify:` command against a
 #### Scenario: Unit introduces its verifier
 
 - **WHEN** the exact Verify command requires a verifier introduced by the unit
-- **THEN** build may commit only the verifier, require a meaningful red run at that commit, then create exactly one implementation commit and require a green run
+- **THEN** build may commit only the verifier, require a meaningful red run at that commit, then create one or more immutable implementation/fix commits and record the final clean commit where `Verify:` passes as post
 
 #### Scenario: Pre run is green or fails for the wrong reason
 

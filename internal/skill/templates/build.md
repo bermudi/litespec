@@ -23,8 +23,8 @@ Read the queue's `Branch:` line and compare it with `git branch --show-current`.
    - The pre run must exit non-zero; Verify fails because the unit outcome is absent. If it exits 0, or fails because of an unrelated command, dependency, or environment error, stop. Do not implement or check the unit.
    - Save the full pre SHA, integer exit status, and raw output exactly as emitted.
 3. Implement the unit — the smallest coherent change. Extend the existing path, don't add a parallel one. No speculative abstraction. If the unit is a contract change, update `specs/<feature>/spec.md` now.
-4. Commit the implementation — exactly one implementation commit per unit. Do not amend the pre commit.
-5. Require a clean tree again. Run the same exact `Verify:` command on the implementation commit. It must exit 0 with the outcome present. Save the full post SHA from `git rev-parse HEAD`, exit status, and raw output.
+4. Create one or more implementation/fix commits for the unit. Keep every commit after pre immutable: fix failures in a new commit, never by amending.
+5. Require a clean tree again. Run the same exact `Verify:` command. It must exit 0 with the outcome present. Post is the final clean commit where `Verify:` passes; save its full SHA from `git rev-parse HEAD`, exit status, and raw output.
 6. Record one receipt — verbatim, not interpretive (see Verification). Required fields, in this order:
    - unit heading
    - exact `Verify:` command
@@ -44,13 +44,13 @@ Read the queue's `Branch:` line and compare it with `git branch --show-current`.
 8. Never amend either recorded evidence commit. Subsequent fixes go in a new commit.
 9. Stop. Tell the user this unit is done and they can re-invoke build for the next.
 
-No batching units. At most one verifier-only commit, exactly one implementation commit, then stop.
+No batching units. At most one verifier-only commit, then one or more implementation/fix commits, then stop.
 
 ---
 
 ## Rebuilding a unit after review
 
-If the unit's box was unchecked by the user after review reported a CRITICAL or WARNING against its `Done means:` or `Verify:`, you are rebuilding — not starting fresh. The previous Verify failed to prove the outcome. Load `references/review-fixing.md` and follow its scope-expansion rules: find the abstract pattern behind the finding, fix all instances, not just the cited `file:line`. Then follow the same red-green order as above. The exact Verify must fail for the missing fix at a clean pre commit before you create the new implementation commit. Record a fresh pre/post receipt, post it, and re-check the box. Never amend a prior evidence commit.
+If the unit's box was unchecked by the user after review reported a CRITICAL or WARNING against its `Done means:` or `Verify:`, you are rebuilding — not starting fresh. The previous Verify failed to prove the outcome. Load `references/review-fixing.md` and follow its scope-expansion rules: find the abstract pattern behind the finding, fix all instances, not just the cited `file:line`. Then follow the same red-green order as above. The exact Verify must fail for the missing fix at a clean pre commit before you create one or more implementation/fix commits. Record a fresh pre/post receipt, post it, and re-check the box. Never amend a prior evidence commit.
 
 ---
 
@@ -81,8 +81,8 @@ If the unit is ambiguous or the Verify is weak and the gap is consequential, pau
 
 ## Guardrails
 
-- At most one verifier-only commit and exactly one implementation commit per unit. Local-queue bookkeeping (Evidence block + checkbox) is a separate metadata commit.
-- Never amend either evidence commit after its SHA is recorded.
+- At most one verifier-only commit and one or more implementation/fix commits per unit. Local-queue bookkeeping (Evidence block + checkbox) is a separate metadata commit.
+- Never amend the pre commit or any implementation/fix commit. Post is the final clean commit where `Verify:` passes.
 - Don't refactor beyond the unit — note drive-bys, don't fix them.
 - If the GH issue needs re-shaping, pause — don't rewrite planning artifacts yourself.
 

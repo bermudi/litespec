@@ -155,13 +155,13 @@ Invoke `litespec-build` for **Unit 1**.
 > go test ./internal/ratelimit -run TestCounterWindow
 > ```
 >
-> It then creates `internal/ratelimit/counter.go`, implements the sliding window, and makes exactly one implementation commit:
+> It then creates `internal/ratelimit/counter.go` and implements the sliding window in one or more implementation/fix commits. It never amends those commits:
 >
 > ```bash
 > git commit -m "ratelimit: add sliding window counter"
 > ```
 >
-> On that clean post commit it runs the same Verify and requires exit status 0. It posts one receipt containing the exact command, both SHAs and statuses, both raw outputs, and matching scope lines; then it checks the unit and stops. Neither evidence commit is amended.
+> Post is the final clean commit where `Verify:` passes with exit status 0. It posts one receipt containing the exact command, both SHAs and statuses, both raw outputs, and matching scope lines; then it checks the unit and stops. The pre and implementation/fix commits are never amended.
 
 Repeat for Unit 2 and Unit 3. Each unit is demo-able and has a Verify that fails without it.
 

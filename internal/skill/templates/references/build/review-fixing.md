@@ -20,7 +20,7 @@ You are rebuilding a unit that review reopened — a CRITICAL or WARNING finding
 2. `go test ./...`
 3. `go vet ./...`
 4. Establish a clean pre commit where the unit's exact `Verify:` fails because the fix is absent. If the old verifier still passes, strengthen only the verifier in one verifier-only commit and use that as pre.
-5. Commit the pattern-wide fix as the single implementation commit, then run the same exact Verify and require exit status 0.
+5. Create one or more implementation/fix commits for the pattern-wide fix without amending them, then run the same exact Verify and require exit status 0 at the final clean post commit.
 6. Record a fresh pre/post receipt. Never amend either evidence commit.
 7. `litespec validate` — confirm no structural regressions.
 

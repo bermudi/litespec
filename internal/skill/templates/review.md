@@ -56,6 +56,8 @@ If a fix needs a new decision, report "needs decision: <question>" instead of in
 #### Evidence
 For every checked unit: a complete red-green receipt exists (verbatim command; labeled pre and post SHAs and statuses; two nonempty fences; matching pre/post scope lines); the recorded command matches the unit's `Verify:` verbatim; the SHAs differ; pre is an ancestor of post and post is an ancestor of `HEAD`.
 
+The history from pre to post may contain one or more implementation/fix commits; do not require post to be the immediate child of pre. Post is the final clean commit where `Verify:` passes for the unit. Build's commits are immutable: fixes belong in new commits, never amendments.
+
 Replay the exact command at all three trees:
 1. Create a detached temporary Git worktree at pre. Run Verify there; it must fail because the outcome is absent, not because of an unrelated command, dependency, or environment error. Remove the worktree afterward even when Verify fails.
 2. Create a detached temporary Git worktree at post. Run Verify there; it must exit 0 with the outcome present. Remove the worktree afterward even when Verify fails.
