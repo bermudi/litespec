@@ -22,7 +22,7 @@ litespec keeps your codebase aligned with durable, load-bearing specs. One GitHu
 
 ```bash
 # Install
-go install github.com/bermudi/litespec/cmd/litespec@latest
+go install github.com/bermudi/litespec/v2/cmd/litespec@latest
 
 # Set up a project
 litespec init

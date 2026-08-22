@@ -2,7 +2,7 @@
 
 A lean, AI-native spec-driven development CLI.
 
-`go 1.26+` | [Design Doc](DESIGN.md) | [Docs](https://bermudi.github.io/litespec/) | Inspired by [OpenSpec](https://github.com/Fission-AI/OpenSpec)
+`go 1.26.1+` | [Design Doc](DESIGN.md) | [Docs](https://bermudi.github.io/litespec/) | Inspired by [OpenSpec](https://github.com/Fission-AI/OpenSpec)
 
 ---
 
@@ -12,7 +12,7 @@ litespec gives AI coding agents structured workflows that keep your codebase ali
 
 ```bash
 # Install
-go install github.com/bermudi/litespec/cmd/litespec@latest
+go install github.com/bermudi/litespec/v2/cmd/litespec@latest
 
 # Initialize — scaffolds specs/product.md, specs/glossary.md, specs/decisions/ + .agents/skills/
 litespec init

@@ -78,7 +78,7 @@ Workflow (two lanes):
 
 Commands:
   init [--tools <ids>]              Initialize project structure
-  validate [--all|--specs|--decisions|--issue N|--queue <path>] [--type T]   Validate specs, decisions, and queues
+  validate [--all|--specs|--decisions|--issue <N>|--queue <path>] [--type T]   Validate specs, decisions, and queues
   view                              Dashboard overview
   update [--tools <ids>]            Regenerate skills and adapters
   upgrade                           Check for and install the latest version
@@ -95,8 +95,8 @@ Flags:
    --all        Validate all specs, decisions, and queues
    --specs      Validate all specs only
    --decisions  Validate all decisions only
-   --issue      Fetch and validate one GH queue issue
-   --queue      Validate one local queue file
+   --issue <N>  Fetch and validate one GH queue issue
+   --queue <path>  Validate one local queue file
    --type       Disambiguate name type: spec|decision (validate)
 `)
 }

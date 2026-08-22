@@ -158,7 +158,7 @@ Generated via `litespec update` from `internal/skill/templates/` (embed.FS). `.a
 | Command | Purpose |
 |---------|---------|
 | `litespec init [--tools <ids>]` | scaffold `specs/` + skills |
-| `litespec validate [--all\|--specs\|--decisions\|--issue N\|--queue <path>] [--type T]` | lint specs + decisions + GH issue queue (labeled litespec) + local specs/queues/ fallback + Verify shell (bash -n) |
+| `litespec validate [--all\|--specs\|--decisions\|--issue <N>\|--queue <path>] [--type T]` | lint specs + decisions + GH issue queue (labeled litespec) + local specs/queues/ fallback + Verify shell (bash -n) |
 | `litespec view` | product + features + open `litespec` GH issues (via `gh` if present) + decisions (spine starred) |
 | `litespec update [--tools <ids>]` | regenerate skills and adapters |
 | `litespec upgrade` | check for and install the latest version via `go install` |

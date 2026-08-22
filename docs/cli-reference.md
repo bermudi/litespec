@@ -11,7 +11,7 @@ Workflow (two lanes):
 
 Commands:
   init [--tools <ids>]              Initialize project structure
-  validate [--all|--specs|--decisions|--issue N|--queue PATH] [--type T]   Validate specs, decisions, and queues
+  validate [--all|--specs|--decisions|--issue <N>|--queue <path>] [--type T]   Validate specs, decisions, and queues
   view                              Dashboard overview
   update [--tools <ids>]            Regenerate skills and adapters
   upgrade                           Check for and install the latest version
@@ -28,8 +28,8 @@ Flags:
    --all        Validate all specs, decisions, and queues
    --specs      Validate all specs only
    --decisions  Validate all decisions only
-   --issue N    Fetch and validate one GH queue issue
-   --queue PATH Validate one local queue file
+   --issue <N>  Fetch and validate one GH queue issue
+   --queue <path>  Validate one local queue file
    --type       Disambiguate name type: spec|decision (validate)
 ```
 
@@ -46,7 +46,7 @@ The flags above are the top-level defaults. Each command also supports its own f
 | `--all` | Validate all specs, decisions, and queues (`validate` only) |
 | `--specs` | Validate all specs only (`validate` only) |
 | `--decisions` | Validate all decisions only (`validate` only) |
-| `--issue N` | Fetch and validate one GH queue issue (`validate` only) |
+| `--issue <N>` | Fetch and validate one GH queue issue (`validate` only) |
 | `--queue <path>` | Validate one local queue file (`validate` only) |
 | `--type <T>` | Disambiguate name type: `spec` or `decision` (`validate` only) |
 
@@ -90,7 +90,7 @@ litespec init --json
 Usage:
 
 ```bash
-litespec validate [<name>|--all|--specs|--decisions|--issue N|--queue <path>] [--type T] [--strict] [--json] [--minimal]
+litespec validate [<name>|--all|--specs|--decisions|--issue <N>|--queue <path>] [--type T] [--strict] [--json] [--minimal]
 ```
 
 Description:
@@ -127,7 +127,7 @@ Flags:
 | `--all` | Validate all specs, decisions, and queues |
 | `--specs` | Validate all specs only |
 | `--decisions` | Validate all decisions only |
-| `--issue N` | Fetch and validate one GH queue issue |
+| `--issue <N>` | Fetch and validate one GH queue issue |
 | `--queue <path>` | Validate one local queue file |
 | `--type <T>` | Disambiguate name: `spec` or `decision` |
 | `--strict` | Treat warnings as errors |
@@ -219,7 +219,7 @@ litespec upgrade [--json] [--minimal]
 
 Description:
 
-Check for the latest release and upgrade via `go install github.com/bermudi/litespec/cmd/litespec@latest`.
+Check for the latest release and upgrade via `go install github.com/bermudi/litespec/v2/cmd/litespec@latest`.
 
 Only works for binaries installed with `go install`. Exits with no change if already up to date.
 

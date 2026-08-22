@@ -117,7 +117,7 @@ Examples:
 }
 
 func printValidateHelp() {
-	fmt.Print(`Usage: litespec validate [<name>|--all|--specs|--decisions|--issue N|--queue <path>] [--type T] [--strict] [--json] [--minimal]
+	fmt.Print(`Usage: litespec validate [<name>|--all|--specs|--decisions|--issue <N>|--queue <path>] [--type T] [--strict] [--json] [--minimal]
 
 Validate specs, decisions, and queues.
 

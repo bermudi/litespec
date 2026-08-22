@@ -6,7 +6,7 @@ This guide walks you through installing litespec v2 and running the commands you
 
 litespec is a Go CLI. You need:
 
-- **Go 1.26 or later** — [Install Go](https://go.dev/dl/)
+- **Go 1.26.1 or later** — [Install Go](https://go.dev/dl/)
 
 Check your version:
 
@@ -19,7 +19,7 @@ go version
 ### Install via `go install` (recommended)
 
 ```bash
-go install github.com/bermudi/litespec/cmd/litespec@latest
+go install github.com/bermudi/litespec/v2/cmd/litespec@latest
 ```
 
 The binary lands in `~/go/bin/litespec`. Add that directory to your PATH:
@@ -55,7 +55,7 @@ Workflow (two lanes):
 
 Commands:
   init [--tools <ids>]              Initialize project structure
-  validate [--all|--specs|--decisions|--issue N|--queue PATH] [--type T]   Validate specs, decisions, and queues
+  validate [--all|--specs|--decisions|--issue <N>|--queue <path>] [--type T]   Validate specs, decisions, and queues
   view                              Dashboard overview
   update [--tools <ids>]            Regenerate skills and adapters
   upgrade                           Check for and install the latest version
@@ -72,8 +72,8 @@ Flags:
    --all        Validate all specs, decisions, and queues
    --specs      Validate all specs only
    --decisions  Validate all decisions only
-   --issue      Fetch and validate one GH queue issue
-   --queue      Validate one local queue file
+   --issue <N>  Fetch and validate one GH queue issue
+   --queue <path>  Validate one local queue file
    --type       Disambiguate name type: spec|decision (validate)
 ```
 
