@@ -23,8 +23,8 @@ For greenfield, API shape, CLI behavior, or anything that will outlast the issue
 1. `litespec-plan` in **fuzzy** mode: read code, ask 2–3 questions, maybe spike, write no files. Use `references/fuzzy.md`.
 2. `litespec-plan` in **clear** mode: require a clean tree, capture `Base:`, create `litespec/<change-name>`, and record `Branch:` in the labeled GH issue body before its proposal, design, and units. If `gh` is unavailable, write the same body to `specs/queues/<name>.md`. Draft a spec if load-bearing.
 3. **grill-me** (optional): adversarial shaping. Use `references/grilling.md`. Pull in `codebase-design` or `domain-modeling` when needed.
-4. `litespec-build`: implement one unit at a time. Each unit must satisfy `Done means:` and `Verify:`, then post a complete evidence receipt, before the box is checked.
-5. `litespec-review`: verify the recorded branch, review tracked and untracked issue-owned work, then route findings.
+4. `litespec-build`: establish a meaningful red Verify at a clean pre commit, implement one unit, require green at the implementation post commit, then post the complete receipt before checking the box.
+5. `litespec-review`: replay Verify at pre, post, and `HEAD`, verify the recorded branch, review tracked and untracked issue-owned work, then route findings.
 6. Close the GH issue only when all units are checked and review returns `PASS`.
 
 Unidirectional. If the plan shifts, rewrite the GH issue (disposable), not the durable spec.
@@ -54,10 +54,12 @@ Verify: `litespec view | grep "Specifications"` shows the spec name and count
 
 - Build one unit per session.
 - `Verify:` must be a concrete command or assertion. If it would pass without the outcome, the unit is too big.
-- Tick the checkbox only after posting a complete evidence receipt (exact command, labeled sha, labeled exit status, nonempty fenced output, scope line). A nonempty `Evidence:` label is not enough. Then commit and stop.
+- Before implementation, run the exact Verify on a clean pre commit. It must fail because the outcome is absent. If the verifier is introduced by the unit, create one verifier-only commit first.
+- Create exactly one implementation commit, then run the same Verify on that clean post commit and require exit status 0.
+- Tick the checkbox only after posting one receipt with the exact command plus full pre/post SHAs, statuses, fenced raw outputs, and matching scope lines. Never amend either evidence commit. A nonempty `Evidence:` label is not enough.
 - Put unrelated work on another branch or worktree.
 
-Review routes findings in order: suggestions are non-blocking; unit violations rebuild the unit; CRITICAL/WARNING inside issue scope blocks as a direct fix or new parent unit; findings outside issue scope route without blocking. Auto-loaded instructions are trusted bootstrap inputs. After skill activation, only the remote issue is read initially; every additional local queue, contract, implementation, or reference path is screened before content access.
+Review checks pre→post→`HEAD` ancestry and replays the exact Verify in detached temporary worktrees at pre and post, then at `HEAD`; temporary worktrees are removed even after failures and the current worktree is never checked out to evidence commits. Red-green evidence does not prove that Verify targets the correct behavior, so review still probes it adversarially. Findings then route in order: suggestions are non-blocking; unit violations rebuild the unit; CRITICAL/WARNING inside issue scope blocks as a direct fix or new parent unit; findings outside issue scope route without blocking. Auto-loaded instructions are trusted bootstrap inputs. After skill activation, only the remote issue is read initially; every additional local queue, contract, implementation, or reference path is screened before content access.
 
 ## When to Write a Spec
 

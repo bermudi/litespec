@@ -54,15 +54,16 @@ If a fix needs a new decision, report "needs decision: <question>" instead of in
 - Flag Verify that would pass without the outcome.
 
 #### Evidence
-For every checked unit: a complete receipt exists (verbatim command, labeled `sha:`, labeled `exit status:`, nonempty fence, matching scope line); the recorded command matches the unit's `Verify:` verbatim; and the recorded sha is an ancestor of `HEAD`.
+For every checked unit: a complete red-green receipt exists (verbatim command; labeled pre and post SHAs and statuses; two nonempty fences; matching pre/post scope lines); the recorded command matches the unit's `Verify:` verbatim; the SHAs differ; pre is an ancestor of post and post is an ancestor of `HEAD`.
 
-Confirm the outcome exists at the recorded sha, not only at `HEAD`:
-1. If the recorded sha equals `Base:`, report a CRITICAL finding breaking the unit's contract.
-2. Otherwise, create a detached temporary Git worktree at the recorded sha, run the exact `Verify:` command from that worktree, and remove the temporary worktree afterward even when Verify fails. Never check out the recorded sha in the reviewer's current worktree.
-3. If Verify does not exit 0 at the recorded sha, report a CRITICAL finding breaking the unit's contract: that tree lacks the verified outcome.
-4. Run the exact Verify command again at `HEAD`. If it no longer exits 0, report a CRITICAL finding breaking the unit's contract.
+Replay the exact command at all three trees:
+1. Create a detached temporary Git worktree at pre. Run Verify there; it must fail because the outcome is absent, not because of an unrelated command, dependency, or environment error. Remove the worktree afterward even when Verify fails.
+2. Create a detached temporary Git worktree at post. Run Verify there; it must exit 0 with the outcome present. Remove the worktree afterward even when Verify fails.
+3. Run the exact `Verify:` command again at `HEAD` and confirm it still exits 0 with the outcome present.
 
-Build commits before running Verify and never amends that commit, so these two runs check the recorded implementation tree as well as its current descendant. A nonempty `Evidence:` label is not a receipt. Missing receipt or an edited command is also a CRITICAL finding breaking that unit's contract (triage rule 2 applies). The evidence scope line is the ceiling: review probes beyond it, evidence never claims beyond it.
+Use cleanup that runs on every path, such as a shell trap or the harness equivalent. Never check out an evidence SHA in the reviewer's current worktree. A green pre run, irrelevant pre failure, failed post or `HEAD`, missing/malformed receipt, edited command, or invalid ancestry is a CRITICAL finding breaking that unit's contract (triage rule 2).
+
+Red-green evidence proves only that Verify discriminates the recorded trees. It does not prove that Verify targets the correct behavior. Probe the command and outcome adversarially beyond the receipt. The scope lines are the ceiling: evidence never claims beyond them.
 
 ### Verdict
 `PASS` or `CHANGES REQUESTED`. The verdict is about the issue-owned branch, not the whole repo. Severity says how confident you are it is wrong; scope says whether this issue owns it.

@@ -149,19 +149,19 @@ Invoke `litespec-build` for **Unit 1**.
 
 > **You:** build unit 1
 >
-> **litespec-build:** Reads the GH issue, `specs/rate-limit/spec.md`, `specs/product.md`, and `specs/glossary.md`. Creates `internal/ratelimit/counter.go`, implements the sliding window, and adds a test. Runs the Verify:
+> **litespec-build:** Reads the GH issue, `specs/rate-limit/spec.md`, `specs/product.md`, and `specs/glossary.md`. Because the unit introduces its test, it first adds that test in one verifier-only commit. It runs the exact Verify at that clean pre commit and confirms the test fails because the counter is absent:
 >
 > ```bash
 > go test ./internal/ratelimit -run TestCounterWindow
 > ```
 >
-> When it passes, it updates the GH issue checkbox from `- [ ] pending` to `- [x] done` and commits:
+> It then creates `internal/ratelimit/counter.go`, implements the sliding window, and makes exactly one implementation commit:
 >
 > ```bash
 > git commit -m "ratelimit: add sliding window counter"
 > ```
 >
-> It then stops. One unit per session.
+> On that clean post commit it runs the same Verify and requires exit status 0. It posts one receipt containing the exact command, both SHAs and statuses, both raw outputs, and matching scope lines; then it checks the unit and stops. Neither evidence commit is amended.
 
 Repeat for Unit 2 and Unit 3. Each unit is demo-able and has a Verify that fails without it.
 
@@ -212,10 +212,13 @@ When all units are done, invoke `litespec-review`. Harness/system instructions a
 > **You:** review
 >
 > **litespec-review:** Adversarial review of the GH issue + `specs/rate-limit/spec.md` vs the implementation. It checks:
+> - Does the exact Verify fail for the absent outcome at pre, pass with it at post, and still pass at `HEAD`? These runs use detached temporary worktrees for pre and post, never the current worktree.
 > - Does the code enforce 100 requests per minute per IP?
 > - Does the 101st request return 429 with `Retry-After`?
 > - Does `RATE_LIMIT_PER_MINUTE` default to 100?
 > - Are edge cases (empty header, window reset, concurrent access) tested?
+
+Red-green evidence distinguishes the recorded trees; it does not prove that Verify targets the correct behavior. That remains part of the adversarial review.
 
 Routing is ordered:
 

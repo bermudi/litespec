@@ -116,7 +116,7 @@ Queue checks:
 - Exactly one `Base:` and `Branch:` ownership line before the first `##` heading.
 - `Base:` is a full commit ID and `Branch:` matches `litespec/<change-name>`.
 - Every unit has `Done means:`, an executable `Verify:`, and a checkbox.
-- A checked unit has a complete evidence receipt (verbatim command, labeled sha, labeled exit status, nonempty fenced output, matching scope line). A nonempty `Evidence:` label is not enough.
+- A checked unit has a complete red-green evidence receipt: the verbatim command; distinct full pre/post SHAs; non-zero pre and zero post statuses; two nonempty fenced outputs; and matching scope lines. A nonempty `Evidence:` label is not enough.
 - `Depends:` references resolve to units in the same queue.
 
 Flags:
