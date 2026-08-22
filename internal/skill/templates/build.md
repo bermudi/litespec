@@ -24,7 +24,8 @@ Read the queue's `Branch:` line and compare it with `git branch --show-current`.
    - exact `Verify:` command
    - `sha: <40- or 64-char hex from git rev-parse HEAD>`
    - `exit status: <integer>`
-   - a nonempty fenced block of raw command output, unedited
+   - a fenced block of raw command output, unedited; if the command emits nothing, write `<no output>` in the fence rather than inventing output
+   - only an exit status of 0 can complete a unit — a failing Verify must not be checked
    - `Evidence scope: this command exited <status> at <sha>; nothing else is inferred.`
    GH issue queue: post that as an issue comment. Local queue file (`specs/queues/<name>.md`): append it as an `Evidence:` block under the unit (after `Verify:`, before the status checkbox). A nonempty `Evidence:` label is not a receipt. Validate rejects missing fields, a short sha, an empty fence, or a command that does not match `Verify:` verbatim.
 5. Check the box in the issue or local queue file (`- [x]`) only after evidence is posted. Commit with the Verify output and evidence location (comment URL or queue file path) in the message.

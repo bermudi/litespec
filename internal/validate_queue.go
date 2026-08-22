@@ -322,9 +322,11 @@ func evidenceReceiptIssues(text, verifyCmd, source, heading string) []Validation
 	statusMatch := evidenceStatusPattern.FindStringSubmatch(text)
 	if statusMatch == nil {
 		fail("must record exit status")
+	} else if statusMatch[1] != "0" {
+		fail("must record exit status 0 for a checked unit")
 	}
 	if !hasFencedOutput(text) {
-		fail("must include raw command output in a fenced block")
+		fail("must include raw command output, or `<no output>`, in a fenced block")
 	}
 	scopeMatch := evidenceScopePattern.FindStringSubmatch(text)
 	if scopeMatch == nil {

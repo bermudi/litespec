@@ -633,7 +633,7 @@ func TestCheckedUnitEvidence(t *testing.T) {
 		if !containsIssue(issues, "must record exit status") {
 			t.Fatalf("expected exit status error, got %v", issues)
 		}
-		if !containsIssue(issues, "must include raw command output in a fenced block") {
+		if !containsIssue(issues, "must include raw command output, or `<no output>`, in a fenced block") {
 			t.Fatalf("expected fenced output error, got %v", issues)
 		}
 		if !containsIssue(issues, "must include scope line") {
@@ -652,8 +652,24 @@ func TestCheckedUnitEvidence(t *testing.T) {
 	t.Run("empty fence fails", func(t *testing.T) {
 		body := checkedUnit("echo hi", "Evidence:\necho hi\nsha: "+evidenceTestSHA+"\nexit status: 0\n```\n```\nEvidence scope: this command exited 0 at "+evidenceTestSHA+"; nothing else is inferred.\n")
 		_, issues := ValidateQueueBody(ownedQueue(body), source)
-		if !containsIssue(issues, "must include raw command output in a fenced block") {
+		if !containsIssue(issues, "must include raw command output, or `<no output>`, in a fenced block") {
 			t.Fatalf("expected empty fence error, got %v", issues)
+		}
+	})
+
+	t.Run("checked unit with failed evidence fails", func(t *testing.T) {
+		body := checkedUnit("echo hi", "Evidence:\necho hi\nsha: "+evidenceTestSHA+"\nexit status: 1\n```\nFAIL\n```\nEvidence scope: this command exited 1 at "+evidenceTestSHA+"; nothing else is inferred.\n")
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
+		if !containsIssue(issues, "must record exit status 0 for a checked unit") {
+			t.Fatalf("expected non-zero exit status error, got %v", issues)
+		}
+	})
+
+	t.Run("checked unit with explicit no output passes", func(t *testing.T) {
+		body := checkedUnit("echo hi", "Evidence:\necho hi\nsha: "+evidenceTestSHA+"\nexit status: 0\n```\n<no output>\n```\nEvidence scope: this command exited 0 at "+evidenceTestSHA+"; nothing else is inferred.\n")
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
+		if len(issues) > 0 {
+			t.Fatalf("expected valid evidence, got %v", issues)
 		}
 	})
 

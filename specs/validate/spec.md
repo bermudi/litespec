@@ -87,7 +87,7 @@ The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec
 
 ### Requirement: Checked Unit Evidence Receipt
 
-When a unit checkbox is checked, `litespec validate` SHALL require a verbatim evidence receipt for that unit. A complete receipt MUST include all of: the unit's `Verify:` command quoted verbatim, a labeled `sha:` (or `HEAD sha:`) line with a full 40- or 64-character hexadecimal commit ID, a labeled `exit status:` line with an integer, a fenced block whose body is nonempty, and the exact scope line `Evidence scope: this command exited <status> at <sha>; nothing else is inferred.` The scope line's status and sha MUST match the labeled fields. Unchecked units SHALL NOT require a receipt. Local queues and issue-body receipts SHALL live in an `Evidence:` block after `Verify:` and before the checkbox. On a GitHub issue, a comment that names the unit heading and carries a complete receipt SHALL satisfy the check. A nonempty `Evidence:` label or a comment that only mentions `Evidence:` SHALL NOT satisfy. Validate SHALL check receipt structure only; it MUST NOT execute the recorded command or interpret the fenced output.
+When a unit checkbox is checked, `litespec validate` SHALL require a verbatim evidence receipt for that unit. A complete receipt MUST include all of: the unit's `Verify:` command quoted verbatim, a labeled `sha:` (or `HEAD sha:`) line with a full 40- or 64-character hexadecimal commit ID, a labeled `exit status:` line with an integer, a fenced block of raw command output, and the exact scope line `Evidence scope: this command exited <status> at <sha>; nothing else is inferred.` The fenced block MUST contain the command's raw output, or the literal `<no output>` when the command emits nothing — it MUST NOT be empty. The recorded `exit status:` MUST be 0; a non-zero status means the Verify failed and the unit MUST NOT be checked. The scope line's status and sha MUST match the labeled fields. Unchecked units SHALL NOT require a receipt. Local queues and issue-body receipts SHALL live in an `Evidence:` block after `Verify:` and before the checkbox. On a GitHub issue, a comment that names the unit heading and carries a complete receipt SHALL satisfy the check. A nonempty `Evidence:` label or a comment that only mentions `Evidence:` SHALL NOT satisfy. Validate SHALL check receipt structure only; it MUST NOT execute the recorded command or interpret the fenced output.
 
 #### Scenario: Unchecked unit without receipt passes
 
@@ -118,6 +118,16 @@ When a unit checkbox is checked, `litespec validate` SHALL require a verbatim ev
 
 - **WHEN** a checked unit receipt omits the Verify command, quotes a different command, or includes only an empty fence
 - **THEN** validation reports an error identifying the incomplete receipt
+
+#### Scenario: Failed verification cannot complete a unit
+
+- **WHEN** a checked unit records a non-zero exit status
+- **THEN** validation reports an error and the unit is not accepted
+
+#### Scenario: Successful verification emits no output
+
+- **WHEN** a checked unit records exit status 0 and the literal `<no output>` in its output fence
+- **THEN** validation accepts the receipt
 
 ### Requirement: Queue Unit Depends Validation
 
