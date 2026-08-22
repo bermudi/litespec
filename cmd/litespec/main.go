@@ -130,13 +130,13 @@ func maybeBackgroundUpgrade() {
 	}
 	_ = os.WriteFile(stampFile, nil, 0o644)
 
-	latest, err := fetchLatestVersion()
-	if err != nil {
-		return
-	}
 	local := version
 	if local == "dev" || local == "" {
 		local = "0.0.0"
+	}
+	latest, err := fetchLatestVersionFor(local)
+	if err != nil {
+		return
 	}
 	cmp, err := compareSemver(local, latest)
 	if err != nil || cmp >= 0 {

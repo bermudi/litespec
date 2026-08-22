@@ -34,14 +34,14 @@ func cmdUpgrade(args []string) error {
 		return err
 	}
 
-	latestTag, err := fetchLatestVersion()
-	if err != nil {
-		return err
-	}
-
 	localVersion := version
 	if localVersion == "dev" || localVersion == "" {
 		localVersion = "0.0.0"
+	}
+
+	latestTag, err := fetchLatestVersionFor(localVersion)
+	if err != nil {
+		return err
 	}
 
 	cmp, err := compareSemver(localVersion, latestTag)
@@ -197,6 +197,14 @@ func fetchLatestVersion() (string, error) {
 	return selectLatestStable(tags)
 }
 
+func fetchLatestVersionFor(localVersion string) (string, error) {
+	tags, err := fetchTagNames("https://api.github.com/repos/bermudi/litespec/tags")
+	if err != nil {
+		return "", err
+	}
+	return selectLatestForChannel(tags, localVersion)
+}
+
 func fetchTagNames(url string) ([]string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
@@ -246,6 +254,32 @@ func selectLatestStable(tags []string) (string, error) {
 		return "", fmt.Errorf("no stable release tag found")
 	}
 	return best, nil
+}
+
+func selectLatestOverall(tags []string) (string, error) {
+	best := ""
+	var bestV semver
+	for _, t := range tags {
+		v, err := parseSemver(t)
+		if err != nil {
+			continue
+		}
+		if best == "" || compareSemverVersions(v, bestV) > 0 {
+			best = t
+			bestV = v
+		}
+	}
+	if best == "" {
+		return "", fmt.Errorf("no release tag found")
+	}
+	return best, nil
+}
+
+func selectLatestForChannel(tags []string, localVersion string) (string, error) {
+	if isPrerelease(localVersion) {
+		return selectLatestOverall(tags)
+	}
+	return selectLatestStable(tags)
 }
 
 func parseSemver(tag string) (semver, error) {
