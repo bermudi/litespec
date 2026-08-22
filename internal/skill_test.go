@@ -356,3 +356,64 @@ func TestGenerateSkills_ReadonlyDir(t *testing.T) {
 		t.Fatal("expected error for read-only root directory")
 	}
 }
+
+func TestGeneratedSkillsUseRedGreenEvidence(t *testing.T) {
+	root := t.TempDir()
+	if err := GenerateSkills(root); err != nil {
+		t.Fatalf("GenerateSkills: %v", err)
+	}
+
+	readFile := func(path string) string {
+		t.Helper()
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		return string(data)
+	}
+	requireContains := func(name, content string, phrases ...string) {
+		t.Helper()
+		for _, phrase := range phrases {
+			if !strings.Contains(content, phrase) {
+				t.Errorf("%s missing %q", name, phrase)
+			}
+		}
+	}
+
+	build := readFile(filepath.Join(root, SkillsDir, "litespec-build", "SKILL.md"))
+	requireContains(t.Name()+"/build", build,
+		"Run the exact `Verify:` command on the clean starting commit before implementation.",
+		"one verifier-only commit",
+		"fails because the unit outcome is absent",
+		"pre sha:",
+		"pre exit status:",
+		"Pre-evidence scope:",
+		"post sha:",
+		"post exit status: 0",
+		"Post-evidence scope:",
+		"Never amend either recorded evidence commit.",
+	)
+
+	review := readFile(filepath.Join(root, SkillsDir, "litespec-review", "SKILL.md"))
+	requireContains(t.Name()+"/review", review,
+		"pre is an ancestor of post and post is an ancestor of `HEAD`",
+		"detached temporary Git worktree at pre",
+		"detached temporary Git worktree at post",
+		"Run the exact `Verify:` command again at `HEAD`",
+		"must fail because the outcome is absent",
+		"must exit 0 with the outcome present",
+		"never check out an evidence SHA in the reviewer's current worktree",
+		"does not prove that Verify targets the correct behavior",
+	)
+
+	for _, path := range []string{"../AGENTS.md", "../DESIGN.md", "../docs/workflow.md"} {
+		content := readFile(path)
+		requireContains(path, content,
+			"pre",
+			"post",
+			"verifier-only commit",
+			"detached temporary worktree",
+			"does not prove",
+		)
+	}
+}
