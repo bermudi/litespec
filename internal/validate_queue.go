@@ -232,12 +232,13 @@ func unitVerifyCommand(body []string) string {
 			if trimmed == "" {
 				continue
 			}
-			if !strings.HasPrefix(trimmed, "```") {
+			delimiter := fenceDelimiter(trimmed)
+			if delimiter == "" {
 				return inline
 			}
 			var blockLines []string
 			for k := j + 1; k < len(body); k++ {
-				if strings.HasPrefix(strings.TrimSpace(body[k]), "```") {
+				if strings.TrimSpace(body[k]) == delimiter {
 					return strings.Join(blockLines, "\n")
 				}
 				blockLines = append(blockLines, body[k])
@@ -251,7 +252,7 @@ func unitVerifyCommand(body []string) string {
 
 func extractEvidenceText(body []string) string {
 	seenVerify := false
-	inFence := false
+	verifyFence := ""
 	for i, line := range body {
 		trimmed := strings.TrimSpace(line)
 		if !seenVerify {
@@ -260,11 +261,7 @@ func extractEvidenceText(body []string) string {
 			}
 			continue
 		}
-		if strings.HasPrefix(trimmed, "```") {
-			inFence = !inFence
-			continue
-		}
-		if inFence {
+		if consumeMarkdownFenceLine(&verifyFence, line) {
 			continue
 		}
 		if isCheckboxLine(trimmed) {
@@ -277,15 +274,14 @@ func extractEvidenceText(body []string) string {
 		if rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "Evidence:")); rest != "" {
 			parts = append(parts, rest)
 		}
-		receiptFence := false
+		receiptFence := ""
 		for j := i + 1; j < len(body); j++ {
 			t := strings.TrimSpace(body[j])
-			if strings.HasPrefix(t, "```") {
-				receiptFence = !receiptFence
+			if consumeMarkdownFenceLine(&receiptFence, body[j]) {
 				parts = append(parts, body[j])
 				continue
 			}
-			if !receiptFence && isCheckboxLine(t) {
+			if isCheckboxLine(t) {
 				break
 			}
 			parts = append(parts, body[j])
@@ -349,6 +345,22 @@ func fenceDelimiter(line string) string {
 		return ""
 	}
 	return trimmed[:count]
+}
+
+func consumeMarkdownFenceLine(open *string, line string) bool {
+	trimmed := strings.TrimSpace(line)
+	if *open != "" {
+		if trimmed == *open {
+			*open = ""
+		}
+		return true
+	}
+	delimiter := fenceDelimiter(trimmed)
+	if delimiter == "" {
+		return false
+	}
+	*open = delimiter
+	return true
 }
 
 func (c *evidenceCursor) consumeFence() (string, bool) {
@@ -528,14 +540,10 @@ func commentSatisfiesEvidence(heading, verifyCmd string, comments []string) bool
 }
 
 func commentNamesUnit(comment, heading string) bool {
-	inFence := false
+	openFence := ""
 	for _, line := range strings.Split(strings.ReplaceAll(comment, "\r\n", "\n"), "\n") {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "```") {
-			inFence = !inFence
-			continue
-		}
-		if inFence {
+		if consumeMarkdownFenceLine(&openFence, line) {
 			continue
 		}
 		if trimmed == "Evidence:" || strings.HasPrefix(trimmed, "Evidence: ") {
@@ -763,7 +771,7 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 		inlineVerifyContent := ""
 		hasFencedBlock := false
 		var verifyBlock string
-		inFencedBlock := false
+		fencedBlock := ""
 		constraintsCount := 0
 		readFirstCount := 0
 		constraintsIdx := -1
@@ -772,11 +780,7 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 		readFirstRest := ""
 
 		for i, line := range unit.Body {
-			if strings.HasPrefix(strings.TrimSpace(line), "```") {
-				inFencedBlock = !inFencedBlock
-				continue
-			}
-			if inFencedBlock {
+			if consumeMarkdownFenceLine(&fencedBlock, line) {
 				continue
 			}
 			trimmed := strings.TrimSpace(line)
@@ -810,10 +814,11 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 					}
 				}
 				for j := i + 1; j < len(unit.Body); j++ {
-					if strings.HasPrefix(unit.Body[j], "```") {
+					delimiter := fenceDelimiter(unit.Body[j])
+					if delimiter != "" {
 						var blockLines []string
 						for k := j + 1; k < len(unit.Body); k++ {
-							if strings.HasPrefix(unit.Body[k], "```") {
+							if strings.TrimSpace(unit.Body[k]) == delimiter {
 								hasFencedBlock = true
 								break
 							}
