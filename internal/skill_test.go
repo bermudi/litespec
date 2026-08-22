@@ -387,6 +387,22 @@ func TestGeneratedSkillsUseRedGreenEvidence(t *testing.T) {
 			}
 		}
 	}
+	requirePolicy := func(name, content string) {
+		t.Helper()
+		requireContains(name, content,
+			"one or more implementation/fix commits",
+			"final clean commit where `Verify:` passes",
+		)
+		lower := strings.ToLower(content)
+		for _, contradiction := range []string{
+			"exactly one implementation commit",
+			"single implementation commit",
+		} {
+			if strings.Contains(lower, contradiction) {
+				t.Errorf("%s still contains contradictory policy %q", name, contradiction)
+			}
+		}
+	}
 
 	build := readFile(filepath.Join(root, SkillsDir, "litespec-build", "SKILL.md"))
 	requireContains(t.Name()+"/build", build,
@@ -401,6 +417,7 @@ func TestGeneratedSkillsUseRedGreenEvidence(t *testing.T) {
 		"Post-evidence scope:",
 		"Never amend either recorded evidence commit.",
 	)
+	requirePolicy(t.Name()+"/build", build)
 
 	review := readFile(filepath.Join(root, SkillsDir, "litespec-review", "SKILL.md"))
 	requireContains(t.Name()+"/review", review,
@@ -415,6 +432,7 @@ func TestGeneratedSkillsUseRedGreenEvidence(t *testing.T) {
 		"never check out an evidence SHA in the reviewer's current worktree",
 		"does not prove that Verify targets the correct behavior",
 	)
+	requirePolicy(t.Name()+"/review", review)
 
 	for _, path := range []string{"../AGENTS.md", "../DESIGN.md", "../docs/workflow.md"} {
 		content := readFile(path)
@@ -427,5 +445,18 @@ func TestGeneratedSkillsUseRedGreenEvidence(t *testing.T) {
 			"removed even when Verify fails",
 			"does not prove",
 		)
+	}
+
+	for _, path := range []string{
+		"../AGENTS.md",
+		"../DESIGN.md",
+		"../docs/concepts.md",
+		"../docs/tutorial.md",
+		"../docs/workflow.md",
+		"../specs/decisions/0004-units-require-red-green-evidence.md",
+		"../specs/review/spec.md",
+	} {
+		content := readFile(path)
+		requirePolicy(path, content)
 	}
 }
