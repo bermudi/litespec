@@ -714,6 +714,20 @@ func TestValidateQueueRedGreenReceipt(t *testing.T) {
 		}
 	})
 
+	t.Run("one comment receipt satisfies only one duplicate heading occurrence", func(t *testing.T) {
+		body := ownedQueue(
+			"## Same outcome\nDone means: first thing\nVerify:\n```\necho hi\n```\n- [x] done\n\n" +
+				"## Same outcome\nDone means: second thing\nVerify:\n```\necho hi\n```\n- [x] done\n",
+		)
+		units, issues := ValidateQueueBody(body, source)
+		comment := "Same outcome\n" + evidenceReceipt("echo hi")
+		result := &ValidationResult{Valid: true}
+		applyQueueIssues(result, units, issues, []string{comment})
+		if len(result.Errors) != 1 {
+			t.Fatalf("expected one unmatched duplicate unit receipt, got %v", result.Errors)
+		}
+	})
+
 	t.Run("receipt output structural tokens are ignored", func(t *testing.T) {
 		evidence := redGreenEvidenceReceipt(
 			"echo hi",
