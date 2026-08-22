@@ -65,7 +65,7 @@ Review's auto-loaded harness/system instructions, `AGENTS.md`, and review `SKILL
 3. **CRITICAL or WARNING inside review scope, outside units** → blocking direct fix if trivial, append a blocking unit to the parent if non-trivial, or `plan` if the shape is wrong.
 4. **CRITICAL or WARNING outside review scope and units** → non-blocking small fix, or draft for a later `plan[clear]` that creates its own queue/branch.
 
-`needs decision` is reported before applying the matching route and does not alter blocking status. The issue closes only when every unit is checked **and** review returns `PASS`.
+`needs decision` is reported before applying the matching route and does not alter blocking status. The issue closes only when every unit checkbox is checked, every rebuild request is resolved, and review returns `PASS`.
 
 ## Key Design Decisions
 
