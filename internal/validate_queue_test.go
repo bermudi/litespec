@@ -16,7 +16,7 @@ func ownedQueue(body string) string {
 const evidenceTestSHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 const evidencePostTestSHA = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
-func evidenceReceipt(verifyCmd string) string {
+func legacyEvidenceReceipt(verifyCmd string) string {
 	return "Evidence:\n" +
 		verifyCmd + "\n" +
 		"sha: " + evidenceTestSHA + "\n" +
@@ -25,6 +25,18 @@ func evidenceReceipt(verifyCmd string) string {
 		verifyCmd + " output\n" +
 		"```\n" +
 		"Evidence scope: this command exited 0 at " + evidenceTestSHA + "; nothing else is inferred.\n"
+}
+
+func evidenceReceipt(verifyCmd string) string {
+	return redGreenEvidenceReceipt(
+		verifyCmd,
+		evidenceTestSHA,
+		"1",
+		verifyCmd+" missing outcome",
+		evidencePostTestSHA,
+		"0",
+		verifyCmd+" output",
+	)
 }
 
 func TestValidateGHIssueQueue(t *testing.T) {
@@ -627,6 +639,48 @@ func TestValidateQueueRedGreenReceipt(t *testing.T) {
 		}
 	})
 
+	t.Run("receipt label in raw output passes", func(t *testing.T) {
+		evidence := redGreenEvidenceReceipt(
+			"echo hi",
+			evidenceTestSHA,
+			"1",
+			"Evidence:\nmissing outcome",
+			evidencePostTestSHA,
+			"0",
+			"hi",
+		)
+		_, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", evidence)), source)
+		if len(issues) > 0 {
+			t.Fatalf("expected no issues, got %v", issues)
+		}
+	})
+
+	t.Run("checkbox in raw output passes", func(t *testing.T) {
+		evidence := redGreenEvidenceReceipt(
+			"echo hi",
+			evidenceTestSHA,
+			"1",
+			"- [x] pre output",
+			evidencePostTestSHA,
+			"0",
+			"- [x] post output",
+		)
+		_, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", evidence)), source)
+		if len(issues) > 0 {
+			t.Fatalf("expected no issues, got %v", issues)
+		}
+	})
+
+	t.Run("fenced Verify takes precedence over inline Verify", func(t *testing.T) {
+		body := "## My outcome\nDone means: something\nVerify: `echo inline`\n```\necho fenced\n```\n" +
+			evidenceReceipt("echo fenced") +
+			"- [x] done\n"
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
+		if len(issues) > 0 {
+			t.Fatalf("expected no issues, got %v", issues)
+		}
+	})
+
 	tests := []struct {
 		name        string
 		evidence    string
@@ -634,7 +688,7 @@ func TestValidateQueueRedGreenReceipt(t *testing.T) {
 	}{
 		{
 			name:        "legacy green-only receipt fails",
-			evidence:    evidenceReceipt("echo hi"),
+			evidence:    legacyEvidenceReceipt("echo hi"),
 			wantMessage: "pre sha",
 		},
 		{
@@ -754,46 +808,42 @@ func TestCheckedUnitEvidence(t *testing.T) {
 		if !containsIssue(issues, "must quote the Verify command verbatim") {
 			t.Fatalf("expected verbatim command error, got %v", issues)
 		}
-		if !containsIssue(issues, "must record HEAD sha") {
-			t.Fatalf("expected sha error, got %v", issues)
-		}
-		if !containsIssue(issues, "must record exit status") {
-			t.Fatalf("expected exit status error, got %v", issues)
-		}
-		if !containsIssue(issues, "must include raw command output, or `<no output>`, in a fenced block") {
-			t.Fatalf("expected fenced output error, got %v", issues)
-		}
-		if !containsIssue(issues, "must include scope line") {
-			t.Fatalf("expected scope line error, got %v", issues)
-		}
 	})
 
 	t.Run("short sha fails", func(t *testing.T) {
-		body := checkedUnit("echo hi", "Evidence:\necho hi\nsha: abc123\nexit status: 0\n```\nhi\n```\nEvidence scope: this command exited 0 at abc123; nothing else is inferred.\n")
+		body := checkedUnit("echo hi", redGreenEvidenceReceipt(
+			"echo hi", "abc123", "1", "missing", evidencePostTestSHA, "0", "hi",
+		))
 		_, issues := ValidateQueueBody(ownedQueue(body), source)
-		if !containsIssue(issues, "must record HEAD sha") {
+		if !containsIssue(issues, "pre sha must be a full") {
 			t.Fatalf("expected sha error, got %v", issues)
 		}
 	})
 
 	t.Run("empty fence fails", func(t *testing.T) {
-		body := checkedUnit("echo hi", "Evidence:\necho hi\nsha: "+evidenceTestSHA+"\nexit status: 0\n```\n```\nEvidence scope: this command exited 0 at "+evidenceTestSHA+"; nothing else is inferred.\n")
+		body := checkedUnit("echo hi", redGreenEvidenceReceipt(
+			"echo hi", evidenceTestSHA, "1", "", evidencePostTestSHA, "0", "hi",
+		))
 		_, issues := ValidateQueueBody(ownedQueue(body), source)
-		if !containsIssue(issues, "must include raw command output, or `<no output>`, in a fenced block") {
+		if !containsIssue(issues, "pre raw command output") {
 			t.Fatalf("expected empty fence error, got %v", issues)
 		}
 	})
 
 	t.Run("checked unit with failed evidence fails", func(t *testing.T) {
-		body := checkedUnit("echo hi", "Evidence:\necho hi\nsha: "+evidenceTestSHA+"\nexit status: 1\n```\nFAIL\n```\nEvidence scope: this command exited 1 at "+evidenceTestSHA+"; nothing else is inferred.\n")
+		body := checkedUnit("echo hi", redGreenEvidenceReceipt(
+			"echo hi", evidenceTestSHA, "1", "missing", evidencePostTestSHA, "1", "FAIL",
+		))
 		_, issues := ValidateQueueBody(ownedQueue(body), source)
-		if !containsIssue(issues, "must record exit status 0 for a checked unit") {
+		if !containsIssue(issues, "post exit status must be 0") {
 			t.Fatalf("expected non-zero exit status error, got %v", issues)
 		}
 	})
 
 	t.Run("checked unit with explicit no output passes", func(t *testing.T) {
-		body := checkedUnit("echo hi", "Evidence:\necho hi\nsha: "+evidenceTestSHA+"\nexit status: 0\n```\n<no output>\n```\nEvidence scope: this command exited 0 at "+evidenceTestSHA+"; nothing else is inferred.\n")
+		body := checkedUnit("echo hi", redGreenEvidenceReceipt(
+			"echo hi", evidenceTestSHA, "1", "<no output>", evidencePostTestSHA, "0", "<no output>",
+		))
 		_, issues := ValidateQueueBody(ownedQueue(body), source)
 		if len(issues) > 0 {
 			t.Fatalf("expected valid evidence, got %v", issues)
@@ -809,18 +859,29 @@ func TestCheckedUnitEvidence(t *testing.T) {
 	})
 
 	t.Run("scope sha mismatch fails", func(t *testing.T) {
-		other := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-		body := checkedUnit("echo hi", "Evidence:\necho hi\nsha: "+evidenceTestSHA+"\nexit status: 0\n```\nhi\n```\nEvidence scope: this command exited 0 at "+other+"; nothing else is inferred.\n")
+		evidence := strings.Replace(
+			evidenceReceipt("echo hi"),
+			"Pre-evidence scope: this command exited 1 at "+evidenceTestSHA,
+			"Pre-evidence scope: this command exited 1 at "+evidencePostTestSHA,
+			1,
+		)
+		body := checkedUnit("echo hi", evidence)
 		_, issues := ValidateQueueBody(ownedQueue(body), source)
-		if !containsIssue(issues, "scope line sha must match recorded HEAD sha") {
+		if !containsIssue(issues, "pre scope line sha must match pre sha") {
 			t.Fatalf("expected sha mismatch, got %v", issues)
 		}
 	})
 
 	t.Run("scope status mismatch fails", func(t *testing.T) {
-		body := checkedUnit("echo hi", "Evidence:\necho hi\nsha: "+evidenceTestSHA+"\nexit status: 0\n```\nhi\n```\nEvidence scope: this command exited 1 at "+evidenceTestSHA+"; nothing else is inferred.\n")
+		evidence := strings.Replace(
+			evidenceReceipt("echo hi"),
+			"Post-evidence scope: this command exited 0",
+			"Post-evidence scope: this command exited 1",
+			1,
+		)
+		body := checkedUnit("echo hi", evidence)
 		_, issues := ValidateQueueBody(ownedQueue(body), source)
-		if !containsIssue(issues, "scope line status must match recorded exit status") {
+		if !containsIssue(issues, "post scope line status must match post exit status") {
 			t.Fatalf("expected status mismatch, got %v", issues)
 		}
 	})
@@ -830,6 +891,14 @@ func TestCheckedUnitEvidence(t *testing.T) {
 		_, issues := ValidateQueueBody(ownedQueue(body), source)
 		if len(issues) > 0 {
 			t.Fatalf("expected no issues, got %v", issues)
+		}
+	})
+
+	t.Run("evidence label inside Verify does not satisfy", func(t *testing.T) {
+		body := checkedUnit("printf 'Evidence:\\n'", "")
+		_, issues := ValidateQueueBody(ownedQueue(body), source)
+		if !containsIssue(issues, "missing Evidence receipt") {
+			t.Fatalf("expected missing receipt, got %v", issues)
 		}
 	})
 }
@@ -903,6 +972,37 @@ func TestGHCommentEvidenceReceipt(t *testing.T) {
 		}
 		if !result.Valid {
 			t.Fatalf("expected Valid true, got false: %v", result.Errors)
+		}
+	})
+
+	t.Run("legacy receipt comment does not satisfy", func(t *testing.T) {
+		if commentSatisfiesEvidence("My outcome", "echo hi", []string{
+			"My outcome\n" + legacyEvidenceReceipt("echo hi"),
+		}) {
+			t.Fatal("expected legacy comment receipt to fail")
+		}
+	})
+
+	t.Run("overlapping heading does not satisfy", func(t *testing.T) {
+		if commentSatisfiesEvidence("My", "echo hi", []string{
+			"My outcome\n" + evidenceReceipt("echo hi"),
+		}) {
+			t.Fatal("expected non-exact heading mention to fail")
+		}
+	})
+
+	t.Run("heading in raw output does not satisfy", func(t *testing.T) {
+		comment := "Other outcome\n" + redGreenEvidenceReceipt(
+			"echo hi",
+			evidenceTestSHA,
+			"1",
+			"My outcome",
+			evidencePostTestSHA,
+			"0",
+			"hi",
+		)
+		if commentSatisfiesEvidence("My outcome", "echo hi", []string{comment}) {
+			t.Fatal("expected heading inside raw output not to associate the comment")
 		}
 	})
 }

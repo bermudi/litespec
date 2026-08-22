@@ -193,11 +193,9 @@ func validateOptionalField(body []string, fieldName string, count int, idx int, 
 	return nil
 }
 
-var (
-	evidenceSHAPattern    = regexp.MustCompile(`(?im)^(?:HEAD\s+)?sha(?:\s+at\s+run\s+time)?\s*[:=]\s*([0-9a-f]{40}(?:[0-9a-f]{24})?)\s*$`)
-	evidenceStatusPattern = regexp.MustCompile(`(?im)^exit status\s*[:=]\s*(-?\d+)\s*$`)
-	evidenceScopePattern  = regexp.MustCompile(`(?im)^Evidence scope:\s*this command exited\s+(-?\d+)\s+at\s+([0-9a-f]{40}(?:[0-9a-f]{24})?);\s*nothing else is inferred\.\s*$`)
-)
+var evidenceCommitPattern = regexp.MustCompile(`^[0-9a-fA-F]{40}(?:[0-9a-fA-F]{24})?$`)
+var preEvidenceScopePattern = regexp.MustCompile(`^Pre-evidence scope: this command exited (-?\d+) at ([0-9a-fA-F]{40}(?:[0-9a-fA-F]{24})?); nothing else is inferred\.$`)
+var postEvidenceScopePattern = regexp.MustCompile(`^Post-evidence scope: this command exited (-?\d+) at ([0-9a-fA-F]{40}(?:[0-9a-fA-F]{24})?); nothing else is inferred\.$`)
 
 func isCheckedLine(trimmed string) bool {
 	for _, cb := range []string{"- [x]", "- [X]"} {
@@ -230,12 +228,16 @@ func unitVerifyCommand(body []string) string {
 			inline = strings.TrimSpace(rest[firstBacktick+1 : lastBacktick])
 		}
 		for j := i + 1; j < len(body); j++ {
-			if !strings.HasPrefix(body[j], "```") {
+			trimmed := strings.TrimSpace(body[j])
+			if trimmed == "" {
 				continue
+			}
+			if !strings.HasPrefix(trimmed, "```") {
+				return inline
 			}
 			var blockLines []string
 			for k := j + 1; k < len(body); k++ {
-				if strings.HasPrefix(body[k], "```") {
+				if strings.HasPrefix(strings.TrimSpace(body[k]), "```") {
 					return strings.Join(blockLines, "\n")
 				}
 				blockLines = append(blockLines, body[k])
@@ -248,8 +250,26 @@ func unitVerifyCommand(body []string) string {
 }
 
 func extractEvidenceText(body []string) string {
+	seenVerify := false
+	inFence := false
 	for i, line := range body {
 		trimmed := strings.TrimSpace(line)
+		if !seenVerify {
+			if strings.HasPrefix(line, "Verify:") {
+				seenVerify = true
+			}
+			continue
+		}
+		if strings.HasPrefix(trimmed, "```") {
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			continue
+		}
+		if isCheckboxLine(trimmed) {
+			break
+		}
 		if !strings.HasPrefix(trimmed, "Evidence:") {
 			continue
 		}
@@ -257,9 +277,15 @@ func extractEvidenceText(body []string) string {
 		if rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "Evidence:")); rest != "" {
 			parts = append(parts, rest)
 		}
+		receiptFence := false
 		for j := i + 1; j < len(body); j++ {
 			t := strings.TrimSpace(body[j])
-			if isCheckboxLine(t) {
+			if strings.HasPrefix(t, "```") {
+				receiptFence = !receiptFence
+				parts = append(parts, body[j])
+				continue
+			}
+			if !receiptFence && isCheckboxLine(t) {
 				break
 			}
 			parts = append(parts, body[j])
@@ -269,29 +295,96 @@ func extractEvidenceText(body []string) string {
 	return ""
 }
 
-func hasFencedOutput(text string) bool {
-	inFence := false
-	var inner []string
-	for _, line := range strings.Split(text, "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), "```") {
-			if inFence {
-				for _, l := range inner {
-					if strings.TrimSpace(l) != "" {
-						return true
-					}
-				}
-				inner = nil
-				inFence = false
-				continue
-			}
-			inFence = true
-			continue
-		}
-		if inFence {
-			inner = append(inner, line)
+type evidenceCursor struct {
+	lines []string
+	at    int
+}
+
+func newEvidenceCursor(text string) *evidenceCursor {
+	normalized := strings.ReplaceAll(text, "\r\n", "\n")
+	lines := strings.Split(normalized, "\n")
+	for len(lines) > 0 && strings.TrimSpace(lines[0]) == "" {
+		lines = lines[1:]
+	}
+	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+		lines = lines[:len(lines)-1]
+	}
+	return &evidenceCursor{lines: lines}
+}
+
+func (c *evidenceCursor) consumeExactLines(value string) bool {
+	wanted := strings.Split(strings.ReplaceAll(value, "\r\n", "\n"), "\n")
+	if c.at+len(wanted) > len(c.lines) {
+		return false
+	}
+	for i, line := range wanted {
+		if c.lines[c.at+i] != line {
+			return false
 		}
 	}
-	return false
+	c.at += len(wanted)
+	return true
+}
+
+func (c *evidenceCursor) consumeField(label string) (string, bool) {
+	if c.at >= len(c.lines) {
+		return "", false
+	}
+	prefix := label + ":"
+	if !strings.HasPrefix(c.lines[c.at], prefix) {
+		return "", false
+	}
+	value := strings.TrimSpace(strings.TrimPrefix(c.lines[c.at], prefix))
+	c.at++
+	return value, true
+}
+
+func fenceDelimiter(line string) string {
+	trimmed := strings.TrimSpace(line)
+	count := 0
+	for count < len(trimmed) && trimmed[count] == '`' {
+		count++
+	}
+	if count < 3 {
+		return ""
+	}
+	return trimmed[:count]
+}
+
+func (c *evidenceCursor) consumeFence() (string, bool) {
+	if c.at >= len(c.lines) {
+		return "", false
+	}
+	delimiter := fenceDelimiter(c.lines[c.at])
+	if delimiter == "" {
+		return "", false
+	}
+	c.at++
+	start := c.at
+	for c.at < len(c.lines) {
+		if strings.TrimSpace(c.lines[c.at]) == delimiter {
+			output := strings.Join(c.lines[start:c.at], "\n")
+			c.at++
+			return output, true
+		}
+		c.at++
+	}
+	return "", false
+}
+
+func evidencePayload(text, verifyCmd string) string {
+	normalized := strings.ReplaceAll(text, "\r\n", "\n")
+	if strings.HasPrefix(strings.TrimLeft(normalized, "\n"), verifyCmd+"\n") {
+		return normalized
+	}
+	lines := strings.Split(normalized, "\n")
+	for i, line := range lines {
+		if strings.TrimSpace(line) != "Evidence:" {
+			continue
+		}
+		return strings.Join(lines[i+1:], "\n")
+	}
+	return text
 }
 
 func evidenceReceiptIssues(text, verifyCmd, source, heading string) []ValidationIssue {
@@ -312,32 +405,105 @@ func evidenceReceiptIssues(text, verifyCmd, source, heading string) []Validation
 		})
 	}
 
-	if verifyCmd != "" && !strings.Contains(text, verifyCmd) {
+	cursor := newEvidenceCursor(evidencePayload(text, verifyCmd))
+	if verifyCmd == "" || !cursor.consumeExactLines(verifyCmd) {
 		fail("must quote the Verify command verbatim")
+		return issues
 	}
-	shaMatch := evidenceSHAPattern.FindStringSubmatch(text)
-	if shaMatch == nil {
-		fail("must record HEAD sha as a full 40- or 64-character hexadecimal commit ID")
+
+	preSHA, ok := cursor.consumeField("pre sha")
+	if !ok {
+		fail("fields must appear in order beginning with pre sha")
+		return issues
 	}
-	statusMatch := evidenceStatusPattern.FindStringSubmatch(text)
-	if statusMatch == nil {
-		fail("must record exit status")
-	} else if statusMatch[1] != "0" {
-		fail("must record exit status 0 for a checked unit")
+	if !evidenceCommitPattern.MatchString(preSHA) {
+		fail("pre sha must be a full 40- or 64-character hexadecimal commit ID")
 	}
-	if !hasFencedOutput(text) {
-		fail("must include raw command output, or `<no output>`, in a fenced block")
+
+	preStatusText, ok := cursor.consumeField("pre exit status")
+	if !ok {
+		fail("fields must appear in order: pre exit status must follow pre sha")
+		return issues
 	}
-	scopeMatch := evidenceScopePattern.FindStringSubmatch(text)
-	if scopeMatch == nil {
-		fail("must include scope line `Evidence scope: this command exited <status> at <sha>; nothing else is inferred.`")
+	preStatus, err := strconv.Atoi(preStatusText)
+	if err != nil {
+		fail("pre exit status must be an integer")
+	} else if preStatus == 0 {
+		fail("pre exit status must be non-zero")
+	}
+
+	preOutput, ok := cursor.consumeFence()
+	if !ok || strings.TrimSpace(preOutput) == "" {
+		fail("must include pre raw command output, or `<no output>`, in a fenced block")
+		return issues
+	}
+
+	if cursor.at >= len(cursor.lines) {
+		fail("must include a matching Pre-evidence scope line")
+		return issues
+	}
+	preScope := preEvidenceScopePattern.FindStringSubmatch(cursor.lines[cursor.at])
+	cursor.at++
+	if preScope == nil {
+		fail("must include a matching Pre-evidence scope line")
 	} else {
-		if statusMatch != nil && scopeMatch[1] != statusMatch[1] {
-			fail("scope line status must match recorded exit status")
+		if preScope[1] != preStatusText {
+			fail("pre scope line status must match pre exit status")
 		}
-		if shaMatch != nil && !strings.EqualFold(scopeMatch[2], shaMatch[1]) {
-			fail("scope line sha must match recorded HEAD sha")
+		if !strings.EqualFold(preScope[2], preSHA) {
+			fail("pre scope line sha must match pre sha")
 		}
+	}
+
+	postSHA, ok := cursor.consumeField("post sha")
+	if !ok {
+		fail("fields must appear in order: post sha must follow the pre scope line")
+		return issues
+	}
+	if !evidenceCommitPattern.MatchString(postSHA) {
+		fail("post sha must be a full 40- or 64-character hexadecimal commit ID")
+	}
+	if evidenceCommitPattern.MatchString(preSHA) && strings.EqualFold(preSHA, postSHA) {
+		fail("pre and post sha must differ")
+	}
+
+	postStatusText, ok := cursor.consumeField("post exit status")
+	if !ok {
+		fail("fields must appear in order: post exit status must follow post sha")
+		return issues
+	}
+	if postStatusText != "0" {
+		fail("post exit status must be 0")
+	}
+
+	postOutput, ok := cursor.consumeFence()
+	if !ok || strings.TrimSpace(postOutput) == "" {
+		fail("must include post raw command output, or `<no output>`, in a fenced block")
+		return issues
+	}
+
+	if cursor.at >= len(cursor.lines) {
+		fail("must include a matching Post-evidence scope line")
+		return issues
+	}
+	postScope := postEvidenceScopePattern.FindStringSubmatch(cursor.lines[cursor.at])
+	cursor.at++
+	if postScope == nil {
+		fail("must include a matching Post-evidence scope line")
+	} else {
+		if postScope[1] != postStatusText {
+			fail("post scope line status must match post exit status")
+		}
+		if !strings.EqualFold(postScope[2], postSHA) {
+			fail("post scope line sha must match post sha")
+		}
+	}
+
+	for cursor.at < len(cursor.lines) && strings.TrimSpace(cursor.lines[cursor.at]) == "" {
+		cursor.at++
+	}
+	if cursor.at != len(cursor.lines) {
+		fail("fields must appear in order with no unexpected trailing content")
 	}
 	return issues
 }
@@ -351,10 +517,31 @@ func validateCheckedUnitEvidence(unit queueUnit, source string) []ValidationIssu
 
 func commentSatisfiesEvidence(heading, verifyCmd string, comments []string) bool {
 	for _, c := range comments {
-		if !strings.Contains(c, heading) {
+		if !commentNamesUnit(c, heading) {
 			continue
 		}
 		if len(evidenceReceiptIssues(c, verifyCmd, "comment", heading)) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func commentNamesUnit(comment, heading string) bool {
+	inFence := false
+	for _, line := range strings.Split(strings.ReplaceAll(comment, "\r\n", "\n"), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "```") {
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			continue
+		}
+		if trimmed == "Evidence:" || strings.HasPrefix(trimmed, "Evidence: ") {
+			return false
+		}
+		if trimmed == heading || trimmed == "## "+heading {
 			return true
 		}
 	}
