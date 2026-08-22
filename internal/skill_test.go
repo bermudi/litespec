@@ -22,8 +22,16 @@ func resetTemplates() {
 	}
 }
 
+func snapshotTemplates() map[string]string {
+	snapshot := make(map[string]string, len(skill.All()))
+	for id, template := range skill.All() {
+		snapshot[id] = template
+	}
+	return snapshot
+}
+
 func TestGenerateSkills_CreatesAllSkillFiles(t *testing.T) {
-	original := skill.All()
+	original := snapshotTemplates()
 	defer func() {
 		resetTemplates()
 		for k, v := range original {
@@ -64,7 +72,7 @@ func TestGenerateSkills_CreatesAllSkillFiles(t *testing.T) {
 }
 
 func TestGenerateSkills_FrontmatterFormat(t *testing.T) {
-	original := skill.All()
+	original := snapshotTemplates()
 	defer func() {
 		resetTemplates()
 		for k, v := range original {
@@ -108,7 +116,7 @@ func TestGenerateSkills_FrontmatterFormat(t *testing.T) {
 }
 
 func TestGenerateSkills_MissingTemplate(t *testing.T) {
-	original := skill.All()
+	original := snapshotTemplates()
 	defer func() {
 		resetTemplates()
 		for k, v := range original {
@@ -129,7 +137,7 @@ func TestGenerateSkills_MissingTemplate(t *testing.T) {
 }
 
 func TestGenerateSkills_RefusesSymlinkWithoutOverwritingTarget(t *testing.T) {
-	original := skill.All()
+	original := snapshotTemplates()
 	defer func() {
 		resetTemplates()
 		for k, v := range original {
@@ -173,7 +181,7 @@ func TestGenerateSkills_RefusesSymlinkWithoutOverwritingTarget(t *testing.T) {
 }
 
 func TestGenerateSkills_WritesResourceFiles(t *testing.T) {
-	original := skill.All()
+	original := snapshotTemplates()
 	originalResources := skill.GetResources("review")
 	defer func() {
 		resetTemplates()
@@ -212,7 +220,7 @@ func TestGenerateSkills_WritesResourceFiles(t *testing.T) {
 }
 
 func TestGenerateSkills_CleansStaleResources(t *testing.T) {
-	original := skill.All()
+	original := snapshotTemplates()
 	defer func() {
 		resetTemplates()
 		for k, v := range original {
@@ -335,7 +343,7 @@ func TestCheckStaleSkills_MixedCurrentAndStale(t *testing.T) {
 }
 
 func TestGenerateSkills_ReadonlyDir(t *testing.T) {
-	original := skill.All()
+	original := snapshotTemplates()
 	defer func() {
 		resetTemplates()
 		for k, v := range original {
