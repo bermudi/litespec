@@ -86,8 +86,15 @@ func parseQueueUnits(body string) []queueUnit {
 	lines := strings.Split(body, "\n")
 	var units []queueUnit
 	var current *queueUnit
+	openFence := ""
 
 	for _, line := range lines {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			if current != nil {
+				current.Body = append(current.Body, line)
+			}
+			continue
+		}
 		if strings.HasPrefix(line, "## ") {
 			if current != nil {
 				units = append(units, *current)
@@ -207,7 +214,11 @@ func isCheckedLine(trimmed string) bool {
 }
 
 func isCheckedUnit(body []string) bool {
+	openFence := ""
 	for _, line := range body {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
 		if isCheckedLine(strings.TrimSpace(line)) {
 			return true
 		}
@@ -528,15 +539,23 @@ func validateCheckedUnitEvidence(unit queueUnit, source string) []ValidationIssu
 }
 
 func commentSatisfiesEvidence(heading, verifyCmd string, comments []string) bool {
-	for _, c := range comments {
+	_, ok := matchingEvidenceComment(heading, verifyCmd, comments, nil)
+	return ok
+}
+
+func matchingEvidenceComment(heading, verifyCmd string, comments []string, used map[int]bool) (int, bool) {
+	for i, c := range comments {
+		if used[i] {
+			continue
+		}
 		if !commentNamesUnit(c, heading) {
 			continue
 		}
 		if len(evidenceReceiptIssues(c, verifyCmd, "comment", heading)) == 0 {
-			return true
+			return i, true
 		}
 	}
-	return false
+	return 0, false
 }
 
 func commentNamesUnit(comment, heading string) bool {
@@ -557,11 +576,29 @@ func commentNamesUnit(comment, heading string) bool {
 }
 
 func applyQueueIssues(result *ValidationResult, units []queueUnit, unitIssues []ValidationIssue, comments []string) {
+	usedComments := make(map[int]bool)
+	commentEvidence := make(map[string]bool)
+	for _, unit := range units {
+		if !isCheckedUnit(unit.Body) {
+			continue
+		}
+		if len(validateCheckedUnitEvidence(unit, "queue")) == 0 {
+			continue
+		}
+		commentIndex, ok := matchingEvidenceComment(unit.Heading, unitVerifyCommand(unit.Body), comments, usedComments)
+		if !ok {
+			continue
+		}
+		usedComments[commentIndex] = true
+		commentEvidence[unit.Heading] = true
+	}
+
 	for _, iss := range unitIssues {
 		if strings.Contains(iss.Message, "Evidence receipt") && len(comments) > 0 {
 			skipped := false
 			for _, u := range units {
-				if strings.Contains(iss.Message, fmt.Sprintf("%q", u.Heading)) && commentSatisfiesEvidence(u.Heading, unitVerifyCommand(u.Body), comments) {
+				unitMessage := fmt.Sprintf("checked unit %q", u.Heading)
+				if strings.Contains(iss.Message, unitMessage) && commentEvidence[u.Heading] {
 					skipped = true
 					break
 				}
@@ -638,7 +675,11 @@ func lintVerifyShell(block string, source string, unitHeading string) []Validati
 }
 
 func isUnit(unit queueUnit) bool {
+	openFence := ""
 	for _, line := range unit.Body {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
 		if strings.HasPrefix(line, "Done means:") || strings.HasPrefix(line, "Verify:") {
 			return true
 		}
@@ -658,7 +699,11 @@ func isCheckboxLine(line string) bool {
 
 func parseDepends(body []string) []string {
 	var deps []string
+	openFence := ""
 	for _, line := range body {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
 		if !strings.HasPrefix(line, "Depends:") {
 			continue
 		}
@@ -683,7 +728,11 @@ func validateQueueOwnership(body string, source string) []ValidationIssue {
 	var bases []ownershipLine
 	var branches []ownershipLine
 	beforeHeading := true
+	openFence := ""
 	for _, line := range strings.Split(body, "\n") {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
 		if strings.HasPrefix(line, "## ") {
 			beforeHeading = false
 		}
