@@ -69,6 +69,16 @@ func TestGeneratedReviewRoutesRebuildRequests(t *testing.T) {
 			t.Errorf("build missing request-selection rule %q", required)
 		}
 	}
+	const closureRule = "The issue closes only when every unit checkbox is checked, every rebuild request is resolved, and review returns `PASS`."
+	for _, path := range []string{"../AGENTS.md", "../docs/project-structure.md"} {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read closure documentation %s: %v", path, err)
+		}
+		if !strings.Contains(string(content), closureRule) {
+			t.Errorf("%s missing closure rule %q", path, closureRule)
+		}
+	}
 
 	var fixture rebuildRoutingFixture
 	data, err := os.ReadFile("testdata/rebuild-routing/github.json")
