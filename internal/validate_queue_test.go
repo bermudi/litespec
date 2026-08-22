@@ -700,6 +700,17 @@ func TestValidateQueueRedGreenReceipt(t *testing.T) {
 		}
 	})
 
+	t.Run("comment heading followed by Verify command needs no Evidence label", func(t *testing.T) {
+		body := ownedQueue(checkedUnit("echo hi", ""))
+		units, issues := ValidateQueueBody(body, source)
+		comment := "## My outcome\n" + strings.TrimPrefix(evidenceReceipt("echo hi"), "Evidence:\n")
+		result := &ValidationResult{Valid: true}
+		applyQueueIssues(result, units, issues, []string{comment})
+		if len(result.Errors) > 0 {
+			t.Fatalf("expected heading and command comment to satisfy receipt, got %v", result.Errors)
+		}
+	})
+
 	t.Run("one comment receipt satisfies only one unit with the same Verify", func(t *testing.T) {
 		body := ownedQueue(
 			"## First outcome\nDone means: first thing\nVerify:\n```\necho hi\n```\n- [x] done\n\n" +
@@ -720,7 +731,7 @@ func TestValidateQueueRedGreenReceipt(t *testing.T) {
 				"## Same outcome\nDone means: second thing\nVerify:\n```\necho hi\n```\n- [x] done\n",
 		)
 		units, issues := ValidateQueueBody(body, source)
-		comment := "Same outcome\n" + evidenceReceipt("echo hi")
+		comment := "## Same outcome\n" + strings.TrimPrefix(evidenceReceipt("echo hi"), "Evidence:\n")
 		result := &ValidationResult{Valid: true}
 		applyQueueIssues(result, units, issues, []string{comment})
 		if len(result.Errors) != 1 {
