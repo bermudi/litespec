@@ -18,12 +18,12 @@ The `litespec-review` safety contract SHALL treat harness/system instructions an
 
 ### Requirement: Adversarial Review of Issue and Spec vs Implementation
 
-After trusted bootstrap and skill activation, `litespec-review` SHALL perform a context-aware, adversarial review by first reading only the remote GH issue body, then safely screening every additional local path before reading its contents. Safely approved content includes the queue units, load-bearing specs, relevant decisions, and exact issue-owned review scope. It SHALL probe for interaction bugs, state transitions, wiring gaps, and contract violations, not only syntax or surface compliance.
+After trusted bootstrap and skill activation, `litespec-review` SHALL perform a context-aware, adversarial review by first reading only the remote GH issue body, then safely screening every additional local path before reading its contents. After that initial body-only step and the ownership/path screen, review SHALL fetch and inspect remote GH issue comments so evidence receipts posted there participate in the review. Safely approved content includes the queue units, load-bearing specs, relevant decisions, and exact issue-owned review scope. It SHALL probe for interaction bugs, state transitions, wiring gaps, and contract violations, not only syntax or surface compliance.
 
 #### Scenario: Review with GH issue and spec
 
 - **WHEN** `litespec-review` is invoked for a change with a GH issue and a load-bearing spec
-- **THEN** it reads the remote issue, screens all selected local paths, then reads approved specs, decisions, and issue-owned changes before probing the implementation
+- **THEN** it reads the remote issue body, screens all selected local paths, fetches issue comments, then reads approved specs, decisions, and issue-owned changes before probing the implementation
 
 #### Scenario: Review for small fix without issue
 
@@ -104,7 +104,7 @@ For every unit, `litespec-build` SHALL run the exact `Verify:` command against a
 
 ### Requirement: Evidence Receipt Cross-Check
 
-For every checked unit, `litespec-review` SHALL verify that a complete red-green evidence receipt exists for the unit's exact `Verify:` command and that its pre and post SHAs are distinct commits with pre an ancestor of post and post an ancestor of `HEAD`. Review SHALL run the exact command in detached temporary worktrees at pre and post, remove each temporary worktree even when Verify fails, and never check out an evidence SHA in the reviewer's current worktree. The pre run MUST exit non-zero because the unit outcome is absent; the post run and a further run at `HEAD` MUST exit 0 with the outcome present. A green pre run, an unrelated pre failure, a failed post or HEAD run, a missing or malformed receipt, or an edited command SHALL be a CRITICAL finding that breaks the unit's contract. Red-green evidence proves that Verify distinguishes the two recorded trees; it SHALL NOT by itself establish that Verify targets the correct behavior, which remains an adversarial review judgment.
+For every checked unit, `litespec-review` SHALL verify that a complete red-green evidence receipt exists for the unit's exact `Verify:` command and that its pre and post SHAs are distinct commits with pre an ancestor of post and post an ancestor of `HEAD`. Review SHALL run the exact command in separate detached temporary worktrees at pre and post and in its own detached temporary worktree at `HEAD`, and never check out an evidence SHA in the reviewer's current worktree. Cleanup SHALL be installed before worktree creation, and cleanup SHALL remove the `HEAD` worktree even when Verify fails, just as it removes the pre and post worktrees on every exit path. The pre run MUST exit non-zero because the unit outcome is absent; the post and `HEAD` runs MUST exit 0 with the outcome present. A green pre run, an unrelated pre failure, a failed post or HEAD run, a missing or malformed receipt, or an edited command SHALL be a CRITICAL finding that breaks the unit's contract. Red-green evidence proves that Verify distinguishes the two recorded trees; it SHALL NOT by itself establish that Verify targets the correct behavior, which remains an adversarial review judgment.
 
 #### Scenario: Reproducible red-green receipt
 

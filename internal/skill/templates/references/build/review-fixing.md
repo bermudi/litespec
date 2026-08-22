@@ -6,6 +6,11 @@ You are rebuilding a unit that review reopened — a CRITICAL or WARNING finding
 - After fixing, re-read the affected module end-to-end. Ask: "Did my changes introduce new surface area? What invariants might now be broken?"
 - Run the full test suite, not just tests related to your fix.
 
+**Red-green rebuild order:**
+1. Start from a clean tree. Establish and record a clean pre commit where the exact `Verify:` fails because the fix is absent. If the existing verifier passes, create at most one verifier-only commit, require a clean tree, and record the meaningful failing run there.
+2. Only after recording that pre run, create one or more implementation/fix commits. Never amend the recorded pre or any later commit.
+3. At the final clean commit where `Verify:` passes, record post, post a fresh evidence receipt, and re-check only the affected unit.
+
 **Per-finding loop:**
 
 1. Read the finding and the relevant source. If it references a spec requirement, read that spec section first.
@@ -16,13 +21,12 @@ You are rebuilding a unit that review reopened — a CRITICAL or WARNING finding
 6. State what was fixed and where.
 
 **Final verification:**
-1. `go build`
-2. `go test ./...`
-3. `go vet ./...`
-4. Establish a clean pre commit where the unit's exact `Verify:` fails because the fix is absent. If the old verifier still passes, strengthen only the verifier in one verifier-only commit and use that as pre.
-5. Create one or more implementation/fix commits for the pattern-wide fix without amending them, then run the same exact Verify and require exit status 0 at the final clean post commit.
-6. Record a fresh pre/post receipt. Never amend either evidence commit.
-7. `litespec validate` — confirm no structural regressions.
+1. Confirm the pre run was recorded before any fix, then run the same exact Verify at the final clean post commit and require exit status 0.
+2. `go build`
+3. `go test ./...`
+4. `go vet ./...`
+5. `litespec validate` — confirm no structural regressions.
+6. Post a fresh evidence receipt and re-check only the affected unit in the GH issue or local queue.
 
 **Escalation:**
 If a finding cannot be resolved, state it explicitly: "Finding [X] in `file:line` could not be resolved because [reason]." Never silently skip a finding. Suggest next steps (decision needed, re-plan the unit).
@@ -31,5 +35,6 @@ If a finding cannot be resolved, state it explicitly: "Finding [X] in `file:line
 - Do not fix only the cited `file:line` while ignoring structurally identical code nearby.
 - Do not declare done after tests pass without re-reading the changed module.
 - SUGGESTIONs remain optional. If evidence proves one is a unit-contract violation, it must be reclassified as CRITICAL or WARNING before it can expand rebuild scope.
-- Do not modify specs, the GH issue, or decisions — fix implementation code only. If the spec itself is wrong, pause and ask.
+- Do not reshape the unit contract: do not change its heading, Done means, Verify, dependencies, constraints, specs, or decisions. If the contract or spec is wrong, pause and ask.
+- Queue bookkeeping is the narrow exception: post a fresh evidence receipt and re-check only the affected unit in the GH issue or local queue. For a local queue, commit that bookkeeping separately after the recorded post commit.
 - Stay within the unit. Drive-bys outside the unit's scope get noted, not fixed.
