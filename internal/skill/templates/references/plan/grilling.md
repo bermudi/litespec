@@ -20,3 +20,5 @@ Grill to find the forks — don't write files until the forks are resolved.
 ## End
 
 When forks are resolved, summarize the shape in one paragraph and ask "ready to nail it?" — then load `references/clear.md` to write the GH issue.
+
+A fork closed by argument is a decision candidate. If the losing road is one someone will reasonably propose again and the reasoning spans files, flag it in the summary so clear mode can `touch` + `validate` a decision file (bar in DESIGN.md). Otherwise it becomes a comment at the line that would change, or nothing.

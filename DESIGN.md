@@ -117,9 +117,22 @@ proposed | accepted | superseded
 ## Consequences
 ```
 
-Optional frontmatter: `spine: true` for load-bearing. Created by agent via skill `references/adr.md`, not a CLI. `validate` checks sections, `view` stars spine.
+Optional frontmatter: `spine: true` for load-bearing. `validate` checks sections, `view` stars spine.
 
 No `litespec decide` command. `touch` + `validate` is enough.
+
+### When to write one
+
+The bar is high, on purpose. A decision closes off a road someone will reasonably propose again — the signal is explaining *why not* rather than *how*. Both must hold:
+
+1. **Real contention.** Someone argued for the other road, or demonstrably will — it's the obvious default. A road closed by argument during grilling counts by construction.
+2. **No better home.** Reasoning that fits at the line that would change is a comment there, not a decision. Decisions hold reasoning that spans files, or argues against a road with no single line to attach to.
+
+When in doubt, don't — a decisions directory that reads like a changelog has stopped being useful. `Context` records what was actually measured; `Consequences` state what would justify revisiting.
+
+### Layering
+
+`AGENTS.md` carries the compressed rule; the decision file carries the full reasoning, once. Neither restates the other — the split is the design, not duplication to clean up.
 
 ## Glossary
 

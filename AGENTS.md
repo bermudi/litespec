@@ -69,7 +69,7 @@ Review's auto-loaded harness/system instructions, `AGENTS.md`, and review `SKILL
 
 ## Key Design Decisions
 
-These came from deliberate debate. Respect the reasoning:
+These came from deliberate debate. Respect the reasoning — and when a ruling closes off a road someone will reasonably re-propose, record it as a decision (bar in DESIGN.md's Decisions section):
 
 - **Convention over configuration** — no config files unless a concrete need arises. OpenSpec ships a stub config.yaml that nobody fills in. We skip it entirely until needed. Tool adapters are auto-detected by scanning for symlinks in adapter skill directories (e.g., `.claude/skills/`) that point into `.agents/skills/`
 - **`.agents/skills/` is canonical** — one source of truth, discovered natively by nearly every AI coding agent. `--tools claude` creates symlinks in `.claude/skills/` as the only exception (Claude Code does not read `.agents/`). No other tool-specific adapters are needed
