@@ -301,6 +301,9 @@ func parseSemver(tag string) (semver, error) {
 	if idx := strings.IndexByte(patchStr, '-'); idx >= 0 {
 		prerelease = patchStr[idx+1:]
 		patchStr = patchStr[:idx]
+		if bIdx := strings.IndexByte(prerelease, '+'); bIdx >= 0 {
+			prerelease = prerelease[:bIdx]
+		}
 	}
 	if idx := strings.IndexByte(patchStr, '+'); idx >= 0 {
 		patchStr = patchStr[:idx]
