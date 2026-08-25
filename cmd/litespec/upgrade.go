@@ -11,8 +11,31 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bermudi/litespec/v2/internal"
+		"github.com/bermudi/litespec/v2/internal"
 )
+
+var (
+	tagsURL                = "https://api.github.com/repos/bermudi/litespec/tags"
+	runGoInstall           = defaultRunGoInstall
+	startBackgroundInstall = defaultStartBackgroundInstall
+	executableFn           = os.Executable
+	modulePathFn           = getModulePath
+)
+
+func defaultRunGoInstall(modulePath, tag string) error {
+	cmd := exec.Command("go", "install", modulePath+"/cmd/litespec@"+tag)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = append(os.Environ(), "GOPROXY=https://proxy.golang.org,direct")
+	return cmd.Run()
+}
+
+func defaultStartBackgroundInstall(modulePath, tag string) {
+	cmd := exec.Command("go", "install", modulePath+"/cmd/litespec@"+tag)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	_ = cmd.Start()
+}
 
 func cmdUpgrade(args []string) error {
 	fs := newFlagSet("upgrade", printUpgradeHelp)
@@ -29,7 +52,7 @@ func cmdUpgrade(args []string) error {
 		return fmt.Errorf("auto-upgrade only supports installations via 'go install'")
 	}
 
-	modulePath, err := getModulePath()
+	modulePath, err := modulePathFn()
 	if err != nil {
 		return err
 	}
@@ -83,11 +106,7 @@ func cmdUpgrade(args []string) error {
 		return nil
 	}
 
-	cmd := exec.Command("go", "install", modulePath+"/cmd/litespec@"+latestTag)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Env = append(os.Environ(), "GOPROXY=https://proxy.golang.org,direct")
-	if err := cmd.Run(); err != nil {
+	if err := runGoInstall(modulePath, latestTag); err != nil {
 		return err
 	}
 
@@ -135,7 +154,7 @@ func cmdUpgrade(args []string) error {
 }
 
 func isGoInstall() bool {
-	exe, err := os.Executable()
+	exe, err := executableFn()
 	if err != nil {
 		return false
 	}
@@ -190,7 +209,7 @@ type githubTag struct {
 }
 
 func fetchLatestVersion() (string, error) {
-	tags, err := fetchTagNames("https://api.github.com/repos/bermudi/litespec/tags")
+	tags, err := fetchTagNames(tagsURL)
 	if err != nil {
 		return "", err
 	}
@@ -198,7 +217,7 @@ func fetchLatestVersion() (string, error) {
 }
 
 func fetchLatestVersionFor(localVersion string) (string, error) {
-	tags, err := fetchTagNames("https://api.github.com/repos/bermudi/litespec/tags")
+	tags, err := fetchTagNames(tagsURL)
 	if err != nil {
 		return "", err
 	}

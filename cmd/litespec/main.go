@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime/debug"
 	"strings"
@@ -120,7 +119,7 @@ func maybeBackgroundUpgrade() {
 		return
 	}
 
-	modulePath, err := getModulePath()
+	modulePath, err := modulePathFn()
 	if err != nil {
 		return
 	}
@@ -142,8 +141,5 @@ func maybeBackgroundUpgrade() {
 	if err != nil || cmp >= 0 {
 		return
 	}
-	cmd := exec.Command("go", "install", modulePath+"/cmd/litespec@"+latest)
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	_ = cmd.Start()
+	startBackgroundInstall(modulePath, latest)
 }
