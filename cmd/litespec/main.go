@@ -55,6 +55,8 @@ func run() error {
 		return cmdView(os.Args[2:])
 	case "update":
 		return cmdUpdate(os.Args[2:])
+	case "digest":
+		return cmdDigest(os.Args[2:])
 	case "upgrade":
 		return cmdUpgrade(os.Args[2:])
 	case "completion":
@@ -80,6 +82,7 @@ Commands:
   validate [--all|--specs|--decisions|--issue <N>|--queue <path>] [--type T]   Validate specs, decisions, and queues
   view                              Dashboard overview
   update [--tools <ids>]            Regenerate skills and adapters
+  digest --issue <N> | --queue <p>  Print expected unit contract digests for a queue
   upgrade                           Check for and install the latest version
   completion <shell>                Generate shell completion script (bash, zsh, fish)
 

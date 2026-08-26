@@ -87,7 +87,7 @@ The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec
 
 ### Requirement: Checked Unit Evidence Receipt
 
-When a unit checkbox is checked, `litespec validate` SHALL require one verbatim red-green evidence receipt for that unit. A complete receipt MUST contain, in order: the unit's `Verify:` command quoted verbatim; `pre sha:` with a full 40- or 64-character hexadecimal commit ID; `pre exit status:` with a non-zero integer; a nonempty fenced block containing raw pre output or literal `<no output>`; `Pre-evidence scope: this command exited <status> at <sha>; nothing else is inferred.` matching the pre fields; `post sha:` with a full commit ID; `post exit status: 0`; a nonempty fenced block containing raw post output or literal `<no output>`; and `Post-evidence scope: this command exited 0 at <sha>; nothing else is inferred.` matching the post fields. The pre and post SHAs MUST differ. Unchecked units SHALL NOT require a receipt. Local queues and issue-body receipts SHALL live in an `Evidence:` block after `Verify:` and before the checkbox. On a GitHub issue, either a comment that names the unit heading or an identity-bearing comment with the unit's exact heading and positive 1-based same-heading occurrence SHALL satisfy the check when it carries a complete receipt. A green-only legacy receipt, nonempty `Evidence:` label, or comment that only mentions `Evidence:` SHALL NOT satisfy. Validate SHALL check receipt structure only; it MUST NOT execute the recorded command, inspect Git ancestry, or interpret either fenced output.
+When a unit checkbox is checked, `litespec validate` SHALL require one verbatim red-green evidence receipt for that unit. A complete receipt MUST contain, in order: the unit's `Verify:` command quoted verbatim; `unit digest:` with 64 lowercase hexadecimal characters; `pre sha:` with a full 40- or 64-character hexadecimal commit ID; `pre exit status:` with a non-zero integer; a nonempty fenced block containing raw pre output or literal `<no output>`; `Pre-evidence scope: this command exited <status> at <sha>; nothing else is inferred.` matching the pre fields; `post sha:` with a full commit ID; `post exit status: 0`; a nonempty fenced block containing raw post output or literal `<no output>`; and `Post-evidence scope: this command exited 0 at <sha>; nothing else is inferred.` matching the post fields. The pre and post SHAs MUST differ. The `unit digest:` value MUST equal the SHA-256 digest of the unit's canonicalized contract: its heading, optional `Read first:`, `Constraints:`, and `Depends:` values, `Done means:` value, and Verify content, each length-prefixed (decimal byte length followed by `:`), line endings normalized to `\n` and trailing whitespace trimmed, absent optional fields omitted. The digest MUST NOT cover the status checkbox, Evidence content, or any other unit text. Validate SHALL recompute the expected digest from the unit's current body and report a missing, malformed, or mismatched digest as an error naming the unit and, on mismatch, both the expected and actual digests — so editing `Done means:` or `Verify:` after evidence is recorded fails validation. One canonicalization SHALL serve GitHub bodies, GitHub comments, and local queue files. Unchecked units SHALL NOT require a receipt. Local queues and issue-body receipts SHALL live in an `Evidence:` block after `Verify:` and before the checkbox. On a GitHub issue, either a comment that names the unit heading or an identity-bearing comment with the unit's exact heading and positive 1-based same-heading occurrence SHALL satisfy the check when it carries a complete receipt. A green-only legacy receipt, nonempty `Evidence:` label, or comment that only mentions `Evidence:` SHALL NOT satisfy. Validate SHALL check receipt structure only; it MUST NOT execute the recorded command, inspect Git ancestry, or interpret either fenced output.
 
 #### Scenario: Unchecked unit without receipt passes
 
@@ -139,6 +139,21 @@ When a unit checkbox is checked, `litespec validate` SHALL require one verbatim 
 - **WHEN** a checked unit carries the former single-sha, single-status receipt shape without pre evidence
 - **THEN** validation reports an incomplete red-green receipt
 
+#### Scenario: Receipt with matching unit digest passes
+
+- **WHEN** a checked unit's receipt carries a `unit digest:` equal to the recomputed digest of the unit's current contract fields
+- **THEN** validation succeeds for that unit
+
+#### Scenario: Missing or malformed unit digest fails
+
+- **WHEN** a checked unit's receipt lacks the `unit digest:` field between the Verify quote and `pre sha:`, or carries a value that is not 64 lowercase hexadecimal characters
+- **THEN** validation reports an error naming the unit
+
+#### Scenario: Edited contract after recorded evidence fails
+
+- **WHEN** `Done means:`, `Verify:`, or any covered contract field is edited after a checked unit's receipt was posted, so the recomputed digest no longer matches the receipt's `unit digest:`
+- **THEN** validation reports a mismatch error naming the unit and both the expected and actual digests
+
 ### Requirement: GitHub Rebuild Request State
 
 `litespec validate` SHALL associate each structured GitHub rebuild request with exactly one unit by exact heading and positive 1-based occurrence among units with that heading. A later complete identity-bearing evidence receipt SHALL resolve every earlier request for that identity. An unresolved request, malformed request, malformed identity-bearing receipt, or identity that does not identify exactly one queue unit MUST produce a validation error.
@@ -152,6 +167,52 @@ When a unit checkbox is checked, `litespec validate` SHALL require one verbatim 
 
 - **WHEN** rebuild metadata is malformed or its heading and occurrence do not identify exactly one unit
 - **THEN** validation reports an error rather than guessing
+
+### Requirement: Witnessed Contract Amendments and Digest Chains
+
+`litespec validate` SHALL parse structured contract amendment records using one grammar for GitHub comments and local queue files. A complete amendment record MUST contain, in order: the exact line `Amendment:`; `Unit occurrence:` naming the unit's positive 1-based same-heading occurrence; `Unit heading:` naming the unit's exact post-amendment heading; `Old digest:` with 64 lowercase hexadecimal characters identifying the superseded contract; `New digest:` with 64 lowercase hexadecimal characters identifying the amended contract; and `Reason:` with one nonempty line. Identity fields SHALL always carry the post-amendment identity because the heading itself is a contract field an amendment may rename; `Old digest:` is the only link to the superseded contract text. An amendment record is append-only routing metadata: on GitHub it SHALL be a comment with the issue body untouched, and locally it SHALL be a block appended after all units of `specs/queues/<name>.md`; no actor other than `litespec-plan` MAY author or alter a unit contract.
+
+A valid amendment SHALL constitute an unresolved rebuild request for its identity: a checked unit MAY be selected by `litespec-build` while it stands even though its checkbox remains checked, and it SHALL resolve only when a later complete identity-bearing evidence receipt carries a `unit digest:` equal to the amendment's `New digest:`. For each unit identity, the last valid amendment's `New digest:` SHALL equal the unit's current contract digest. The distinct digests observed for that identity across receipts, together with the current contract digest, MUST form a chain: every transition between consecutive distinct observed digests, and from the last observed digest to the current contract digest, SHALL be connected by a path over amendment edges (`Old digest:` → `New digest:`), where two amendments between consecutive observations are connected by their shared intermediate digest. A silent contract edit followed by a fresh receipt with no bridging amendment SHALL therefore produce a validation error naming the unit and the disconnected digests, because a valid historical receipt whose digest no longer matches the current contract participates as an observation rather than a structural failure only when an amendment claims its digest as provenance. An unresolvable identity-bearing receipt whose declared digest no amendment records SHALL remain a boundary error. A malformed amendment record, an identity that does not identify exactly one queue unit, or a terminal `New digest:` that does not match the current contract digest SHALL produce a visible validation error rather than a guess. Validate MUST NOT execute commands or consult Git history to evaluate chains.
+
+#### Scenario: Amendment makes a checked unit selectable again
+
+- **WHEN** a checked unit's contract changed, a valid amendment comment names its post-amendment identity with matching Old and New digests, and no later complete receipt resolves it
+- **THEN** validation reports the unresolved request so build can select the checked unit while no existing queue text was modified
+
+#### Scenario: Later receipt carrying the New digest resolves the amendment
+
+- **WHEN** a later complete identity-bearing evidence receipt declares the `unit digest:` equal to the amendment's `New digest`
+- **THEN** the amendment-request state resolves without editing the issue body or any prior comment
+
+#### Scenario: Heading rename accepted through post-amendment identity
+
+- **WHEN** an amendment renames a unit heading, names the post-amendment heading and occurrence, and records the pre-rename digest as `Old digest`
+- **THEN** validation accepts the rename provenance and treats receipts recorded under the superseded heading as chained observations via `Old digest`
+
+#### Scenario: Silent edit plus fresh receipt fails the chain
+
+- **WHEN** a contract field changed without any amendment, old and new receipts both exist, and the transition between their distinct digests is not bridged by an amendment edge
+- **THEN** validation reports a broken-chain error naming the unit and the disconnected digests
+
+#### Scenario: Two amendments between receipts bridge the chain
+
+- **WHEN** two valid amendments witness X→Y and Y→Z between a receipt at X and a later receipt at Z
+- **THEN** validation accepts the chain because the transition path crosses the shared intermediate digest Y
+
+#### Scenario: Malformed amendment fails visibly
+
+- **WHEN** a comment or local block begins `Amendment:` but omits a required field, misorders fields, or leaves `Reason:` empty
+- **THEN** validation reports a malformed-amendment error instead of guessing at intent
+
+#### Scenario: Terminal New digest mismatch fails
+
+- **WHEN** the last valid amendment for a unit identity declares a `New digest:` that does not equal the unit's current contract digest
+- **THEN** validation reports the mismatch so plan cannot re-anchor history onto a fabricated contract
+
+#### Scenario: Local queue amendment block parses by the same grammar
+
+- **WHEN** a block identical to the GitHub amendment grammar is appended after the units of a local queue file
+- **THEN** validation parses it, reports its unresolved request against the named unit, and ignores it as unit-body content
 
 ### Requirement: Queue Unit Depends Validation
 

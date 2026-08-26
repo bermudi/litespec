@@ -1,7 +1,10 @@
 package internal
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -217,7 +220,12 @@ Verify:
 ## Good Two
 Done means: two
 Verify:
-` + "```\necho two\n```\n" + evidenceReceipt("echo two") + `- [x] done
+` + "```\necho two\n```\n" + strings.Replace(
+		evidenceReceipt("echo two"),
+		fixtureUnitDigest("echo two"),
+		unitDigestFor("Good Two", "two", "echo two"),
+		1,
+	) + `- [x] done
 
 ## Bad One
 Verify:
@@ -607,9 +615,27 @@ func checkedUnit(verify, evidence string) string {
 	return "## My outcome\nDone means: something\nVerify:\n```\n" + verify + "\n```\n" + evidence + "- [x] done\n"
 }
 
+func fixtureUnitDigest(verifyCmd string) string {
+	return unitDigestFor("My outcome", "something", verifyCmd)
+}
+
+func unitDigestFor(heading, doneMeans, verifyCmd string) string {
+	return unitContractDigest(queueUnit{
+		Heading: heading,
+		Body: []string{
+			"Done means: " + doneMeans,
+			"Verify:",
+			"```",
+			verifyCmd,
+			"```",
+		},
+	})
+}
+
 func redGreenEvidenceReceipt(verifyCmd, preSHA, preStatus, preOutput, postSHA, postStatus, postOutput string) string {
 	return "Evidence:\n" +
 		verifyCmd + "\n" +
+		"unit digest: " + fixtureUnitDigest(verifyCmd) + "\n" +
 		"pre sha: " + preSHA + "\n" +
 		"pre exit status: " + preStatus + "\n" +
 		"```\n" + preOutput + "\n```\n" +
@@ -705,7 +731,7 @@ func TestValidateQueueRedGreenReceipt(t *testing.T) {
 		units, issues := ValidateQueueBody(body, source)
 		comment := "## My outcome\n" + strings.TrimPrefix(evidenceReceipt("echo hi"), "Evidence:\n")
 		result := &ValidationResult{Valid: true}
-		applyQueueIssues(result, units, issues, []string{comment})
+		applyQueueIssues(result, "GitHub comments", units, issues, []string{comment})
 		if len(result.Errors) > 0 {
 			t.Fatalf("expected heading and command comment to satisfy receipt, got %v", result.Errors)
 		}
@@ -717,9 +743,14 @@ func TestValidateQueueRedGreenReceipt(t *testing.T) {
 				"## Second outcome\nDone means: second thing\nVerify:\n```\necho hi\n```\n- [x] done\n",
 		)
 		units, issues := ValidateQueueBody(body, source)
-		comment := "First outcome\nSecond outcome\n" + evidenceReceipt("echo hi")
+		comment := "First outcome\nSecond outcome\n" + strings.Replace(
+			evidenceReceipt("echo hi"),
+			fixtureUnitDigest("echo hi"),
+			unitDigestFor("First outcome", "first thing", "echo hi"),
+			1,
+		)
 		result := &ValidationResult{Valid: true}
-		applyQueueIssues(result, units, issues, []string{comment})
+		applyQueueIssues(result, "GitHub comments", units, issues, []string{comment})
 		if len(result.Errors) != 1 {
 			t.Fatalf("expected one unmatched unit receipt, got %v", result.Errors)
 		}
@@ -731,9 +762,14 @@ func TestValidateQueueRedGreenReceipt(t *testing.T) {
 				"## Same outcome\nDone means: second thing\nVerify:\n```\necho hi\n```\n- [x] done\n",
 		)
 		units, issues := ValidateQueueBody(body, source)
-		comment := "## Same outcome\n" + strings.TrimPrefix(evidenceReceipt("echo hi"), "Evidence:\n")
+		comment := "## Same outcome\n" + strings.Replace(
+			strings.TrimPrefix(evidenceReceipt("echo hi"), "Evidence:\n"),
+			fixtureUnitDigest("echo hi"),
+			unitDigestFor("Same outcome", "first thing", "echo hi"),
+			1,
+		)
 		result := &ValidationResult{Valid: true}
-		applyQueueIssues(result, units, issues, []string{comment})
+		applyQueueIssues(result, "GitHub comments", units, issues, []string{comment})
 		if len(result.Errors) != 1 {
 			t.Fatalf("expected one unmatched duplicate unit receipt, got %v", result.Errors)
 		}
@@ -766,7 +802,7 @@ func TestValidateQueueRedGreenReceipt(t *testing.T) {
 		{
 			name:        "legacy green-only receipt fails",
 			evidence:    legacyEvidenceReceipt("echo hi"),
-			wantMessage: "pre sha",
+			wantMessage: "must include a `unit digest:` field",
 		},
 		{
 			name: "green pre fails",
@@ -1053,7 +1089,7 @@ func TestGHCommentEvidenceReceipt(t *testing.T) {
 	})
 
 	t.Run("legacy receipt comment does not satisfy", func(t *testing.T) {
-		if commentSatisfiesEvidence("My outcome", "echo hi", []string{
+		if commentSatisfiesEvidence("My outcome", "echo hi", fixtureUnitDigest("echo hi"), []string{
 			"My outcome\n" + legacyEvidenceReceipt("echo hi"),
 		}) {
 			t.Fatal("expected legacy comment receipt to fail")
@@ -1061,7 +1097,7 @@ func TestGHCommentEvidenceReceipt(t *testing.T) {
 	})
 
 	t.Run("overlapping heading does not satisfy", func(t *testing.T) {
-		if commentSatisfiesEvidence("My", "echo hi", []string{
+		if commentSatisfiesEvidence("My", "echo hi", fixtureUnitDigest("echo hi"), []string{
 			"My outcome\n" + evidenceReceipt("echo hi"),
 		}) {
 			t.Fatal("expected non-exact heading mention to fail")
@@ -1078,7 +1114,7 @@ func TestGHCommentEvidenceReceipt(t *testing.T) {
 			"0",
 			"hi",
 		)
-		if commentSatisfiesEvidence("My outcome", "echo hi", []string{comment}) {
+		if commentSatisfiesEvidence("My outcome", "echo hi", fixtureUnitDigest("echo hi"), []string{comment}) {
 			t.Fatal("expected heading inside raw output not to associate the comment")
 		}
 	})
@@ -1198,6 +1234,157 @@ func TestQueueDepends(t *testing.T) {
 		_, issues := ValidateQueueBody(ownedQueue(body), source)
 		if len(issues) > 0 {
 			t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
+		}
+	})
+}
+
+func TestValidateUnitContractDigest(t *testing.T) {
+	source := "GH issue #1"
+
+	// Hand-computed canonical serialization of the fixture unit: heading,
+	// Done means, Verify content — each length-prefixed, in that order.
+	canonical := "10:My outcome" +
+		"9:something" +
+		fmt.Sprintf("%d:echo hi", len("echo hi"))
+	sum := sha256.Sum256([]byte(canonical))
+	goodDigest := hex.EncodeToString(sum[:])
+
+	if computed := fixtureUnitDigest("echo hi"); computed != goodDigest {
+		t.Fatalf("unitContractDigest = %s, want hand-computed %s", computed, goodDigest)
+	}
+
+	digestReceipt := func(digest string) string {
+		return strings.Replace(
+			evidenceReceipt("echo hi"),
+			fixtureUnitDigest("echo hi"),
+			digest,
+			1,
+		)
+	}
+
+	t.Run("complete receipt with matching digest passes", func(t *testing.T) {
+		_, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", digestReceipt(goodDigest))), source)
+		if len(issues) > 0 {
+			t.Fatalf("expected no issues, got %v", issues)
+		}
+	})
+
+	t.Run("missing digest fails naming the unit", func(t *testing.T) {
+		evidence := strings.Replace(evidenceReceipt("echo hi"), "unit digest: "+fixtureUnitDigest("echo hi")+"\n", "", 1)
+		_, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", evidence)), source)
+		if !containsIssue(issues, `checked unit "My outcome" Evidence receipt must include a `+"`unit digest:`") {
+			t.Fatalf("expected missing unit digest error naming the unit, got %v", issues)
+		}
+	})
+
+	t.Run("malformed digest fails", func(t *testing.T) {
+		_, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", digestReceipt("XYZ"))), source)
+		if !containsIssue(issues, "unit digest must be 64 lowercase hexadecimal characters") {
+			t.Fatalf("expected malformed digest error, got %v", issues)
+		}
+	})
+
+	t.Run("digest mismatch names expected and actual digests", func(t *testing.T) {
+		otherSum := sha256.Sum256([]byte("10:My outcome9:something7:echo other"))
+		otherDigest := hex.EncodeToString(otherSum[:])
+		_, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", digestReceipt(otherDigest))), source)
+		if !containsIssue(issues, "expected "+goodDigest+", actual "+otherDigest) {
+			t.Fatalf("expected mismatch error naming both digests, got %v", issues)
+		}
+	})
+
+	t.Run("editing Done means after evidence invalidates the receipt", func(t *testing.T) {
+		body := checkedUnit("echo hi", digestReceipt(goodDigest))
+		tampered := strings.Replace(body, "Done means: something", "Done means: moved goalpost", 1)
+		_, issues := ValidateQueueBody(ownedQueue(tampered), source)
+		if !containsIssue(issues, "unit digest mismatch") || !containsIssue(issues, "actual "+goodDigest) {
+			t.Fatalf("expected digest mismatch after contract edit, got %v", issues)
+		}
+	})
+
+	t.Run("optional contract fields are covered by the digest", func(t *testing.T) {
+		withConstraints := strings.Replace(
+			checkedUnit("echo hi", digestReceipt(goodDigest)),
+			"Done means: something",
+			"Done means: something\nConstraints: keep boundaries",
+			1,
+		)
+		constraintsCanonical := "10:My outcome15:keep boundaries" + canonical[len("10:My outcome"):]
+		constraintsSum := sha256.Sum256([]byte(constraintsCanonical))
+		constraintsDigest := hex.EncodeToString(constraintsSum[:])
+		_, issues := ValidateQueueBody(ownedQueue(withConstraints), source)
+		if !containsIssue(issues, "expected "+constraintsDigest+", actual "+goodDigest) {
+			t.Fatalf("expected Constraints to be covered by digest, got %v", issues)
+		}
+		updated := strings.Replace(withConstraints, "unit digest: "+goodDigest, "unit digest: "+constraintsDigest, 1)
+		_, issues = ValidateQueueBody(ownedQueue(updated), source)
+		if len(issues) > 0 {
+			t.Fatalf("expected updated digest to pass, got %v", issues)
+		}
+	})
+
+	t.Run("digest excludes checkbox and evidence content", func(t *testing.T) {
+		base := queueUnit{
+			Heading: "My outcome",
+			Body:    []string{"Done means: something", "Verify:", "```", "echo hi", "```"},
+		}
+		mutable := queueUnit{
+			Heading: "My outcome",
+			Body: []string{
+				"Done means: something",
+				"Verify:",
+				"```",
+				"echo hi",
+				"```",
+				"- [x] done",
+				"Evidence:\nwhatever mutable trail",
+			},
+		}
+		if unitContractDigest(base) != unitContractDigest(mutable) {
+			t.Fatalf("digest changed for mutable-only differences")
+		}
+	})
+
+	t.Run("identity-bearing comment receipt requires matching digest", func(t *testing.T) {
+		units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", "")), source)
+		comment := "## My outcome\n" + digestReceipt(goodDigest)
+		result := &ValidationResult{Valid: true}
+		applyQueueIssues(result, "GitHub comments", units, issues, []string{comment})
+		if len(result.Errors) != 0 {
+			t.Fatalf("expected matching comment receipt to satisfy validation, got %v", result.Errors)
+		}
+
+		staleComment := "## My outcome\n" + digestReceipt(strings.Repeat("a", 64))
+		result = &ValidationResult{Valid: true}
+		applyQueueIssues(result, "GitHub comments", units, issues, []string{staleComment})
+		if len(result.Errors) == 0 {
+			t.Fatalf("expected stale comment digest to leave receipt unsatisfied")
+		}
+	})
+
+	t.Run("local queue file uses the same canonicalization", func(t *testing.T) {
+		root := t.TempDir()
+		path := filepath.Join(root, "specs", "queues", "digest-fixture.md")
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("mkdir: %v", err)
+		}
+		writeFile := func(content string) {
+			t.Helper()
+			if err := os.WriteFile(path, []byte(ownedQueue(content)), 0o644); err != nil {
+				t.Fatalf("write queue fixture: %v", err)
+			}
+		}
+
+		writeFile(strings.Replace(
+			checkedUnit("echo hi", digestReceipt(goodDigest)),
+			"Done means: something", "Done means: moved goalpost", 1,
+		))
+		result, err := ValidateQueueFile(path)
+		if err != nil {
+			t.Fatalf("ValidateQueueFile: %v", err)
+		}
+		if result.Valid || !containsIssue(result.Errors, "unit digest mismatch") {
+			t.Fatalf("expected local queue to reject tampered contract, got %+v", result)
 		}
 	})
 }

@@ -106,6 +106,8 @@ For every unit, `litespec-build` SHALL run the exact `Verify:` command against a
 
 For every checked unit, `litespec-review` SHALL verify that a complete red-green evidence receipt exists for the unit's exact `Verify:` command and that its pre and post SHAs are distinct commits with pre an ancestor of post and post an ancestor of `HEAD`. Review SHALL run the exact command in separate detached temporary worktrees at pre and post and in its own detached temporary worktree at `HEAD`, and never check out an evidence SHA in the reviewer's current worktree. Cleanup SHALL be installed before worktree creation, and cleanup SHALL remove the `HEAD` worktree even when Verify fails, just as it removes the pre and post worktrees on every exit path. The pre run MUST exit non-zero because the unit outcome is absent; the post and `HEAD` runs MUST exit 0 with the outcome present. A green pre run, an unrelated pre failure, a failed post or HEAD run, a missing or malformed receipt, or an edited command SHALL be a CRITICAL finding that breaks the unit's contract. Red-green evidence proves that Verify distinguishes the two recorded trees; it SHALL NOT by itself establish that Verify targets the correct behavior, which remains an adversarial review judgment.
 
+Review SHALL also cross-check each checked unit's receipt `unit digest:` against the unit's current contract digest. A receipt bound to a superseded contract digest is acceptable only when witnessed amendment records (per the validate spec) bridge the observed digests to the current contract; the observed digests MUST form a chain over amendment edges ending at the current contract digest. An unbridged transition — a silent contract edit followed by a fresh receipt — SHALL be a CRITICAL finding breaking that unit's contract, routing to `litespec-plan` because neither build nor review may repair a contract.
+
 #### Scenario: Reproducible red-green receipt
 
 - **WHEN** a checked unit has a complete receipt whose exact Verify fails for the absent outcome at pre, passes with the outcome at post, and still passes at `HEAD`
@@ -120,6 +122,16 @@ For every checked unit, `litespec-review` SHALL verify that a complete red-green
 
 - **WHEN** a checked unit has only a prose sticker, an edited command, a missing receipt, or Verify fails at post or `HEAD`
 - **THEN** review reports a CRITICAL finding that breaks that unit's contract
+
+#### Scenario: Unwitnessed contract displacement is critical
+
+- **WHEN** a checked unit's observed receipt digests do not chain to its current contract digest through amendment records
+- **THEN** review reports a CRITICAL finding naming the unit and routes the contract repair to `litespec-plan`
+
+#### Scenario: Amendment-witnessed history passes the cross-check
+
+- **WHEN** the digests observed for a checked unit chain through valid amendment records to its current contract digest and every receipt's pre/post replay holds
+- **THEN** review does not report a digest-chain finding for that unit
 
 ### Requirement: Findings and Verdict
 
