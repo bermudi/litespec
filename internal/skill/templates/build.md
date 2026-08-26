@@ -35,7 +35,7 @@ Read the queue's `Branch:` line and compare it with `git branch --show-current`.
 7. Record one receipt — verbatim, not interpretive (see Verification). Required fields, in this order:
    - for a checked GitHub rebuild, `Unit occurrence: <n>`, `Unit heading: <exact heading>`, and `Evidence:`; otherwise the unit heading
    - exact `Verify:` command
-   - `unit digest: <64 lowercase hex>` — the sha256 digest of this unit's canonicalized contract fields (heading, optional `Read first:`/`Constraints:`/`Depends:` values, `Done means:` value, Verify content), each length-prefixed; status checkbox and Evidence content are excluded. Validate recomputes it from the current body: a missing or wrong digest is an error, so an edit to `Done means:` or `Verify:` after evidence is recorded fails validation.
+   - `unit digest: <64 lowercase hex>` — run `litespec digest --issue <N>` (or `--queue <path>`) and paste the line whose heading and occurrence match this unit; status checkbox and Evidence content are excluded from the digest. Validate recomputes it from the current body: a missing or wrong digest is an error, so an edit to `Done means:` or `Verify:` after evidence is recorded fails validation.
    - `pre sha: <full 40- or 64-char hex>`
    - `pre exit status: <non-zero integer>`
    - a fenced block of raw pre output, unedited; if the command emits nothing, write `<no output>`
