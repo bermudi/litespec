@@ -731,7 +731,7 @@ func TestValidateQueueRedGreenReceipt(t *testing.T) {
 		units, issues := ValidateQueueBody(body, source)
 		comment := "## My outcome\n" + strings.TrimPrefix(evidenceReceipt("echo hi"), "Evidence:\n")
 		result := &ValidationResult{Valid: true}
-		applyQueueIssues(result, units, issues, []string{comment})
+		applyQueueIssues(result, "GitHub comments", units, issues, []string{comment})
 		if len(result.Errors) > 0 {
 			t.Fatalf("expected heading and command comment to satisfy receipt, got %v", result.Errors)
 		}
@@ -750,7 +750,7 @@ func TestValidateQueueRedGreenReceipt(t *testing.T) {
 			1,
 		)
 		result := &ValidationResult{Valid: true}
-		applyQueueIssues(result, units, issues, []string{comment})
+		applyQueueIssues(result, "GitHub comments", units, issues, []string{comment})
 		if len(result.Errors) != 1 {
 			t.Fatalf("expected one unmatched unit receipt, got %v", result.Errors)
 		}
@@ -769,7 +769,7 @@ func TestValidateQueueRedGreenReceipt(t *testing.T) {
 			1,
 		)
 		result := &ValidationResult{Valid: true}
-		applyQueueIssues(result, units, issues, []string{comment})
+		applyQueueIssues(result, "GitHub comments", units, issues, []string{comment})
 		if len(result.Errors) != 1 {
 			t.Fatalf("expected one unmatched duplicate unit receipt, got %v", result.Errors)
 		}
@@ -1349,14 +1349,14 @@ func TestValidateUnitContractDigest(t *testing.T) {
 		units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", "")), source)
 		comment := "## My outcome\n" + digestReceipt(goodDigest)
 		result := &ValidationResult{Valid: true}
-		applyQueueIssues(result, units, issues, []string{comment})
+		applyQueueIssues(result, "GitHub comments", units, issues, []string{comment})
 		if len(result.Errors) != 0 {
 			t.Fatalf("expected matching comment receipt to satisfy validation, got %v", result.Errors)
 		}
 
 		staleComment := "## My outcome\n" + digestReceipt(strings.Repeat("a", 64))
 		result = &ValidationResult{Valid: true}
-		applyQueueIssues(result, units, issues, []string{staleComment})
+		applyQueueIssues(result, "GitHub comments", units, issues, []string{staleComment})
 		if len(result.Errors) == 0 {
 			t.Fatalf("expected stale comment digest to leave receipt unsatisfied")
 		}

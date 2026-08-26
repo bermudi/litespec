@@ -20,52 +20,14 @@ func formatRebuildRequest(identity queueUnitIdentity) string {
 }
 
 func unresolvedRebuildRequests(units []queueUnit, comments []string) ([]queueUnitIdentity, []error) {
-	identities := queueUnitIdentities(units)
-	valid := make(map[queueUnitIdentity]int, len(identities))
-	for i, identity := range identities {
-		valid[identity] = i
-	}
-
-	unresolved := make(map[queueUnitIdentity]bool)
-	var errs []error
-	for commentIndex, comment := range comments {
-		identity, kind, err := parseRebuildComment(comment, units)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("comment %d: %w", commentIndex+1, err))
-			continue
-		}
-		if kind == rebuildCommentOther {
-			continue
-		}
-		if _, ok := valid[identity]; !ok {
-			errs = append(errs, fmt.Errorf(
-				"comment %d: unit occurrence %d with heading %q does not identify exactly one queue unit",
-				commentIndex+1,
-				identity.Occurrence,
-				identity.Heading,
-			))
-			continue
-		}
-		if kind == rebuildCommentRequest {
-			unresolved[identity] = true
-			continue
-		}
-		delete(unresolved, identity)
-	}
-
-	result := make([]queueUnitIdentity, 0, len(unresolved))
-	for _, identity := range identities {
-		if unresolved[identity] {
-			result = append(result, identity)
-		}
-	}
-	return result, errs
+	scan := scanQueueComments(units, comments)
+	return scan.unresolved, scan.errors
 }
 
 func selectableUnitIdentities(units []queueUnit, comments []string) ([]queueUnitIdentity, []error) {
-	unresolved, errs := unresolvedRebuildRequests(units, comments)
-	unresolvedSet := make(map[queueUnitIdentity]bool, len(unresolved))
-	for _, identity := range unresolved {
+	scan := scanQueueComments(units, comments)
+	unresolvedSet := make(map[queueUnitIdentity]bool, len(scan.unresolved))
+	for _, identity := range scan.unresolved {
 		unresolvedSet[identity] = true
 	}
 
@@ -76,7 +38,7 @@ func selectableUnitIdentities(units []queueUnit, comments []string) ([]queueUnit
 			selectable = append(selectable, identities[i])
 		}
 	}
-	return selectable, errs
+	return selectable, scan.errors
 }
 
 type rebuildCommentKind int
@@ -85,50 +47,72 @@ const (
 	rebuildCommentOther rebuildCommentKind = iota
 	rebuildCommentRequest
 	rebuildCommentEvidence
+	rebuildCommentStaleEvidence
 )
 
-func parseRebuildComment(comment string, units []queueUnit) (queueUnitIdentity, rebuildCommentKind, error) {
+// parseRebuildComment classifies an identity-bearing comment. For evidence
+// receipts it also returns the declared `unit digest:` value; a receipt whose
+// only defect is that its digest no longer matches the current contract is
+// reported as rebuildCommentStaleEvidence with the digest intact so the
+// amendment chain can judge whether the contract edit was witnessed.
+func parseRebuildComment(comment string, units []queueUnit) (queueUnitIdentity, rebuildCommentKind, string, error) {
 	normalized := strings.TrimSpace(strings.ReplaceAll(comment, "\r\n", "\n"))
 	lines := strings.Split(normalized, "\n")
 	if len(lines) == 0 {
-		return queueUnitIdentity{}, rebuildCommentOther, nil
+		return queueUnitIdentity{}, rebuildCommentOther, "", nil
 	}
 
 	if lines[0] == "Rebuild request:" {
 		if len(lines) != 3 {
-			return queueUnitIdentity{}, rebuildCommentOther, fmt.Errorf("malformed rebuild request")
+			return queueUnitIdentity{}, rebuildCommentOther, "", fmt.Errorf("malformed rebuild request")
 		}
 		identity, err := parseIdentityLines(lines[1], lines[2])
 		if err != nil {
-			return queueUnitIdentity{}, rebuildCommentOther, fmt.Errorf("malformed rebuild request: %w", err)
+			return queueUnitIdentity{}, rebuildCommentOther, "", fmt.Errorf("malformed rebuild request: %w", err)
 		}
-		return identity, rebuildCommentRequest, nil
+		return identity, rebuildCommentRequest, "", nil
 	}
 	if strings.HasPrefix(lines[0], "Rebuild request") {
-		return queueUnitIdentity{}, rebuildCommentOther, fmt.Errorf("malformed rebuild request")
+		return queueUnitIdentity{}, rebuildCommentOther, "", fmt.Errorf("malformed rebuild request")
 	}
 
 	hasOccurrence := strings.HasPrefix(lines[0], "Unit occurrence:")
 	hasHeading := len(lines) > 1 && strings.HasPrefix(lines[1], "Unit heading:")
 	if !hasOccurrence && !hasHeading {
-		return queueUnitIdentity{}, rebuildCommentOther, nil
+		return queueUnitIdentity{}, rebuildCommentOther, "", nil
 	}
 	if !hasOccurrence || !hasHeading || len(lines) < 4 || strings.TrimSpace(lines[2]) != "Evidence:" {
-		return queueUnitIdentity{}, rebuildCommentOther, fmt.Errorf("malformed identity-bearing evidence receipt")
+		return queueUnitIdentity{}, rebuildCommentOther, "", fmt.Errorf("malformed identity-bearing evidence receipt")
 	}
 	identity, err := parseIdentityLines(lines[0], lines[1])
 	if err != nil {
-		return queueUnitIdentity{}, rebuildCommentOther, fmt.Errorf("malformed identity-bearing evidence receipt: %w", err)
-	}
-	unit, ok := findQueueUnit(units, identity)
-	if !ok {
-		return identity, rebuildCommentEvidence, nil
+		return queueUnitIdentity{}, rebuildCommentOther, "", fmt.Errorf("malformed identity-bearing evidence receipt: %w", err)
 	}
 	evidence := strings.Join(lines[2:], "\n")
-	if issues := evidenceReceiptIssues(evidence, unitVerifyCommand(unit.Body), unitContractDigest(unit), "comment", identity.Heading); len(issues) != 0 {
-		return queueUnitIdentity{}, rebuildCommentOther, fmt.Errorf("incomplete evidence receipt for occurrence %d heading %q", identity.Occurrence, identity.Heading)
+	declaredDigest := receiptDeclaredDigest(evidence)
+	unit, ok := findQueueUnit(units, identity)
+	if !ok {
+		return identity, rebuildCommentEvidence, declaredDigest, nil
 	}
-	return identity, rebuildCommentEvidence, nil
+	issues := evidenceReceiptIssues(evidence, unitVerifyCommand(unit.Body), unitContractDigest(unit), "comment", identity.Heading)
+	switch {
+	case len(issues) == 0:
+		return identity, rebuildCommentEvidence, declaredDigest, nil
+	case len(issues) == 1 && strings.Contains(issues[0].Message, "unit digest mismatch"):
+		return identity, rebuildCommentStaleEvidence, declaredDigest, nil
+	default:
+		return queueUnitIdentity{}, rebuildCommentOther, "", fmt.Errorf("incomplete evidence receipt for occurrence %d heading %q", identity.Occurrence, identity.Heading)
+	}
+}
+
+func receiptDeclaredDigest(text string) string {
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "unit digest:") {
+			return strings.TrimSpace(strings.TrimPrefix(trimmed, "unit digest:"))
+		}
+	}
+	return ""
 }
 
 func parseIdentityLines(occurrenceLine, headingLine string) (queueUnitIdentity, error) {

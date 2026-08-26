@@ -138,6 +138,7 @@ func TestGeneratedReviewRoutesRebuildRequests(t *testing.T) {
 	receiptResult := &ValidationResult{Valid: true}
 	applyQueueIssues(
 		receiptResult,
+		"GitHub comments",
 		receiptUnits,
 		receiptIssues,
 		[]string{fixtureEvidenceComment(queueUnitIdentity{Occurrence: 1, Heading: "Duplicate"}, true)},

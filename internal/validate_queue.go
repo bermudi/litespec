@@ -74,7 +74,7 @@ func ValidateGHIssueQueues(root string) (*ValidationResult, error) {
 			for _, c := range issue.Comments {
 				commentBodies = append(commentBodies, c.Body)
 			}
-			applyQueueIssues(result, units, unitIssues, commentBodies)
+			applyQueueIssues(result, "GitHub comments", units, unitIssues, commentBodies)
 		}
 	}
 
@@ -605,7 +605,7 @@ func commentNamesUnit(comment, heading string) bool {
 	return false
 }
 
-func applyQueueIssues(result *ValidationResult, units []queueUnit, unitIssues []ValidationIssue, comments []string) {
+func applyQueueIssues(result *ValidationResult, commentSource string, units []queueUnit, unitIssues []ValidationIssue, comments []string) {
 	usedComments := make(map[int]bool)
 	commentEvidence := make(map[int]bool)
 	identities := queueUnitIdentities(units)
@@ -646,19 +646,19 @@ func applyQueueIssues(result *ValidationResult, units []queueUnit, unitIssues []
 	for _, err := range requestErrors {
 		result.Errors = append(result.Errors, ValidationIssue{
 			Severity: SeverityError,
-			Message:  fmt.Sprintf("GitHub rebuild routing: %v", err),
-			File:     "GitHub comments",
+			Message:  fmt.Sprintf("queue rebuild routing: %v", err),
+			File:     commentSource,
 		})
 	}
 	for _, identity := range unresolved {
 		result.Errors = append(result.Errors, ValidationIssue{
 			Severity: SeverityError,
 			Message: fmt.Sprintf(
-				"GitHub unit occurrence %d with heading %q has an unresolved rebuild request",
+				"unit occurrence %d with heading %q has an unresolved rebuild request",
 				identity.Occurrence,
 				identity.Heading,
 			),
-			File: "GitHub comments",
+			File: commentSource,
 		})
 	}
 }
@@ -675,7 +675,7 @@ func matchingEvidenceCommentForUnit(
 		if used[i] {
 			continue
 		}
-		commentIdentity, kind, err := parseRebuildComment(comment, units)
+		commentIdentity, kind, _, err := parseRebuildComment(comment, units)
 		if err == nil && kind == rebuildCommentEvidence && commentIdentity == identity {
 			return i, true
 		}
@@ -1051,28 +1051,23 @@ func ValidateGHIssueByNumber(root string, number int) (*ValidationResult, error)
 	for _, c := range issue.Comments {
 		commentBodies = append(commentBodies, c.Body)
 	}
-	applyQueueIssues(result, units, unitIssues, commentBodies)
+	applyQueueIssues(result, "GitHub comments", units, unitIssues, commentBodies)
 	result.Valid = len(result.Errors) == 0
 	return result, nil
 }
 
 func ValidateQueueFile(path string) (*ValidationResult, error) {
-	body, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
+	stripped, amendmentBlocks := splitLocalAmendmentBlocks(string(raw))
 	result := &ValidationResult{Valid: true}
 	source := fmt.Sprintf("queue file %s", path)
-	units, unitIssues := ValidateQueueBody(string(body), source)
+	units, unitIssues := ValidateQueueBody(stripped, source)
 	result.UnitsCount += len(units)
-	for _, iss := range unitIssues {
-		if iss.Severity == SeverityWarning {
-			result.Warnings = append(result.Warnings, iss)
-		} else {
-			result.Errors = append(result.Errors, iss)
-		}
-	}
+	applyQueueIssues(result, source, units, unitIssues, amendmentBlocks)
 	result.Valid = len(result.Errors) == 0
 	return result, nil
 }
