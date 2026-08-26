@@ -185,9 +185,14 @@ func TestGeneratedReviewRoutesRebuildRequests(t *testing.T) {
 }
 
 func fixtureEvidenceComment(identity queueUnitIdentity, complete bool) string {
+	contractUnit := queueUnit{
+		Heading: identity.Heading,
+		Body:    []string{"Done means: outcome", "Verify: `go test ./...`"},
+	}
 	body := "Unit occurrence: " + strconv.Itoa(identity.Occurrence) +
 		"\nUnit heading: " + identity.Heading +
 		"\nEvidence:\ngo test ./...\n" +
+		"unit digest: " + unitContractDigest(contractUnit) + "\n" +
 		"pre sha: 1111111111111111111111111111111111111111\n" +
 		"pre exit status: 1\n```\nFAIL\n```\n" +
 		"Pre-evidence scope: this command exited 1 at 1111111111111111111111111111111111111111; nothing else is inferred.\n" +

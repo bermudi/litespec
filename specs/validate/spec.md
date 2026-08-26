@@ -87,7 +87,7 @@ The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec
 
 ### Requirement: Checked Unit Evidence Receipt
 
-When a unit checkbox is checked, `litespec validate` SHALL require one verbatim red-green evidence receipt for that unit. A complete receipt MUST contain, in order: the unit's `Verify:` command quoted verbatim; `pre sha:` with a full 40- or 64-character hexadecimal commit ID; `pre exit status:` with a non-zero integer; a nonempty fenced block containing raw pre output or literal `<no output>`; `Pre-evidence scope: this command exited <status> at <sha>; nothing else is inferred.` matching the pre fields; `post sha:` with a full commit ID; `post exit status: 0`; a nonempty fenced block containing raw post output or literal `<no output>`; and `Post-evidence scope: this command exited 0 at <sha>; nothing else is inferred.` matching the post fields. The pre and post SHAs MUST differ. Unchecked units SHALL NOT require a receipt. Local queues and issue-body receipts SHALL live in an `Evidence:` block after `Verify:` and before the checkbox. On a GitHub issue, either a comment that names the unit heading or an identity-bearing comment with the unit's exact heading and positive 1-based same-heading occurrence SHALL satisfy the check when it carries a complete receipt. A green-only legacy receipt, nonempty `Evidence:` label, or comment that only mentions `Evidence:` SHALL NOT satisfy. Validate SHALL check receipt structure only; it MUST NOT execute the recorded command, inspect Git ancestry, or interpret either fenced output.
+When a unit checkbox is checked, `litespec validate` SHALL require one verbatim red-green evidence receipt for that unit. A complete receipt MUST contain, in order: the unit's `Verify:` command quoted verbatim; `unit digest:` with 64 lowercase hexadecimal characters; `pre sha:` with a full 40- or 64-character hexadecimal commit ID; `pre exit status:` with a non-zero integer; a nonempty fenced block containing raw pre output or literal `<no output>`; `Pre-evidence scope: this command exited <status> at <sha>; nothing else is inferred.` matching the pre fields; `post sha:` with a full commit ID; `post exit status: 0`; a nonempty fenced block containing raw post output or literal `<no output>`; and `Post-evidence scope: this command exited 0 at <sha>; nothing else is inferred.` matching the post fields. The pre and post SHAs MUST differ. The `unit digest:` value MUST equal the SHA-256 digest of the unit's canonicalized contract: its heading, optional `Read first:`, `Constraints:`, and `Depends:` values, `Done means:` value, and Verify content, each length-prefixed (decimal byte length followed by `:`), line endings normalized to `\n` and trailing whitespace trimmed, absent optional fields omitted. The digest MUST NOT cover the status checkbox, Evidence content, or any other unit text. Validate SHALL recompute the expected digest from the unit's current body and report a missing, malformed, or mismatched digest as an error naming the unit and, on mismatch, both the expected and actual digests — so editing `Done means:` or `Verify:` after evidence is recorded fails validation. One canonicalization SHALL serve GitHub bodies, GitHub comments, and local queue files. Unchecked units SHALL NOT require a receipt. Local queues and issue-body receipts SHALL live in an `Evidence:` block after `Verify:` and before the checkbox. On a GitHub issue, either a comment that names the unit heading or an identity-bearing comment with the unit's exact heading and positive 1-based same-heading occurrence SHALL satisfy the check when it carries a complete receipt. A green-only legacy receipt, nonempty `Evidence:` label, or comment that only mentions `Evidence:` SHALL NOT satisfy. Validate SHALL check receipt structure only; it MUST NOT execute the recorded command, inspect Git ancestry, or interpret either fenced output.
 
 #### Scenario: Unchecked unit without receipt passes
 
@@ -138,6 +138,21 @@ When a unit checkbox is checked, `litespec validate` SHALL require one verbatim 
 
 - **WHEN** a checked unit carries the former single-sha, single-status receipt shape without pre evidence
 - **THEN** validation reports an incomplete red-green receipt
+
+#### Scenario: Receipt with matching unit digest passes
+
+- **WHEN** a checked unit's receipt carries a `unit digest:` equal to the recomputed digest of the unit's current contract fields
+- **THEN** validation succeeds for that unit
+
+#### Scenario: Missing or malformed unit digest fails
+
+- **WHEN** a checked unit's receipt lacks the `unit digest:` field between the Verify quote and `pre sha:`, or carries a value that is not 64 lowercase hexadecimal characters
+- **THEN** validation reports an error naming the unit
+
+#### Scenario: Edited contract after recorded evidence fails
+
+- **WHEN** `Done means:`, `Verify:`, or any covered contract field is edited after a checked unit's receipt was posted, so the recomputed digest no longer matches the receipt's `unit digest:`
+- **THEN** validation reports a mismatch error naming the unit and both the expected and actual digests
 
 ### Requirement: GitHub Rebuild Request State
 

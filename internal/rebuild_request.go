@@ -125,7 +125,7 @@ func parseRebuildComment(comment string, units []queueUnit) (queueUnitIdentity, 
 		return identity, rebuildCommentEvidence, nil
 	}
 	evidence := strings.Join(lines[2:], "\n")
-	if issues := evidenceReceiptIssues(evidence, unitVerifyCommand(unit.Body), "comment", identity.Heading); len(issues) != 0 {
+	if issues := evidenceReceiptIssues(evidence, unitVerifyCommand(unit.Body), unitContractDigest(unit), "comment", identity.Heading); len(issues) != 0 {
 		return queueUnitIdentity{}, rebuildCommentOther, fmt.Errorf("incomplete evidence receipt for occurrence %d heading %q", identity.Occurrence, identity.Heading)
 	}
 	return identity, rebuildCommentEvidence, nil

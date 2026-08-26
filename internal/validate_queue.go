@@ -410,7 +410,7 @@ func evidencePayload(text, verifyCmd string) string {
 	return text
 }
 
-func evidenceReceiptIssues(text, verifyCmd, source, heading string) []ValidationIssue {
+func evidenceReceiptIssues(text, verifyCmd, expectedDigest, source, heading string) []ValidationIssue {
 	if strings.TrimSpace(text) == "" {
 		return []ValidationIssue{{
 			Severity: SeverityError,
@@ -432,6 +432,17 @@ func evidenceReceiptIssues(text, verifyCmd, source, heading string) []Validation
 	if verifyCmd == "" || !cursor.consumeExactLines(verifyCmd) {
 		fail("must quote the Verify command verbatim")
 		return issues
+	}
+
+	digestText, ok := cursor.consumeField("unit digest")
+	if !ok {
+		fail("must include a `unit digest:` field between the Verify command and pre sha")
+		return issues
+	}
+	if !unitDigestPattern.MatchString(digestText) {
+		fail("unit digest must be 64 lowercase hexadecimal characters")
+	} else if digestText != expectedDigest {
+		fail(fmt.Sprintf("unit digest mismatch: expected %s, actual %s — recompute with litespec or amend the contract", expectedDigest, digestText))
 	}
 
 	preSHA, ok := cursor.consumeField("pre sha")
@@ -535,15 +546,15 @@ func validateCheckedUnitEvidence(unit queueUnit, source string) []ValidationIssu
 	if !isCheckedUnit(unit.Body) {
 		return nil
 	}
-	return evidenceReceiptIssues(extractEvidenceText(unit.Body), unitVerifyCommand(unit.Body), source, unit.Heading)
+	return evidenceReceiptIssues(extractEvidenceText(unit.Body), unitVerifyCommand(unit.Body), unitContractDigest(unit), source, unit.Heading)
 }
 
-func commentSatisfiesEvidence(heading, verifyCmd string, comments []string) bool {
-	_, ok := matchingEvidenceComment(heading, verifyCmd, comments, nil)
+func commentSatisfiesEvidence(heading, verifyCmd, expectedDigest string, comments []string) bool {
+	_, ok := matchingEvidenceComment(heading, verifyCmd, expectedDigest, comments, nil)
 	return ok
 }
 
-func matchingEvidenceComment(heading, verifyCmd string, comments []string, used map[int]bool) (int, bool) {
+func matchingEvidenceComment(heading, verifyCmd, expectedDigest string, comments []string, used map[int]bool) (int, bool) {
 	for i, c := range comments {
 		if used[i] {
 			continue
@@ -555,7 +566,7 @@ func matchingEvidenceComment(heading, verifyCmd string, comments []string, used 
 		if afterHeading, ok := commentTextAfterUnitHeading(c, heading); ok {
 			evidenceText = afterHeading
 		}
-		if len(evidenceReceiptIssues(evidenceText, verifyCmd, "comment", heading)) == 0 {
+		if len(evidenceReceiptIssues(evidenceText, verifyCmd, expectedDigest, "comment", heading)) == 0 {
 			return i, true
 		}
 	}
@@ -608,6 +619,7 @@ func applyQueueIssues(result *ValidationResult, units []queueUnit, unitIssues []
 		commentIndex, ok := matchingEvidenceCommentForUnit(
 			identities[unitIndex],
 			unit,
+			unitContractDigest(unit),
 			units,
 			comments,
 			usedComments,
@@ -654,6 +666,7 @@ func applyQueueIssues(result *ValidationResult, units []queueUnit, unitIssues []
 func matchingEvidenceCommentForUnit(
 	identity queueUnitIdentity,
 	unit queueUnit,
+	expectedDigest string,
 	units []queueUnit,
 	comments []string,
 	used map[int]bool,
@@ -667,7 +680,7 @@ func matchingEvidenceCommentForUnit(
 			return i, true
 		}
 	}
-	return matchingEvidenceComment(unit.Heading, unitVerifyCommand(unit.Body), comments, used)
+	return matchingEvidenceComment(unit.Heading, unitVerifyCommand(unit.Body), expectedDigest, comments, used)
 }
 
 var ghIssueView = func(root string, number int) ([]byte, error) {
