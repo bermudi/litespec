@@ -55,6 +55,14 @@ var CommandSpecs = []CommandSpec{
 		},
 	},
 	{
+		Name:        "digest",
+		Description: "Print expected unit contract digests for a queue",
+		Flags: []FlagSpec{
+			{Name: "--issue", Description: "GH issue number", TakesValue: true},
+			{Name: "--queue", Description: "Local queue markdown file", TakesValue: true},
+		},
+	},
+	{
 		Name:        "view",
 		Description: "Dashboard overview",
 		Flags: []FlagSpec{
