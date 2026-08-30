@@ -351,6 +351,16 @@ A queue unit MAY declare one `Boundary:` value. A filesystem, process, or networ
 - **WHEN** a filesystem, process, or network unit omits a required risk or gives a blank N/A reason
 - **THEN** queue validation reports the missing or empty risk entry and exits non-zero
 
+#### Scenario: Unknown boundary value fails
+
+- **WHEN** a unit declares `Boundary:` with a value other than exactly `filesystem`, `process`, or `network` — such as `Filesystem`, `Process`, `Network`, `database`, or any other unknown word
+- **THEN** queue validation reports that the boundary value is outside the closed, case-sensitive vocabulary and exits non-zero
+
+#### Scenario: Omitted boundary stays valid
+
+- **WHEN** a unit declares no `Boundary:` field at all
+- **THEN** queue validation accepts the unit without requiring boundary vocabulary or risk accounting
+
 ### Requirement: Re-plan Marker State
 
 `litespec validate` SHALL scan routing metadata oldest to newest and count completed review-requested rebuild cycles per unit contract digest. A cycle begins with one or more literal `Rebuild request:` records and completes when a later complete identity-bearing evidence receipt resolves them. An amendment and the receipt resolving it MUST NOT count as a review-requested rebuild cycle. After two completed cycles for the current digest, another rebuild request MUST be invalid. The valid route is exactly `Re-plan required:`, `Unit occurrence: <positive integer>`, `Unit heading: <exact heading>`, `Unit digest: <current 64 lowercase hex digest>`, and `Reason: <nonempty one-line reason>` on consecutive lines. A marker before two completed cycles or a second unresolved marker for the same identity and digest MUST be invalid. A marker SHALL remain unresolved until a plan-authored amendment has an `Old digest:` equal to the marker digest. The amendment's normal fresh-evidence requirement then applies, while the new digest starts with zero completed cycles. GitHub comments and the append-only metadata stream after local queue units SHALL use the same request, receipt, marker, and amendment grammar.

@@ -308,7 +308,13 @@ func validateUnitBoundaryRiskAccounting(unit queueUnit, source string) []Validat
 	if boundaryFound && strings.TrimSpace(boundary) == "" {
 		fail("Boundary: must be nonempty")
 	}
-	if boundary != "filesystem" && boundary != "process" && boundary != "network" {
+	if !boundaryFound || boundary == "" {
+		return issues
+	}
+	switch boundary {
+	case "filesystem", "process", "network":
+	default:
+		fail(fmt.Sprintf("Boundary: must be one of %q, %q, %q (closed, case-sensitive vocabulary); got %q", "filesystem", "process", "network", boundary))
 		return issues
 	}
 
