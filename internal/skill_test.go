@@ -586,3 +586,59 @@ func TestGeneratedSkillsRouteRepeatedFailureToPlan(t *testing.T) {
 		}
 	}
 }
+
+func TestGeneratedReviewSkillInventoriesBeforePriorCoverage(t *testing.T) {
+	content := generatedReviewSkill(t)
+	inventory := "Before reading any prior review coverage records, construct an independent risk inventory from the current contracts."
+	priorCoverage := "Only after writing that inventory, read prior coverage records"
+	requireSkillPhrases(t, content, inventory, priorCoverage)
+	if strings.Index(content, inventory) > strings.Index(content, priorCoverage) {
+		t.Error("generated review instructions read prior coverage before constructing an independent risk inventory")
+	}
+}
+
+func TestGeneratedReviewSkillPersistsCoverage(t *testing.T) {
+	content := generatedReviewSkill(t)
+	requireSkillPhrases(t, content,
+		"For every issue review, append one coverage record keyed by the reviewed full `HEAD` SHA and each covered unit identity.",
+		"Review coverage:",
+		"HEAD: <full HEAD SHA>",
+		"Exercised:",
+		"Not exercised:",
+		"Uncertain:",
+		"<scenario>: <probe performed>",
+		"GitHub queue: post the record as a new issue comment.",
+		"Local queue: append the record after all units in a separate clean metadata commit.",
+	)
+}
+
+func TestGeneratedReviewSkillTreatsCoverageAsAdvisory(t *testing.T) {
+	content := generatedReviewSkill(t)
+	requireSkillPhrases(t, content,
+		"Use prior coverage only to expand the independent inventory and target unexercised risks.",
+		"Prior coverage is advisory only.",
+		"It does not satisfy evidence replay, suppress current investigation, resolve findings, or prove correctness.",
+	)
+}
+
+func generatedReviewSkill(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	if err := GenerateSkills(root); err != nil {
+		t.Fatalf("GenerateSkills: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, SkillsDir, "litespec-review", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read generated review skill: %v", err)
+	}
+	return string(data)
+}
+
+func requireSkillPhrases(t *testing.T, content string, phrases ...string) {
+	t.Helper()
+	for _, phrase := range phrases {
+		if !strings.Contains(content, phrase) {
+			t.Errorf("generated litespec-review instructions missing %q", phrase)
+		}
+	}
+}
