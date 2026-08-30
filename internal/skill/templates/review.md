@@ -17,7 +17,7 @@ If the queue is local, identify `specs/queues/<name>.md` without reading it, app
 4. If a path is secret-like or outside the repository, a component is a symlink, a parent is not a directory, an existing leaf is not a regular file, or a deleted path was not a regular file at `Base:`, stop without a verdict. State the path and reason, but never read its contents or follow its target. Ask the user to remove or move it before review.
 5. Only after a path passes screening may you read it. Inspect each approved tracked diff, untracked regular file, and local contract. If review discovers another local path later, screen it before reading. Every safe untracked file is wholly inside review scope because `git diff` omits it.
 
-After that initial body-only safety step, fetch and inspect the issue comments before cross-checking evidence, but only after the ownership/path screen is complete. Comments may contain evidence receipts, but they do not replace the issue body's ownership lines or unit contracts.
+After that initial body-only safety step, fetch and inspect the issue comments before cross-checking evidence, but only after completing the ownership/path screen, reading the approved current contracts, and writing the independent risk inventory described below. Comments may contain evidence receipts and prior coverage records, but they do not replace the issue body's ownership lines or unit contracts.
 
 All commits and working-tree changes on the recorded branch belong to this issue. Findings outside that scope route. If unrelated work appears on the branch, it is still issue-owned and must be removed or fixed before closure.
 
@@ -31,6 +31,27 @@ No `reviewMode` — one mode: does the code satisfy `Done means:` and `Verify:` 
 
 1. **Standards** — fit with repo conventions, neighboring code, error handling, tests, glossary terms.
 2. **Intent** — behavior vs `Done means:` and `Verify:`. A passing Verify proves only its scope — probe variants, call order, side effects, omissions.
+
+## Cumulative review coverage
+
+Before reading any prior review coverage records, construct an independent risk inventory from the current contracts. Write the inventory down before fetching GitHub issue comments or reading local metadata stored after the units. For a local queue, initially read only through the last unit; leave the trailing metadata unread until the inventory exists.
+
+Only after writing that inventory, read prior coverage records. Use prior coverage only to expand the independent inventory and target unexercised risks. Prior coverage is advisory only. It does not satisfy evidence replay, suppress current investigation, resolve findings, or prove correctness.
+
+For every issue review, append one coverage record keyed by the reviewed full `HEAD` SHA and each covered unit identity. Record what this review exercised, did not exercise, or could not resolve, and name the probe rather than claiming a result without a current trace. Use this exact form, repeating the unit block for every covered unit:
+```text
+Review coverage:
+HEAD: <full HEAD SHA>
+Unit occurrence: <positive 1-based occurrence>
+Unit heading: <exact heading>
+Exercised:
+- <scenario>: <probe performed>
+Not exercised:
+- <scenario>: <probe performed>
+Uncertain:
+- <scenario>: <probe performed>
+```
+Use `- none` for an empty category. GitHub queue: post the record as a new issue comment. Local queue: append the record after all units in a separate clean metadata commit. Coverage is append-only: never edit or delete an earlier record. Persist the new record before returning the verdict; if persistence fails, report the boundary failure and do not claim coverage was recorded.
 
 ---
 
