@@ -1190,8 +1190,8 @@ func TestCLIValidateMinimalText(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, out)
 	}
-	if !strings.HasPrefix(out, "ok\t") {
-		t.Errorf("expected minimal text starting with 'ok\\t', got: %s", out)
+	if !strings.HasPrefix(out, "structure-ok\tsemantics-unverified\t") {
+		t.Errorf("expected minimal text to state validation scope, got: %s", out)
 	}
 }
 
