@@ -492,3 +492,59 @@ func TestGeneratedSkillsUseRedGreenEvidence(t *testing.T) {
 		requirePolicy(path, content)
 	}
 }
+
+func TestGeneratedPlanSkillShapesBoundaryUnits(t *testing.T) {
+	root := t.TempDir()
+	if err := GenerateSkills(root); err != nil {
+		t.Fatalf("GenerateSkills: %v", err)
+	}
+
+	readFile := func(path ...string) string {
+		t.Helper()
+		data, err := os.ReadFile(filepath.Join(path...))
+		if err != nil {
+			t.Fatalf("read generated plan instructions: %v", err)
+		}
+		return string(data)
+	}
+	plan := readFile(root, SkillsDir, "litespec-plan", "SKILL.md")
+	clear := readFile(root, SkillsDir, "litespec-plan", "references", "clear.md")
+	instructions := plan + "\n" + clear
+	for _, phrase := range []string{
+		"one external boundary or one failure policy",
+		"Split broad demos across independent boundaries into separate units.",
+		"Boundary: <filesystem | process | network — when applicable>",
+		"- [<clause-id>] <observable outcome>",
+		"- [<clause-id>] <named test scenario>",
+		"Risk cases:",
+		"timeout:",
+		"cleanup:",
+		"non-ENOENT errors:",
+		"concurrency:",
+		"optional configured dependencies:",
+	} {
+		if !strings.Contains(instructions, phrase) {
+			t.Errorf("generated plan instructions missing %q", phrase)
+		}
+	}
+}
+
+func TestGeneratedBuildSkillConsumesScenarioContract(t *testing.T) {
+	root := t.TempDir()
+	if err := GenerateSkills(root); err != nil {
+		t.Fatalf("GenerateSkills: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, SkillsDir, "litespec-build", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read generated build skill: %v", err)
+	}
+	content := string(data)
+	for _, phrase := range []string{
+		"Treat `Done means:`, `Scenarios:`, `Boundary:`, `Risk cases:`, and `Verify:` as fixed contract fields.",
+		"Do not add, remove, rename, or remap clause IDs, scenario mappings, boundary declarations, or risk cases.",
+	} {
+		if !strings.Contains(content, phrase) {
+			t.Errorf("generated build instructions missing %q", phrase)
+		}
+	}
+}
