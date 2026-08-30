@@ -866,19 +866,30 @@ func applyQueueIssues(result *ValidationResult, commentSource string, units []qu
 		}
 	}
 
-	unresolved, requestErrors := unresolvedRebuildRequests(units, comments)
-	for _, err := range requestErrors {
+	scan := scanQueueComments(units, comments)
+	for _, err := range scan.errors {
 		result.Errors = append(result.Errors, ValidationIssue{
 			Severity: SeverityError,
 			Message:  fmt.Sprintf("queue rebuild routing: %v", err),
 			File:     commentSource,
 		})
 	}
-	for _, identity := range unresolved {
+	for _, identity := range scan.unresolved {
 		result.Errors = append(result.Errors, ValidationIssue{
 			Severity: SeverityError,
 			Message: fmt.Sprintf(
 				"unit occurrence %d with heading %q has an unresolved rebuild request",
+				identity.Occurrence,
+				identity.Heading,
+			),
+			File: commentSource,
+		})
+	}
+	for _, identity := range scan.replanRequired {
+		result.Errors = append(result.Errors, ValidationIssue{
+			Severity: SeverityError,
+			Message: fmt.Sprintf(
+				"unit occurrence %d with heading %q has an unresolved re-plan marker",
 				identity.Occurrence,
 				identity.Heading,
 			),
@@ -1288,12 +1299,12 @@ func ValidateQueueFile(path string) (*ValidationResult, error) {
 		return nil, err
 	}
 
-	stripped, amendmentBlocks := splitLocalAmendmentBlocks(string(raw))
+	stripped, metadataBlocks := splitLocalQueueMetadataBlocks(string(raw))
 	result := &ValidationResult{Valid: true}
 	source := fmt.Sprintf("queue file %s", path)
 	units, unitIssues := ValidateQueueBody(stripped, source)
 	result.UnitsCount += len(units)
-	applyQueueIssues(result, source, units, unitIssues, amendmentBlocks)
+	applyQueueIssues(result, source, units, unitIssues, metadataBlocks)
 	result.Valid = len(result.Errors) == 0
 	return result, nil
 }

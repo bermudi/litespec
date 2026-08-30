@@ -69,7 +69,7 @@ Plan is the only actor that may change a unit contract; build and review never d
    New digest: <64 lowercase hex>
    Reason: <one line>
    ```
-   Identity fields carry the post-amendment identity because the heading itself may have renamed.
+   Identity fields carry the post-amendment identity because the heading itself may have renamed. An amendment resolves an outstanding re-plan marker only when its `Old digest:` equals the marker's `Unit digest:`.
 4. The amendment leaves the checked unit selectable but unresolved until build posts a fresh identity-bearing receipt whose `unit digest:` equals `New digest:`. Validate enforces the chain: every observed digest must connect to the current contract digest through amendment edges.
 
 ---

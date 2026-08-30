@@ -30,10 +30,17 @@ func selectableUnitIdentities(units []queueUnit, comments []string) ([]queueUnit
 	for _, identity := range scan.unresolved {
 		unresolvedSet[identity] = true
 	}
+	markedSet := make(map[queueUnitIdentity]bool, len(scan.replanRequired))
+	for _, identity := range scan.replanRequired {
+		markedSet[identity] = true
+	}
 
 	identities := queueUnitIdentities(units)
 	selectable := make([]queueUnitIdentity, 0)
 	for i, unit := range units {
+		if markedSet[identities[i]] {
+			continue
+		}
 		if !isCheckedUnit(unit.Body) || unresolvedSet[identities[i]] {
 			selectable = append(selectable, identities[i])
 		}

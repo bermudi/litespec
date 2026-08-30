@@ -397,3 +397,55 @@ func TestReplanMarkerResolvedByAmendment(t *testing.T) {
 		t.Errorf("new digest completed rebuild cycles = %d, want 0", got)
 	}
 }
+
+func TestQueueReplanMarkerValidation(t *testing.T) {
+	identity := queueUnitIdentity{Occurrence: 1, Heading: "First unit"}
+	units := amendmentTestUnits(t, amendmentTestBody(amendmentTestOldDoneMeans, identity.Heading))
+	digest := unitContractDigest(units[0])
+	evidence := amendmentReceipt(identity.Occurrence, identity.Heading, digest)
+	completedCycles := []string{
+		evidence,
+		formatRebuildRequest(identity),
+		evidence,
+		formatRebuildRequest(identity),
+		evidence,
+	}
+	marker := replanMarker(identity.Occurrence, identity.Heading, digest)
+	hasError := func(comments []string, fragment string) bool {
+		t.Helper()
+		for _, err := range scanQueueComments(units, comments).errors {
+			if strings.Contains(err.Error(), fragment) {
+				return true
+			}
+		}
+		return false
+	}
+
+	if !hasError([]string{evidence, marker}, "requires two completed rebuild cycles") {
+		t.Error("marker before two completed cycles was accepted")
+	}
+	if !hasError(append(append([]string{}, completedCycles...), marker, marker), "duplicate unresolved re-plan marker") {
+		t.Error("duplicate unresolved marker was accepted")
+	}
+	malformed := strings.Replace(marker, "Unit digest: "+digest, "Unit digest: bad", 1)
+	if !hasError(append(append([]string{}, completedCycles...), malformed), "malformed re-plan marker") {
+		t.Error("malformed marker was accepted")
+	}
+	wrongDigest := strings.Repeat("9", 64)
+	if !hasError(append(append([]string{}, completedCycles...), replanMarker(identity.Occurrence, identity.Heading, wrongDigest)), "outside its contract history") {
+		t.Error("marker for an unrelated digest was accepted")
+	}
+}
+
+func TestLocalQueueReplanMarkerMetadata(t *testing.T) {
+	body := amendmentTestBody(amendmentTestOldDoneMeans, "First unit")
+	units := amendmentTestUnits(t, body)
+	marker := replanMarker(1, "First unit", unitContractDigest(units[0]))
+	stripped, metadata := splitLocalQueueMetadataBlocks(body + "\n\n" + marker + "\n")
+	if strings.Contains(stripped, "Re-plan required:") {
+		t.Error("local re-plan marker remained in the queue contract body")
+	}
+	if len(metadata) != 1 || metadata[0] != marker {
+		t.Errorf("local metadata = %q, want the exact marker", metadata)
+	}
+}
