@@ -1353,6 +1353,113 @@ func TestScenarioMappingAffectsUnitDigest(t *testing.T) {
 	}
 }
 
+func TestQueueUnitBoundaryRiskAccounting(t *testing.T) {
+	source := "GH issue #1"
+	unit := func(boundary, risks string) string {
+		return ownedQueue("## Probe service\nBoundary: " + boundary + "\nDone means:\n- [timeout] returns on timeout\n- [cleanup] removes temporary state\nScenarios:\n- [timeout] TestTimeout\n- [cleanup] TestCleanup\n" + risks + "Verify: `go test ./internal -run TestProbeService`\n- [ ] pending\n")
+	}
+	completeRisks := "Risk cases:\n- timeout: [timeout]\n- cleanup: [cleanup]\n- non-ENOENT errors: N/A — no filesystem lookup\n- concurrency: N/A — each probe owns its state\n- optional configured dependencies: N/A — the probe is mandatory\n"
+
+	for _, boundary := range []string{"filesystem", "process", "network"} {
+		t.Run(boundary+" complete accounting passes", func(t *testing.T) {
+			_, issues := ValidateQueueBody(unit(boundary, completeRisks), source)
+			if len(issues) > 0 {
+				t.Fatalf("expected complete %s risk accounting to pass, got %v", boundary, issues)
+			}
+		})
+		t.Run(boundary+" requires risk cases", func(t *testing.T) {
+			_, issues := ValidateQueueBody(unit(boundary, ""), source)
+			if !containsIssue(issues, "missing Risk cases: for "+boundary+" boundary") {
+				t.Fatalf("expected missing Risk cases error, got %v", issues)
+			}
+		})
+	}
+
+	tests := []struct {
+		name        string
+		risks       string
+		wantMessage string
+	}{
+		{
+			name:        "missing standard risk fails",
+			risks:       strings.Replace(completeRisks, "- cleanup: [cleanup]\n", "", 1),
+			wantMessage: `Risk cases: missing "cleanup" entry`,
+		},
+		{
+			name:        "unknown scenario fails",
+			risks:       strings.Replace(completeRisks, "- timeout: [timeout]", "- timeout: [unknown]", 1),
+			wantMessage: `risk "timeout" references unknown scenario ID "unknown"`,
+		},
+		{
+			name:        "empty N/A reason fails",
+			risks:       strings.Replace(completeRisks, "N/A — no filesystem lookup", "N/A —", 1),
+			wantMessage: `risk "non-ENOENT errors" must include a nonempty N/A reason`,
+		},
+		{
+			name:        "duplicate risk fails",
+			risks:       strings.Replace(completeRisks, "- cleanup: [cleanup]\n", "- cleanup: [cleanup]\n- cleanup: [cleanup]\n", 1),
+			wantMessage: `duplicate "cleanup" entry`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, issues := ValidateQueueBody(unit("process", tt.risks), source)
+			if !containsIssue(issues, tt.wantMessage) {
+				t.Fatalf("expected %q, got %v", tt.wantMessage, issues)
+			}
+		})
+	}
+
+	t.Run("boundary is unique", func(t *testing.T) {
+		body := strings.Replace(unit("process", completeRisks), "Boundary: process", "Boundary: process\nBoundary: network", 1)
+		_, issues := ValidateQueueBody(body, source)
+		if !containsIssue(issues, "duplicate Boundary: fields") {
+			t.Fatalf("expected duplicate Boundary error, got %v", issues)
+		}
+	})
+
+	t.Run("boundary is nonempty", func(t *testing.T) {
+		_, issues := ValidateQueueBody(unit("", completeRisks), source)
+		if !containsIssue(issues, "Boundary: must be nonempty") {
+			t.Fatalf("expected empty Boundary error, got %v", issues)
+		}
+	})
+}
+
+func TestBoundaryRiskAccountingAffectsUnitDigest(t *testing.T) {
+	unit := queueUnit{
+		Heading: "Probe service",
+		Body: []string{
+			"Boundary: process",
+			"Done means:",
+			"- [timeout] returns on timeout",
+			"Scenarios:",
+			"- [timeout] TestTimeout",
+			"Risk cases:",
+			"- timeout: [timeout]",
+			"- cleanup: N/A — no cleanup state",
+			"- non-ENOENT errors: N/A — no filesystem lookup",
+			"- concurrency: N/A — probes are serialized",
+			"- optional configured dependencies: N/A — the probe is mandatory",
+			"Verify: `go test ./internal -run TestTimeout`",
+		},
+	}
+	changedBoundary := unit
+	changedBoundary.Body = append([]string(nil), unit.Body...)
+	changedBoundary.Body[0] = "Boundary: network"
+	changedRisk := unit
+	changedRisk.Body = append([]string(nil), unit.Body...)
+	changedRisk.Body[7] = "- cleanup: N/A — cleanup is handled by the caller"
+
+	baseDigest := unitContractDigest(unit)
+	if got := unitContractDigest(changedBoundary); got == baseDigest {
+		t.Fatal("changing the boundary did not change the unit digest")
+	}
+	if got := unitContractDigest(changedRisk); got == baseDigest {
+		t.Fatal("changing risk accounting did not change the unit digest")
+	}
+}
+
 func TestValidateUnitContractDigest(t *testing.T) {
 	source := "GH issue #1"
 
