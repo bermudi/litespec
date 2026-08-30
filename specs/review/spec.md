@@ -158,7 +158,7 @@ A finding is blocking when it is CRITICAL or WARNING and at least one of: it bre
 
 For each finding, `litespec-review` SHALL apply the first matching rule:
 1. A SUGGESTION SHALL be routed to the non-blocking small fix lane at the user's discretion.
-2. A CRITICAL or WARNING that breaks a unit's `Done means:` or `Verify:` SHALL be a blocking rebuild. For a GitHub queue, review SHALL append a rebuild-request comment and the checked unit remains selectable by `litespec-build`; for a local queue, the unit SHALL be unchecked and rebuilt with `litespec-build`.
+2. A CRITICAL or WARNING that breaks a unit contract SHALL block. Before two completed rebuild cycles against the current contract digest, review SHALL append a rebuild request and route to `litespec-build`. After two completed cycles, review SHALL append a re-plan marker instead and route to `litespec-plan`; it MUST NOT request a third rebuild against the unchanged digest.
 3. A CRITICAL or WARNING inside review scope but outside every unit SHALL be blocking. A trivial finding SHALL route to a direct fix on the issue branch; a non-trivial, correctly shaped finding SHALL be appended as a new unchecked unit on the parent queue and built on the same branch; a shape problem SHALL route to `litespec-plan`.
 4. A CRITICAL or WARNING outside review scope and every unit SHALL be non-blocking. A trivial finding SHALL route to the small fix lane; a non-trivial finding SHALL be drafted for a later `litespec-plan` invocation that creates its own queue and isolated branch; a shape problem SHALL route to `litespec-plan`.
 
@@ -186,7 +186,7 @@ A finding that needs a durable ruling SHALL be reported as `"needs decision: <qu
 
 ### Requirement: Automatic Unit Rebuild Routing
 
-After applying finding triage, `litespec-review` SHALL persist routing metadata for every checked unit routed by rule 2 before returning `CHANGES REQUESTED`. For a GitHub queue, review MUST NOT replace or edit the issue body. It SHALL post one append-only issue comment per affected unit with this structure:
+After applying finding triage, `litespec-review` SHALL scan remote comments or local append-only metadata oldest to newest using the same request-to-receipt cycle rules as validate, then persist routing metadata for every checked unit routed by rule 2 before returning `CHANGES REQUESTED`. For each unit with fewer than two completed rebuild cycles against its current digest, review SHALL record a rebuild request. For each unit already carrying two completed cycles, it SHALL record one re-plan marker and MUST NOT record another rebuild request. If an unresolved marker already exists for that identity and digest, review SHALL preserve it without posting a duplicate and report the existing plan route. For a GitHub queue, review MUST NOT replace or edit the issue body. A rebuild request SHALL use this structure:
 
 ```text
 Rebuild request:
@@ -194,9 +194,21 @@ Unit occurrence: <positive 1-based occurrence of this exact heading among queue 
 Unit heading: <exact unit heading>
 ```
 
+A re-plan marker SHALL use this structure:
+
+```text
+Re-plan required:
+Unit occurrence: <positive 1-based occurrence>
+Unit heading: <exact unit heading>
+Unit digest: <current 64 lowercase hex digest>
+Reason: <nonempty one-line reason>
+```
+
 A GitHub rebuild request is unresolved when no later comment contains a complete evidence receipt for the same unit occurrence and exact heading. A later complete receipt for that same unit SHALL resolve every earlier unresolved request for it. `litespec-build` SHALL treat a checked unit with an unresolved rebuild request as selectable, subject to the normal dependency rules, and SHALL post a fresh complete receipt that identifies the same unit occurrence and heading. Prior evidence and the checked status remain unchanged until that later receipt resolves the request.
 
-For a local queue, review SHALL uncheck only the affected status lines, preserve prior evidence and every unaffected unit, and create a separate routing metadata commit so the next build starts from a clean tree. Review SHALL NOT require the user to perform either mechanical routing mutation. If the comment or local commit cannot be persisted safely, review SHALL report the boundary failure and MUST NOT claim the rebuild is ready.
+A re-plan marker is unresolved until a later plan-authored amendment starts at its `Unit digest:`. While unresolved, build SHALL refuse the marked contract and the issue SHALL remain open. The amendment then follows its normal unresolved-request lifecycle until fresh evidence satisfies its new digest.
+
+For a local queue, review SHALL append the same structured routing record after all units. For a rebuild it SHALL also uncheck only the affected status lines; for a re-plan marker it SHALL leave the checked contract unavailable to build. It SHALL preserve prior evidence and every unaffected unit and create a separate routing metadata commit so the next actor starts from a clean tree. Review SHALL NOT require the user to perform either mechanical routing mutation. If the comment or local commit cannot be persisted safely, review SHALL report the boundary failure and MUST NOT claim the route is ready.
 
 #### Scenario: GitHub rebuild request preserves issue body
 
@@ -225,7 +237,7 @@ For a local queue, review SHALL uncheck only the affected status lines, preserve
 
 ### Requirement: Pure Review Role
 
-The `litespec-review` skill MUST NOT write code, check units, remove evidence, alter unaffected units, or implement fixes. It SHALL report and route findings. Posting GitHub rebuild-request comments, unchecking local units routed to blocking rebuild, and appending a new unchecked unit to the parent GH issue body or local queue are permitted routing mutations; review MUST NOT otherwise modify the queue.
+The `litespec-review` skill MUST NOT write code, check units, remove evidence, alter unaffected units, or implement fixes. It SHALL report and route findings. Posting rebuild requests, re-plan markers, and review coverage records; unchecking local units routed to blocking rebuild; and appending a new unchecked unit to the parent GH issue body or local queue are permitted metadata or routing mutations. Review MUST NOT otherwise modify the queue.
 
 #### Scenario: Review does not implement
 
@@ -272,11 +284,11 @@ When the change contains stateful code paths, `litespec-review` SHALL load `refe
 
 ### Requirement: Issue Closure Condition
 
-A GH issue SHALL close only when every unit checkbox is checked, no rebuild request is unresolved, and `litespec-review` returns `PASS`. Routed non-blocking findings SHALL NOT prevent closure or reopen the issue.
+A GH issue SHALL close only when every unit checkbox is checked, no rebuild request, re-plan marker, or amendment is unresolved, and `litespec-review` returns `PASS`. Routed non-blocking findings SHALL NOT prevent closure or reopen the issue.
 
 #### Scenario: Checked units and pass permit closure
 
-- **WHEN** every unit checkbox is checked, every rebuild request is resolved, and review returns `PASS`
+- **WHEN** every unit checkbox is checked, every rebuild request, re-plan marker, and amendment is resolved, and review returns `PASS`
 - **THEN** the issue may close
 
 #### Scenario: Checked unit with unresolved rebuild request stays open
@@ -286,9 +298,51 @@ A GH issue SHALL close only when every unit checkbox is checked, no rebuild requ
 
 ### Requirement: No Persistent Finding Tracker
 
-`litespec-review` findings SHALL be ephemeral. A finding SHALL route to an existing unit, be fixed directly, or become a new queue issue. A structured GitHub rebuild-request comment is queue routing metadata resolved by later evidence, not a finding tracker. The review skill SHALL NOT maintain a separate finding tracker, task list, or persistent finding artifact.
+`litespec-review` findings SHALL be ephemeral. A finding SHALL route to an existing unit, be fixed directly, or become a new queue issue. Structured rebuild requests, re-plan markers, and review coverage records are routing or exercised-risk metadata, not a finding tracker. The review skill SHALL NOT maintain a separate finding tracker or task list, and a later reviewer MUST recompute findings from current state rather than carry them forward as conclusions.
 
 #### Scenario: Re-review reads current state
 
 - **WHEN** `litespec-review` is re-run after fixes
-- **THEN** it evaluates the current issue-owned branch, specs, and code and recomputes the verdict without a previous finding log
+- **THEN** it evaluates the current issue-owned branch, specs, and code and recomputes findings without treating a previous finding or coverage record as proof
+
+### Requirement: Boundary-Shaped Unit Contracts
+
+`litespec-plan` SHALL shape each unit around one external boundary or one failure policy rather than grouping independent boundaries under one demo. Every `Done means:` clause SHALL carry a stable ID mapped by the unit's `Scenarios:` contract to at least one named test scenario. Filesystem, process, and network units SHALL account for timeout, cleanup, non-ENOENT errors, concurrency, and optional configured dependencies by mapped scenario or reasoned N/A. `litespec-build` SHALL treat those scenario and risk mappings as part of the fixed unit contract, and `litespec-review` SHALL judge whether the named tests actually exercise them.
+
+#### Scenario: One demo crosses independent boundaries
+
+- **WHEN** a proposed demo includes independent filesystem, database, process, and network behavior
+- **THEN** plan splits it into boundary- or failure-policy units instead of accepting the demo as one unit
+
+#### Scenario: Structural mapping is semantically weak
+
+- **WHEN** scenario IDs and risk entries are structurally complete but their named tests do not exercise the claimed behavior
+- **THEN** review reports the inadequate contract coverage even though validate accepted its structure
+
+### Requirement: Cumulative Review Coverage
+
+For every issue review, `litespec-review` SHALL first construct an independent risk inventory from the current contracts before reading prior coverage records. It SHALL then read safely screened append-only review coverage records, expand the inventory with previously attempted scenarios, and persist a new record keyed to the reviewed full HEAD SHA and each covered unit identity. The record SHALL distinguish exercised, not exercised, and uncertain scenarios and SHALL describe the probe performed. Prior coverage MUST remain advisory: it SHALL NOT suppress current investigation, satisfy evidence replay, resolve findings, or establish correctness. GitHub SHALL store records as issue comments; a local queue SHALL store equivalent records in its append-only metadata stream after all units.
+
+#### Scenario: Fresh review learns without anchoring
+
+- **WHEN** prior reviews exercised some adversarial paths
+- **THEN** the reviewer drafts its own risks first, then uses prior records to target gaps and posts a new HEAD-keyed coverage record
+
+#### Scenario: Prior handled result is not proof
+
+- **WHEN** a prior coverage record marks a scenario exercised without a current trace supporting it
+- **THEN** the current reviewer does not treat that record as evidence that the behavior is correct
+
+### Requirement: Repeated Rebuild Escape Hatch
+
+A unit SHALL complete at most two review-requested rebuild cycles against its current contract digest. After two such cycles, the next CRITICAL or WARNING that breaks that unit SHALL route to `litespec-plan`: review SHALL persist a structured blocking re-plan marker bound to the current unit digest and MUST NOT post a third rebuild request. Build MUST refuse the marked contract. Plan SHALL resolve the marker only by authoring an amendment from the marked digest, reshaping the unit and appending units when needed. The amendment SHALL reset the rebuild count for its new digest and remain unresolved until fresh evidence satisfies the new contract. Evidence that resolves the amendment SHALL NOT itself count as a review-requested rebuild cycle.
+
+#### Scenario: Third unit-breaking finding forces plan
+
+- **WHEN** two rebuild cycles completed against the current unit digest and review confirms another unit-breaking finding
+- **THEN** review records a re-plan marker, returns `CHANGES REQUESTED`, and does not route the unchanged unit to build
+
+#### Scenario: Reshaped contract returns to build
+
+- **WHEN** plan narrows or splits the marked contract through a witnessed amendment
+- **THEN** the re-plan marker resolves and build may select the amended or newly appended units under their new contracts
