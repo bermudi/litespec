@@ -1238,6 +1238,96 @@ func TestQueueDepends(t *testing.T) {
 	})
 }
 
+func TestQueueUnitScenarioMapping(t *testing.T) {
+	source := "GH issue #1"
+	unit := func(doneMeans, scenarios string) string {
+		return ownedQueue("## My outcome\nDone means:\n" + doneMeans + "Scenarios:\n" + scenarios + "Verify: `go test ./internal -run TestMyOutcome`\n- [ ] pending\n")
+	}
+
+	t.Run("complete mapping passes", func(t *testing.T) {
+		_, issues := ValidateQueueBody(unit(
+			"- [timeout] returns on timeout\n- [cleanup] removes temporary state\n",
+			"- [timeout] TestTimeout\n- [cleanup] TestCleanup\n",
+		), source)
+		if len(issues) > 0 {
+			t.Fatalf("expected complete mapping to pass, got %v", issues)
+		}
+	})
+
+	tests := []struct {
+		name        string
+		doneMeans   string
+		scenarios   string
+		wantMessage string
+	}{
+		{
+			name:        "clause without identifier fails",
+			doneMeans:   "- returns on timeout\n",
+			scenarios:   "- [timeout] TestTimeout\n",
+			wantMessage: "identified Done means clause",
+		},
+		{
+			name:        "duplicate clause identifier fails",
+			doneMeans:   "- [timeout] returns on timeout\n- [timeout] stops work\n",
+			scenarios:   "- [timeout] TestTimeout\n",
+			wantMessage: `duplicate Done means clause ID "timeout"`,
+		},
+		{
+			name:        "unmapped clause fails",
+			doneMeans:   "- [timeout] returns on timeout\n- [cleanup] removes temporary state\n",
+			scenarios:   "- [timeout] TestTimeout\n",
+			wantMessage: `Done means clause ID "cleanup" has no scenario mapping`,
+		},
+		{
+			name:        "unknown clause mapping fails",
+			doneMeans:   "- [timeout] returns on timeout\n",
+			scenarios:   "- [timeout] TestTimeout\n- [cleanup] TestCleanup\n",
+			wantMessage: `scenario mapping references unknown Done means clause ID "cleanup"`,
+		},
+		{
+			name:        "unnamed scenario fails",
+			doneMeans:   "- [timeout] returns on timeout\n",
+			scenarios:   "- [timeout]\n",
+			wantMessage: `scenario mapping for clause ID "timeout" must name a test scenario`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, issues := ValidateQueueBody(unit(tt.doneMeans, tt.scenarios), source)
+			if !containsIssue(issues, tt.wantMessage) {
+				t.Fatalf("expected %q, got %v", tt.wantMessage, issues)
+			}
+		})
+	}
+}
+
+func TestScenarioMappingAffectsUnitDigest(t *testing.T) {
+	unit := queueUnit{
+		Heading: "My outcome",
+		Body: []string{
+			"Done means:",
+			"- [timeout] returns on timeout",
+			"Scenarios:",
+			"- [timeout] TestTimeout",
+			"Verify: `go test ./internal -run TestTimeout`",
+		},
+	}
+	changedClause := unit
+	changedClause.Body = append([]string(nil), unit.Body...)
+	changedClause.Body[1] = "- [timeout] reports timeout"
+	changedScenario := unit
+	changedScenario.Body = append([]string(nil), unit.Body...)
+	changedScenario.Body[3] = "- [timeout] TestTimeoutResult"
+
+	baseDigest := unitContractDigest(unit)
+	if got := unitContractDigest(changedClause); got == baseDigest {
+		t.Fatal("changing an identified Done means clause did not change the unit digest")
+	}
+	if got := unitContractDigest(changedScenario); got == baseDigest {
+		t.Fatal("changing a scenario mapping did not change the unit digest")
+	}
+}
+
 func TestValidateUnitContractDigest(t *testing.T) {
 	source := "GH issue #1"
 
