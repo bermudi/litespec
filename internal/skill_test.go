@@ -548,3 +548,41 @@ func TestGeneratedBuildSkillConsumesScenarioContract(t *testing.T) {
 		}
 	}
 }
+
+func TestGeneratedSkillsRouteRepeatedFailureToPlan(t *testing.T) {
+	root := t.TempDir()
+	if err := GenerateSkills(root); err != nil {
+		t.Fatalf("GenerateSkills: %v", err)
+	}
+	readSkill := func(name string) string {
+		t.Helper()
+		data, err := os.ReadFile(filepath.Join(root, SkillsDir, name, "SKILL.md"))
+		if err != nil {
+			t.Fatalf("read generated %s skill: %v", name, err)
+		}
+		return string(data)
+	}
+	checks := map[string][]string{
+		"litespec-review": {
+			"After two completed review-requested rebuild cycles against the current digest, record a re-plan marker instead of another rebuild request.",
+			"Re-plan required:",
+			"Unit digest: <current 64 lowercase hex digest>",
+			"Do not post a duplicate unresolved marker",
+		},
+		"litespec-build": {
+			"An unresolved `Re-plan required:` marker makes that contract unavailable to build.",
+			"Stop and route it to `litespec-plan`; do not rebuild the marked contract.",
+		},
+		"litespec-plan": {
+			"An amendment resolves an outstanding re-plan marker only when its `Old digest:` equals the marker's `Unit digest:`.",
+		},
+	}
+	for name, phrases := range checks {
+		content := readSkill(name)
+		for _, phrase := range phrases {
+			if !strings.Contains(content, phrase) {
+				t.Errorf("generated %s instructions missing %q", name, phrase)
+			}
+		}
+	}
+}
