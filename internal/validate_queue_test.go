@@ -13,7 +13,29 @@ import (
 )
 
 func ownedQueue(body string) string {
-	return "Base: 1111111111111111111111111111111111111111\nBranch: litespec/test-change\n\n" + body
+	lines := strings.Split(body, "\n")
+	var normalized []string
+	openFence := ""
+	for _, line := range lines {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			normalized = append(normalized, line)
+			continue
+		}
+		if strings.HasPrefix(line, "Done means:") {
+			value := strings.TrimSpace(strings.TrimPrefix(line, "Done means:"))
+			if value != "" {
+				normalized = append(normalized,
+					"Done means:",
+					"- [outcome] "+value,
+					"Scenarios:",
+					"- [outcome] TestOutcome",
+				)
+				continue
+			}
+		}
+		normalized = append(normalized, line)
+	}
+	return "Base: 1111111111111111111111111111111111111111\nBranch: litespec/test-change\n\n" + strings.Join(normalized, "\n")
 }
 
 const evidenceTestSHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -623,7 +645,10 @@ func unitDigestFor(heading, doneMeans, verifyCmd string) string {
 	return unitContractDigest(queueUnit{
 		Heading: heading,
 		Body: []string{
-			"Done means: " + doneMeans,
+			"Done means:",
+			"- [outcome] " + doneMeans,
+			"Scenarios:",
+			"- [outcome] TestOutcome",
 			"Verify:",
 			"```",
 			verifyCmd,
@@ -1332,9 +1357,12 @@ func TestValidateUnitContractDigest(t *testing.T) {
 	source := "GH issue #1"
 
 	// Hand-computed canonical serialization of the fixture unit: heading,
-	// Done means, Verify content — each length-prefixed, in that order.
+	// Done means, Scenarios, Verify content — each length-prefixed, in that order.
+	doneMeans := "- [outcome] something"
+	scenarios := "- [outcome] TestOutcome"
 	canonical := "10:My outcome" +
-		"9:something" +
+		fmt.Sprintf("%d:%s", len(doneMeans), doneMeans) +
+		fmt.Sprintf("%d:%s", len(scenarios), scenarios) +
 		fmt.Sprintf("%d:echo hi", len("echo hi"))
 	sum := sha256.Sum256([]byte(canonical))
 	goodDigest := hex.EncodeToString(sum[:])
@@ -1375,8 +1403,7 @@ func TestValidateUnitContractDigest(t *testing.T) {
 	})
 
 	t.Run("digest mismatch names expected and actual digests", func(t *testing.T) {
-		otherSum := sha256.Sum256([]byte("10:My outcome9:something7:echo other"))
-		otherDigest := hex.EncodeToString(otherSum[:])
+		otherDigest := unitDigestFor("My outcome", "something", "echo other")
 		_, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", digestReceipt(otherDigest))), source)
 		if !containsIssue(issues, "expected "+goodDigest+", actual "+otherDigest) {
 			t.Fatalf("expected mismatch error naming both digests, got %v", issues)

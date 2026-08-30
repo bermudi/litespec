@@ -148,6 +148,139 @@ var placeholderSet = map[string]bool{
 	"none": true, "tbd": true, "todo": true, "null": true, "nil": true,
 }
 
+var identifiedQueueEntryPattern = regexp.MustCompile(`^[-*][ \t]+\[([^][ \t]+)\](?:[ \t]+(.*))?$`)
+
+func queueUnitFieldLines(body []string, prefix string) ([]string, bool) {
+	openFence := ""
+	for i, line := range body {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, prefix) {
+			continue
+		}
+		var values []string
+		if rest := strings.TrimSpace(strings.TrimPrefix(trimmed, prefix)); rest != "" {
+			values = append(values, rest)
+		}
+		for _, nextLine := range body[i+1:] {
+			next := strings.TrimSpace(nextLine)
+			if next == "" {
+				continue
+			}
+			if isQueueUnitFieldLine(next) || isCheckboxLine(next) {
+				break
+			}
+			values = append(values, next)
+		}
+		return values, true
+	}
+	return nil, false
+}
+
+func isQueueUnitFieldLine(line string) bool {
+	for _, prefix := range []string{
+		"Read first:", "Constraints:", "Depends:", "Boundary:", "Done means:",
+		"Scenarios:", "Risk cases:", "Verify:", "Evidence:",
+	} {
+		if strings.HasPrefix(line, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func queueUnitFieldCount(body []string, prefix string) int {
+	count := 0
+	openFence := ""
+	for _, line := range body {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		if strings.HasPrefix(strings.TrimSpace(line), prefix) {
+			count++
+		}
+	}
+	return count
+}
+
+func validateUnitScenarioMapping(unit queueUnit, source string) []ValidationIssue {
+	doneLines, doneFound := queueUnitFieldLines(unit.Body, "Done means:")
+	if !doneFound {
+		return nil
+	}
+
+	var issues []ValidationIssue
+	fail := func(message string) {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: unit %q %s", source, unit.Heading, message),
+			File:     source,
+		})
+	}
+
+	if queueUnitFieldCount(unit.Body, "Done means:") > 1 {
+		fail("has duplicate Done means: fields (only one allowed)")
+	}
+
+	clauseIDs := make(map[string]bool)
+	for _, line := range doneLines {
+		match := identifiedQueueEntryPattern.FindStringSubmatch(line)
+		if match == nil || strings.TrimSpace(match[2]) == "" {
+			fail("must contain a nonempty identified Done means clause bullet")
+			continue
+		}
+		id := match[1]
+		if clauseIDs[id] {
+			fail(fmt.Sprintf("has duplicate Done means clause ID %q", id))
+			continue
+		}
+		clauseIDs[id] = true
+	}
+	if len(doneLines) == 0 {
+		fail("must contain at least one identified Done means clause")
+	}
+
+	scenarioLines, scenariosFound := queueUnitFieldLines(unit.Body, "Scenarios:")
+	if !scenariosFound {
+		fail("missing Scenarios: mapping")
+		return issues
+	}
+	if queueUnitFieldCount(unit.Body, "Scenarios:") > 1 {
+		fail("has duplicate Scenarios: fields (only one allowed)")
+	}
+	if len(scenarioLines) == 0 {
+		fail("Scenarios: mapping must be nonempty")
+		return issues
+	}
+
+	mapped := make(map[string]bool)
+	for _, line := range scenarioLines {
+		match := identifiedQueueEntryPattern.FindStringSubmatch(line)
+		if match == nil {
+			fail("Scenarios: must contain identified mapping bullets")
+			continue
+		}
+		id := match[1]
+		if strings.TrimSpace(match[2]) == "" {
+			fail(fmt.Sprintf("scenario mapping for clause ID %q must name a test scenario", id))
+			continue
+		}
+		if !clauseIDs[id] {
+			fail(fmt.Sprintf("scenario mapping references unknown Done means clause ID %q", id))
+			continue
+		}
+		mapped[id] = true
+	}
+	for id := range clauseIDs {
+		if !mapped[id] {
+			fail(fmt.Sprintf("Done means clause ID %q has no scenario mapping", id))
+		}
+	}
+	return issues
+}
+
 func isPlaceholderValue(s string) bool {
 	return placeholderSet[strings.ToLower(strings.TrimSpace(s))]
 }
@@ -955,6 +1088,7 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 
 		issues = append(issues, validateOptionalField(unit.Body, "Constraints", constraintsCount, constraintsIdx, constraintsRest, source, unit.Heading)...)
 		issues = append(issues, validateOptionalField(unit.Body, "Read first", readFirstCount, readFirstIdx, readFirstRest, source, unit.Heading)...)
+		issues = append(issues, validateUnitScenarioMapping(unit, source)...)
 
 		if !doneFound {
 			issues = append(issues, ValidationIssue{

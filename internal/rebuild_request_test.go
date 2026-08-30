@@ -97,7 +97,14 @@ func TestGeneratedReviewRoutesRebuildRequests(t *testing.T) {
 		}
 		units = append(units, queueUnit{
 			Heading: unit.Heading,
-			Body:    []string{"Done means: outcome", "Verify: `go test ./...`", status},
+			Body: []string{
+				"Done means:",
+				"- [outcome] outcome",
+				"Scenarios:",
+				"- [outcome] TestOutcome",
+				"Verify: `go test ./...`",
+				status,
+			},
 		})
 	}
 	comments := make([]string, 0, len(fixture.Events))
@@ -133,7 +140,7 @@ func TestGeneratedReviewRoutesRebuildRequests(t *testing.T) {
 
 	const queueBody = "Base: 1111111111111111111111111111111111111111\n" +
 		"Branch: litespec/rebuild-fixture\n\n" +
-		"## Duplicate\nDone means: outcome\nVerify: `go test ./...`\n- [x] done\n"
+		"## Duplicate\nDone means:\n- [outcome] outcome\nScenarios:\n- [outcome] TestOutcome\nVerify: `go test ./...`\n- [x] done\n"
 	receiptUnits, receiptIssues := ValidateQueueBody(queueBody, "fixture")
 	receiptResult := &ValidationResult{Valid: true}
 	applyQueueIssues(
@@ -188,7 +195,13 @@ func TestGeneratedReviewRoutesRebuildRequests(t *testing.T) {
 func fixtureEvidenceComment(identity queueUnitIdentity, complete bool) string {
 	contractUnit := queueUnit{
 		Heading: identity.Heading,
-		Body:    []string{"Done means: outcome", "Verify: `go test ./...`"},
+		Body: []string{
+			"Done means:",
+			"- [outcome] outcome",
+			"Scenarios:",
+			"- [outcome] TestOutcome",
+			"Verify: `go test ./...`",
+		},
 	}
 	body := "Unit occurrence: " + strconv.Itoa(identity.Occurrence) +
 		"\nUnit heading: " + identity.Heading +

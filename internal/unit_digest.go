@@ -11,9 +11,9 @@ import (
 var unitDigestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 // unitContractDigest binds a unit's contract text: heading, optional Read
-// first/Constraints/Depends values, Done means value, and the Verify command
-// content, each length-prefixed in that fixed order. Status checkbox,
-// Evidence content, and every other unit line are excluded by design.
+// first/Constraints/Depends values, Done means clauses, scenario mappings,
+// and the Verify command content, each length-prefixed in that fixed order.
+// Status checkbox, Evidence content, and every other unit line are excluded.
 func unitContractDigest(unit queueUnit) string {
 	fields := [][]byte{contractFieldBytes(unit.Heading)}
 	if v, ok := queueUnitFieldValue(unit.Body, "Read first:"); ok {
@@ -25,8 +25,11 @@ func unitContractDigest(unit queueUnit) string {
 	if v, ok := queueUnitFieldValue(unit.Body, "Depends:"); ok {
 		fields = append(fields, contractFieldBytes(v))
 	}
-	doneMeans, _ := queueUnitFieldValue(unit.Body, "Done means:")
-	fields = append(fields, contractFieldBytes(doneMeans))
+	doneMeans, _ := queueUnitFieldLines(unit.Body, "Done means:")
+	fields = append(fields, contractFieldBytes(strings.Join(doneMeans, "\n")))
+	if scenarios, ok := queueUnitFieldLines(unit.Body, "Scenarios:"); ok {
+		fields = append(fields, contractFieldBytes(strings.Join(scenarios, "\n")))
+	}
 	fields = append(fields, contractFieldBytes(unitVerifyCommand(unit.Body)))
 
 	var b strings.Builder
