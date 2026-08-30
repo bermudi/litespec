@@ -18,10 +18,11 @@ type digestEdge struct {
 }
 
 type queueCommentScan struct {
-	unresolved []queueUnitIdentity
-	observed   map[queueUnitIdentity][]string
-	edges      map[queueUnitIdentity][]digestEdge
-	errors     []error
+	unresolved             []queueUnitIdentity
+	observed               map[queueUnitIdentity][]string
+	edges                  map[queueUnitIdentity][]digestEdge
+	completedRebuildCycles map[queueUnitIdentity]map[string]int
+	errors                 []error
 }
 
 func parseAmendmentComment(comment string, units []queueUnit) (contractAmendment, bool, bool, error) {
@@ -110,8 +111,9 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 	}
 
 	scan := queueCommentScan{
-		observed: make(map[queueUnitIdentity][]string),
-		edges:    make(map[queueUnitIdentity][]digestEdge),
+		observed:               make(map[queueUnitIdentity][]string),
+		edges:                  make(map[queueUnitIdentity][]digestEdge),
+		completedRebuildCycles: make(map[queueUnitIdentity]map[string]int),
 	}
 
 	type amendmentSighting struct {
@@ -156,6 +158,7 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 		}
 	}
 
+	pendingRebuildRequests := make(map[queueUnitIdentity]int)
 	for commentIndex, comment := range comments {
 		if amendmentShaped[commentIndex] {
 			continue
@@ -168,7 +171,8 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 		if kind == rebuildCommentOther {
 			continue
 		}
-		if _, ok := validUnit[identity]; !ok {
+		_, ok := validUnit[identity]
+		if !ok {
 			if kind != rebuildCommentRequest && digest != "" && oldDigests[digest] {
 				for _, sight := range sightings {
 					if sight.valid && sight.record.oldDigest == digest {
@@ -186,13 +190,39 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 			continue
 		}
 		if kind == rebuildCommentRequest {
-			unresolved[identity] = true
+			if _, pending := pendingRebuildRequests[identity]; !pending {
+				pendingRebuildRequests[identity] = commentIndex
+			}
 			continue
 		}
 		scan.observed[identity] = append(scan.observed[identity], digest)
+		if requestIndex, pending := pendingRebuildRequests[identity]; pending {
+			if scan.completedRebuildCycles[identity] == nil {
+				scan.completedRebuildCycles[identity] = make(map[string]int)
+			}
+			if scan.completedRebuildCycles[identity][digest] >= 2 {
+				scan.errors = append(scan.errors, thirdRebuildRequestError(requestIndex, identity, digest))
+			} else {
+				scan.completedRebuildCycles[identity][digest]++
+			}
+			delete(pendingRebuildRequests, identity)
+		}
 		if kind == rebuildCommentEvidence {
 			delete(unresolved, identity)
 		}
+	}
+
+	for unitIndex, identity := range identities {
+		requestIndex, pending := pendingRebuildRequests[identity]
+		if !pending {
+			continue
+		}
+		currentDigest := unitContractDigest(units[unitIndex])
+		if scan.completedRebuildCycles[identity][currentDigest] >= 2 {
+			scan.errors = append(scan.errors, thirdRebuildRequestError(requestIndex, identity, currentDigest))
+			continue
+		}
+		unresolved[identity] = true
 	}
 
 	for identity, newDigest := range finalNewDigest {
@@ -223,6 +253,16 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 		}
 	}
 	return scan
+}
+
+func thirdRebuildRequestError(commentIndex int, identity queueUnitIdentity, digest string) error {
+	return fmt.Errorf(
+		"comment %d: unit occurrence %d with heading %q already completed two rebuild cycles for digest %s and requires re-planning",
+		commentIndex+1,
+		identity.Occurrence,
+		identity.Heading,
+		digest,
+	)
 }
 
 func digestChainIssues(identity queueUnitIdentity, observed []string, edges []digestEdge, current string) []error {
