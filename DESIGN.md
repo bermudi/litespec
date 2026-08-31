@@ -60,28 +60,35 @@ you: "add X" -> plan[fuzzy] (read code, grill by default — references/fuzzy.md
 
 Each queue issue owns a dedicated `litespec/<change-name>` branch. `plan[clear]` requires a clean tree, captures `Base:`, creates the branch, and records `Branch:`. Auto-loaded harness/repository instructions are review's trusted bootstrap boundary. After activation, review initially reads only the remote issue; every additional local queue, contract, implementation, and reference path is screened with its parent components before content access. Unsafe paths stop review. Unrelated work uses another branch or worktree.
 
-Review routing is ordered: suggestion; unit violation; in-scope finding outside units; out-of-scope finding. DISPUTED is terminal non-blocking (never routes, never blocks, generates no unit) and sits outside the blocking chain. CRITICAL/WARNING inside issue scope blocks even when no unit covers it. Out-of-scope findings route without blocking. Evidence cross-check (checked units: red-green receipt, command verbatim, pre→post→HEAD ancestry, three re-runs) and DISPUTED citation bar (rejecting authority required) are part of review. A GitHub unit violation produces one append-only structured rebuild-request comment per affected unit identity (exact heading plus its 1-based same-heading occurrence); review never edits the issue body for this route. Local review unchecks only affected units in a clean metadata commit. The issue closes only when every unit is checked, every rebuild request is resolved by later identity-matched complete evidence, and review returns `PASS`.
+Review routing is ordered: suggestion; unit violation; in-scope finding outside units; out-of-scope finding. DISPUTED is terminal non-blocking. CRITICAL/WARNING inside issue scope blocks even when no unit covers it. Evidence cross-check (red-green receipt, pre→post→HEAD ancestry, three re-runs) remains part of review. Review first constructs an independent risk inventory, then consults append-only HEAD-keyed coverage records and persists a new advisory record. A unit violation produces a rebuild request only while fewer than two rebuild cycles completed against the current unit digest. The next violation records `Re-plan required:` and plan must amend/reshape that contract before build continues. GitHub metadata lives in comments; local metadata is appended after all units in a clean metadata commit. The issue closes only when every unit is checked, every rebuild request, re-plan marker, and amendment is resolved, and review returns `PASS`.
 
 `grill-me` is a skill reference, not a CLI. `plan` owns spec drafting in clear mode: if the feature is load-bearing, it writes/updates `specs/<feature>/spec.md` alongside the issue.
 
 ## Unit rule
 
-One unit = one thing you can demo + one `Verify:` that would fail if it's missing.
+One unit = one external boundary or one failure policy + one `Verify:` that would fail if it is missing. A broad demo crossing independent boundaries must split.
 
-Optional per-unit fields: `Read first:` (context, not scope — areas and rulings, not file lists) and `Constraints:` (boundaries — what must stay true or is out of bounds, never what to edit). Both are unique and nonempty when present; omit rather than placeholder. `Depends:` lists other unit headings. The worker owns the implementation path.
+Every `Done means:` clause is a bullet carrying a unique bracketed ID. Required `Scenarios:` entries map every clause ID to at least one named test scenario. Filesystem, process, and network units declare `Boundary:` and a `Risk cases:` matrix covering timeout, cleanup, non-ENOENT errors, concurrency, and optional configured dependencies; each risk maps to a scenario ID or gives a concrete N/A reason. Validate checks mapping shape and references, while plan/review judge whether boundaries were omitted and tests are adequate. Optional `Read first:`, `Constraints:`, and `Depends:` retain their current meanings. All contract fields participate in the unit digest.
 
-Evidence protocol: before implementation, build runs the exact `Verify:` on a clean pre commit and requires a non-zero failure caused by the absent outcome. If the verifier does not exist yet, build may create at most one verifier-only commit and use it as pre. Build selects the first unchecked unit or checked unit with an unresolved rebuild request or amendment, subject to dependencies. It then creates one or more implementation/fix commits without amending them; post is the final clean commit where `Verify:` passes. The pre commit also remains immutable. The receipt records the command once, the `unit digest:` printed by `litespec digest`, then `pre sha:`, non-zero `pre exit status:`, fenced raw output, matching `Pre-evidence scope:`, followed by `post sha:`, `post exit status: 0`, fenced raw output, and matching `Post-evidence scope:`. A GitHub rebuild receipt also carries the request's exact heading and heading occurrence; one later complete identity-matched receipt resolves all earlier requests without changing the checked body. Local queue evidence is an `Evidence:` block after `Verify:` and before the checkbox, committed separately. Validate checks structure only. Review checks pre→post→`HEAD` ancestry, runs Verify in a detached temporary worktree at pre and requires the missing-outcome failure, runs it in another detached temporary worktree at post and requires success with the outcome, then runs it in a detached temporary worktree at `HEAD` and requires success there. All worktrees are removed even when Verify fails; the current review worktree is never checked out to an evidence SHA. Red-green evidence shows discrimination between two trees; it does not prove that Verify targets the correct behavior, so adversarial review remains required.
+Evidence protocol remains one exact command: build records a meaningful non-zero run on a clean pre commit, creating at most one verifier-only commit when needed, then creates one or more implementation/fix commits. Post is the final clean commit where `Verify:` passes. Review replays Verify in a detached temporary worktree at pre, post, and a detached temporary worktree at `HEAD`; all are removed even when Verify fails. Red-green evidence does not prove that Verify targets the right behavior, so scenario mapping and adversarial review remain required. A unit may complete at most two review-requested rebuild cycles against one current contract digest. On the next unit-breaking finding, review records a digest-bound `Re-plan required:` marker instead of another rebuild request. Build refuses that marker. Plan resolves it only through an amendment from the marked digest, narrowing/renaming the unit and appending units as needed. The amendment resets rebuild counting for its new digest and remains unresolved until fresh evidence; that amendment evidence does not consume a review-requested rebuild cycle.
 
-Unit contracts are amendable only by plan (decision 0006, spine): a contract change is witnessed by an append-only `Amendment:` record — a comment on GitHub, a block appended after the units of a local queue file — carrying the post-amendment identity plus `Old digest:` → `New digest:` provenance. The amendment is an unresolved rebuild request until a fresh identity-bearing receipt carries the new digest; observed receipt digests must chain over amendment edges to the current contract digest, so a silent edit plus fresh repost fails validation instead of silently succeeding. The chain is visible and consequential, not cryptographic.
+Review coverage is append-only metadata keyed to reviewed HEAD and unit identity. A fresh reviewer drafts risks independently before reading earlier records, then uses them to expand unexercised paths. Coverage is advisory: it does not satisfy receipts, suppress current investigation, or prove correctness. GitHub stores metadata in comments; local queues use an append-only metadata stream after all units.
 
-In GH issue body — immutable `Base: <sha>` and `Branch: litespec/<change-name>` ownership lines above the units, then:
+In a queue body — immutable `Base:` and `Branch:` lines above the units, then:
 ```markdown
-## Show graph for 2 changes
-Read first: litespec view, specs/product.md
-Constraints: API remains backward compatible; no new config files
-Depends: Show graph for 1 change
-Done means: `litespec view` shows arrows between deps
-Verify: `go test ./...` and view output contains "->"
+## Terminate timed-out probe process trees
+Boundary: process
+Done means:
+- [tree-timeout] A timed-out probe terminates its descendants
+Scenarios:
+- [tree-timeout] TestProbeTimeoutTerminatesDescendants
+Risk cases:
+- timeout: [tree-timeout]
+- cleanup: [tree-timeout]
+- non-ENOENT errors: N/A — no filesystem lookup
+- concurrency: N/A — each probe owns its process tree
+- optional configured dependencies: N/A — probe is mandatory once selected
+Verify: `go test ./... -run TestProbeTimeoutTerminatesDescendants`
 - [ ] pending
 ```
 
@@ -173,7 +180,7 @@ Generated via `litespec update` from `internal/skill/templates/` (embed.FS). `.a
 | Command | Purpose |
 |---------|---------|
 | `litespec init [--tools <ids>]` | scaffold `specs/` + skills |
-| `litespec validate [--all\|--specs\|--decisions\|--issue <N>\|--queue <path>] [--type T]` | lint specs + decisions + GH issue queue (labeled litespec) + local specs/queues/ fallback + Verify shell (bash -n) |
+| `litespec validate [--all\|--specs\|--decisions\|--issue <N>\|--queue <path>] [--type T]` | lint structural contracts and report `structure ok; implementation semantics not verified` on success |
 | `litespec view` | product + features + open `litespec` GH issues (via `gh` if present) + decisions (spine starred) |
 | `litespec update [--tools <ids>]` | regenerate skills and adapters |
 | `litespec upgrade` | check for and install the latest version via `go install` |

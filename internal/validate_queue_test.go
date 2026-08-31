@@ -13,7 +13,29 @@ import (
 )
 
 func ownedQueue(body string) string {
-	return "Base: 1111111111111111111111111111111111111111\nBranch: litespec/test-change\n\n" + body
+	lines := strings.Split(body, "\n")
+	var normalized []string
+	openFence := ""
+	for _, line := range lines {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			normalized = append(normalized, line)
+			continue
+		}
+		if strings.HasPrefix(line, "Done means:") {
+			value := strings.TrimSpace(strings.TrimPrefix(line, "Done means:"))
+			if value != "" {
+				normalized = append(normalized,
+					"Done means:",
+					"- [outcome] "+value,
+					"Scenarios:",
+					"- [outcome] TestOutcome",
+				)
+				continue
+			}
+		}
+		normalized = append(normalized, line)
+	}
+	return "Base: 1111111111111111111111111111111111111111\nBranch: litespec/test-change\n\n" + strings.Join(normalized, "\n")
 }
 
 const evidenceTestSHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -221,11 +243,11 @@ Verify:
 Done means: two
 Verify:
 ` + "```\necho two\n```\n" + strings.Replace(
-		evidenceReceipt("echo two"),
-		fixtureUnitDigest("echo two"),
-		unitDigestFor("Good Two", "two", "echo two"),
-		1,
-	) + `- [x] done
+			evidenceReceipt("echo two"),
+			fixtureUnitDigest("echo two"),
+			unitDigestFor("Good Two", "two", "echo two"),
+			1,
+		) + `- [x] done
 
 ## Bad One
 Verify:
@@ -623,7 +645,10 @@ func unitDigestFor(heading, doneMeans, verifyCmd string) string {
 	return unitContractDigest(queueUnit{
 		Heading: heading,
 		Body: []string{
-			"Done means: " + doneMeans,
+			"Done means:",
+			"- [outcome] " + doneMeans,
+			"Scenarios:",
+			"- [outcome] TestOutcome",
 			"Verify:",
 			"```",
 			verifyCmd,
@@ -1238,13 +1263,213 @@ func TestQueueDepends(t *testing.T) {
 	})
 }
 
+func TestQueueUnitScenarioMapping(t *testing.T) {
+	source := "GH issue #1"
+	unit := func(doneMeans, scenarios string) string {
+		return ownedQueue("## My outcome\nDone means:\n" + doneMeans + "Scenarios:\n" + scenarios + "Verify: `go test ./internal -run TestMyOutcome`\n- [ ] pending\n")
+	}
+
+	t.Run("complete mapping passes", func(t *testing.T) {
+		_, issues := ValidateQueueBody(unit(
+			"- [timeout] returns on timeout\n- [cleanup] removes temporary state\n",
+			"- [timeout] TestTimeout\n- [cleanup] TestCleanup\n",
+		), source)
+		if len(issues) > 0 {
+			t.Fatalf("expected complete mapping to pass, got %v", issues)
+		}
+	})
+
+	tests := []struct {
+		name        string
+		doneMeans   string
+		scenarios   string
+		wantMessage string
+	}{
+		{
+			name:        "clause without identifier fails",
+			doneMeans:   "- returns on timeout\n",
+			scenarios:   "- [timeout] TestTimeout\n",
+			wantMessage: "identified Done means clause",
+		},
+		{
+			name:        "duplicate clause identifier fails",
+			doneMeans:   "- [timeout] returns on timeout\n- [timeout] stops work\n",
+			scenarios:   "- [timeout] TestTimeout\n",
+			wantMessage: `duplicate Done means clause ID "timeout"`,
+		},
+		{
+			name:        "unmapped clause fails",
+			doneMeans:   "- [timeout] returns on timeout\n- [cleanup] removes temporary state\n",
+			scenarios:   "- [timeout] TestTimeout\n",
+			wantMessage: `Done means clause ID "cleanup" has no scenario mapping`,
+		},
+		{
+			name:        "unknown clause mapping fails",
+			doneMeans:   "- [timeout] returns on timeout\n",
+			scenarios:   "- [timeout] TestTimeout\n- [cleanup] TestCleanup\n",
+			wantMessage: `scenario mapping references unknown Done means clause ID "cleanup"`,
+		},
+		{
+			name:        "unnamed scenario fails",
+			doneMeans:   "- [timeout] returns on timeout\n",
+			scenarios:   "- [timeout]\n",
+			wantMessage: `scenario mapping for clause ID "timeout" must name a test scenario`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, issues := ValidateQueueBody(unit(tt.doneMeans, tt.scenarios), source)
+			if !containsIssue(issues, tt.wantMessage) {
+				t.Fatalf("expected %q, got %v", tt.wantMessage, issues)
+			}
+		})
+	}
+}
+
+func TestScenarioMappingAffectsUnitDigest(t *testing.T) {
+	unit := queueUnit{
+		Heading: "My outcome",
+		Body: []string{
+			"Done means:",
+			"- [timeout] returns on timeout",
+			"Scenarios:",
+			"- [timeout] TestTimeout",
+			"Verify: `go test ./internal -run TestTimeout`",
+		},
+	}
+	changedClause := unit
+	changedClause.Body = append([]string(nil), unit.Body...)
+	changedClause.Body[1] = "- [timeout] reports timeout"
+	changedScenario := unit
+	changedScenario.Body = append([]string(nil), unit.Body...)
+	changedScenario.Body[3] = "- [timeout] TestTimeoutResult"
+
+	baseDigest := unitContractDigest(unit)
+	if got := unitContractDigest(changedClause); got == baseDigest {
+		t.Fatal("changing an identified Done means clause did not change the unit digest")
+	}
+	if got := unitContractDigest(changedScenario); got == baseDigest {
+		t.Fatal("changing a scenario mapping did not change the unit digest")
+	}
+}
+
+func TestQueueUnitBoundaryRiskAccounting(t *testing.T) {
+	source := "GH issue #1"
+	unit := func(boundary, risks string) string {
+		return ownedQueue("## Probe service\nBoundary: " + boundary + "\nDone means:\n- [timeout] returns on timeout\n- [cleanup] removes temporary state\nScenarios:\n- [timeout] TestTimeout\n- [cleanup] TestCleanup\n" + risks + "Verify: `go test ./internal -run TestProbeService`\n- [ ] pending\n")
+	}
+	completeRisks := "Risk cases:\n- timeout: [timeout]\n- cleanup: [cleanup]\n- non-ENOENT errors: N/A — no filesystem lookup\n- concurrency: N/A — each probe owns its state\n- optional configured dependencies: N/A — the probe is mandatory\n"
+
+	for _, boundary := range []string{"filesystem", "process", "network"} {
+		t.Run(boundary+" complete accounting passes", func(t *testing.T) {
+			_, issues := ValidateQueueBody(unit(boundary, completeRisks), source)
+			if len(issues) > 0 {
+				t.Fatalf("expected complete %s risk accounting to pass, got %v", boundary, issues)
+			}
+		})
+		t.Run(boundary+" requires risk cases", func(t *testing.T) {
+			_, issues := ValidateQueueBody(unit(boundary, ""), source)
+			if !containsIssue(issues, "missing Risk cases: for "+boundary+" boundary") {
+				t.Fatalf("expected missing Risk cases error, got %v", issues)
+			}
+		})
+	}
+
+	tests := []struct {
+		name        string
+		risks       string
+		wantMessage string
+	}{
+		{
+			name:        "missing standard risk fails",
+			risks:       strings.Replace(completeRisks, "- cleanup: [cleanup]\n", "", 1),
+			wantMessage: `Risk cases: missing "cleanup" entry`,
+		},
+		{
+			name:        "unknown scenario fails",
+			risks:       strings.Replace(completeRisks, "- timeout: [timeout]", "- timeout: [unknown]", 1),
+			wantMessage: `risk "timeout" references unknown scenario ID "unknown"`,
+		},
+		{
+			name:        "empty N/A reason fails",
+			risks:       strings.Replace(completeRisks, "N/A — no filesystem lookup", "N/A —", 1),
+			wantMessage: `risk "non-ENOENT errors" must include a nonempty N/A reason`,
+		},
+		{
+			name:        "duplicate risk fails",
+			risks:       strings.Replace(completeRisks, "- cleanup: [cleanup]\n", "- cleanup: [cleanup]\n- cleanup: [cleanup]\n", 1),
+			wantMessage: `duplicate "cleanup" entry`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, issues := ValidateQueueBody(unit("process", tt.risks), source)
+			if !containsIssue(issues, tt.wantMessage) {
+				t.Fatalf("expected %q, got %v", tt.wantMessage, issues)
+			}
+		})
+	}
+
+	t.Run("boundary is unique", func(t *testing.T) {
+		body := strings.Replace(unit("process", completeRisks), "Boundary: process", "Boundary: process\nBoundary: network", 1)
+		_, issues := ValidateQueueBody(body, source)
+		if !containsIssue(issues, "duplicate Boundary: fields") {
+			t.Fatalf("expected duplicate Boundary error, got %v", issues)
+		}
+	})
+
+	t.Run("boundary is nonempty", func(t *testing.T) {
+		_, issues := ValidateQueueBody(unit("", completeRisks), source)
+		if !containsIssue(issues, "Boundary: must be nonempty") {
+			t.Fatalf("expected empty Boundary error, got %v", issues)
+		}
+	})
+}
+
+func TestBoundaryRiskAccountingAffectsUnitDigest(t *testing.T) {
+	unit := queueUnit{
+		Heading: "Probe service",
+		Body: []string{
+			"Boundary: process",
+			"Done means:",
+			"- [timeout] returns on timeout",
+			"Scenarios:",
+			"- [timeout] TestTimeout",
+			"Risk cases:",
+			"- timeout: [timeout]",
+			"- cleanup: N/A — no cleanup state",
+			"- non-ENOENT errors: N/A — no filesystem lookup",
+			"- concurrency: N/A — probes are serialized",
+			"- optional configured dependencies: N/A — the probe is mandatory",
+			"Verify: `go test ./internal -run TestTimeout`",
+		},
+	}
+	changedBoundary := unit
+	changedBoundary.Body = append([]string(nil), unit.Body...)
+	changedBoundary.Body[0] = "Boundary: network"
+	changedRisk := unit
+	changedRisk.Body = append([]string(nil), unit.Body...)
+	changedRisk.Body[7] = "- cleanup: N/A — cleanup is handled by the caller"
+
+	baseDigest := unitContractDigest(unit)
+	if got := unitContractDigest(changedBoundary); got == baseDigest {
+		t.Fatal("changing the boundary did not change the unit digest")
+	}
+	if got := unitContractDigest(changedRisk); got == baseDigest {
+		t.Fatal("changing risk accounting did not change the unit digest")
+	}
+}
+
 func TestValidateUnitContractDigest(t *testing.T) {
 	source := "GH issue #1"
 
 	// Hand-computed canonical serialization of the fixture unit: heading,
-	// Done means, Verify content — each length-prefixed, in that order.
+	// Done means, Scenarios, Verify content — each length-prefixed, in that order.
+	doneMeans := "- [outcome] something"
+	scenarios := "- [outcome] TestOutcome"
 	canonical := "10:My outcome" +
-		"9:something" +
+		fmt.Sprintf("%d:%s", len(doneMeans), doneMeans) +
+		fmt.Sprintf("%d:%s", len(scenarios), scenarios) +
 		fmt.Sprintf("%d:echo hi", len("echo hi"))
 	sum := sha256.Sum256([]byte(canonical))
 	goodDigest := hex.EncodeToString(sum[:])
@@ -1285,8 +1510,7 @@ func TestValidateUnitContractDigest(t *testing.T) {
 	})
 
 	t.Run("digest mismatch names expected and actual digests", func(t *testing.T) {
-		otherSum := sha256.Sum256([]byte("10:My outcome9:something7:echo other"))
-		otherDigest := hex.EncodeToString(otherSum[:])
+		otherDigest := unitDigestFor("My outcome", "something", "echo other")
 		_, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", digestReceipt(otherDigest))), source)
 		if !containsIssue(issues, "expected "+goodDigest+", actual "+otherDigest) {
 			t.Fatalf("expected mismatch error naming both digests, got %v", issues)

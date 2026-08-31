@@ -5,10 +5,12 @@ import (
 )
 
 type ValidationResultJSON struct {
-	Valid    bool                  `json:"valid"`
-	Errors   []ValidationIssueJSON `json:"errors"`
-	Warnings []ValidationIssueJSON `json:"warnings"`
-	Summary  ValidationSummaryJSON `json:"summary"`
+	Valid                   bool                  `json:"valid"`
+	ValidationScope         string                `json:"validationScope"`
+	ImplementationSemantics string                `json:"implementationSemantics"`
+	Errors                  []ValidationIssueJSON `json:"errors"`
+	Warnings                []ValidationIssueJSON `json:"warnings"`
+	Summary                 ValidationSummaryJSON `json:"summary"`
 }
 
 type ValidationIssueJSON struct {
@@ -38,9 +40,11 @@ func BuildValidationResultJSON(r *ValidationResult) ValidationResultJSON {
 		warnings[i] = ValidationIssueJSON{Severity: "warning", Message: w.Message, File: w.File, StrictExempt: w.StrictExempt}
 	}
 	return ValidationResultJSON{
-		Valid:    r.Valid,
-		Errors:   errors,
-		Warnings: warnings,
+		Valid:                   r.Valid,
+		ValidationScope:         "structure",
+		ImplementationSemantics: "unverified",
+		Errors:                  errors,
+		Warnings:                warnings,
 		Summary: ValidationSummaryJSON{
 			Total:        len(errors) + len(warnings),
 			Invalid:      len(errors),

@@ -1190,8 +1190,8 @@ func TestCLIValidateMinimalText(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, out)
 	}
-	if !strings.HasPrefix(out, "ok\t") {
-		t.Errorf("expected minimal text starting with 'ok\\t', got: %s", out)
+	if !strings.HasPrefix(out, "structure-ok\tsemantics-unverified\t") {
+		t.Errorf("expected minimal text to state validation scope, got: %s", out)
 	}
 }
 
@@ -1238,7 +1238,7 @@ func TestValidateSummaryIncludesUnits(t *testing.T) {
 	if err := os.MkdirAll(queueDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	queueContent := "Base: 1111111111111111111111111111111111111111\nBranch: litespec/add-auth\n\n## Add auth\nDone means: authentication is wired\nVerify:\n```bash\necho ok\n```\n- [ ] pending\n"
+	queueContent := "Base: 1111111111111111111111111111111111111111\nBranch: litespec/add-auth\n\n## Add auth\nDone means:\n- [auth] authentication is wired\nScenarios:\n- [auth] TestAuthenticationWiring\nVerify:\n```bash\necho ok\n```\n- [ ] pending\n"
 	if err := os.WriteFile(filepath.Join(queueDir, "test.md"), []byte(queueContent), 0o644); err != nil {
 		t.Fatal(err)
 	}

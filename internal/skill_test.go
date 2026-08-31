@@ -492,3 +492,153 @@ func TestGeneratedSkillsUseRedGreenEvidence(t *testing.T) {
 		requirePolicy(path, content)
 	}
 }
+
+func TestGeneratedPlanSkillShapesBoundaryUnits(t *testing.T) {
+	root := t.TempDir()
+	if err := GenerateSkills(root); err != nil {
+		t.Fatalf("GenerateSkills: %v", err)
+	}
+
+	readFile := func(path ...string) string {
+		t.Helper()
+		data, err := os.ReadFile(filepath.Join(path...))
+		if err != nil {
+			t.Fatalf("read generated plan instructions: %v", err)
+		}
+		return string(data)
+	}
+	plan := readFile(root, SkillsDir, "litespec-plan", "SKILL.md")
+	clear := readFile(root, SkillsDir, "litespec-plan", "references", "clear.md")
+	instructions := plan + "\n" + clear
+	for _, phrase := range []string{
+		"one external boundary or one failure policy",
+		"Split broad demos across independent boundaries into separate units.",
+		"Boundary: <filesystem | process | network — when applicable>",
+		"- [<clause-id>] <observable outcome>",
+		"- [<clause-id>] <named test scenario>",
+		"Risk cases:",
+		"timeout:",
+		"cleanup:",
+		"non-ENOENT errors:",
+		"concurrency:",
+		"optional configured dependencies:",
+	} {
+		if !strings.Contains(instructions, phrase) {
+			t.Errorf("generated plan instructions missing %q", phrase)
+		}
+	}
+}
+
+func TestGeneratedBuildSkillConsumesScenarioContract(t *testing.T) {
+	root := t.TempDir()
+	if err := GenerateSkills(root); err != nil {
+		t.Fatalf("GenerateSkills: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, SkillsDir, "litespec-build", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read generated build skill: %v", err)
+	}
+	content := string(data)
+	for _, phrase := range []string{
+		"Treat `Done means:`, `Scenarios:`, `Boundary:`, `Risk cases:`, and `Verify:` as fixed contract fields.",
+		"Do not add, remove, rename, or remap clause IDs, scenario mappings, boundary declarations, or risk cases.",
+	} {
+		if !strings.Contains(content, phrase) {
+			t.Errorf("generated build instructions missing %q", phrase)
+		}
+	}
+}
+
+func TestGeneratedSkillsRouteRepeatedFailureToPlan(t *testing.T) {
+	root := t.TempDir()
+	if err := GenerateSkills(root); err != nil {
+		t.Fatalf("GenerateSkills: %v", err)
+	}
+	readSkill := func(name string) string {
+		t.Helper()
+		data, err := os.ReadFile(filepath.Join(root, SkillsDir, name, "SKILL.md"))
+		if err != nil {
+			t.Fatalf("read generated %s skill: %v", name, err)
+		}
+		return string(data)
+	}
+	checks := map[string][]string{
+		"litespec-review": {
+			"After two completed review-requested rebuild cycles against the current digest, record a re-plan marker instead of another rebuild request.",
+			"Re-plan required:",
+			"Unit digest: <current 64 lowercase hex digest>",
+			"Do not post a duplicate unresolved marker",
+		},
+		"litespec-build": {
+			"An unresolved `Re-plan required:` marker makes that contract unavailable to build.",
+			"Stop and route it to `litespec-plan`; do not rebuild the marked contract.",
+		},
+		"litespec-plan": {
+			"An amendment resolves an outstanding re-plan marker only when its `Old digest:` equals the marker's `Unit digest:`.",
+		},
+	}
+	for name, phrases := range checks {
+		content := readSkill(name)
+		for _, phrase := range phrases {
+			if !strings.Contains(content, phrase) {
+				t.Errorf("generated %s instructions missing %q", name, phrase)
+			}
+		}
+	}
+}
+
+func TestGeneratedReviewSkillInventoriesBeforePriorCoverage(t *testing.T) {
+	content := generatedReviewSkill(t)
+	inventory := "Before reading any prior review coverage records, construct an independent risk inventory from the current contracts."
+	priorCoverage := "Only after writing that inventory, read prior coverage records"
+	requireSkillPhrases(t, content, inventory, priorCoverage)
+	if strings.Index(content, inventory) > strings.Index(content, priorCoverage) {
+		t.Error("generated review instructions read prior coverage before constructing an independent risk inventory")
+	}
+}
+
+func TestGeneratedReviewSkillPersistsCoverage(t *testing.T) {
+	content := generatedReviewSkill(t)
+	requireSkillPhrases(t, content,
+		"For every issue review, append one coverage record keyed by the reviewed full `HEAD` SHA and each covered unit identity.",
+		"Review coverage:",
+		"HEAD: <full HEAD SHA>",
+		"Exercised:",
+		"Not exercised:",
+		"Uncertain:",
+		"<scenario>: <probe performed>",
+		"GitHub queue: post the record as a new issue comment.",
+		"Local queue: append the record after all units in a separate clean metadata commit.",
+	)
+}
+
+func TestGeneratedReviewSkillTreatsCoverageAsAdvisory(t *testing.T) {
+	content := generatedReviewSkill(t)
+	requireSkillPhrases(t, content,
+		"Use prior coverage only to expand the independent inventory and target unexercised risks.",
+		"Prior coverage is advisory only.",
+		"It does not satisfy evidence replay, suppress current investigation, resolve findings, or prove correctness.",
+	)
+}
+
+func generatedReviewSkill(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	if err := GenerateSkills(root); err != nil {
+		t.Fatalf("GenerateSkills: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, SkillsDir, "litespec-review", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read generated review skill: %v", err)
+	}
+	return string(data)
+}
+
+func requireSkillPhrases(t *testing.T, content string, phrases ...string) {
+	t.Helper()
+	for _, phrase := range phrases {
+		if !strings.Contains(content, phrase) {
+			t.Errorf("generated litespec-review instructions missing %q", phrase)
+		}
+	}
+}

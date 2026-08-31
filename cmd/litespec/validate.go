@@ -10,8 +10,10 @@ import (
 )
 
 type validateMinimalJSON struct {
-	Valid  bool     `json:"valid"`
-	Errors []string `json:"errors,omitempty"`
+	Valid                   bool     `json:"valid"`
+	ValidationScope         string   `json:"validationScope"`
+	ImplementationSemantics string   `json:"implementationSemantics"`
+	Errors                  []string `json:"errors,omitempty"`
 }
 
 func cmdValidate(args []string) error {
@@ -183,12 +185,12 @@ func cmdValidate(args []string) error {
 		return err
 	}
 
-	okText := fmt.Sprintf("ok: %d %s, %d %s, %d %s, %d %s\n",
+	okText := fmt.Sprintf("structure ok; implementation semantics not verified: %d %s, %d %s, %d %s, %d %s\n",
 		result.CapabilitiesCount, pluralize("capability", result.CapabilitiesCount),
 		result.RequirementsCount, pluralize("requirement", result.RequirementsCount),
 		result.ScenariosCount, pluralize("scenario", result.ScenariosCount),
 		result.UnitsCount, pluralize("unit", result.UnitsCount))
-	okMinimalText := fmt.Sprintf("ok\t%d %s, %d %s, %d %s, %d %s\n",
+	okMinimalText := fmt.Sprintf("structure-ok\tsemantics-unverified\t%d %s, %d %s, %d %s, %d %s\n",
 		result.CapabilitiesCount, pluralize("capability", result.CapabilitiesCount),
 		result.RequirementsCount, pluralize("requirement", result.RequirementsCount),
 		result.ScenariosCount, pluralize("scenario", result.ScenariosCount),
@@ -198,8 +200,8 @@ func cmdValidate(args []string) error {
 }
 
 func renderQueueResult(result *internal.ValidationResult, asJSON, asMinimal, strict bool) error {
-	okText := fmt.Sprintf("ok: %d units\n", result.UnitsCount)
-	okMinimalText := fmt.Sprintf("ok\t%d units\n", result.UnitsCount)
+	okText := fmt.Sprintf("structure ok; implementation semantics not verified: %d units\n", result.UnitsCount)
+	okMinimalText := fmt.Sprintf("structure-ok\tsemantics-unverified\t%d units\n", result.UnitsCount)
 	invalidText := fmt.Sprintf("invalid: %d errors\n", len(result.Errors))
 
 	return renderValidationResult(result, asJSON, asMinimal, strict, okText, okMinimalText, invalidText)
@@ -208,7 +210,11 @@ func renderQueueResult(result *internal.ValidationResult, asJSON, asMinimal, str
 func renderValidationResult(result *internal.ValidationResult, asJSON, asMinimal, strict bool, okText, okMinimalText, invalidText string) error {
 	out := internal.BuildValidationResultJSON(result)
 
-	minJSON := validateMinimalJSON{Valid: out.Valid}
+	minJSON := validateMinimalJSON{
+		Valid:                   out.Valid,
+		ValidationScope:         out.ValidationScope,
+		ImplementationSemantics: out.ImplementationSemantics,
+	}
 	for _, e := range out.Errors {
 		minJSON.Errors = append(minJSON.Errors, e.Message)
 	}
@@ -226,15 +232,16 @@ func renderValidationResult(result *internal.ValidationResult, asJSON, asMinimal
 	}
 
 	var text string
+	if result.Valid {
+		text += okText
+	}
 	for _, issue := range result.Errors {
 		text += fmt.Sprintf("ERROR  %s: %s\n", issue.File, issue.Message)
 	}
 	for _, issue := range result.Warnings {
 		text += fmt.Sprintf("WARN   %s: %s\n", issue.File, issue.Message)
 	}
-	if result.Valid {
-		text += okText
-	} else if invalidText != "" {
+	if !result.Valid && invalidText != "" {
 		text += invalidText
 	}
 

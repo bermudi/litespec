@@ -97,7 +97,14 @@ func TestGeneratedReviewRoutesRebuildRequests(t *testing.T) {
 		}
 		units = append(units, queueUnit{
 			Heading: unit.Heading,
-			Body:    []string{"Done means: outcome", "Verify: `go test ./...`", status},
+			Body: []string{
+				"Done means:",
+				"- [outcome] outcome",
+				"Scenarios:",
+				"- [outcome] TestOutcome",
+				"Verify: `go test ./...`",
+				status,
+			},
 		})
 	}
 	comments := make([]string, 0, len(fixture.Events))
@@ -133,7 +140,7 @@ func TestGeneratedReviewRoutesRebuildRequests(t *testing.T) {
 
 	const queueBody = "Base: 1111111111111111111111111111111111111111\n" +
 		"Branch: litespec/rebuild-fixture\n\n" +
-		"## Duplicate\nDone means: outcome\nVerify: `go test ./...`\n- [x] done\n"
+		"## Duplicate\nDone means:\n- [outcome] outcome\nScenarios:\n- [outcome] TestOutcome\nVerify: `go test ./...`\n- [x] done\n"
 	receiptUnits, receiptIssues := ValidateQueueBody(queueBody, "fixture")
 	receiptResult := &ValidationResult{Valid: true}
 	applyQueueIssues(
@@ -185,10 +192,88 @@ func TestGeneratedReviewRoutesRebuildRequests(t *testing.T) {
 	}
 }
 
+func TestCompletedRebuildCyclesPerDigest(t *testing.T) {
+	identity := queueUnitIdentity{Occurrence: 1, Heading: "Duplicate"}
+	units := []queueUnit{{
+		Heading: identity.Heading,
+		Body: []string{
+			"Done means:",
+			"- [outcome] outcome",
+			"Scenarios:",
+			"- [outcome] TestOutcome",
+			"Verify: `go test ./...`",
+			"- [x] done",
+		},
+	}}
+	digest := unitContractDigest(units[0])
+	comments := []string{
+		formatRebuildRequest(identity),
+		formatRebuildRequest(identity),
+		fixtureEvidenceComment(identity, true),
+		formatRebuildRequest(identity),
+		fixtureEvidenceComment(identity, true),
+	}
+
+	scan := scanQueueComments(units, comments)
+	if len(scan.errors) != 0 {
+		t.Fatalf("unexpected errors: %v", scan.errors)
+	}
+	if got := scan.completedRebuildCycles[identity][digest]; got != 2 {
+		t.Errorf("completed rebuild cycles = %d, want 2", got)
+	}
+	if len(scan.unresolved) != 0 {
+		t.Errorf("unresolved = %v, want none", scan.unresolved)
+	}
+}
+
+func TestThirdRebuildRequestRequiresReplan(t *testing.T) {
+	identity := queueUnitIdentity{Occurrence: 1, Heading: "Duplicate"}
+	const queueBody = "Base: 1111111111111111111111111111111111111111\n" +
+		"Branch: litespec/rebuild-fixture\n\n" +
+		"## Duplicate\nDone means:\n- [outcome] outcome\nScenarios:\n- [outcome] TestOutcome\nVerify: `go test ./...`\n- [x] done\n"
+	units, unitIssues := ValidateQueueBody(queueBody, "fixture")
+	comments := []string{
+		formatRebuildRequest(identity),
+		fixtureEvidenceComment(identity, true),
+		formatRebuildRequest(identity),
+		fixtureEvidenceComment(identity, true),
+		formatRebuildRequest(identity),
+	}
+
+	result := &ValidationResult{Valid: true}
+	applyQueueIssues(result, "GitHub comments", units, unitIssues, comments)
+	foundRequiresReplan := false
+	for _, issue := range result.Errors {
+		if strings.Contains(issue.Message, "requires re-planning") {
+			foundRequiresReplan = true
+		}
+		if strings.Contains(issue.Message, "unresolved rebuild request") {
+			t.Errorf("third request must not leave the unit rebuildable: %s", issue.Message)
+		}
+	}
+	if !foundRequiresReplan {
+		t.Errorf("expected third request validation error requiring re-planning, got %v", result.Errors)
+	}
+
+	selectable, errs := selectableUnitIdentities(units, comments)
+	if len(errs) == 0 {
+		t.Fatal("expected third request selection error")
+	}
+	if len(selectable) != 0 {
+		t.Errorf("selectable = %v, want none after a third request", selectable)
+	}
+}
+
 func fixtureEvidenceComment(identity queueUnitIdentity, complete bool) string {
 	contractUnit := queueUnit{
 		Heading: identity.Heading,
-		Body:    []string{"Done means: outcome", "Verify: `go test ./...`"},
+		Body: []string{
+			"Done means:",
+			"- [outcome] outcome",
+			"Scenarios:",
+			"- [outcome] TestOutcome",
+			"Verify: `go test ./...`",
+		},
 	}
 	body := "Unit occurrence: " + strconv.Itoa(identity.Occurrence) +
 		"\nUnit heading: " + identity.Heading +

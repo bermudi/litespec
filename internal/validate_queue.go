@@ -148,6 +148,236 @@ var placeholderSet = map[string]bool{
 	"none": true, "tbd": true, "todo": true, "null": true, "nil": true,
 }
 
+var identifiedQueueEntryPattern = regexp.MustCompile(`^[-*][ \t]+\[([^][ \t]+)\](?:[ \t]+(.*))?$`)
+
+func queueUnitFieldLines(body []string, prefix string) ([]string, bool) {
+	openFence := ""
+	for i, line := range body {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, prefix) {
+			continue
+		}
+		var values []string
+		if rest := strings.TrimSpace(strings.TrimPrefix(trimmed, prefix)); rest != "" {
+			values = append(values, rest)
+		}
+		for _, nextLine := range body[i+1:] {
+			next := strings.TrimSpace(nextLine)
+			if next == "" {
+				continue
+			}
+			if isQueueUnitFieldLine(next) || isCheckboxLine(next) {
+				break
+			}
+			values = append(values, next)
+		}
+		return values, true
+	}
+	return nil, false
+}
+
+func isQueueUnitFieldLine(line string) bool {
+	for _, prefix := range []string{
+		"Read first:", "Constraints:", "Depends:", "Boundary:", "Done means:",
+		"Scenarios:", "Risk cases:", "Verify:", "Evidence:",
+	} {
+		if strings.HasPrefix(line, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func queueUnitFieldCount(body []string, prefix string) int {
+	count := 0
+	openFence := ""
+	for _, line := range body {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		if strings.HasPrefix(strings.TrimSpace(line), prefix) {
+			count++
+		}
+	}
+	return count
+}
+
+func validateUnitScenarioMapping(unit queueUnit, source string) []ValidationIssue {
+	doneLines, doneFound := queueUnitFieldLines(unit.Body, "Done means:")
+	if !doneFound {
+		return nil
+	}
+
+	var issues []ValidationIssue
+	fail := func(message string) {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: unit %q %s", source, unit.Heading, message),
+			File:     source,
+		})
+	}
+
+	if queueUnitFieldCount(unit.Body, "Done means:") > 1 {
+		fail("has duplicate Done means: fields (only one allowed)")
+	}
+
+	clauseIDs := make(map[string]bool)
+	for _, line := range doneLines {
+		match := identifiedQueueEntryPattern.FindStringSubmatch(line)
+		if match == nil || strings.TrimSpace(match[2]) == "" {
+			fail("must contain a nonempty identified Done means clause bullet")
+			continue
+		}
+		id := match[1]
+		if clauseIDs[id] {
+			fail(fmt.Sprintf("has duplicate Done means clause ID %q", id))
+			continue
+		}
+		clauseIDs[id] = true
+	}
+	if len(doneLines) == 0 {
+		fail("must contain at least one identified Done means clause")
+	}
+
+	scenarioLines, scenariosFound := queueUnitFieldLines(unit.Body, "Scenarios:")
+	if !scenariosFound {
+		fail("missing Scenarios: mapping")
+		return issues
+	}
+	if queueUnitFieldCount(unit.Body, "Scenarios:") > 1 {
+		fail("has duplicate Scenarios: fields (only one allowed)")
+	}
+	if len(scenarioLines) == 0 {
+		fail("Scenarios: mapping must be nonempty")
+		return issues
+	}
+
+	mapped := make(map[string]bool)
+	for _, line := range scenarioLines {
+		match := identifiedQueueEntryPattern.FindStringSubmatch(line)
+		if match == nil {
+			fail("Scenarios: must contain identified mapping bullets")
+			continue
+		}
+		id := match[1]
+		if strings.TrimSpace(match[2]) == "" {
+			fail(fmt.Sprintf("scenario mapping for clause ID %q must name a test scenario", id))
+			continue
+		}
+		if !clauseIDs[id] {
+			fail(fmt.Sprintf("scenario mapping references unknown Done means clause ID %q", id))
+			continue
+		}
+		mapped[id] = true
+	}
+	for id := range clauseIDs {
+		if !mapped[id] {
+			fail(fmt.Sprintf("Done means clause ID %q has no scenario mapping", id))
+		}
+	}
+	return issues
+}
+
+var requiredBoundaryRisks = []string{
+	"timeout",
+	"cleanup",
+	"non-ENOENT errors",
+	"concurrency",
+	"optional configured dependencies",
+}
+
+var riskScenarioPattern = regexp.MustCompile(`^\[([^][ \t]+)\]$`)
+
+func validateUnitBoundaryRiskAccounting(unit queueUnit, source string) []ValidationIssue {
+	var issues []ValidationIssue
+	fail := func(message string) {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: unit %q %s", source, unit.Heading, message),
+			File:     source,
+		})
+	}
+
+	boundary, boundaryFound := queueUnitFieldValue(unit.Body, "Boundary:")
+	if boundaryCount := queueUnitFieldCount(unit.Body, "Boundary:"); boundaryCount > 1 {
+		fail("has duplicate Boundary: fields (only one allowed)")
+	}
+	if boundaryFound && strings.TrimSpace(boundary) == "" {
+		fail("Boundary: must be nonempty")
+	}
+	if !boundaryFound || boundary == "" {
+		return issues
+	}
+	switch boundary {
+	case "filesystem", "process", "network":
+	default:
+		fail(fmt.Sprintf("Boundary: must be one of %q, %q, %q (closed, case-sensitive vocabulary); got %q", "filesystem", "process", "network", boundary))
+		return issues
+	}
+
+	riskLines, risksFound := queueUnitFieldLines(unit.Body, "Risk cases:")
+	if riskCount := queueUnitFieldCount(unit.Body, "Risk cases:"); riskCount > 1 {
+		fail("has duplicate Risk cases: fields (only one allowed)")
+	}
+	if !risksFound {
+		fail(fmt.Sprintf("missing Risk cases: for %s boundary", boundary))
+		return issues
+	}
+
+	scenarioIDs := make(map[string]bool)
+	scenarioLines, _ := queueUnitFieldLines(unit.Body, "Scenarios:")
+	for _, line := range scenarioLines {
+		if match := identifiedQueueEntryPattern.FindStringSubmatch(line); match != nil {
+			scenarioIDs[match[1]] = true
+		}
+	}
+
+	seenRisks := make(map[string]bool)
+	for _, line := range riskLines {
+		if !strings.HasPrefix(line, "- ") && !strings.HasPrefix(line, "* ") {
+			fail("Risk cases: must contain bullet entries")
+			continue
+		}
+		name, value, ok := strings.Cut(strings.TrimSpace(line[2:]), ":")
+		name = strings.TrimSpace(name)
+		value = strings.TrimSpace(value)
+		if !ok || name == "" || value == "" {
+			fail("Risk cases: entries must use `<risk>: [scenario-id]` or `<risk>: N/A — <reason>`")
+			continue
+		}
+		if seenRisks[name] {
+			fail(fmt.Sprintf("Risk cases: has duplicate %q entry", name))
+			continue
+		}
+		seenRisks[name] = true
+
+		if strings.HasPrefix(value, "N/A") {
+			reason := strings.TrimSpace(strings.TrimPrefix(value, "N/A —"))
+			if !strings.HasPrefix(value, "N/A —") || reason == "" {
+				fail(fmt.Sprintf("Risk cases: risk %q must include a nonempty N/A reason", name))
+			}
+			continue
+		}
+		match := riskScenarioPattern.FindStringSubmatch(value)
+		if match == nil {
+			fail(fmt.Sprintf("Risk cases: risk %q must map to a scenario ID or use N/A — <reason>", name))
+			continue
+		}
+		if !scenarioIDs[match[1]] {
+			fail(fmt.Sprintf("Risk cases: risk %q references unknown scenario ID %q", name, match[1]))
+		}
+	}
+	for _, risk := range requiredBoundaryRisks {
+		if !seenRisks[risk] {
+			fail(fmt.Sprintf("Risk cases: missing %q entry", risk))
+		}
+	}
+	return issues
+}
+
 func isPlaceholderValue(s string) bool {
 	return placeholderSet[strings.ToLower(strings.TrimSpace(s))]
 }
@@ -642,19 +872,30 @@ func applyQueueIssues(result *ValidationResult, commentSource string, units []qu
 		}
 	}
 
-	unresolved, requestErrors := unresolvedRebuildRequests(units, comments)
-	for _, err := range requestErrors {
+	scan := scanQueueComments(units, comments)
+	for _, err := range scan.errors {
 		result.Errors = append(result.Errors, ValidationIssue{
 			Severity: SeverityError,
 			Message:  fmt.Sprintf("queue rebuild routing: %v", err),
 			File:     commentSource,
 		})
 	}
-	for _, identity := range unresolved {
+	for _, identity := range scan.unresolved {
 		result.Errors = append(result.Errors, ValidationIssue{
 			Severity: SeverityError,
 			Message: fmt.Sprintf(
 				"unit occurrence %d with heading %q has an unresolved rebuild request",
+				identity.Occurrence,
+				identity.Heading,
+			),
+			File: commentSource,
+		})
+	}
+	for _, identity := range scan.replanRequired {
+		result.Errors = append(result.Errors, ValidationIssue{
+			Severity: SeverityError,
+			Message: fmt.Sprintf(
+				"unit occurrence %d with heading %q has an unresolved re-plan marker",
 				identity.Occurrence,
 				identity.Heading,
 			),
@@ -955,6 +1196,8 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 
 		issues = append(issues, validateOptionalField(unit.Body, "Constraints", constraintsCount, constraintsIdx, constraintsRest, source, unit.Heading)...)
 		issues = append(issues, validateOptionalField(unit.Body, "Read first", readFirstCount, readFirstIdx, readFirstRest, source, unit.Heading)...)
+		issues = append(issues, validateUnitScenarioMapping(unit, source)...)
+		issues = append(issues, validateUnitBoundaryRiskAccounting(unit, source)...)
 
 		if !doneFound {
 			issues = append(issues, ValidationIssue{
@@ -1062,12 +1305,12 @@ func ValidateQueueFile(path string) (*ValidationResult, error) {
 		return nil, err
 	}
 
-	stripped, amendmentBlocks := splitLocalAmendmentBlocks(string(raw))
+	stripped, metadataBlocks := splitLocalQueueMetadataBlocks(string(raw))
 	result := &ValidationResult{Valid: true}
 	source := fmt.Sprintf("queue file %s", path)
 	units, unitIssues := ValidateQueueBody(stripped, source)
 	result.UnitsCount += len(units)
-	applyQueueIssues(result, source, units, unitIssues, amendmentBlocks)
+	applyQueueIssues(result, source, units, unitIssues, metadataBlocks)
 	result.Valid = len(result.Errors) == 0
 	return result, nil
 }

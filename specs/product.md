@@ -10,7 +10,7 @@
 
 1. Small fix — zero ceremony: You say "fix typo" -> agent reads product + relevant spec + decisions/glossary -> edits code -> updates the one specs/<feature>/spec.md if contract change -> done. No new, no issue required.
 
-2. New feature — plan[fuzzy] (read code, ask 2-3 questions, no files) -> plan[clear] (write GH issue: proposal + design + units with Verify; also draft spec if load-bearing) -> you: "looks good" or "grill-me" -> build: one unit at a time -> review -> close GH issue
+2. New feature — plan[fuzzy] (read code, grill, no files) -> plan[clear] (write GH issue with boundary/failure-policy units, scenario mappings, and Verify; draft load-bearing spec) -> build one unit -> review with cumulative advisory coverage -> rebuild at most twice per unchanged unit contract, otherwise re-plan its shape -> close only after PASS
 
 ## What we are
 

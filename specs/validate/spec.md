@@ -28,7 +28,7 @@ The `litespec validate` command SHALL validate feature specs under `specs/<featu
 
 ### Requirement: GH Issue Queue Validation
 
-The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec` via `gh issue list` and lint each issue body as a queue. Across the entire queue body there SHALL be exactly one `Base:` line and exactly one `Branch:` line, and both SHALL occur before the first `##` heading. `Base:` SHALL contain a full 40- or 64-character hexadecimal commit ID; `Branch:` SHALL match `litespec/<kebab-change-name>`. A `##` section is treated as a unit only when its body contains a `Done means:` or `Verify:` line; prose sections SHALL be skipped. Each unit SHALL have a non-empty heading, a `Done means:` line, a `Verify:` line carrying either an inline backtick command on the same line or a fenced code block within the unit body, and a checkbox. Each unit MAY include at most one `Read first:` line and at most one `Constraints:` line; both are optional, unique, and nonempty when present. `Read first:` is context, not scope — prefer areas and rulings over long file lists. `Constraints:` states what must stay true or what is out of bounds — it never says what to edit; the worker owns the implementation path. Omit either field rather than writing a placeholder. A checked unit SHALL carry a complete evidence receipt (see Checked Unit Evidence Receipt). Missing or malformed ownership or unit elements, duplicate or empty optional fields, or a checked unit without a complete receipt SHALL produce an error. Issues without the `litespec` label SHALL NOT be scanned.
+The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec` via `gh issue list` and lint each issue body as a queue. Across the entire queue body there SHALL be exactly one `Base:` line and exactly one `Branch:` line, and both SHALL occur before the first `##` heading. `Base:` SHALL contain a full 40- or 64-character hexadecimal commit ID; `Branch:` SHALL match `litespec/<kebab-change-name>`. A `##` section is treated as a unit only when its body contains a `Done means:` or `Verify:` line; prose sections SHALL be skipped. Each unit SHALL have a non-empty heading, identified `Done means:` bullet clauses, a `Scenarios:` mapping for those clause IDs, a `Verify:` line carrying either an inline backtick command on the same line or a fenced code block within the unit body, and a checkbox. Each unit MAY include at most one `Read first:`, `Constraints:`, `Depends:`, and `Boundary:` field; each present field is unique and nonempty. Filesystem, process, and network boundaries require the `Risk cases:` matrix defined below. `Read first:` is context, not scope. `Constraints:` states what must stay true or what is out of bounds; it never says what to edit. A checked unit SHALL carry a complete evidence receipt. Missing or malformed ownership, scenario mapping, boundary-risk accounting, or unit elements; duplicate or empty fields; or a checked unit without a complete receipt SHALL produce an error. Issues without the `litespec` label SHALL NOT be scanned.
 
 #### Scenario: Well-formed queue passes
 
@@ -87,7 +87,7 @@ The `litespec validate` command SHALL fetch open GitHub issues labeled `litespec
 
 ### Requirement: Checked Unit Evidence Receipt
 
-When a unit checkbox is checked, `litespec validate` SHALL require one verbatim red-green evidence receipt for that unit. A complete receipt MUST contain, in order: the unit's `Verify:` command quoted verbatim; `unit digest:` with 64 lowercase hexadecimal characters; `pre sha:` with a full 40- or 64-character hexadecimal commit ID; `pre exit status:` with a non-zero integer; a nonempty fenced block containing raw pre output or literal `<no output>`; `Pre-evidence scope: this command exited <status> at <sha>; nothing else is inferred.` matching the pre fields; `post sha:` with a full commit ID; `post exit status: 0`; a nonempty fenced block containing raw post output or literal `<no output>`; and `Post-evidence scope: this command exited 0 at <sha>; nothing else is inferred.` matching the post fields. The pre and post SHAs MUST differ. The `unit digest:` value MUST equal the SHA-256 digest of the unit's canonicalized contract: its heading, optional `Read first:`, `Constraints:`, and `Depends:` values, `Done means:` value, and Verify content, each length-prefixed (decimal byte length followed by `:`), line endings normalized to `\n` and trailing whitespace trimmed, absent optional fields omitted. The digest MUST NOT cover the status checkbox, Evidence content, or any other unit text. Validate SHALL recompute the expected digest from the unit's current body and report a missing, malformed, or mismatched digest as an error naming the unit and, on mismatch, both the expected and actual digests — so editing `Done means:` or `Verify:` after evidence is recorded fails validation. One canonicalization SHALL serve GitHub bodies, GitHub comments, and local queue files. Unchecked units SHALL NOT require a receipt. Local queues and issue-body receipts SHALL live in an `Evidence:` block after `Verify:` and before the checkbox. On a GitHub issue, either a comment that names the unit heading or an identity-bearing comment with the unit's exact heading and positive 1-based same-heading occurrence SHALL satisfy the check when it carries a complete receipt. A green-only legacy receipt, nonempty `Evidence:` label, or comment that only mentions `Evidence:` SHALL NOT satisfy. Validate SHALL check receipt structure only; it MUST NOT execute the recorded command, inspect Git ancestry, or interpret either fenced output.
+When a unit checkbox is checked, `litespec validate` SHALL require one verbatim red-green evidence receipt for that unit. A complete receipt MUST contain, in order: the unit's `Verify:` command quoted verbatim; `unit digest:` with 64 lowercase hexadecimal characters; `pre sha:` with a full 40- or 64-character hexadecimal commit ID; `pre exit status:` with a non-zero integer; a nonempty fenced block containing raw pre output or literal `<no output>`; `Pre-evidence scope: this command exited <status> at <sha>; nothing else is inferred.` matching the pre fields; `post sha:` with a full commit ID; `post exit status: 0`; a nonempty fenced block containing raw post output or literal `<no output>`; and `Post-evidence scope: this command exited 0 at <sha>; nothing else is inferred.` matching the post fields. The pre and post SHAs MUST differ. The `unit digest:` value MUST equal the SHA-256 digest of the unit's canonicalized contract: its heading; optional `Read first:`, `Constraints:`, `Depends:`, and `Boundary:` values; identified `Done means:` clauses; `Scenarios:` mappings; any required `Risk cases:` entries; and Verify content, each length-prefixed (decimal byte length followed by `:`), line endings normalized to `\n` and trailing whitespace trimmed, absent optional fields omitted. The digest MUST NOT cover the status checkbox, Evidence content, append-only queue metadata, or any other unit text. Validate SHALL recompute the expected digest from the unit's current body and report a missing, malformed, or mismatched digest as an error naming the unit and, on mismatch, both the expected and actual digests — so editing `Done means:` or `Verify:` after evidence is recorded fails validation. One canonicalization SHALL serve GitHub bodies, GitHub comments, and local queue files. Unchecked units SHALL NOT require a receipt. An initial local or issue-body receipt SHALL live in an `Evidence:` block after `Verify:` and before the checkbox; later local rebuild receipts MAY use identity-bearing records in the append-only metadata stream after all units. On GitHub, either a comment that names the unit heading or an identity-bearing comment with the unit's exact heading and positive 1-based same-heading occurrence SHALL satisfy the check when it carries a complete receipt. A green-only legacy receipt, nonempty `Evidence:` label, or comment that only mentions `Evidence:` SHALL NOT satisfy. Validate SHALL check receipt structure only; it MUST NOT execute the recorded command, inspect Git ancestry, or interpret either fenced output.
 
 #### Scenario: Unchecked unit without receipt passes
 
@@ -154,9 +154,9 @@ When a unit checkbox is checked, `litespec validate` SHALL require one verbatim 
 - **WHEN** `Done means:`, `Verify:`, or any covered contract field is edited after a checked unit's receipt was posted, so the recomputed digest no longer matches the receipt's `unit digest:`
 - **THEN** validation reports a mismatch error naming the unit and both the expected and actual digests
 
-### Requirement: GitHub Rebuild Request State
+### Requirement: Queue Rebuild Request State
 
-`litespec validate` SHALL associate each structured GitHub rebuild request with exactly one unit by exact heading and positive 1-based occurrence among units with that heading. A later complete identity-bearing evidence receipt SHALL resolve every earlier request for that identity. An unresolved request, malformed request, malformed identity-bearing receipt, or identity that does not identify exactly one queue unit MUST produce a validation error.
+`litespec validate` SHALL associate each structured rebuild request with exactly one unit by exact heading and positive 1-based occurrence among units with that heading. The exact grammar is `Rebuild request:` followed by `Unit occurrence: <positive integer>` and `Unit heading: <exact heading>` on consecutive lines with no other content. A later complete identity-bearing evidence receipt SHALL resolve every earlier request for that identity. An unresolved request, malformed request, malformed identity-bearing receipt, or identity that does not identify exactly one queue unit MUST produce a validation error. The same grammar SHALL apply to GitHub comments and the local queue metadata stream.
 
 #### Scenario: Later receipt resolves repeated requests
 
@@ -322,3 +322,79 @@ When `gh` is not on `PATH` or `gh issue list` fails AND no `specs/queues/` direc
 
 - **WHEN** `gh` is absent, no `specs/queues/` exists, and a spec has an error
 - **THEN** validate reports the spec error and exits non-zero
+
+### Requirement: Unit Scenario Mapping
+
+Every queue unit SHALL express `Done means:` as one or more nonempty bullet clauses carrying unique bracketed IDs, followed by a `Scenarios:` block that maps every clause ID to at least one nonempty named test scenario. Every scenario mapping MUST reference an existing clause ID, and every clause ID MUST appear in the mapping. `Scenarios:` SHALL be unique and nonempty. The mapping SHALL participate in the unit contract digest. Validate SHALL check the identifiers and one-to-one coverage structure but SHALL NOT inspect test source or claim that a named test exercises the clause.
+
+#### Scenario: Every clause has a named test scenario
+
+- **WHEN** a unit has `Done means:` clauses `[timeout]` and `[cleanup]` and its `Scenarios:` block maps both IDs to named tests
+- **THEN** queue validation accepts the scenario mapping and includes it in the unit digest
+
+#### Scenario: Unmapped or unknown clause fails
+
+- **WHEN** a `Done means:` clause has no scenario mapping or a scenario mapping names an ID absent from `Done means:`
+- **THEN** queue validation reports the unmatched ID and exits non-zero
+
+### Requirement: External Boundary Risk Accounting
+
+A queue unit MAY declare one `Boundary:` value. A filesystem, process, or network boundary MUST include one `Risk cases:` block accounting for `timeout`, `cleanup`, `non-ENOENT errors`, `concurrency`, and `optional configured dependencies`. Each risk SHALL map to a scenario ID declared by that unit or use `N/A — <nonempty reason>`. `Boundary:` and `Risk cases:` SHALL participate in the unit contract digest. Validate SHALL enforce the shape and references but SHALL NOT judge whether a boundary was omitted, an N/A reason is true, or a mapped test is behaviorally adequate.
+
+#### Scenario: Boundary risks map to scenarios or reasons
+
+- **WHEN** a process unit maps timeout and cleanup to scenario IDs and marks the other required risks N/A with nonempty reasons
+- **THEN** queue validation accepts the risk accounting and includes it in the unit digest
+
+#### Scenario: Boundary risk is missing
+
+- **WHEN** a filesystem, process, or network unit omits a required risk or gives a blank N/A reason
+- **THEN** queue validation reports the missing or empty risk entry and exits non-zero
+
+#### Scenario: Unknown boundary value fails
+
+- **WHEN** a unit declares `Boundary:` with a value other than exactly `filesystem`, `process`, or `network` — such as `Filesystem`, `Process`, `Network`, `database`, or any other unknown word
+- **THEN** queue validation reports that the boundary value is outside the closed, case-sensitive vocabulary and exits non-zero
+
+#### Scenario: Omitted boundary stays valid
+
+- **WHEN** a unit declares no `Boundary:` field at all
+- **THEN** queue validation accepts the unit without requiring boundary vocabulary or risk accounting
+
+### Requirement: Re-plan Marker State
+
+`litespec validate` SHALL scan routing metadata oldest to newest and count completed review-requested rebuild cycles per unit contract digest. A cycle begins with one or more literal `Rebuild request:` records and completes when a later complete identity-bearing evidence receipt resolves them. An amendment and the receipt resolving it MUST NOT count as a review-requested rebuild cycle. After two completed cycles for the current digest, another rebuild request MUST be invalid. The valid route is exactly `Re-plan required:`, `Unit occurrence: <positive integer>`, `Unit heading: <exact heading>`, `Unit digest: <current 64 lowercase hex digest>`, and `Reason: <nonempty one-line reason>` on consecutive lines. A marker before two completed cycles or a second unresolved marker for the same identity and digest MUST be invalid. A marker SHALL remain unresolved until a plan-authored amendment has an `Old digest:` equal to the marker digest. The amendment's normal fresh-evidence requirement then applies, while the new digest starts with zero completed cycles. GitHub comments and the append-only metadata stream after local queue units SHALL use the same request, receipt, marker, and amendment grammar.
+
+#### Scenario: Third rebuild request is rejected
+
+- **WHEN** two rebuild request-to-receipt cycles completed against one unit digest and another rebuild request is recorded
+- **THEN** validation reports that the unit requires re-planning instead of another rebuild
+
+#### Scenario: Plan amendment resolves marker and resets count
+
+- **WHEN** a re-plan marker names the current digest and a later valid amendment starts at that digest
+- **THEN** the marker resolves, the amendment remains selectable until fresh evidence arrives, and rebuild counting restarts at zero for the new digest
+
+#### Scenario: Amendment evidence is not a review rebuild
+
+- **WHEN** fresh evidence resolves an amendment without resolving any literal `Rebuild request:` record
+- **THEN** the current digest still has zero completed review-requested rebuild cycles
+
+#### Scenario: Premature or duplicate marker fails
+
+- **WHEN** a re-plan marker appears before two completed cycles or another unresolved marker already exists for the same identity and digest
+- **THEN** validation reports malformed routing state and exits non-zero
+
+### Requirement: Validation Scope Output
+
+A successful `litespec validate` invocation SHALL state `structure ok; implementation semantics not verified` in human-readable output. Minimal output MUST carry equivalent `structure-ok` and `semantics-unverified` signals. Full and minimal JSON SHALL preserve the structural `valid` boolean and include machine-readable fields identifying the validation scope as structure and implementation semantics as unverified. Counts MAY follow the scope statement. The command MUST NOT describe successful structural validation with an unqualified `ok`.
+
+#### Scenario: Text success names its limit
+
+- **WHEN** validation finds no structural errors in text mode
+- **THEN** output begins with `structure ok; implementation semantics not verified`
+
+#### Scenario: JSON success names its limit
+
+- **WHEN** validation finds no structural errors in JSON or minimal JSON mode
+- **THEN** the response reports structural validity and explicitly reports that implementation semantics were not verified
