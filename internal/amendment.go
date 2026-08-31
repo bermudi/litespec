@@ -155,6 +155,7 @@ func splitLocalQueueMetadataBlocks(body string) (string, []string) {
 }
 
 func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
+	comments = mergeContinuedComments(comments)
 	identities := queueUnitIdentities(units)
 	validUnit := make(map[queueUnitIdentity]int, len(identities))
 	for i, identity := range identities {

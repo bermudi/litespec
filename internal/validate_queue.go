@@ -836,6 +836,7 @@ func commentNamesUnit(comment, heading string) bool {
 }
 
 func applyQueueIssues(result *ValidationResult, commentSource string, units []queueUnit, unitIssues []ValidationIssue, comments []string) {
+	comments = mergeContinuedComments(comments)
 	usedComments := make(map[int]bool)
 	commentEvidence := make(map[int]bool)
 	identities := queueUnitIdentities(units)
