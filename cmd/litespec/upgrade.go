@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-		"github.com/bermudi/litespec/v2/internal"
+	"github.com/bermudi/litespec/v2/internal"
 )
 
 var (

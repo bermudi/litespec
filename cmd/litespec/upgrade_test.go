@@ -199,8 +199,8 @@ func TestCompareSemverPrerelease(t *testing.T) {
 		local, remote string
 		want          int
 	}{
-		{"v2.0.0-beta.2", "v2.0.0", -1},       // prerelease < stable same base
-		{"v2.0.0", "v2.0.0-beta.2", 1},        // stable > prerelease same base
+		{"v2.0.0-beta.2", "v2.0.0", -1},        // prerelease < stable same base
+		{"v2.0.0", "v2.0.0-beta.2", 1},         // stable > prerelease same base
 		{"v2.0.0-beta.2", "v2.0.0-beta.4", -1}, // beta.2 < beta.4
 		{"v2.0.0-beta.4", "v2.0.0-beta.2", 1},  // beta.4 > beta.2
 		{"v2.0.0-beta.6", "v2.0.0-beta.6", 0},  // equal prereleases
