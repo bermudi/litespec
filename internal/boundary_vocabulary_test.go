@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -66,8 +65,5 @@ func TestBoundaryVocabularyAffectsUnitDigest(t *testing.T) {
 	baseDigest := unitContractDigest(unit)
 	if got := unitContractDigest(changedBoundary); got == baseDigest {
 		t.Fatal("changing the boundary value did not change the unit digest")
-	}
-	if !strings.HasPrefix(baseDigest, "") {
-		t.Fatal("unreachable")
 	}
 }

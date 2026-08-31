@@ -243,11 +243,11 @@ Verify:
 Done means: two
 Verify:
 ` + "```\necho two\n```\n" + strings.Replace(
-		evidenceReceipt("echo two"),
-		fixtureUnitDigest("echo two"),
-		unitDigestFor("Good Two", "two", "echo two"),
-		1,
-	) + `- [x] done
+			evidenceReceipt("echo two"),
+			fixtureUnitDigest("echo two"),
+			unitDigestFor("Good Two", "two", "echo two"),
+			1,
+		) + `- [x] done
 
 ## Bad One
 Verify:
