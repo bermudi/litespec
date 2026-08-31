@@ -59,7 +59,7 @@ Grill by default: load `references/grilling.md` and ask one question at a time t
 Plan is the only actor that may change a unit contract; build and review never do. A contract change is witnessed, append-only:
 
 1. Run `litespec digest --issue <N>` (or `--queue <path>`) and record the unit's current digest.
-2. Edit the unit's contract fields (heading, `Read first:`, `Constraints:`, `Depends:`, `Boundary:`, `Done means:`, `Scenarios:`, `Risk cases:`, `Verify:`) directly in the queue — on GitHub this is a deliberate plan-owned body edit, locally an edit to `specs/queues/<name>.md`.
+2. Edit the unit's contract fields (heading, `Read first:`, `Constraints:`, `Depends:`, `Boundary:`, `Done means:`, `Scenarios:`, `Risk cases:`, `Verify:`) directly in the queue — on GitHub this is a deliberate plan-owned body edit, locally an edit to `specs/queues/<name>.md`. Dry-run a changed `Verify:` on the base tree before posting the witness — `references/clear.md` owns the rule.
 3. Re-run `litespec digest` and post the witness — GitHub: one comment with the record below; local: append the same block at the end of the queue file as a separate clean metadata commit:
    ```text
    Amendment:
@@ -84,5 +84,5 @@ After writing, check if you introduced a term not in `specs/glossary.md`. Offer 
 
 - Don't prescribe files to edit in the GH issue — scope is outcome + boundaries. Use `Read first:` for context (areas/rulings, not file lists) and `Constraints:` for boundaries (what must stay true or is out of bounds); never as an edit list. The worker owns the path.
 - Don't create files for a small fix. Small fix = edit code + update `specs/<feature>/spec.md` directly, no issue required.
-- Don't invent Verify that doesn't fail without the outcome.
+- Don't invent Verify that doesn't fail without the outcome; dry-run it on the base tree before filing.
 - Don't put unrelated work on a queue issue's branch. Use another branch or worktree.
