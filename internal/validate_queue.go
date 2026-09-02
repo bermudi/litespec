@@ -563,6 +563,38 @@ func (c *evidenceCursor) consumeExactLines(value string) bool {
 	return true
 }
 
+func (c *evidenceCursor) skipBlanks() {
+	for c.at < len(c.lines) && strings.TrimSpace(c.lines[c.at]) == "" {
+		c.at++
+	}
+}
+
+// consumeVerifyCommand accepts the exact bare command or the queue's own
+// `Verify:` label form, with or without backticks; the command text itself
+// must still match verbatim.
+func (c *evidenceCursor) consumeVerifyCommand(verifyCmd string) bool {
+	c.skipBlanks()
+	if c.consumeExactLines(verifyCmd) {
+		return true
+	}
+	if c.at >= len(c.lines) {
+		return false
+	}
+	trimmed := strings.TrimSpace(c.lines[c.at])
+	if !strings.HasPrefix(trimmed, "Verify:") {
+		return false
+	}
+	rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "Verify:"))
+	if len(rest) >= 2 && strings.HasPrefix(rest, "`") && strings.HasSuffix(rest, "`") {
+		rest = rest[1 : len(rest)-1]
+	}
+	if rest != verifyCmd {
+		return false
+	}
+	c.at++
+	return true
+}
+
 func (c *evidenceCursor) consumeField(label string) (string, bool) {
 	if c.at >= len(c.lines) {
 		return "", false
@@ -659,11 +691,12 @@ func evidenceReceiptIssues(text, verifyCmd, expectedDigest, source, heading stri
 	}
 
 	cursor := newEvidenceCursor(evidencePayload(text, verifyCmd))
-	if verifyCmd == "" || !cursor.consumeExactLines(verifyCmd) {
+	if verifyCmd == "" || !cursor.consumeVerifyCommand(verifyCmd) {
 		fail("must quote the Verify command verbatim")
 		return issues
 	}
 
+	cursor.skipBlanks()
 	digestText, ok := cursor.consumeField("unit digest")
 	if !ok {
 		fail("must include a `unit digest:` field between the Verify command and pre sha")
@@ -675,6 +708,7 @@ func evidenceReceiptIssues(text, verifyCmd, expectedDigest, source, heading stri
 		fail(fmt.Sprintf("unit digest mismatch: expected %s, actual %s — recompute with litespec or amend the contract", expectedDigest, digestText))
 	}
 
+	cursor.skipBlanks()
 	preSHA, ok := cursor.consumeField("pre sha")
 	if !ok {
 		fail("fields must appear in order beginning with pre sha")
@@ -684,6 +718,7 @@ func evidenceReceiptIssues(text, verifyCmd, expectedDigest, source, heading stri
 		fail("pre sha must be a full 40- or 64-character hexadecimal commit ID")
 	}
 
+	cursor.skipBlanks()
 	preStatusText, ok := cursor.consumeField("pre exit status")
 	if !ok {
 		fail("fields must appear in order: pre exit status must follow pre sha")
@@ -696,12 +731,14 @@ func evidenceReceiptIssues(text, verifyCmd, expectedDigest, source, heading stri
 		fail("pre exit status must be non-zero")
 	}
 
+	cursor.skipBlanks()
 	preOutput, ok := cursor.consumeFence()
 	if !ok || strings.TrimSpace(preOutput) == "" {
 		fail("must include pre raw command output, or `<no output>`, in a fenced block")
 		return issues
 	}
 
+	cursor.skipBlanks()
 	if cursor.at >= len(cursor.lines) {
 		fail("must include a matching Pre-evidence scope line")
 		return issues
@@ -719,6 +756,7 @@ func evidenceReceiptIssues(text, verifyCmd, expectedDigest, source, heading stri
 		}
 	}
 
+	cursor.skipBlanks()
 	postSHA, ok := cursor.consumeField("post sha")
 	if !ok {
 		fail("fields must appear in order: post sha must follow the pre scope line")
@@ -731,6 +769,7 @@ func evidenceReceiptIssues(text, verifyCmd, expectedDigest, source, heading stri
 		fail("pre and post sha must differ")
 	}
 
+	cursor.skipBlanks()
 	postStatusText, ok := cursor.consumeField("post exit status")
 	if !ok {
 		fail("fields must appear in order: post exit status must follow post sha")
@@ -740,12 +779,14 @@ func evidenceReceiptIssues(text, verifyCmd, expectedDigest, source, heading stri
 		fail("post exit status must be 0")
 	}
 
+	cursor.skipBlanks()
 	postOutput, ok := cursor.consumeFence()
 	if !ok || strings.TrimSpace(postOutput) == "" {
 		fail("must include post raw command output, or `<no output>`, in a fenced block")
 		return issues
 	}
 
+	cursor.skipBlanks()
 	if cursor.at >= len(cursor.lines) {
 		fail("must include a matching Post-evidence scope line")
 		return issues
