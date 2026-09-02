@@ -85,4 +85,5 @@ After writing, check if you introduced a term not in `specs/glossary.md`. Offer 
 - Don't prescribe files to edit in the GH issue — scope is outcome + boundaries. Use `Read first:` for context (areas/rulings, not file lists) and `Constraints:` for boundaries (what must stay true or is out of bounds); never as an edit list. The worker owns the path.
 - Don't create files for a small fix. Small fix = edit code + update `specs/<feature>/spec.md` directly, no issue required.
 - Don't invent Verify that doesn't fail without the outcome; dry-run it on the base tree before filing.
+- Don't file a unit whose outcome an earlier unit in the same queue already delivers or is constrained to preserve — reshape it as a regression pin (the named tests are the outcome; the Verify fails while the pin is absent) or drop it.
 - Don't put unrelated work on a queue issue's branch. Use another branch or worktree.
