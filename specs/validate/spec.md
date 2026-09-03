@@ -179,6 +179,58 @@ When a unit checkbox is checked, `litespec validate` SHALL require one verbatim 
 - **WHEN** a superseded receipt uses raw-output chunks after a heading rename
 - **THEN** every chunk repeats the parsed top-level occurrence and heading exactly, and a missing or mismatched identity fails validation
 
+### Requirement: Versioned Evidence Compatibility and Append-only Recovery
+
+New evidence receipts SHALL declare the parser protocol and digest algorithm that produced them. In a versioned receipt, the fields MUST appear immediately after the `Evidence:` marker and before the quoted Verify command in this order:
+
+```text
+Protocol: evidence/v1
+Digest algorithm: unit-contract-sha256-v1
+Receipt ID: receipt-sha256-v1:<64 lowercase hex>
+Recovered from: <receipt ID>  (optional)
+```
+
+`Protocol: evidence/v1` names the current versioned red-green receipt grammar and `Digest algorithm: unit-contract-sha256-v1` names the existing canonical unit-contract SHA-256 algorithm. A future parser or digest algorithm SHALL use a new identifier. A receipt containing any version field MUST contain all required version fields, and an unknown or malformed protocol or digest algorithm MUST produce a visible validation error rather than falling back to another version. Validate SHALL retain and dispatch supported historical parsers and digest algorithms by their recorded identifiers; it MUST NOT reinterpret an old receipt with the current parser or digest algorithm.
+
+`Receipt ID:` SHALL be a stable content-derived identifier: `receipt-sha256-v1:` followed by the lowercase SHA-256 of the canonical logical receipt with the ID field omitted. The canonical input SHALL include the declared protocol, digest algorithm, optional recovery reference, routing identity, Verify command, unit digest, pre/post SHAs and statuses, scope lines, and reconstructed raw outputs; it SHALL exclude the `Evidence:` wrapper, status checkbox, storage comment boundaries, and inserted continuation bytes. Every chunk of one receipt MUST repeat the protocol, digest algorithm, Receipt ID, and exact routing identity. A legacy unversioned receipt containing none of the version fields SHALL remain valid under the preserved `evidence/legacy-v0` grammar and `unit-contract-sha256-v1` algorithm; validation SHALL derive an in-memory `legacy-receipt-sha256-v1:<64 lowercase hex>` ID from its canonical logical content without rewriting the record. A partial mixture of versioned and unversioned fields is malformed.
+
+A digest-algorithm change alone SHALL NOT be treated as a contract amendment when the receipt's declared supported algorithm recomputes the current unit contract to the receipt's digest. Actual contract revisions SHALL continue to use the amendment-chain rules. A later complete versioned receipt MAY carry `Recovered from: <receipt ID>` and be appended to the GitHub comment stream or local queue metadata stream without changing an earlier record; the new receipt MUST validate independently, the reference MUST resolve to an earlier complete receipt or derived legacy ID, and both records remain visible. Recovery provenance SHALL NOT suppress, rewrite, or reclassify the earlier receipt. This requirement introduces no `Supersedes:`, quarantine, or `Authorized by:` control: a state-changing lifecycle needs authenticated actor/provenance infrastructure and is a later dependency, not a text button. The GitHub and local lanes SHALL use the same rules, and validation SHALL remain structural only.
+
+#### Scenario: Versioned receipt declares protocol and algorithm
+
+- **WHEN** a new receipt carries `Protocol: evidence/v1`, `Digest algorithm: unit-contract-sha256-v1`, a recomputed stable `Receipt ID:`, and the complete red-green fields
+- **THEN** validation dispatches the declared versions and accepts the receipt when its unit digest matches the declared algorithm
+
+#### Scenario: Legacy unversioned receipt remains compatible
+
+- **WHEN** a complete pre-existing red-green receipt has none of `Protocol:`, `Digest algorithm:`, `Receipt ID:`, or `Recovered from:`
+- **THEN** validation uses the preserved legacy parser and digest algorithm, derives its stable legacy ID in memory, and keeps it eligible for the existing amendment chain
+
+#### Scenario: Unknown or partial version metadata fails
+
+- **WHEN** a receipt names an unknown protocol or digest algorithm, or includes only some of the required version fields
+- **THEN** validation reports a visible compatibility error instead of silently using the current parser or treating the record as legacy
+
+#### Scenario: Digest algorithm evolution does not break an unchanged contract
+
+- **WHEN** an older receipt's declared algorithm and a newer receipt's declared algorithm produce different digests for the same unchanged current contract
+- **THEN** validation recognizes both as the current contract under their declared algorithms and does not require a fictitious amendment edge
+
+#### Scenario: Recovery is append-only and independently complete
+
+- **WHEN** a later complete versioned receipt names an earlier receipt with `Recovered from: <receipt ID>` and is appended without editing prior comments or queue metadata
+- **THEN** validation resolves the reference, preserves both records, and may use the later receipt for normal unit-request resolution without suppressing the earlier record
+
+#### Scenario: Continuation chunks retain stable receipt identity
+
+- **WHEN** one versioned receipt is split across field-boundary or raw-output continuation comments
+- **THEN** every chunk carries the same protocol, digest algorithm, Receipt ID, and routing identity, and validation rejects a changed or duplicated identity
+
+#### Scenario: Text authorization cannot supersede evidence
+
+- **WHEN** a comment or local metadata block contains `Supersedes:`, quarantine text, or an `Authorized by:` string without authenticated provenance
+- **THEN** validation does not use it to suppress or replace a receipt and reports no state-changing authorization from the text alone
+
 ### Requirement: Queue Rebuild Request State
 
 `litespec validate` SHALL associate each structured rebuild request with exactly one unit by exact heading and positive 1-based occurrence among units with that heading. The exact grammar is `Rebuild request:` followed by `Unit occurrence: <positive integer>` and `Unit heading: <exact heading>` on consecutive lines with no other content. A later complete identity-bearing evidence receipt SHALL resolve every earlier request for that identity. An unresolved request, malformed request, malformed identity-bearing receipt, or identity that does not identify exactly one queue unit MUST produce a validation error. The same grammar SHALL apply to GitHub comments and the local queue metadata stream.
