@@ -806,9 +806,8 @@ func (c *evidenceCursor) consumeRawOutput(phase, expectedDigest, expectedHeading
 			return "", false, "raw output chunk Unit occurrence must be a positive integer"
 		}
 		c.skipBlanks()
-		chunkHeading, ok := c.consumeField("Unit heading")
-		if !ok || chunkHeading != expectedHeading {
-			return "", false, "raw output chunk Unit heading must match the receipt identity"
+		if !c.consumeExactLines("Unit heading: " + expectedHeading) {
+			return "", false, "raw output chunk Unit heading must match the receipt identity exactly"
 		}
 		c.skipBlanks()
 		chunkDigest, ok := c.consumeField("unit digest")
@@ -1059,6 +1058,9 @@ func commentEvidenceDocument(comment continuedComment, heading string) (evidence
 	for i, line := range document.lines {
 		if consumeMarkdownFenceLine(&openFence, line) {
 			continue
+		}
+		if line == "Raw output chunk:" {
+			return evidenceDocument{}, false
 		}
 		trimmed := strings.TrimSpace(line)
 		if trimmed == heading || trimmed == "## "+heading {

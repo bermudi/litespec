@@ -85,6 +85,18 @@ func chunkedReceiptComments(verifyCmd, digest string) []string {
 	return []string{first, second, third, fourth}
 }
 
+func headingFormReceipt(verifyCmd, digest string) string {
+	receipt := strings.Replace(evidenceReceipt(verifyCmd), fixtureUnitDigest(verifyCmd), digest, 1)
+	return "## My outcome\n" + strings.TrimPrefix(receipt, "Evidence:\n")
+}
+
+func headingFormChunkedReceiptComments(verifyCmd, digest string) []string {
+	comments := chunkedReceiptComments(verifyCmd, digest)
+	lines := strings.SplitN(comments[0], "\n", 3)
+	comments[0] = "## My outcome\n" + lines[2]
+	return comments
+}
+
 func TestMergeContinuedCommentsJoinsMarkerWithNextComment(t *testing.T) {
 	head := continuedReceiptHead("echo hi", "aaaa")
 	tail := continuedReceiptTail("echo hi")
@@ -337,13 +349,67 @@ func TestRawOutputChunksInOneCommentFailValidation(t *testing.T) {
 	}
 }
 
-func TestOrphanRawOutputChunkFailsValidation(t *testing.T) {
-	units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", "")), "GH issue #1")
+func TestRawOutputChunksBeforeHeadingFormReceiptFailValidation(t *testing.T) {
+	source := "GH issue #1"
+	units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", evidenceReceipt("echo hi"))), source)
 	digest := unitContractDigest(units[0])
+	headingReceipt := headingFormReceipt("echo hi", digest)
+
+	tests := []struct {
+		name     string
+		comments []string
+	}{
+		{
+			name: "same physical comment",
+			comments: []string{strings.Join([]string{
+				rawOutputChunk("pre", 1, 2, digest, "orphan one", false),
+				rawOutputChunk("pre", 2, 2, digest, "orphan two", false),
+				headingReceipt,
+			}, "\n")},
+		},
+		{
+			name: "earlier marker-joined comments",
+			comments: []string{
+				rawOutputChunk("pre", 1, 2, digest, "orphan one", true),
+				rawOutputChunk("pre", 2, 2, digest, "orphan two", true),
+				headingReceipt,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := &ValidationResult{Valid: true}
+			applyQueueIssues(result, "GitHub comments", units, issues, test.comments)
+			if !containsIssue(result.Errors, "orphan raw output chunk") {
+				t.Fatalf("expected orphan raw output chunk error, got %v", result.Errors)
+			}
+		})
+	}
+}
+
+func TestRawOutputChunkUnitHeadingMustMatchByteForByte(t *testing.T) {
+	source := "GH issue #1"
+	units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", evidenceReceipt("echo hi"))), source)
+	digest := unitContractDigest(units[0])
+	comments := headingFormChunkedReceiptComments("echo hi", digest)
+	comments[0] = strings.Replace(comments[0], "Unit heading: My outcome", "Unit heading: My outcome ", 1)
+
+	records := mergeContinuedCommentRecords(comments)
+	document, ok := commentEvidenceDocument(records[0], "My outcome")
+	if !ok {
+		t.Fatal("expected heading-form receipt to be located")
+	}
+	identity := queueUnitIdentity{Occurrence: 1, Heading: "My outcome"}
+	receiptIssues := evidenceReceiptIssuesForDocument(document, "echo hi", digest, "comment", identity.Heading, &identity)
+	if !containsIssue(receiptIssues, "Unit heading must match the receipt identity exactly") {
+		t.Fatalf("expected byte-for-byte heading error, got %v", receiptIssues)
+	}
+
 	result := &ValidationResult{Valid: true}
-	applyQueueIssues(result, "GitHub comments", units, issues, []string{rawOutputChunk("pre", 1, 2, digest, "orphan", false)})
-	if len(result.Errors) == 0 {
-		t.Fatal("expected orphan raw output chunk to fail validation")
+	applyQueueIssues(result, "GitHub comments", units, issues, comments)
+	if !containsIssue(result.Errors, "orphan raw output chunk") {
+		t.Fatalf("expected malformed chunk receipt to be rejected, got %v", result.Errors)
 	}
 }
 
@@ -379,14 +445,35 @@ func TestHeadingFormChunkOccurrenceMustMatchUnit(t *testing.T) {
 	)
 	units, issues := ValidateQueueBody(body, "GH issue #1")
 	firstDigest := unitContractDigest(units[0])
-	comments := chunkedReceiptComments("echo hi", firstDigest)
-	lines := strings.SplitN(comments[0], "\n", 3)
-	comments[0] = "## My outcome\n" + lines[2]
-	comments[0] = strings.Replace(comments[0], "Unit occurrence: 1", "Unit occurrence: 999", 1)
+	secondDigest := unitContractDigest(units[1])
+	firstComments := chunkedReceiptComments("echo hi", firstDigest)
+	secondComments := headingFormChunkedReceiptComments("echo hi", secondDigest)
+	comments := append(firstComments, secondComments...)
+	records := mergeContinuedCommentRecords(comments)
+	firstIdentity := queueUnitIdentity{Occurrence: 1, Heading: "My outcome"}
+	secondIdentity := queueUnitIdentity{Occurrence: 2, Heading: "My outcome"}
+	used := make(map[int]bool)
+	if _, ok := matchingEvidenceCommentForUnit(firstIdentity, units[0], firstDigest, units, records, used); !ok {
+		t.Fatal("expected complete receipt for occurrence 1 to match occurrence 1")
+	}
+	used[0] = true
+	if _, ok := matchingEvidenceCommentForUnit(secondIdentity, units[1], secondDigest, units, records, used); ok {
+		t.Fatal("expected complete heading-form receipt declaring occurrence 1 not to match occurrence 2")
+	}
+
+	document, ok := commentEvidenceDocument(records[len(firstComments)], "My outcome")
+	if !ok {
+		t.Fatal("expected heading-form receipt to be located")
+	}
+	receiptIssues := evidenceReceiptIssuesForDocument(document, "echo hi", secondDigest, "comment", secondIdentity.Heading, &secondIdentity)
+	if !containsIssue(receiptIssues, "Unit occurrence must match the receipt identity") {
+		t.Fatalf("expected occurrence mismatch error, got %v", receiptIssues)
+	}
+
 	result := &ValidationResult{Valid: true}
-	applyQueueIssues(result, "GitHub comments", units, issues, comments)
+	applyQueueIssues(result, "GH issue #1", units, issues, comments)
 	if len(result.Errors) == 0 {
-		t.Fatal("expected heading-form receipt with wrong chunk occurrence to fail validation")
+		t.Fatal("expected occurrence 2 to remain unsatisfied by occurrence 1's receipt")
 	}
 }
 
