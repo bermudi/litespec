@@ -57,11 +57,79 @@ const (
 	rebuildCommentStaleEvidence
 )
 
+type evidenceReceiptDeclaration struct {
+	digest string
+}
+
+func receiptVerifyCommand(lines []string) (string, bool) {
+	end := len(lines)
+	for end > 0 && strings.TrimSpace(lines[end-1]) == "" {
+		end--
+	}
+	if end == 0 {
+		return "", false
+	}
+	if end == 1 {
+		if command, ok := verifyCommandFromLabel(lines[0]); ok {
+			return command, command != ""
+		}
+	}
+	return strings.Join(lines[:end], "\n"), true
+}
+
+func validEvidenceReceiptDeclarations(
+	document evidenceDocument,
+	source string,
+	heading string,
+	expectedIdentity *queueUnitIdentity,
+) []evidenceReceiptDeclaration {
+	document = document.trimSpace()
+	var declarations []evidenceReceiptDeclaration
+	openFence := ""
+	for i, line := range document.lines {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		if !strings.HasPrefix(line, "unit digest:") {
+			continue
+		}
+		digest := strings.TrimSpace(strings.TrimPrefix(line, "unit digest:"))
+		if !unitDigestPattern.MatchString(digest) {
+			continue
+		}
+		verifyCmd, ok := receiptVerifyCommand(document.lines[:i])
+		if !ok {
+			continue
+		}
+		issues, _ := evidenceReceiptIssuesForDocument(
+			document,
+			verifyCmd,
+			digest,
+			source,
+			heading,
+			expectedIdentity,
+		)
+		if len(issues) == 0 {
+			declarations = append(declarations, evidenceReceiptDeclaration{digest: digest})
+		}
+	}
+	return declarations
+}
+
+func digestMatchesAnyUnit(digest string, units []queueUnit) bool {
+	for _, unit := range units {
+		if unitContractDigest(unit) == digest {
+			return true
+		}
+	}
+	return false
+}
+
 // parseRebuildComment classifies an identity-bearing comment. For evidence
-// receipts it also returns the declared `unit digest:` value; a receipt whose
-// only defect is that its digest no longer matches the current contract is
-// reported as rebuildCommentStaleEvidence with the digest intact so the
-// amendment chain can judge whether the contract edit was witnessed.
+// receipts it also returns the declared `unit digest:` value; a complete
+// receipt for a superseded contract is reported as rebuildCommentStaleEvidence
+// with the digest intact so the amendment chain can judge whether the contract
+// edit was witnessed.
 func parseRebuildComment(comment string, units []queueUnit) (queueUnitIdentity, rebuildCommentKind, string, error) {
 	return parseRebuildCommentRecord(continuedComment{text: comment, parts: []continuedCommentPart{{text: comment}}}, units)
 }
@@ -102,30 +170,35 @@ func parseRebuildCommentRecord(comment continuedComment, units []queueUnit) (que
 	evidenceDocument := evidencePayloadDocument(document.afterLine(2))
 	unit, ok := findQueueUnit(units, identity)
 	if !ok {
-		for _, candidate := range units {
-			issues, declaredDigest := evidenceReceiptIssuesForDocument(
-				evidenceDocument,
-				unitVerifyCommand(candidate.Body),
-				"",
-				"comment",
-				identity.Heading,
-				nil,
-			)
-			if len(issues) == 1 && strings.Contains(issues[0].Message, "unit digest mismatch") {
-				return identity, rebuildCommentEvidence, declaredDigest, nil
+		declarations := validEvidenceReceiptDeclarations(evidenceDocument, "comment", identity.Heading, &identity)
+		if len(declarations) == 1 {
+			declaration := declarations[0]
+			if digestMatchesAnyUnit(declaration.digest, units) {
+				return queueUnitIdentity{}, rebuildCommentOther, "", fmt.Errorf("incomplete evidence receipt for occurrence %d heading %q", identity.Occurrence, identity.Heading)
 			}
+			return identity, rebuildCommentEvidence, declaration.digest, nil
 		}
 		return identity, rebuildCommentEvidence, "", nil
 	}
-	issues, declaredDigest := evidenceReceiptIssuesForDocument(evidenceDocument, unitVerifyCommand(unit.Body), unitContractDigest(unit), "comment", identity.Heading, &identity)
-	switch {
-	case len(issues) == 0:
+
+	currentDigest := unitContractDigest(unit)
+	issues, declaredDigest := evidenceReceiptIssuesForDocument(
+		evidenceDocument,
+		unitVerifyCommand(unit.Body),
+		currentDigest,
+		"comment",
+		identity.Heading,
+		&identity,
+	)
+	if len(issues) == 0 {
 		return identity, rebuildCommentEvidence, declaredDigest, nil
-	case len(issues) == 1 && strings.Contains(issues[0].Message, "unit digest mismatch"):
-		return identity, rebuildCommentStaleEvidence, declaredDigest, nil
-	default:
-		return queueUnitIdentity{}, rebuildCommentOther, "", fmt.Errorf("incomplete evidence receipt for occurrence %d heading %q", identity.Occurrence, identity.Heading)
 	}
+
+	declarations := validEvidenceReceiptDeclarations(evidenceDocument, "comment", identity.Heading, &identity)
+	if len(declarations) == 1 && declarations[0].digest != currentDigest {
+		return identity, rebuildCommentStaleEvidence, declarations[0].digest, nil
+	}
+	return queueUnitIdentity{}, rebuildCommentOther, "", fmt.Errorf("incomplete evidence receipt for occurrence %d heading %q", identity.Occurrence, identity.Heading)
 }
 
 func parseIdentityLines(occurrenceLine, headingLine string) (queueUnitIdentity, error) {

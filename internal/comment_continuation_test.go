@@ -361,6 +361,165 @@ func TestChunkedRenamedReceiptUsesCompleteCandidateGrammar(t *testing.T) {
 	assertRenamedReceiptFallback(t, chunkedReceiptComments)
 }
 
+func changedVerifyQueue(t *testing.T, oldHeading, newHeading, oldVerify, newVerify string) ([]queueUnit, []queueUnit, string, string) {
+	t.Helper()
+	oldBody := ownedQueue("## " + oldHeading + "\nDone means: target\nVerify:\n```\n" + oldVerify + "\n```\n- [x] done\n")
+	newBody := ownedQueue("## " + newHeading + "\nDone means: target\nVerify:\n```\n" + newVerify + "\n```\n- [x] done\n")
+	oldUnits := parseQueueUnits(oldBody)
+	newUnits := parseQueueUnits(newBody)
+	if len(oldUnits) != 1 || len(newUnits) != 1 {
+		t.Fatalf("changed Verify fixture units = %d old, %d new; want one each", len(oldUnits), len(newUnits))
+	}
+	oldDigest := unitContractDigest(oldUnits[0])
+	newDigest := unitContractDigest(newUnits[0])
+	if oldDigest == newDigest {
+		t.Fatal("changed Verify fixture digests must differ")
+	}
+	return oldUnits, newUnits, oldDigest, newDigest
+}
+
+func TestSameHeadingChangedVerifyReceiptUsesDeclaredGrammar(t *testing.T) {
+	_, newUnits, oldDigest, newDigest := changedVerifyQueue(t, "My outcome", "My outcome", "echo old", "echo new")
+	comments := []string{
+		continuedReceiptHead("echo old", oldDigest),
+		continuedReceiptTail("echo old"),
+		amendmentRecord(1, "My outcome", oldDigest, newDigest, "change the verifier"),
+		continuedReceiptHead("echo new", newDigest),
+		continuedReceiptTail("echo new"),
+	}
+
+	oldReceipt := mergeContinuedCommentRecords(comments[:2])[0].text
+	identity, kind, digest, err := parseRebuildComment(oldReceipt, newUnits)
+	if err != nil {
+		t.Fatalf("same-heading stale receipt returned an error: %v", err)
+	}
+	if identity != (queueUnitIdentity{Occurrence: 1, Heading: "My outcome"}) || kind != rebuildCommentStaleEvidence || digest != oldDigest {
+		t.Fatalf("same-heading stale receipt = identity %v, kind %d, digest %q", identity, kind, digest)
+	}
+
+	unresolved, errs := unresolvedRebuildRequests(newUnits, comments)
+	if len(errs) != 0 {
+		t.Fatalf("changed Verify same-heading receipt returned errors: %v", errs)
+	}
+	if len(unresolved) != 0 {
+		t.Fatalf("changed Verify same-heading receipt left unresolved state: %v", unresolved)
+	}
+}
+
+func TestRenamedChangedVerifyChunkReceiptUsesDeclaredGrammar(t *testing.T) {
+	oldUnits, newUnits, oldDigest, newDigest := changedVerifyQueue(t, "Old outcome", "Renamed outcome", "echo old", "echo new")
+	oldIdentity := queueUnitIdentity{Occurrence: 1, Heading: oldUnits[0].Heading}
+	newIdentity := queueUnitIdentity{Occurrence: 1, Heading: newUnits[0].Heading}
+	oldReceipt := receiptPartsForIdentity(chunkedReceiptComments, "echo old", oldIdentity.Heading, oldDigest)
+	newReceipt := receiptPartsForIdentity(chunkedReceiptComments, "echo new", newIdentity.Heading, newDigest)
+	amendment := amendmentRecord(1, newIdentity.Heading, oldDigest, newDigest, "rename and change the verifier")
+	comments := append(append(oldReceipt, amendment), newReceipt...)
+
+	records := mergeContinuedCommentRecords(oldReceipt)
+	gotIdentity, kind, gotDigest, err := parseRebuildCommentRecord(records[0], newUnits)
+	if err != nil {
+		t.Fatalf("renamed changed Verify chunk receipt returned an error: %v", err)
+	}
+	if gotIdentity != oldIdentity || kind != rebuildCommentEvidence || gotDigest != oldDigest {
+		t.Fatalf("renamed changed Verify chunk receipt = identity %v, kind %d, digest %q; want %v, evidence, %q", gotIdentity, kind, gotDigest, oldIdentity, oldDigest)
+	}
+
+	unresolved, errs := unresolvedRebuildRequests(newUnits, comments)
+	if len(errs) != 0 {
+		t.Fatalf("renamed changed Verify chunk receipt returned errors: %v", errs)
+	}
+	if len(unresolved) != 0 {
+		t.Fatalf("renamed changed Verify chunk receipt left unresolved state: %v", unresolved)
+	}
+
+	unresolved, errs = unresolvedRebuildRequests(newUnits, append([]string{amendment}, oldReceipt...))
+	if len(errs) != 0 {
+		t.Fatalf("stale receipt after amendment returned errors: %v", errs)
+	}
+	if len(unresolved) != 1 || unresolved[0] != newIdentity {
+		t.Fatalf("stale receipt after amendment unresolved = %v, want %v", unresolved, newIdentity)
+	}
+}
+
+func TestCurrentDigestChangedVerifyReceiptRemainsFatal(t *testing.T) {
+	_, newUnits, _, newDigest := changedVerifyQueue(t, "My outcome", "My outcome", "echo old", "echo new")
+	receipt := strings.Join([]string{
+		continuedReceiptHead("echo old", newDigest),
+		continuedReceiptTail("echo old"),
+	}, "\n")
+	_, _, _, err := parseRebuildComment(receipt, newUnits)
+	if err == nil {
+		t.Fatal("expected a current-digest receipt with an edited Verify command to fail")
+	}
+}
+
+func TestRenamedChangedVerifyChunkIdentityMismatchFails(t *testing.T) {
+	oldUnits, newUnits, oldDigest, newDigest := changedVerifyQueue(t, "Old outcome", "Renamed outcome", "echo old", "echo new")
+	oldHeading := oldUnits[0].Heading
+	newHeading := newUnits[0].Heading
+	amendment := amendmentRecord(1, newHeading, oldDigest, newDigest, "rename and change the verifier")
+
+	tests := []struct {
+		name string
+		edit func([]string) []string
+	}{
+		{
+			name: "wrong occurrence",
+			edit: func(receipt []string) []string {
+				return replaceChunkIdentity(receipt, "Unit occurrence: 1", "Unit occurrence: 2")
+			},
+		},
+		{
+			name: "wrong heading",
+			edit: func(receipt []string) []string {
+				return replaceChunkIdentity(receipt, "Unit heading: "+oldHeading, "Unit heading: Other outcome")
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			oldReceipt := test.edit(receiptPartsForIdentity(chunkedReceiptComments, "echo old", oldHeading, oldDigest))
+			newReceipt := receiptPartsForIdentity(chunkedReceiptComments, "echo new", newHeading, newDigest)
+			comments := append(append(oldReceipt, amendment), newReceipt...)
+			_, errs := unresolvedRebuildRequests(newUnits, comments)
+			if len(errs) == 0 {
+				t.Fatal("expected malformed renamed stale chunk identity to fail")
+			}
+		})
+	}
+}
+
+func replaceChunkIdentity(parts []string, old, replacement string) []string {
+	copied := append([]string(nil), parts...)
+	for i, part := range copied {
+		lines := strings.Split(part, "\n")
+		inChunk := false
+		for lineIndex, line := range lines {
+			if line == "Raw output chunk:" {
+				inChunk = true
+			}
+			if inChunk {
+				lines[lineIndex] = strings.ReplaceAll(line, old, replacement)
+			}
+		}
+		copied[i] = strings.Join(lines, "\n")
+	}
+	return copied
+}
+
+func TestChunkReceiptWithoutExpectedIdentityFails(t *testing.T) {
+	comments := headingFormChunkedReceiptComments("echo hi", strings.Repeat("a", 64))
+	records := mergeContinuedCommentRecords(comments)
+	document, ok := commentEvidenceDocument(records[0], "My outcome")
+	if !ok {
+		t.Fatal("expected heading-form chunk receipt to be located")
+	}
+	issues, _ := evidenceReceiptIssuesForDocument(document, "echo hi", strings.Repeat("a", 64), "comment", "My outcome", nil)
+	if !containsIssue(issues, "must have a receipt identity") {
+		t.Fatalf("expected missing expected identity error, got %v", issues)
+	}
+}
+
 func TestChunkedRawOutputDuplicateChunkFailsValidation(t *testing.T) {
 	source := "GH issue #1"
 	units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", "")), source)

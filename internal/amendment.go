@@ -235,6 +235,7 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 	}
 
 	unresolved := make(map[queueUnitIdentity]bool)
+	latestAmendmentDigest := make(map[queueUnitIdentity]string)
 	markers := make(map[queueUnitIdentity]queueReplanMarker)
 	pendingRebuildRequests := make(map[queueUnitIdentity]int)
 	var pendingOrder []queueUnitIdentity
@@ -248,6 +249,7 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 			if marker, marked := markers[record.identity]; marked && marker.digest == record.oldDigest {
 				delete(markers, record.identity)
 			}
+			latestAmendmentDigest[record.identity] = record.newDigest
 			unresolved[record.identity] = true
 			continue
 		}
@@ -344,7 +346,9 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 			delete(pendingRebuildRequests, identity)
 		}
 		if kind == rebuildCommentEvidence {
-			delete(unresolved, resolvedIdentity)
+			if amendedDigest, amended := latestAmendmentDigest[resolvedIdentity]; !amended || digest == amendedDigest {
+				delete(unresolved, resolvedIdentity)
+			}
 		}
 	}
 

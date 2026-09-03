@@ -649,6 +649,18 @@ func (c *evidenceCursor) skipBlanks() {
 	}
 }
 
+func verifyCommandFromLabel(line string) (string, bool) {
+	trimmed := strings.TrimSpace(line)
+	if !strings.HasPrefix(trimmed, "Verify:") {
+		return "", false
+	}
+	rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "Verify:"))
+	if len(rest) >= 2 && strings.HasPrefix(rest, "`") && strings.HasSuffix(rest, "`") {
+		rest = rest[1 : len(rest)-1]
+	}
+	return rest, true
+}
+
 // consumeVerifyCommand accepts the exact bare command or the queue's own
 // `Verify:` label form, with or without backticks; the command text itself
 // must still match verbatim.
@@ -660,15 +672,8 @@ func (c *evidenceCursor) consumeVerifyCommand(verifyCmd string) bool {
 	if c.at >= len(c.lines) {
 		return false
 	}
-	trimmed := strings.TrimSpace(c.lines[c.at])
-	if !strings.HasPrefix(trimmed, "Verify:") {
-		return false
-	}
-	rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "Verify:"))
-	if len(rest) >= 2 && strings.HasPrefix(rest, "`") && strings.HasSuffix(rest, "`") {
-		rest = rest[1 : len(rest)-1]
-	}
-	if rest != verifyCmd {
+	declared, ok := verifyCommandFromLabel(c.lines[c.at])
+	if !ok || declared != verifyCmd {
 		return false
 	}
 	c.at++
@@ -805,8 +810,11 @@ func (c *evidenceCursor) consumeRawOutput(phase, declaredDigest, expectedHeading
 		if err != nil || occurrence < 1 {
 			return "", false, "raw output chunk Unit occurrence must be a positive integer"
 		}
+		if expectedIdentity == nil {
+			return "", false, "raw output chunk must have a receipt identity"
+		}
 		c.skipBlanks()
-		if !c.consumeExactLines("Unit heading: " + expectedHeading) {
+		if !c.consumeExactLines("Unit heading: " + expectedIdentity.Heading) {
 			return "", false, "raw output chunk Unit heading must match the receipt identity exactly"
 		}
 		c.skipBlanks()
@@ -814,7 +822,7 @@ func (c *evidenceCursor) consumeRawOutput(phase, declaredDigest, expectedHeading
 		if !ok || chunkDigest != declaredDigest {
 			return "", false, "raw output chunk unit digest must match the receipt identity"
 		}
-		if expectedIdentity != nil && occurrence != expectedIdentity.Occurrence {
+		if occurrence != expectedIdentity.Occurrence {
 			return "", false, "raw output chunk Unit occurrence must match the receipt identity"
 		}
 

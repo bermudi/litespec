@@ -77,7 +77,7 @@ If a fix needs a new decision, report "needs decision: <question>" instead of in
 - Flag Verify that would pass without the outcome.
 
 #### Evidence
-For every checked unit: a complete red-green receipt exists (verbatim command; labeled pre and post SHAs and statuses; two nonempty fences; matching pre/post scope lines); the recorded command matches the unit's `Verify:` verbatim; the SHAs differ; pre is an ancestor of post and post is an ancestor of `HEAD`.
+For every checked unit: a complete red-green receipt exists (verbatim command; labeled pre and post SHAs and statuses; two nonempty fences; matching pre/post scope lines); a receipt declaring the current digest matches the unit's `Verify:` verbatim; a superseded receipt is checked against its own declared command and digest and must be connected to the current digest by valid amendment edges; the SHAs differ; pre is an ancestor of post and post is an ancestor of `HEAD`.
 
 The history from pre to post may contain one or more implementation/fix commits; do not require post to be the immediate child of pre. Post is the final clean commit where `Verify:` passes for the unit. Build's commits are immutable: fixes belong in new commits, never amendments.
 
