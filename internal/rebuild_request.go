@@ -100,13 +100,24 @@ func parseRebuildCommentRecord(comment continuedComment, units []queueUnit) (que
 		return queueUnitIdentity{}, rebuildCommentOther, "", fmt.Errorf("malformed identity-bearing evidence receipt: %w", err)
 	}
 	evidenceDocument := evidencePayloadDocument(document.afterLine(2))
-	evidence := strings.Join(evidenceDocument.lines, "\n")
-	declaredDigest := receiptDeclaredDigest(evidence)
 	unit, ok := findQueueUnit(units, identity)
 	if !ok {
-		return identity, rebuildCommentEvidence, declaredDigest, nil
+		for _, candidate := range units {
+			_, declaredDigest := evidenceReceiptIssuesForDocument(
+				evidenceDocument,
+				unitVerifyCommand(candidate.Body),
+				"",
+				"comment",
+				identity.Heading,
+				nil,
+			)
+			if declaredDigest != "" {
+				return identity, rebuildCommentEvidence, declaredDigest, nil
+			}
+		}
+		return identity, rebuildCommentEvidence, "", nil
 	}
-	issues := evidenceReceiptIssuesForDocument(evidenceDocument, unitVerifyCommand(unit.Body), unitContractDigest(unit), "comment", identity.Heading, &identity)
+	issues, declaredDigest := evidenceReceiptIssuesForDocument(evidenceDocument, unitVerifyCommand(unit.Body), unitContractDigest(unit), "comment", identity.Heading, &identity)
 	switch {
 	case len(issues) == 0:
 		return identity, rebuildCommentEvidence, declaredDigest, nil
@@ -115,16 +126,6 @@ func parseRebuildCommentRecord(comment continuedComment, units []queueUnit) (que
 	default:
 		return queueUnitIdentity{}, rebuildCommentOther, "", fmt.Errorf("incomplete evidence receipt for occurrence %d heading %q", identity.Occurrence, identity.Heading)
 	}
-}
-
-func receiptDeclaredDigest(text string) string {
-	for _, line := range strings.Split(text, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "unit digest:") {
-			return strings.TrimSpace(strings.TrimPrefix(trimmed, "unit digest:"))
-		}
-	}
-	return ""
 }
 
 func parseIdentityLines(occurrenceLine, headingLine string) (queueUnitIdentity, error) {

@@ -240,6 +240,57 @@ func TestChunkedRawOutputReceiptReconstructsAndSatisfiesCheckedUnit(t *testing.T
 	}
 }
 
+func multilineVerifyWithMisleadingDigest() string {
+	return strings.Join([]string{
+		"echo hi",
+		"unit digest: " + strings.Repeat("0", 64),
+		"echo done",
+	}, "\n")
+}
+
+func assertMultilineVerifyReceipt(t *testing.T, comments func(string, string) []string) {
+	t.Helper()
+	source := "GH issue #1"
+	verifyCmd := multilineVerifyWithMisleadingDigest()
+	units, issues := ValidateQueueBody(ownedQueue(checkedUnit(verifyCmd, "")), source)
+	if len(units) != 1 {
+		t.Fatalf("expected one queue unit, got %d", len(units))
+	}
+	digest := unitContractDigest(units[0])
+	if digest == strings.Repeat("0", 64) {
+		t.Fatal("fixture digest must differ from the misleading Verify digest")
+	}
+
+	records := mergeContinuedCommentRecords(comments(verifyCmd, digest))
+	identity := queueUnitIdentity{Occurrence: 1, Heading: "My outcome"}
+	gotIdentity, kind, gotDigest, err := parseRebuildCommentRecord(records[0], units)
+	if err != nil {
+		t.Fatalf("multiline Verify receipt returned an error: %v", err)
+	}
+	if gotIdentity != identity || kind != rebuildCommentEvidence || gotDigest != digest {
+		t.Fatalf("receipt = identity %v, kind %d, digest %q; want %v, evidence, %q", gotIdentity, kind, gotDigest, identity, digest)
+	}
+
+	result := &ValidationResult{Valid: true}
+	applyQueueIssues(result, source, units, issues, comments(verifyCmd, digest))
+	if len(result.Errors) > 0 {
+		t.Fatalf("expected multiline Verify receipt to satisfy checked unit, got %v", result.Errors)
+	}
+}
+
+func TestFieldBoundaryReceiptUsesStructuredDigestAfterMultilineVerify(t *testing.T) {
+	assertMultilineVerifyReceipt(t, func(verifyCmd, digest string) []string {
+		return []string{
+			continuedReceiptHead(verifyCmd, digest),
+			continuedReceiptTail(verifyCmd),
+		}
+	})
+}
+
+func TestChunkedReceiptUsesStructuredDigestAfterMultilineVerify(t *testing.T) {
+	assertMultilineVerifyReceipt(t, chunkedReceiptComments)
+}
+
 func TestChunkedRawOutputDuplicateChunkFailsValidation(t *testing.T) {
 	source := "GH issue #1"
 	units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", "")), source)
@@ -424,7 +475,7 @@ func TestRawOutputChunkUnitHeadingMustMatchByteForByte(t *testing.T) {
 		t.Fatal("expected heading-form receipt to be located")
 	}
 	identity := queueUnitIdentity{Occurrence: 1, Heading: "My outcome"}
-	receiptIssues := evidenceReceiptIssuesForDocument(document, "echo hi", digest, "comment", identity.Heading, &identity)
+	receiptIssues, _ := evidenceReceiptIssuesForDocument(document, "echo hi", digest, "comment", identity.Heading, &identity)
 	if !containsIssue(receiptIssues, "Unit heading must match the receipt identity exactly") {
 		t.Fatalf("expected byte-for-byte heading error, got %v", receiptIssues)
 	}
@@ -488,7 +539,7 @@ func TestHeadingFormChunkOccurrenceMustMatchUnit(t *testing.T) {
 	if !ok {
 		t.Fatal("expected heading-form receipt to be located")
 	}
-	receiptIssues := evidenceReceiptIssuesForDocument(document, "echo hi", secondDigest, "comment", secondIdentity.Heading, &secondIdentity)
+	receiptIssues, _ := evidenceReceiptIssuesForDocument(document, "echo hi", secondDigest, "comment", secondIdentity.Heading, &secondIdentity)
 	if !containsIssue(receiptIssues, "Unit occurrence must match the receipt identity") {
 		t.Fatalf("expected occurrence mismatch error, got %v", receiptIssues)
 	}

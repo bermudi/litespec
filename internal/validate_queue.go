@@ -866,7 +866,7 @@ func evidenceReceiptIssues(text, verifyCmd, expectedDigest, source, heading stri
 }
 
 func evidenceReceiptIssuesForIdentity(text, verifyCmd, expectedDigest, source, heading string, expectedIdentity *queueUnitIdentity) []ValidationIssue {
-	return evidenceReceiptIssuesForDocument(
+	issues, _ := evidenceReceiptIssuesForDocument(
 		evidencePayloadDocument(newEvidenceDocument(text)),
 		verifyCmd,
 		expectedDigest,
@@ -874,15 +874,16 @@ func evidenceReceiptIssuesForIdentity(text, verifyCmd, expectedDigest, source, h
 		heading,
 		expectedIdentity,
 	)
+	return issues
 }
 
-func evidenceReceiptIssuesForDocument(document evidenceDocument, verifyCmd, expectedDigest, source, heading string, expectedIdentity *queueUnitIdentity) []ValidationIssue {
+func evidenceReceiptIssuesForDocument(document evidenceDocument, verifyCmd, expectedDigest, source, heading string, expectedIdentity *queueUnitIdentity) ([]ValidationIssue, string) {
 	if len(document.lines) == 0 || strings.TrimSpace(strings.Join(document.lines, "\n")) == "" {
 		return []ValidationIssue{{
 			Severity: SeverityError,
 			Message:  fmt.Sprintf("%s: checked unit %q missing Evidence receipt", source, heading),
 			File:     source,
-		}}
+		}}, ""
 	}
 
 	var issues []ValidationIssue
@@ -897,14 +898,14 @@ func evidenceReceiptIssuesForDocument(document evidenceDocument, verifyCmd, expe
 	cursor := newEvidenceCursorFromDocument(document)
 	if verifyCmd == "" || !cursor.consumeVerifyCommand(verifyCmd) {
 		fail("must quote the Verify command verbatim")
-		return issues
+		return issues, ""
 	}
 
 	cursor.skipBlanks()
 	digestText, ok := cursor.consumeField("unit digest")
 	if !ok {
 		fail("must include a `unit digest:` field between the Verify command and pre sha")
-		return issues
+		return issues, ""
 	}
 	if !unitDigestPattern.MatchString(digestText) {
 		fail("unit digest must be 64 lowercase hexadecimal characters")
@@ -916,7 +917,7 @@ func evidenceReceiptIssuesForDocument(document evidenceDocument, verifyCmd, expe
 	preSHA, ok := cursor.consumeField("pre sha")
 	if !ok {
 		fail("fields must appear in order beginning with pre sha")
-		return issues
+		return issues, digestText
 	}
 	if !evidenceCommitPattern.MatchString(preSHA) {
 		fail("pre sha must be a full 40- or 64-character hexadecimal commit ID")
@@ -926,7 +927,7 @@ func evidenceReceiptIssuesForDocument(document evidenceDocument, verifyCmd, expe
 	preStatusText, ok := cursor.consumeField("pre exit status")
 	if !ok {
 		fail("fields must appear in order: pre exit status must follow pre sha")
-		return issues
+		return issues, digestText
 	}
 	preStatus, err := strconv.Atoi(preStatusText)
 	if err != nil {
@@ -939,13 +940,13 @@ func evidenceReceiptIssuesForDocument(document evidenceDocument, verifyCmd, expe
 	_, ok, reason := cursor.consumeRawOutput("pre", digestText, heading, expectedIdentity)
 	if !ok {
 		fail(reason)
-		return issues
+		return issues, digestText
 	}
 
 	cursor.skipBlanks()
 	if cursor.at >= len(cursor.lines) {
 		fail("must include a matching Pre-evidence scope line")
-		return issues
+		return issues, digestText
 	}
 	preScope := preEvidenceScopePattern.FindStringSubmatch(cursor.lines[cursor.at])
 	cursor.at++
@@ -964,7 +965,7 @@ func evidenceReceiptIssuesForDocument(document evidenceDocument, verifyCmd, expe
 	postSHA, ok := cursor.consumeField("post sha")
 	if !ok {
 		fail("fields must appear in order: post sha must follow the pre scope line")
-		return issues
+		return issues, digestText
 	}
 	if !evidenceCommitPattern.MatchString(postSHA) {
 		fail("post sha must be a full 40- or 64-character hexadecimal commit ID")
@@ -977,7 +978,7 @@ func evidenceReceiptIssuesForDocument(document evidenceDocument, verifyCmd, expe
 	postStatusText, ok := cursor.consumeField("post exit status")
 	if !ok {
 		fail("fields must appear in order: post exit status must follow post sha")
-		return issues
+		return issues, digestText
 	}
 	if postStatusText != "0" {
 		fail("post exit status must be 0")
@@ -987,13 +988,13 @@ func evidenceReceiptIssuesForDocument(document evidenceDocument, verifyCmd, expe
 	_, ok, reason = cursor.consumeRawOutput("post", digestText, heading, expectedIdentity)
 	if !ok {
 		fail(reason)
-		return issues
+		return issues, digestText
 	}
 
 	cursor.skipBlanks()
 	if cursor.at >= len(cursor.lines) {
 		fail("must include a matching Post-evidence scope line")
-		return issues
+		return issues, digestText
 	}
 	postScope := postEvidenceScopePattern.FindStringSubmatch(cursor.lines[cursor.at])
 	cursor.at++
@@ -1014,7 +1015,7 @@ func evidenceReceiptIssuesForDocument(document evidenceDocument, verifyCmd, expe
 	if cursor.at != len(cursor.lines) {
 		fail("fields must appear in order with no unexpected trailing content")
 	}
-	return issues
+	return issues, digestText
 }
 
 func validateCheckedUnitEvidence(unit queueUnit, source string) []ValidationIssue {
@@ -1045,7 +1046,8 @@ func matchingEvidenceCommentRecords(heading, verifyCmd, expectedDigest string, c
 		if !ok {
 			continue
 		}
-		if len(evidenceReceiptIssuesForDocument(document, verifyCmd, expectedDigest, "comment", heading, expectedIdentity)) == 0 {
+		issues, _ := evidenceReceiptIssuesForDocument(document, verifyCmd, expectedDigest, "comment", heading, expectedIdentity)
+		if len(issues) == 0 {
 			return i, true
 		}
 	}
@@ -1109,7 +1111,11 @@ func commentHasValidHeadingEvidence(comment continuedComment, units []queueUnit)
 			continue
 		}
 		document, ok := commentEvidenceDocument(comment, unit.Heading)
-		if ok && len(evidenceReceiptIssuesForDocument(document, unitVerifyCommand(unit.Body), unitContractDigest(unit), "comment", unit.Heading, &identities[i])) == 0 {
+		if !ok {
+			continue
+		}
+		issues, _ := evidenceReceiptIssuesForDocument(document, unitVerifyCommand(unit.Body), unitContractDigest(unit), "comment", unit.Heading, &identities[i])
+		if len(issues) == 0 {
 			return true
 		}
 	}
