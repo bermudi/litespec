@@ -171,14 +171,14 @@ func parseRebuildCommentRecord(comment continuedComment, units []queueUnit) (que
 	unit, ok := findQueueUnit(units, identity)
 	if !ok {
 		declarations := validEvidenceReceiptDeclarations(evidenceDocument, "comment", identity.Heading, &identity)
-		if len(declarations) == 1 {
-			declaration := declarations[0]
-			if digestMatchesAnyUnit(declaration.digest, units) {
-				return queueUnitIdentity{}, rebuildCommentOther, "", fmt.Errorf("incomplete evidence receipt for occurrence %d heading %q", identity.Occurrence, identity.Heading)
-			}
-			return identity, rebuildCommentEvidence, declaration.digest, nil
+		if len(declarations) != 1 {
+			return queueUnitIdentity{}, rebuildCommentOther, "", fmt.Errorf("incomplete evidence receipt for occurrence %d heading %q", identity.Occurrence, identity.Heading)
 		}
-		return identity, rebuildCommentEvidence, "", nil
+		declaration := declarations[0]
+		if digestMatchesAnyUnit(declaration.digest, units) {
+			return queueUnitIdentity{}, rebuildCommentOther, "", fmt.Errorf("incomplete evidence receipt for occurrence %d heading %q", identity.Occurrence, identity.Heading)
+		}
+		return identity, rebuildCommentEvidence, declaration.digest, nil
 	}
 
 	currentDigest := unitContractDigest(unit)

@@ -479,6 +479,10 @@ func TestRenamedChangedVerifyChunkIdentityMismatchFails(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			oldReceipt := test.edit(receiptPartsForIdentity(chunkedReceiptComments, "echo old", oldHeading, oldDigest))
+			records := mergeContinuedCommentRecords(oldReceipt)
+			if _, _, _, err := parseRebuildCommentRecord(records[0], newUnits); err == nil {
+				t.Fatal("expected malformed renamed stale chunk identity to fail parsing")
+			}
 			newReceipt := receiptPartsForIdentity(chunkedReceiptComments, "echo new", newHeading, newDigest)
 			comments := append(append(oldReceipt, amendment), newReceipt...)
 			_, errs := unresolvedRebuildRequests(newUnits, comments)
