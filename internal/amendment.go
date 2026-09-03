@@ -23,6 +23,35 @@ type digestEdge struct {
 	to   string
 }
 
+type amendmentSighting struct {
+	index  int
+	record contractAmendment
+	valid  bool
+	err    error
+}
+
+type amendmentTransitionKey struct {
+	identity  queueUnitIdentity
+	oldDigest string
+	newDigest string
+}
+
+type digestStateKey struct {
+	digest     string
+	occurrence int
+}
+
+type amendmentHistory struct {
+	terminalByIndex    map[int]queueUnitIdentity
+	terminalByPosition map[int]queueUnitIdentity
+	aliases            map[queueUnitIdentity]map[queueUnitIdentity]bool
+	postStates         map[digestStateKey][]int
+	oldStates          map[digestStateKey][]int
+	current            map[queueUnitIdentity]string
+	records            map[int]contractAmendment
+	errors             []error
+}
+
 type queueCommentScan struct {
 	unresolved             []queueUnitIdentity
 	replanRequired         []queueUnitIdentity
@@ -32,7 +61,7 @@ type queueCommentScan struct {
 	errors                 []error
 }
 
-func parseAmendmentComment(comment string, units []queueUnit) (contractAmendment, bool, bool, error) {
+func parseAmendmentComment(comment string, _ []queueUnit) (contractAmendment, bool, bool, error) {
 	normalized := strings.TrimSpace(strings.ReplaceAll(comment, "\r\n", "\n"))
 	lines := strings.Split(normalized, "\n")
 	if len(lines) == 0 || !strings.HasPrefix(lines[0], "Amendment:") {
@@ -67,13 +96,6 @@ func parseAmendmentComment(comment string, units []queueUnit) (contractAmendment
 	reason := strings.TrimSpace(strings.TrimPrefix(lines[5], "Reason:"))
 	if reason == "" {
 		return malformed("reason must be nonempty")
-	}
-	if _, ok := findQueueUnit(units, identity); !ok {
-		return contractAmendment{}, true, false, fmt.Errorf(
-			"amendment occurrence %d with heading %q does not identify exactly one queue unit",
-			identity.Occurrence,
-			identity.Heading,
-		)
 	}
 	return contractAmendment{
 		identity:  identity,
@@ -154,6 +176,301 @@ func splitLocalQueueMetadataBlocks(body string) (string, []string) {
 	return strings.Join(kept, "\n"), blocks
 }
 
+func buildAmendmentHistory(units []queueUnit, sightings []amendmentSighting) amendmentHistory {
+	history := amendmentHistory{
+		terminalByIndex:    make(map[int]queueUnitIdentity),
+		terminalByPosition: make(map[int]queueUnitIdentity),
+		aliases:            make(map[queueUnitIdentity]map[queueUnitIdentity]bool),
+		postStates:         make(map[digestStateKey][]int),
+		oldStates:          make(map[digestStateKey][]int),
+		current:            make(map[queueUnitIdentity]string),
+		records:            make(map[int]contractAmendment),
+	}
+
+	identities := queueUnitIdentities(units)
+	currentByDigest := make(map[digestStateKey][]queueUnitIdentity)
+	for i, identity := range identities {
+		digest := unitContractDigest(units[i])
+		history.current[identity] = digest
+		state := digestStateKey{digest: digest, occurrence: identity.Occurrence}
+		currentByDigest[state] = append(currentByDigest[state], identity)
+		history.aliases[identity] = map[queueUnitIdentity]bool{identity: true}
+	}
+
+	canonicalByKey := make(map[amendmentTransitionKey]int)
+	canonicalPositions := make([]int, 0, len(sightings))
+	for position, sighting := range sightings {
+		if !sighting.valid {
+			continue
+		}
+		key := amendmentTransitionKey{
+			identity:  sighting.record.identity,
+			oldDigest: sighting.record.oldDigest,
+			newDigest: sighting.record.newDigest,
+		}
+		if _, exists := canonicalByKey[key]; exists {
+			continue
+		}
+		canonicalByKey[key] = position
+		canonicalPositions = append(canonicalPositions, position)
+		history.records[position] = sighting.record
+	}
+
+	byOldDigest := make(map[string][]int)
+	byOld := make(map[string]map[amendmentTransitionKey]int)
+	byNew := make(map[string]map[amendmentTransitionKey]int)
+	for _, position := range canonicalPositions {
+		record := history.records[position]
+		key := amendmentTransitionKey{
+			identity:  record.identity,
+			oldDigest: record.oldDigest,
+			newDigest: record.newDigest,
+		}
+		if byOld[record.oldDigest] == nil {
+			byOld[record.oldDigest] = make(map[amendmentTransitionKey]int)
+		}
+		byOld[record.oldDigest][key] = position
+		if byNew[record.newDigest] == nil {
+			byNew[record.newDigest] = make(map[amendmentTransitionKey]int)
+		}
+		byNew[record.newDigest][key] = position
+		byOldDigest[record.oldDigest] = append(byOldDigest[record.oldDigest], position)
+	}
+
+	reportedOldBranches := make(map[string]bool)
+	reportedNewBranches := make(map[string]bool)
+	for _, position := range canonicalPositions {
+		record := history.records[position]
+		if len(byOld[record.oldDigest]) > 1 && !reportedOldBranches[record.oldDigest] {
+			reportedOldBranches[record.oldDigest] = true
+			history.errors = append(history.errors, fmt.Errorf(
+				"amendment comment %d: branching amendment history from digest %s at occurrence %d",
+				sightings[position].index+1,
+				record.oldDigest,
+				record.identity.Occurrence,
+			))
+		}
+		if len(byNew[record.newDigest]) > 1 && !reportedNewBranches[record.newDigest] {
+			reportedNewBranches[record.newDigest] = true
+			history.errors = append(history.errors, fmt.Errorf(
+				"amendment comment %d: ambiguous amendment history reaches digest %s at occurrence %d",
+				sightings[position].index+1,
+				record.newDigest,
+				record.identity.Occurrence,
+			))
+		}
+	}
+
+	successors := make(map[int][]int)
+	for _, position := range canonicalPositions {
+		record := history.records[position]
+		candidates := make(map[int]bool)
+		for _, candidate := range byOldDigest[record.newDigest] {
+			if candidate == position || sightings[candidate].index <= sightings[position].index {
+				continue
+			}
+			candidateRecord := history.records[candidate]
+			if candidateRecord.identity.Occurrence != record.identity.Occurrence {
+				continue
+			}
+			candidates[candidate] = true
+		}
+		for candidate := range candidates {
+			successors[position] = append(successors[position], candidate)
+		}
+	}
+
+	state := make(map[int]uint8)
+	terminal := make(map[int]queueUnitIdentity)
+	reportedCycles := make(map[int]bool)
+	var resolve func(int) (queueUnitIdentity, bool)
+	resolve = func(position int) (queueUnitIdentity, bool) {
+		switch state[position] {
+		case 1:
+			if !reportedCycles[position] {
+				reportedCycles[position] = true
+				record := history.records[position]
+				history.errors = append(history.errors, fmt.Errorf(
+					"amendment comment %d: digest-linked amendment chain loops at digest %s",
+					sightings[position].index+1,
+					record.newDigest,
+				))
+			}
+			return queueUnitIdentity{}, false
+		case 2:
+			resolved, ok := terminal[position]
+			return resolved, ok
+		}
+
+		state[position] = 1
+		record := history.records[position]
+		next := successors[position]
+		if len(next) > 1 {
+			state[position] = 2
+			return queueUnitIdentity{}, false
+		}
+		if len(next) == 1 {
+			resolved, ok := resolve(next[0])
+			state[position] = 2
+			if ok {
+				terminal[position] = resolved
+			}
+			return resolved, ok
+		}
+
+		if currentDigest, ok := history.current[record.identity]; ok {
+			if currentDigest == record.newDigest {
+				terminal[position] = record.identity
+			}
+			state[position] = 2
+			return record.identity, currentDigest == record.newDigest
+		}
+		newState := digestStateKey{digest: record.newDigest, occurrence: record.identity.Occurrence}
+		if len(currentByDigest[newState]) > 0 {
+			history.errors = append(history.errors, fmt.Errorf(
+				"amendment comment %d: New digest %s reaches the current contract, but post-amendment occurrence %d with heading %q is not that exact queue identity",
+				sightings[position].index+1,
+				record.newDigest,
+				record.identity.Occurrence,
+				record.identity.Heading,
+			))
+		} else {
+			history.errors = append(history.errors, fmt.Errorf(
+				"amendment comment %d: amendment occurrence %d with heading %q is disconnected at New digest %s; no later identity transition reaches the current queue",
+				sightings[position].index+1,
+				record.identity.Occurrence,
+				record.identity.Heading,
+				record.newDigest,
+			))
+		}
+		state[position] = 2
+		return queueUnitIdentity{}, false
+	}
+
+	for _, position := range canonicalPositions {
+		resolve(position)
+	}
+
+	for _, position := range canonicalPositions {
+		resolved, ok := terminal[position]
+		if !ok {
+			continue
+		}
+		record := history.records[position]
+		history.terminalByPosition[position] = resolved
+		history.aliases[record.identity] = addIdentityTarget(history.aliases[record.identity], resolved)
+		appendDigestStatePosition(history.postStates, digestStateKey{
+			digest:     record.newDigest,
+			occurrence: record.identity.Occurrence,
+		}, position)
+		appendDigestStatePosition(history.oldStates, digestStateKey{
+			digest:     record.oldDigest,
+			occurrence: record.identity.Occurrence,
+		}, position)
+	}
+	for _, sighting := range sightings {
+		if !sighting.valid {
+			continue
+		}
+		canonical := canonicalByKey[amendmentTransitionKey{
+			identity:  sighting.record.identity,
+			oldDigest: sighting.record.oldDigest,
+			newDigest: sighting.record.newDigest,
+		}]
+		if resolved, ok := terminal[canonical]; ok {
+			history.terminalByIndex[sighting.index] = resolved
+		}
+	}
+
+	for identity, targets := range history.aliases {
+		if len(targets) > 1 {
+			history.errors = append(history.errors, fmt.Errorf(
+				"amendment identity occurrence %d with heading %q maps ambiguously across digest-linked chains",
+				identity.Occurrence,
+				identity.Heading,
+			))
+		}
+	}
+	return history
+}
+
+func addIdentityTarget(targets map[queueUnitIdentity]bool, target queueUnitIdentity) map[queueUnitIdentity]bool {
+	if targets == nil {
+		targets = make(map[queueUnitIdentity]bool)
+	}
+	targets[target] = true
+	return targets
+}
+
+func appendDigestStatePosition(states map[digestStateKey][]int, key digestStateKey, position int) {
+	for _, existing := range states[key] {
+		if existing == position {
+			return
+		}
+	}
+	states[key] = append(states[key], position)
+}
+
+func (h amendmentHistory) resolveMetadataIdentity(identity queueUnitIdentity) (queueUnitIdentity, bool) {
+	targets := h.aliases[identity]
+	if len(targets) != 1 {
+		return queueUnitIdentity{}, false
+	}
+	for target := range targets {
+		return target, true
+	}
+	return queueUnitIdentity{}, false
+}
+
+func (h amendmentHistory) resolveReceiptIdentity(identity queueUnitIdentity, digest string) (queueUnitIdentity, bool) {
+	key := digestStateKey{digest: digest, occurrence: identity.Occurrence}
+	if positions := h.postStates[key]; len(positions) > 0 {
+		if len(positions) != 1 {
+			return queueUnitIdentity{}, false
+		}
+		position := positions[0]
+		if h.records[position].identity != identity {
+			return queueUnitIdentity{}, false
+		}
+		return h.terminalByPosition[position], true
+	}
+	if positions := h.oldStates[key]; len(positions) > 0 {
+		if len(positions) != 1 {
+			return queueUnitIdentity{}, false
+		}
+		resolved := h.terminalByPosition[positions[0]]
+		if current, ok := h.current[identity]; ok && current != "" && resolved != identity {
+			return queueUnitIdentity{}, false
+		}
+		if aliased, ok := h.resolveMetadataIdentity(identity); ok && aliased != resolved {
+			return queueUnitIdentity{}, false
+		}
+		return resolved, true
+	}
+	if _, ok := h.current[identity]; ok {
+		return identity, true
+	}
+	return queueUnitIdentity{}, false
+}
+
+func (h amendmentHistory) digestBelongsToIdentity(identity queueUnitIdentity, digest string) bool {
+	if current, ok := h.current[identity]; ok && current == digest {
+		return true
+	}
+	key := digestStateKey{digest: digest, occurrence: identity.Occurrence}
+	for _, position := range h.postStates[key] {
+		if h.terminalByPosition[position] == identity {
+			return true
+		}
+	}
+	for _, position := range h.oldStates[key] {
+		if h.terminalByPosition[position] == identity {
+			return true
+		}
+	}
+	return false
+}
+
 func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 	commentRecords := mergeContinuedCommentRecords(comments)
 	identities := queueUnitIdentities(units)
@@ -168,16 +485,11 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 		completedRebuildCycles: make(map[queueUnitIdentity]map[string]int),
 	}
 
-	type amendmentSighting struct {
-		index  int
-		record contractAmendment
-		valid  bool
-		err    error
-	}
 	var sightings []amendmentSighting
 	amendmentShaped := make(map[int]bool)
 	amendmentsAt := make(map[int]contractAmendment)
-	lastAmendmentAt := make(map[queueUnitIdentity]int)
+	lastValidAmendmentAt := make(map[queueUnitIdentity]int)
+	lastValidAmendment := make(map[queueUnitIdentity]contractAmendment)
 	for index, comment := range commentRecords {
 		record, handled, validRecord, err := parseAmendmentComment(comment.text, units)
 		if !handled {
@@ -185,16 +497,12 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 		}
 		amendmentShaped[index] = true
 		sightings = append(sightings, amendmentSighting{index: index, record: record, valid: validRecord, err: err})
-		if !validRecord {
-			continue
-		}
-		amendmentsAt[index] = record
-		scan.edges[record.identity] = append(
-			scan.edges[record.identity],
-			digestEdge{from: record.oldDigest, to: record.newDigest},
-		)
-		if prev, ok := lastAmendmentAt[record.identity]; !ok || index > prev {
-			lastAmendmentAt[record.identity] = index
+		if validRecord {
+			amendmentsAt[index] = record
+			if previous, exists := lastValidAmendmentAt[record.identity]; !exists || index > previous {
+				lastValidAmendmentAt[record.identity] = index
+				lastValidAmendment[record.identity] = record
+			}
 		}
 	}
 	for _, sight := range sightings {
@@ -203,36 +511,24 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 		}
 	}
 
-	resolveIdentity := func(identity queueUnitIdentity, digest string) (queueUnitIdentity, bool) {
-		if _, ok := validUnit[identity]; ok {
-			return identity, true
+	history := buildAmendmentHistory(units, sightings)
+	scan.errors = append(scan.errors, history.errors...)
+	for _, sight := range sightings {
+		if !sight.valid {
+			continue
 		}
-		candidates := make(map[queueUnitIdentity]bool)
-		for _, sight := range sightings {
-			if sight.valid && sight.record.oldDigest == digest {
-				candidates[sight.record.identity] = true
-			}
+		identity, ok := history.terminalByIndex[sight.index]
+		if !ok {
+			continue
 		}
-		if len(candidates) != 1 {
-			return queueUnitIdentity{}, false
-		}
-		for candidate := range candidates {
-			return candidate, true
-		}
-		return queueUnitIdentity{}, false
+		scan.edges[identity] = append(scan.edges[identity], digestEdge{
+			from: sight.record.oldDigest,
+			to:   sight.record.newDigest,
+		})
 	}
-	digestBelongsToIdentity := func(identity queueUnitIdentity, digest string) bool {
-		unitIndex, ok := validUnit[identity]
-		if ok && unitContractDigest(units[unitIndex]) == digest {
-			return true
-		}
-		for _, edge := range scan.edges[identity] {
-			if edge.from == digest {
-				return true
-			}
-		}
-		return false
-	}
+
+	resolveIdentity := history.resolveReceiptIdentity
+	digestBelongsToIdentity := history.digestBelongsToIdentity
 
 	unresolved := make(map[queueUnitIdentity]bool)
 	latestAmendmentDigest := make(map[queueUnitIdentity]string)
@@ -246,11 +542,15 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 			if !ok {
 				continue
 			}
-			if marker, marked := markers[record.identity]; marked && marker.digest == record.oldDigest {
-				delete(markers, record.identity)
+			identity, ok := history.terminalByIndex[commentIndex]
+			if !ok {
+				continue
 			}
-			latestAmendmentDigest[record.identity] = record.newDigest
-			unresolved[record.identity] = true
+			if marker, marked := markers[identity]; marked && marker.digest == record.oldDigest {
+				delete(markers, identity)
+			}
+			latestAmendmentDigest[identity] = record.newDigest
+			unresolved[identity] = true
 			continue
 		}
 
@@ -317,6 +617,9 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 			continue
 		}
 		if kind == rebuildCommentRequest {
+			if resolved, ok := history.resolveMetadataIdentity(identity); ok {
+				identity = resolved
+			}
 			if _, pending := pendingRebuildRequests[identity]; !pending {
 				pendingRebuildRequests[identity] = commentIndex
 				pendingOrder = append(pendingOrder, identity)
@@ -334,7 +637,7 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 			continue
 		}
 		scan.observed[resolvedIdentity] = append(scan.observed[resolvedIdentity], digest)
-		if requestIndex, pending := pendingRebuildRequests[identity]; pending {
+		if requestIndex, pending := pendingRebuildRequests[resolvedIdentity]; pending {
 			if scan.completedRebuildCycles[resolvedIdentity] == nil {
 				scan.completedRebuildCycles[resolvedIdentity] = make(map[string]int)
 			}
@@ -343,7 +646,7 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 			} else {
 				scan.completedRebuildCycles[resolvedIdentity][digest]++
 			}
-			delete(pendingRebuildRequests, identity)
+			delete(pendingRebuildRequests, resolvedIdentity)
 		}
 		if kind == rebuildCommentEvidence {
 			if amendedDigest, amended := latestAmendmentDigest[resolvedIdentity]; !amended || digest == amendedDigest {
@@ -375,24 +678,18 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 		unresolved[identity] = true
 	}
 
-	finalNewDigest := make(map[queueUnitIdentity]string)
-	for _, sight := range sightings {
-		if sight.valid && lastAmendmentAt[sight.record.identity] == sight.index {
-			finalNewDigest[sight.record.identity] = sight.record.newDigest
-		}
-	}
-	for identity, newDigest := range finalNewDigest {
-		unit, ok := findQueueUnit(units, identity)
-		if !ok {
+	for identity := range lastValidAmendmentAt {
+		if _, currentIdentity := validUnit[identity]; !currentIdentity {
 			continue
 		}
-		current := unitContractDigest(unit)
-		if newDigest != current {
+		record := lastValidAmendment[identity]
+		current := history.current[identity]
+		if record.newDigest != current {
 			scan.errors = append(scan.errors, fmt.Errorf(
 				"unit occurrence %d with heading %q: final amendment declares New digest %s but the current contract digest is %s",
 				identity.Occurrence,
 				identity.Heading,
-				newDigest,
+				record.newDigest,
 				current,
 			))
 		}

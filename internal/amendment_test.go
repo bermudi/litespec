@@ -84,6 +84,14 @@ func amendmentRecord(occ int, heading, oldDigest, newDigest, reason string) stri
 
 const amendmentFakeDigest = "3333333333333333333333333333333333333333333333333333333333333333"
 
+func amendmentTestBodyWithVerify(doneMeans, heading, verify string) string {
+	return strings.Replace(amendmentTestBody(doneMeans, heading), "echo first", verify, 1)
+}
+
+func amendmentReceiptWithVerify(occurrence int, heading, digest, verify string) string {
+	return strings.Replace(amendmentReceipt(occurrence, heading, digest), "echo first", verify, 1)
+}
+
 func TestAmendmentImpliesUnresolvedRebuildRequest(t *testing.T) {
 	oldUnits := amendmentTestUnits(t, amendmentTestBody(amendmentTestOldDoneMeans, "First unit"))
 	newBody := amendmentTestBody(amendmentTestNewDoneMeans, "First unit")
@@ -270,6 +278,166 @@ func TestAmendmentImpliesUnresolvedRebuildRequest(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("expected unresolvable-identity error, got %v", errs)
+		}
+	})
+}
+
+func TestSuccessiveRenamedAmendmentsWithChangedVerify(t *testing.T) {
+	oldUnits := amendmentTestUnits(t, amendmentTestBodyWithVerify("old outcome", "Old/X", "echo old"))
+	middleUnits := amendmentTestUnits(t, amendmentTestBodyWithVerify("middle outcome", "Middle/Y", "echo middle"))
+	finalUnits := amendmentTestUnits(t, amendmentTestBodyWithVerify("final outcome", "Final/Z", "echo final"))
+	oldDigest := unitContractDigest(oldUnits[0])
+	middleDigest := unitContractDigest(middleUnits[0])
+	finalDigest := unitContractDigest(finalUnits[0])
+	comments := []string{
+		amendmentReceiptWithVerify(1, "Old/X", oldDigest, "echo old"),
+		amendmentRecord(1, "Middle/Y", oldDigest, middleDigest, "rename the first revision"),
+		amendmentReceiptWithVerify(1, "Middle/Y", middleDigest, "echo middle"),
+		amendmentRecord(1, "Final/Z", middleDigest, finalDigest, "rename the final revision"),
+		amendmentReceiptWithVerify(1, "Final/Z", finalDigest, "echo final"),
+	}
+
+	unresolved, errs := unresolvedRebuildRequests(finalUnits, comments)
+	if len(errs) != 0 {
+		t.Fatalf("successive renamed amendments returned errors: %v", errs)
+	}
+	if len(unresolved) != 0 {
+		t.Fatalf("successive renamed amendments unresolved = %v, want none", unresolved)
+	}
+
+	withoutIntermediateReceipt := []string{comments[0], comments[1], comments[3], comments[4]}
+	unresolved, errs = unresolvedRebuildRequests(finalUnits, withoutIntermediateReceipt)
+	if len(errs) != 0 {
+		t.Fatalf("successive renamed amendments without intermediate receipt returned errors: %v", errs)
+	}
+	if len(unresolved) != 0 {
+		t.Fatalf("successive renamed amendments without intermediate receipt unresolved = %v, want none", unresolved)
+	}
+}
+
+func TestSuccessiveRenamedAmendmentsWithChangedVerifyChunks(t *testing.T) {
+	oldUnits := amendmentTestUnits(t, amendmentTestBodyWithVerify("old outcome", "Old/X", "echo old"))
+	middleUnits := amendmentTestUnits(t, amendmentTestBodyWithVerify("middle outcome", "Middle/Y", "echo middle"))
+	finalUnits := amendmentTestUnits(t, amendmentTestBodyWithVerify("final outcome", "Final/Z", "echo final"))
+	oldDigest := unitContractDigest(oldUnits[0])
+	middleDigest := unitContractDigest(middleUnits[0])
+	finalDigest := unitContractDigest(finalUnits[0])
+	chunked := func(heading, verify, digest string) []string {
+		return receiptPartsForIdentity(chunkedReceiptComments, verify, heading, digest)
+	}
+	comments := chunked("Old/X", "echo old", oldDigest)
+	comments = append(comments, amendmentRecord(1, "Middle/Y", oldDigest, middleDigest, "rename the first revision"))
+	comments = append(comments, chunked("Middle/Y", "echo middle", middleDigest)...)
+	comments = append(comments, amendmentRecord(1, "Final/Z", middleDigest, finalDigest, "rename the final revision"))
+	comments = append(comments, chunked("Final/Z", "echo final", finalDigest)...)
+
+	unresolved, errs := unresolvedRebuildRequests(finalUnits, comments)
+	if len(errs) != 0 {
+		t.Fatalf("successive renamed chunk receipts returned errors: %v", errs)
+	}
+	if len(unresolved) != 0 {
+		t.Fatalf("successive renamed chunk receipts unresolved = %v, want none", unresolved)
+	}
+}
+
+func TestSuccessiveRenamedAmendmentsRequireExactIntermediateIdentity(t *testing.T) {
+	oldUnits := amendmentTestUnits(t, amendmentTestBodyWithVerify("old outcome", "Old/X", "echo old"))
+	middleUnits := amendmentTestUnits(t, amendmentTestBodyWithVerify("middle outcome", "Middle/Y", "echo middle"))
+	finalUnits := amendmentTestUnits(t, amendmentTestBodyWithVerify("final outcome", "Final/Z", "echo final"))
+	oldDigest := unitContractDigest(oldUnits[0])
+	middleDigest := unitContractDigest(middleUnits[0])
+	finalDigest := unitContractDigest(finalUnits[0])
+	base := []string{
+		amendmentReceiptWithVerify(1, "Old/X", oldDigest, "echo old"),
+		amendmentRecord(1, "Middle/Y", oldDigest, middleDigest, "rename the first revision"),
+		amendmentReceiptWithVerify(1, "Middle/Y", middleDigest, "echo middle"),
+		amendmentRecord(1, "Final/Z", middleDigest, finalDigest, "rename the final revision"),
+		amendmentReceiptWithVerify(1, "Final/Z", finalDigest, "echo final"),
+	}
+
+	for _, test := range []struct {
+		name string
+		edit func([]string) []string
+	}{
+		{
+			name: "intermediate amendment heading",
+			edit: func(comments []string) []string {
+				comments[1] = strings.Replace(comments[1], "Unit heading: Middle/Y", "Unit heading: Wrong/Y", 1)
+				return comments
+			},
+		},
+		{
+			name: "intermediate heading",
+			edit: func(comments []string) []string {
+				comments[2] = strings.Replace(comments[2], "Unit heading: Middle/Y", "Unit heading: Wrong/Y", 1)
+				return comments
+			},
+		},
+		{
+			name: "intermediate amendment occurrence",
+			edit: func(comments []string) []string {
+				comments[1] = strings.Replace(comments[1], "Unit occurrence: 1", "Unit occurrence: 2", 1)
+				return comments
+			},
+		},
+		{
+			name: "intermediate occurrence",
+			edit: func(comments []string) []string {
+				comments[2] = strings.Replace(comments[2], "Unit occurrence: 1", "Unit occurrence: 2", 1)
+				return comments
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			comments := append([]string(nil), base...)
+			_, errs := unresolvedRebuildRequests(finalUnits, test.edit(comments))
+			if len(errs) == 0 {
+				t.Fatalf("expected exact intermediate identity failure")
+			}
+		})
+	}
+}
+
+func TestAmendmentHistoryRejectsBranchingAndDisconnectedSuccessors(t *testing.T) {
+	oldUnits := amendmentTestUnits(t, amendmentTestBodyWithVerify("old outcome", "Old/X", "echo old"))
+	middleUnits := amendmentTestUnits(t, amendmentTestBodyWithVerify("middle outcome", "Middle/Y", "echo middle"))
+	finalUnits := amendmentTestUnits(t, amendmentTestBodyWithVerify("final outcome", "Final/Z", "echo final"))
+	oldDigest := unitContractDigest(oldUnits[0])
+	middleDigest := unitContractDigest(middleUnits[0])
+	finalDigest := unitContractDigest(finalUnits[0])
+	oldReceipt := amendmentReceiptWithVerify(1, "Old/X", oldDigest, "echo old")
+	finalReceipt := amendmentReceiptWithVerify(1, "Final/Z", finalDigest, "echo final")
+
+	t.Run("missing transition is disconnected", func(t *testing.T) {
+		comments := []string{
+			oldReceipt,
+			amendmentRecord(1, "Final/Z", middleDigest, finalDigest, "skip the missing revision"),
+			finalReceipt,
+		}
+		_, errs := unresolvedRebuildRequests(finalUnits, comments)
+		if len(errs) == 0 {
+			t.Fatal("expected disconnected amendment history to fail")
+		}
+	})
+
+	t.Run("two successors branch the history", func(t *testing.T) {
+		comments := []string{
+			oldReceipt,
+			amendmentRecord(1, "Middle/Y", oldDigest, middleDigest, "first path"),
+			amendmentRecord(1, "Final/Z", middleDigest, finalDigest, "valid path"),
+			amendmentRecord(1, "Final/Z", middleDigest, amendmentFakeDigest, "forged path"),
+			finalReceipt,
+		}
+		_, errs := unresolvedRebuildRequests(finalUnits, comments)
+		found := false
+		for _, err := range errs {
+			if strings.Contains(err.Error(), "branching amendment history") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("expected branching amendment history error, got %v", errs)
 		}
 	})
 }

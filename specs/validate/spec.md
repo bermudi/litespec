@@ -219,6 +219,11 @@ A valid amendment SHALL constitute an unresolved rebuild request for its identit
 - **WHEN** a contract field changed without any amendment, old and new receipts both exist, and the transition between their distinct digests is not bridged by an amendment edge
 - **THEN** validation reports a broken-chain error naming the unit and the disconnected digests
 
+#### Scenario: Successive heading renames follow digest-linked identities
+
+- **WHEN** valid amendments witness `Old/X` → `Middle/Y` → `Final/Z`, the current queue contains only `Final/Z`, and receipts use each revision's exact occurrence, heading, digest, and Verify command
+- **THEN** validation accepts the unique occurrence-preserving digest path while rejecting an intermediate receipt whose identity does not exactly match its recorded post-amendment heading
+
 #### Scenario: Two amendments between receipts bridge the chain
 
 - **WHEN** two valid amendments witness X→Y and Y→Z between a receipt at X and a later receipt at Z
