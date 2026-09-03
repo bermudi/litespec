@@ -291,6 +291,76 @@ func TestChunkedReceiptUsesStructuredDigestAfterMultilineVerify(t *testing.T) {
 	assertMultilineVerifyReceipt(t, chunkedReceiptComments)
 }
 
+func renamedMultilineReceiptFixture(t *testing.T) (string, []queueUnit, string, string) {
+	t.Helper()
+	verifyCmd := multilineVerifyWithMisleadingDigest()
+	oldBody := ownedQueue("## Old outcome\nDone means: target\nVerify:\n```\n" + verifyCmd + "\n```\n- [ ] pending\n")
+	newBody := ownedQueue("## Prefix outcome\nDone means: prefix\nVerify:\n```\necho hi\n```\n- [ ] pending\n\n" +
+		"## Renamed outcome\nDone means: target\nVerify:\n```\n" + verifyCmd + "\n```\n- [ ] pending\n")
+	oldUnits := parseQueueUnits(oldBody)
+	newUnits := parseQueueUnits(newBody)
+	if len(oldUnits) != 1 || len(newUnits) != 2 {
+		t.Fatalf("fixture units = %d old, %d new; want 1 old and 2 new", len(oldUnits), len(newUnits))
+	}
+	oldDigest := unitContractDigest(oldUnits[0])
+	newDigest := unitContractDigest(newUnits[1])
+	if oldDigest == newDigest {
+		t.Fatal("fixture digests must differ across the renamed contract")
+	}
+	return verifyCmd, newUnits, oldDigest, newDigest
+}
+
+func receiptPartsForIdentity(
+	makeReceipt func(string, string) []string,
+	verifyCmd, heading, digest string,
+) []string {
+	parts := makeReceipt(verifyCmd, digest)
+	for i := range parts {
+		parts[i] = strings.ReplaceAll(parts[i], "Unit heading: My outcome", "Unit heading: "+heading)
+	}
+	return parts
+}
+
+func assertRenamedReceiptFallback(t *testing.T, makeReceipt func(string, string) []string) {
+	t.Helper()
+	verifyCmd, newUnits, oldDigest, newDigest := renamedMultilineReceiptFixture(t)
+	oldIdentity := queueUnitIdentity{Occurrence: 1, Heading: "Old outcome"}
+	newIdentity := queueUnitIdentity{Occurrence: 1, Heading: "Renamed outcome"}
+	oldReceipt := receiptPartsForIdentity(makeReceipt, verifyCmd, oldIdentity.Heading, oldDigest)
+	records := mergeContinuedCommentRecords(oldReceipt)
+	gotIdentity, kind, gotDigest, err := parseRebuildCommentRecord(records[0], newUnits)
+	if err != nil {
+		t.Fatalf("renamed receipt returned an error: %v", err)
+	}
+	if gotIdentity != oldIdentity || kind != rebuildCommentEvidence || gotDigest != oldDigest {
+		t.Fatalf("renamed receipt = identity %v, kind %d, digest %q; want %v, evidence, %q", gotIdentity, kind, gotDigest, oldIdentity, oldDigest)
+	}
+
+	comments := append([]string{}, oldReceipt...)
+	comments = append(comments, amendmentRecord(1, newIdentity.Heading, oldDigest, newDigest, "rename the outcome"))
+	comments = append(comments, receiptPartsForIdentity(makeReceipt, verifyCmd, newIdentity.Heading, newDigest)...)
+	unresolved, errs := unresolvedRebuildRequests(newUnits, comments)
+	if len(errs) > 0 {
+		t.Fatalf("renamed receipt broke amendment routing: %v", errs)
+	}
+	if len(unresolved) > 0 {
+		t.Fatalf("renamed receipt left amendment unresolved: %v", unresolved)
+	}
+}
+
+func TestFieldBoundaryRenamedReceiptUsesCompleteCandidateGrammar(t *testing.T) {
+	assertRenamedReceiptFallback(t, func(verifyCmd, digest string) []string {
+		return []string{
+			continuedReceiptHead(verifyCmd, digest),
+			continuedReceiptTail(verifyCmd),
+		}
+	})
+}
+
+func TestChunkedRenamedReceiptUsesCompleteCandidateGrammar(t *testing.T) {
+	assertRenamedReceiptFallback(t, chunkedReceiptComments)
+}
+
 func TestChunkedRawOutputDuplicateChunkFailsValidation(t *testing.T) {
 	source := "GH issue #1"
 	units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", "")), source)

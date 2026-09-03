@@ -103,7 +103,7 @@ func parseRebuildCommentRecord(comment continuedComment, units []queueUnit) (que
 	unit, ok := findQueueUnit(units, identity)
 	if !ok {
 		for _, candidate := range units {
-			_, declaredDigest := evidenceReceiptIssuesForDocument(
+			issues, declaredDigest := evidenceReceiptIssuesForDocument(
 				evidenceDocument,
 				unitVerifyCommand(candidate.Body),
 				"",
@@ -111,7 +111,7 @@ func parseRebuildCommentRecord(comment continuedComment, units []queueUnit) (que
 				identity.Heading,
 				nil,
 			)
-			if declaredDigest != "" {
+			if len(issues) == 1 && strings.Contains(issues[0].Message, "unit digest mismatch") {
 				return identity, rebuildCommentEvidence, declaredDigest, nil
 			}
 		}
