@@ -155,7 +155,7 @@ func splitLocalQueueMetadataBlocks(body string) (string, []string) {
 }
 
 func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
-	comments = mergeContinuedComments(comments)
+	commentRecords := mergeContinuedCommentRecords(comments)
 	identities := queueUnitIdentities(units)
 	validUnit := make(map[queueUnitIdentity]int, len(identities))
 	for i, identity := range identities {
@@ -178,8 +178,8 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 	amendmentShaped := make(map[int]bool)
 	amendmentsAt := make(map[int]contractAmendment)
 	lastAmendmentAt := make(map[queueUnitIdentity]int)
-	for index, comment := range comments {
-		record, handled, validRecord, err := parseAmendmentComment(comment, units)
+	for index, comment := range commentRecords {
+		record, handled, validRecord, err := parseAmendmentComment(comment.text, units)
 		if !handled {
 			continue
 		}
@@ -238,7 +238,8 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 	markers := make(map[queueUnitIdentity]queueReplanMarker)
 	pendingRebuildRequests := make(map[queueUnitIdentity]int)
 	var pendingOrder []queueUnitIdentity
-	for commentIndex, comment := range comments {
+	for commentIndex, commentRecord := range commentRecords {
+		comment := commentRecord.text
 		if amendmentShaped[commentIndex] {
 			record, ok := amendmentsAt[commentIndex]
 			if !ok {
@@ -302,12 +303,15 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 			continue
 		}
 
-		identity, kind, digest, err := parseRebuildComment(comment, units)
+		identity, kind, digest, err := parseRebuildCommentRecord(commentRecord, units)
 		if err != nil {
 			scan.errors = append(scan.errors, fmt.Errorf("comment %d: %w", commentIndex+1, err))
 			continue
 		}
 		if kind == rebuildCommentOther {
+			if commentContainsRawOutputChunk(commentRecord) && !commentHasValidHeadingEvidence(commentRecord, units) {
+				scan.errors = append(scan.errors, fmt.Errorf("comment %d: orphan raw output chunk", commentIndex+1))
+			}
 			continue
 		}
 		if kind == rebuildCommentRequest {

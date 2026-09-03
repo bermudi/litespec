@@ -39,12 +39,16 @@ func continuedReceiptTail(verifyCmd string) string {
 }
 
 func rawOutputChunk(phase string, number, total int, digest, payload string, marker bool) string {
+	return rawOutputChunkFor(phase, number, total, 1, "My outcome", digest, payload, marker)
+}
+
+func rawOutputChunkFor(phase string, number, total, occurrence int, heading, digest, payload string, marker bool) string {
 	lines := []string{
 		"Raw output chunk:",
 		"Output: " + phase,
 		fmt.Sprintf("Chunk: %d/%d", number, total),
-		"Unit occurrence: 1",
-		"Unit heading: My outcome",
+		fmt.Sprintf("Unit occurrence: %d", occurrence),
+		"Unit heading: " + heading,
 		"unit digest: " + digest,
 		"```",
 		payload,
@@ -305,6 +309,84 @@ func TestInterruptedContinuationFailsValidation(t *testing.T) {
 	joined := strings.ToLower(strings.Join(issueMessages(result.Errors), "\n"))
 	if !strings.Contains(joined, "evidence receipt") {
 		t.Fatalf("expected an evidence receipt error, got %v", result.Errors)
+	}
+}
+
+func TestRawOutputChunkMissingMarkerFailsValidation(t *testing.T) {
+	units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", "")), "GH issue #1")
+	digest := unitContractDigest(units[0])
+	comments := chunkedReceiptComments("echo hi", digest)
+	comments[0] = strings.TrimSuffix(comments[0], "\n"+receiptContinuationMarker)
+	result := &ValidationResult{Valid: true}
+	applyQueueIssues(result, "GitHub comments", units, issues, comments[:1])
+	if len(result.Errors) == 0 {
+		t.Fatal("expected missing raw output continuation marker to fail validation")
+	}
+}
+
+func TestRawOutputChunksInOneCommentFailValidation(t *testing.T) {
+	units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", "")), "GH issue #1")
+	digest := unitContractDigest(units[0])
+	comments := chunkedReceiptComments("echo hi", digest)
+	first := strings.TrimSuffix(comments[0], "\n"+receiptContinuationMarker)
+	comments[0] = first + "\n" + rawOutputChunk("pre", 2, 2, digest, "pre two", false)
+	result := &ValidationResult{Valid: true}
+	applyQueueIssues(result, "GitHub comments", units, issues, comments[:1])
+	if len(result.Errors) == 0 {
+		t.Fatal("expected multiple raw output chunks in one comment to fail validation")
+	}
+}
+
+func TestOrphanRawOutputChunkFailsValidation(t *testing.T) {
+	units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", "")), "GH issue #1")
+	digest := unitContractDigest(units[0])
+	result := &ValidationResult{Valid: true}
+	applyQueueIssues(result, "GitHub comments", units, issues, []string{rawOutputChunk("pre", 1, 2, digest, "orphan", false)})
+	if len(result.Errors) == 0 {
+		t.Fatal("expected orphan raw output chunk to fail validation")
+	}
+}
+
+func TestRawOutputChunkDuplicatedAfterReceiptFailsValidation(t *testing.T) {
+	units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", "")), "GH issue #1")
+	digest := unitContractDigest(units[0])
+	comments := chunkedReceiptComments("echo hi", digest)
+	comments[3] += "\n" + rawOutputChunk("post", 1, 2, digest, "duplicate", false)
+	result := &ValidationResult{Valid: true}
+	applyQueueIssues(result, "GitHub comments", units, issues, comments)
+	if len(result.Errors) == 0 {
+		t.Fatal("expected duplicated raw output chunk after a complete receipt to fail validation")
+	}
+}
+
+func TestHeadingFormChunkReceiptResolves(t *testing.T) {
+	units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", "")), "GH issue #1")
+	digest := unitContractDigest(units[0])
+	comments := chunkedReceiptComments("echo hi", digest)
+	lines := strings.SplitN(comments[0], "\n", 3)
+	comments[0] = "## My outcome\n" + lines[2]
+	result := &ValidationResult{Valid: true}
+	applyQueueIssues(result, "GitHub comments", units, issues, comments)
+	if len(result.Errors) > 0 {
+		t.Fatalf("expected heading-form chunk receipt to satisfy checked unit, got %v", result.Errors)
+	}
+}
+
+func TestHeadingFormChunkOccurrenceMustMatchUnit(t *testing.T) {
+	body := ownedQueue(
+		"## My outcome\nDone means: first thing\nVerify:\n```\necho hi\n```\n- [x] done\n\n" +
+			"## My outcome\nDone means: second thing\nVerify:\n```\necho hi\n```\n- [x] done\n",
+	)
+	units, issues := ValidateQueueBody(body, "GH issue #1")
+	firstDigest := unitContractDigest(units[0])
+	comments := chunkedReceiptComments("echo hi", firstDigest)
+	lines := strings.SplitN(comments[0], "\n", 3)
+	comments[0] = "## My outcome\n" + lines[2]
+	comments[0] = strings.Replace(comments[0], "Unit occurrence: 1", "Unit occurrence: 999", 1)
+	result := &ValidationResult{Valid: true}
+	applyQueueIssues(result, "GitHub comments", units, issues, comments)
+	if len(result.Errors) == 0 {
+		t.Fatal("expected heading-form receipt with wrong chunk occurrence to fail validation")
 	}
 }
 

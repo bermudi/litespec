@@ -63,8 +63,12 @@ const (
 // reported as rebuildCommentStaleEvidence with the digest intact so the
 // amendment chain can judge whether the contract edit was witnessed.
 func parseRebuildComment(comment string, units []queueUnit) (queueUnitIdentity, rebuildCommentKind, string, error) {
-	normalized := strings.TrimSpace(strings.ReplaceAll(comment, "\r\n", "\n"))
-	lines := strings.Split(normalized, "\n")
+	return parseRebuildCommentRecord(continuedComment{text: comment, parts: []continuedCommentPart{{text: comment}}}, units)
+}
+
+func parseRebuildCommentRecord(comment continuedComment, units []queueUnit) (queueUnitIdentity, rebuildCommentKind, string, error) {
+	document := newEvidenceDocumentFromComment(comment).trimSpace()
+	lines := document.lines
 	if len(lines) == 0 {
 		return queueUnitIdentity{}, rebuildCommentOther, "", nil
 	}
@@ -95,13 +99,14 @@ func parseRebuildComment(comment string, units []queueUnit) (queueUnitIdentity, 
 	if err != nil {
 		return queueUnitIdentity{}, rebuildCommentOther, "", fmt.Errorf("malformed identity-bearing evidence receipt: %w", err)
 	}
-	evidence := strings.Join(lines[2:], "\n")
+	evidenceDocument := evidencePayloadDocument(document.afterLine(2))
+	evidence := strings.Join(evidenceDocument.lines, "\n")
 	declaredDigest := receiptDeclaredDigest(evidence)
 	unit, ok := findQueueUnit(units, identity)
 	if !ok {
 		return identity, rebuildCommentEvidence, declaredDigest, nil
 	}
-	issues := evidenceReceiptIssuesForIdentity(evidence, unitVerifyCommand(unit.Body), unitContractDigest(unit), "comment", identity.Heading, &identity)
+	issues := evidenceReceiptIssuesForDocument(evidenceDocument, unitVerifyCommand(unit.Body), unitContractDigest(unit), "comment", identity.Heading, &identity)
 	switch {
 	case len(issues) == 0:
 		return identity, rebuildCommentEvidence, declaredDigest, nil

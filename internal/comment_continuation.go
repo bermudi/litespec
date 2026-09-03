@@ -4,33 +4,64 @@ import "strings"
 
 const receiptContinuationMarker = "Receipt continues in next comment (GitHub comment size limit)."
 
-// mergeContinuedComments joins a comment whose last unfenced line is the
-// receipt continuation marker with the immediately following comment, chaining
-// across as many comments as needed. GitHub caps issue comments at 65,536
-// characters; a verbatim red-green receipt that exceeds it splits at a field
-// boundary or uses the explicit raw-output chunk form. Consumed comments are
-// blanked so comment indices and error numbering stay stable. A dangling marker
-// (no following comment) is left in place so receipt validation reports the
-// incomplete receipt. Marker text inside fenced output is raw content, never a
-// marker.
+type continuedCommentPart struct {
+	text      string
+	continued bool
+}
+
+type continuedComment struct {
+	text  string
+	parts []continuedCommentPart
+}
+
 func mergeContinuedComments(comments []string) []string {
-	merged := make([]string, len(comments))
-	copy(merged, comments)
+	merged := mergeContinuedCommentRecords(comments)
+	texts := make([]string, len(merged))
+	for i, comment := range merged {
+		texts[i] = comment.text
+	}
+	return texts
+}
+
+func mergeContinuedCommentRecords(comments []string) []continuedComment {
+	merged := make([]continuedComment, len(comments))
+	for i, comment := range comments {
+		merged[i] = continuedComment{
+			text: comment,
+			parts: []continuedCommentPart{{
+				text: comment,
+			}},
+		}
+	}
 	for i := 0; i < len(merged); i++ {
-		if strings.TrimSpace(merged[i]) == "" {
+		if strings.TrimSpace(merged[i].text) == "" {
 			continue
 		}
 		next := i + 1
-		for commentEndsWithContinuationMarker(merged[i]) {
-			if next >= len(merged) || strings.TrimSpace(merged[next]) == "" {
+		for commentEndsWithContinuationMarker(merged[i].text) {
+			if next >= len(merged) || strings.TrimSpace(merged[next].text) == "" {
 				break
 			}
-			merged[i] = stripContinuationMarker(merged[i]) + "\n" + strings.TrimSpace(merged[next])
-			merged[next] = ""
+			last := len(merged[i].parts) - 1
+			merged[i].parts[last].text = stripContinuationMarker(merged[i].parts[last].text)
+			merged[i].parts[last].continued = true
+			merged[i].parts = append(merged[i].parts, continuedCommentPart{
+				text: strings.TrimSpace(merged[next].text),
+			})
+			merged[i].text = continuedCommentText(merged[i].parts)
+			merged[next] = continuedComment{}
 			next++
 		}
 	}
 	return merged
+}
+
+func continuedCommentText(parts []continuedCommentPart) string {
+	texts := make([]string, len(parts))
+	for i, part := range parts {
+		texts[i] = part.text
+	}
+	return strings.Join(texts, "\n")
 }
 
 func commentEndsWithContinuationMarker(comment string) bool {

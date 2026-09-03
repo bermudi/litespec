@@ -533,21 +533,100 @@ func extractEvidenceText(body []string) string {
 	return ""
 }
 
-type evidenceCursor struct {
-	lines []string
-	at    int
+type evidenceDocument struct {
+	lines                  []string
+	partIndexes            []int
+	partContinued          []bool
+	trackCommentBoundaries bool
+}
+
+func newEvidenceDocument(text string) evidenceDocument {
+	normalized := strings.ReplaceAll(text, "\r\n", "\n")
+	lines := strings.Split(normalized, "\n")
+	indexes := make([]int, len(lines))
+	return evidenceDocument{lines: lines, partIndexes: indexes, partContinued: []bool{false}}
+}
+
+func newEvidenceDocumentFromComment(comment continuedComment) evidenceDocument {
+	if len(comment.parts) == 0 {
+		return newEvidenceDocument(comment.text)
+	}
+	var lines []string
+	var indexes []int
+	continued := make([]bool, len(comment.parts))
+	for partIndex, part := range comment.parts {
+		partLines := strings.Split(strings.ReplaceAll(part.text, "\r\n", "\n"), "\n")
+		lines = append(lines, partLines...)
+		for range partLines {
+			indexes = append(indexes, partIndex)
+		}
+		continued[partIndex] = part.continued
+	}
+	return evidenceDocument{lines: lines, partIndexes: indexes, partContinued: continued, trackCommentBoundaries: true}
+}
+
+func (d evidenceDocument) trimSpace() evidenceDocument {
+	start := 0
+	for start < len(d.lines) && strings.TrimSpace(d.lines[start]) == "" {
+		start++
+	}
+	end := len(d.lines)
+	for end > start && strings.TrimSpace(d.lines[end-1]) == "" {
+		end--
+	}
+	return evidenceDocument{
+		lines:                  d.lines[start:end],
+		partIndexes:            d.partIndexes[start:end],
+		partContinued:          d.partContinued,
+		trackCommentBoundaries: d.trackCommentBoundaries,
+	}
+}
+
+func (d evidenceDocument) afterLine(index int) evidenceDocument {
+	if index >= len(d.lines) {
+		return evidenceDocument{partContinued: d.partContinued, trackCommentBoundaries: d.trackCommentBoundaries}
+	}
+	return evidenceDocument{
+		lines:                  d.lines[index:],
+		partIndexes:            d.partIndexes[index:],
+		partContinued:          d.partContinued,
+		trackCommentBoundaries: d.trackCommentBoundaries,
+	}
+}
+
+func evidencePayloadDocument(document evidenceDocument) evidenceDocument {
+	openFence := ""
+	for i, line := range document.lines {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		if strings.TrimSpace(line) == "Evidence:" {
+			return document.afterLine(i + 1)
+		}
+	}
+	return document
 }
 
 func newEvidenceCursor(text string) *evidenceCursor {
-	normalized := strings.ReplaceAll(text, "\r\n", "\n")
-	lines := strings.Split(normalized, "\n")
-	for len(lines) > 0 && strings.TrimSpace(lines[0]) == "" {
-		lines = lines[1:]
+	return newEvidenceCursorFromDocument(newEvidenceDocument(text))
+}
+
+func newEvidenceCursorFromDocument(document evidenceDocument) *evidenceCursor {
+	document = document.trimSpace()
+	return &evidenceCursor{
+		lines:                  document.lines,
+		partIndexes:            document.partIndexes,
+		partContinued:          document.partContinued,
+		trackCommentBoundaries: document.trackCommentBoundaries,
 	}
-	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
-		lines = lines[:len(lines)-1]
-	}
-	return &evidenceCursor{lines: lines}
+}
+
+type evidenceCursor struct {
+	lines                  []string
+	partIndexes            []int
+	partContinued          []bool
+	trackCommentBoundaries bool
+	at                     int
 }
 
 func (c *evidenceCursor) consumeExactLines(value string) bool {
@@ -677,10 +756,19 @@ func (c *evidenceCursor) consumeRawOutput(phase, expectedDigest, expectedHeading
 	var reconstructed strings.Builder
 	wantedChunk := 1
 	totalChunks := 0
+	previousPart := -1
 	for {
 		if c.at >= len(c.lines) || c.lines[c.at] != "Raw output chunk:" {
 			return "", false, fmt.Sprintf("raw %s output chunks must be consecutive and complete", phase)
 		}
+		chunkPart := c.partAt(c.at)
+		if c.trackCommentBoundaries && c.rawChunkCountInPart(chunkPart) != 1 {
+			return "", false, fmt.Sprintf("raw %s output chunks must contain exactly one chunk per comment", phase)
+		}
+		if c.trackCommentBoundaries && previousPart >= 0 && chunkPart != previousPart+1 {
+			return "", false, fmt.Sprintf("raw %s output chunks must continue in the immediately following marked comment", phase)
+		}
+		previousPart = chunkPart
 		c.at++
 
 		c.skipBlanks()
@@ -740,24 +828,38 @@ func (c *evidenceCursor) consumeRawOutput(phase, expectedDigest, expectedHeading
 		if chunkNumber == totalChunks {
 			return reconstructed.String(), true, ""
 		}
+		if c.trackCommentBoundaries && (chunkPart >= len(c.partContinued) || !c.partContinued[chunkPart] || chunkPart+1 >= len(c.partContinued)) {
+			return "", false, fmt.Sprintf("raw %s output chunks must continue in the immediately following marked comment", phase)
+		}
 		wantedChunk++
 		c.skipBlanks()
 	}
 }
 
-func evidencePayload(text, verifyCmd string) string {
-	normalized := strings.ReplaceAll(text, "\r\n", "\n")
-	if strings.HasPrefix(strings.TrimLeft(normalized, "\n"), verifyCmd+"\n") {
-		return normalized
+func (c *evidenceCursor) partAt(line int) int {
+	if line >= 0 && line < len(c.partIndexes) {
+		return c.partIndexes[line]
 	}
-	lines := strings.Split(normalized, "\n")
-	for i, line := range lines {
-		if strings.TrimSpace(line) != "Evidence:" {
+	return 0
+}
+
+func (c *evidenceCursor) rawChunkCountInPart(part int) int {
+	openFence := ""
+	count := 0
+	for i, line := range c.lines {
+		if consumeMarkdownFenceLine(&openFence, line) {
 			continue
 		}
-		return strings.Join(lines[i+1:], "\n")
+		if c.partAt(i) == part && line == "Raw output chunk:" {
+			count++
+		}
 	}
-	return text
+	return count
+}
+
+func evidencePayload(text, verifyCmd string) string {
+	document := evidencePayloadDocument(newEvidenceDocument(text))
+	return strings.Join(document.lines, "\n")
 }
 
 func evidenceReceiptIssues(text, verifyCmd, expectedDigest, source, heading string) []ValidationIssue {
@@ -765,7 +867,18 @@ func evidenceReceiptIssues(text, verifyCmd, expectedDigest, source, heading stri
 }
 
 func evidenceReceiptIssuesForIdentity(text, verifyCmd, expectedDigest, source, heading string, expectedIdentity *queueUnitIdentity) []ValidationIssue {
-	if strings.TrimSpace(text) == "" {
+	return evidenceReceiptIssuesForDocument(
+		evidencePayloadDocument(newEvidenceDocument(text)),
+		verifyCmd,
+		expectedDigest,
+		source,
+		heading,
+		expectedIdentity,
+	)
+}
+
+func evidenceReceiptIssuesForDocument(document evidenceDocument, verifyCmd, expectedDigest, source, heading string, expectedIdentity *queueUnitIdentity) []ValidationIssue {
+	if len(document.lines) == 0 || strings.TrimSpace(strings.Join(document.lines, "\n")) == "" {
 		return []ValidationIssue{{
 			Severity: SeverityError,
 			Message:  fmt.Sprintf("%s: checked unit %q missing Evidence receipt", source, heading),
@@ -782,7 +895,7 @@ func evidenceReceiptIssuesForIdentity(text, verifyCmd, expectedDigest, source, h
 		})
 	}
 
-	cursor := newEvidenceCursor(evidencePayload(text, verifyCmd))
+	cursor := newEvidenceCursorFromDocument(document)
 	if verifyCmd == "" || !cursor.consumeVerifyCommand(verifyCmd) {
 		fail("must quote the Verify command verbatim")
 		return issues
@@ -918,34 +1031,53 @@ func commentSatisfiesEvidence(heading, verifyCmd, expectedDigest string, comment
 }
 
 func matchingEvidenceComment(heading, verifyCmd, expectedDigest string, comments []string, used map[int]bool) (int, bool) {
-	for i, c := range comments {
+	return matchingEvidenceCommentRecords(heading, verifyCmd, expectedDigest, mergeContinuedCommentRecords(comments), used, nil)
+}
+
+func matchingEvidenceCommentRecords(heading, verifyCmd, expectedDigest string, comments []continuedComment, used map[int]bool, expectedIdentity *queueUnitIdentity) (int, bool) {
+	for i, comment := range comments {
 		if used[i] {
 			continue
 		}
-		if !commentNamesUnit(c, heading) {
+		if !commentNamesUnit(comment.text, heading) {
 			continue
 		}
-		evidenceText := c
-		if afterHeading, ok := commentTextAfterUnitHeading(c, heading); ok {
-			evidenceText = afterHeading
+		document, ok := commentEvidenceDocument(comment, heading)
+		if !ok {
+			continue
 		}
-		if len(evidenceReceiptIssues(evidenceText, verifyCmd, expectedDigest, "comment", heading)) == 0 {
+		if len(evidenceReceiptIssuesForDocument(document, verifyCmd, expectedDigest, "comment", heading, expectedIdentity)) == 0 {
 			return i, true
 		}
 	}
 	return 0, false
 }
 
-func commentTextAfterUnitHeading(comment, heading string) (string, bool) {
-	lines := strings.Split(strings.ReplaceAll(comment, "\r\n", "\n"), "\n")
+func commentEvidenceDocument(comment continuedComment, heading string) (evidenceDocument, bool) {
+	document := newEvidenceDocumentFromComment(comment)
 	openFence := ""
-	for i, line := range lines {
+	for i, line := range document.lines {
 		if consumeMarkdownFenceLine(&openFence, line) {
 			continue
 		}
 		trimmed := strings.TrimSpace(line)
 		if trimmed == heading || trimmed == "## "+heading {
-			return strings.Join(lines[i+1:], "\n"), true
+			return evidencePayloadDocument(document.afterLine(i + 1)), true
+		}
+	}
+	return evidencePayloadDocument(document), false
+}
+
+func commentTextAfterUnitHeading(comment, heading string) (string, bool) {
+	document := newEvidenceDocument(comment)
+	openFence := ""
+	for i, line := range document.lines {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if trimmed == heading || trimmed == "## "+heading {
+			return strings.Join(document.afterLine(i+1).lines, "\n"), true
 		}
 	}
 	return "", false
@@ -968,8 +1100,35 @@ func commentNamesUnit(comment, heading string) bool {
 	return false
 }
 
+func commentHasValidHeadingEvidence(comment continuedComment, units []queueUnit) bool {
+	identities := queueUnitIdentities(units)
+	for i, unit := range units {
+		if !commentNamesUnit(comment.text, unit.Heading) {
+			continue
+		}
+		document, ok := commentEvidenceDocument(comment, unit.Heading)
+		if ok && len(evidenceReceiptIssuesForDocument(document, unitVerifyCommand(unit.Body), unitContractDigest(unit), "comment", unit.Heading, &identities[i])) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func commentContainsRawOutputChunk(comment continuedComment) bool {
+	openFence := ""
+	for _, line := range strings.Split(strings.ReplaceAll(comment.text, "\r\n", "\n"), "\n") {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		if line == "Raw output chunk:" {
+			return true
+		}
+	}
+	return false
+}
+
 func applyQueueIssues(result *ValidationResult, commentSource string, units []queueUnit, unitIssues []ValidationIssue, comments []string) {
-	comments = mergeContinuedComments(comments)
+	commentRecords := mergeContinuedCommentRecords(comments)
 	usedComments := make(map[int]bool)
 	commentEvidence := make(map[int]bool)
 	identities := queueUnitIdentities(units)
@@ -985,7 +1144,7 @@ func applyQueueIssues(result *ValidationResult, commentSource string, units []qu
 			unit,
 			unitContractDigest(unit),
 			units,
-			comments,
+			commentRecords,
 			usedComments,
 		)
 		if !ok {
@@ -1043,19 +1202,19 @@ func matchingEvidenceCommentForUnit(
 	unit queueUnit,
 	expectedDigest string,
 	units []queueUnit,
-	comments []string,
+	comments []continuedComment,
 	used map[int]bool,
 ) (int, bool) {
 	for i, comment := range comments {
 		if used[i] {
 			continue
 		}
-		commentIdentity, kind, _, err := parseRebuildComment(comment, units)
+		commentIdentity, kind, _, err := parseRebuildCommentRecord(comment, units)
 		if err == nil && kind == rebuildCommentEvidence && commentIdentity == identity {
 			return i, true
 		}
 	}
-	return matchingEvidenceComment(unit.Heading, unitVerifyCommand(unit.Body), expectedDigest, comments, used)
+	return matchingEvidenceCommentRecords(unit.Heading, unitVerifyCommand(unit.Body), expectedDigest, comments, used, &identity)
 }
 
 var ghIssueView = func(root string, number int) ([]byte, error) {
