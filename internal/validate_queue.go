@@ -433,6 +433,7 @@ func validateOptionalField(body []string, fieldName string, count int, idx int, 
 var evidenceCommitPattern = regexp.MustCompile(`^[0-9a-fA-F]{40}(?:[0-9a-fA-F]{24})?$`)
 var preEvidenceScopePattern = regexp.MustCompile(`^Pre-evidence scope: this command exited (-?\d+) at ([0-9a-fA-F]{40}(?:[0-9a-fA-F]{24})?); nothing else is inferred\.$`)
 var postEvidenceScopePattern = regexp.MustCompile(`^Post-evidence scope: this command exited (-?\d+) at ([0-9a-fA-F]{40}(?:[0-9a-fA-F]{24})?); nothing else is inferred\.$`)
+var rawOutputChunkCountPattern = regexp.MustCompile(`^([1-9][0-9]*)/([1-9][0-9]*)$`)
 
 func isCheckedLine(trimmed string) bool {
 	for _, cb := range []string{"- [x]", "- [X]"} {
@@ -657,6 +658,93 @@ func (c *evidenceCursor) consumeFence() (string, bool) {
 	return "", false
 }
 
+// consumeRawOutput accepts either the ordinary output fence or a sequence of
+// explicitly numbered raw-output chunks. Chunk payloads are concatenated
+// without inserting bytes; the repeated identity prevents a continuation from
+// being attached to another receipt.
+func (c *evidenceCursor) consumeRawOutput(phase, expectedDigest, expectedHeading string, expectedIdentity *queueUnitIdentity) (string, bool, string) {
+	if c.at >= len(c.lines) {
+		return "", false, fmt.Sprintf("must include %s raw command output in a fenced block", phase)
+	}
+	if c.lines[c.at] != "Raw output chunk:" {
+		output, ok := c.consumeFence()
+		if !ok || strings.TrimSpace(output) == "" {
+			return "", false, fmt.Sprintf("must include %s raw command output, or `<no output>`, in a fenced block", phase)
+		}
+		return output, true, ""
+	}
+
+	var reconstructed strings.Builder
+	wantedChunk := 1
+	totalChunks := 0
+	for {
+		if c.at >= len(c.lines) || c.lines[c.at] != "Raw output chunk:" {
+			return "", false, fmt.Sprintf("raw %s output chunks must be consecutive and complete", phase)
+		}
+		c.at++
+
+		c.skipBlanks()
+		outputPhase, ok := c.consumeField("Output")
+		if !ok || outputPhase != phase {
+			return "", false, fmt.Sprintf("raw output chunk must declare Output: %s", phase)
+		}
+		c.skipBlanks()
+		chunkText, ok := c.consumeField("Chunk")
+		if !ok {
+			return "", false, "raw output chunk must declare Chunk: <number>/<total>"
+		}
+		match := rawOutputChunkCountPattern.FindStringSubmatch(chunkText)
+		if match == nil {
+			return "", false, "raw output chunk must declare Chunk: <number>/<total>"
+		}
+		chunkNumber, _ := strconv.Atoi(match[1])
+		chunkTotal, _ := strconv.Atoi(match[2])
+		if chunkTotal < 2 || chunkNumber != wantedChunk {
+			return "", false, fmt.Sprintf("raw %s output chunks must be numbered consecutively from 1", phase)
+		}
+		if totalChunks == 0 {
+			totalChunks = chunkTotal
+		} else if chunkTotal != totalChunks {
+			return "", false, fmt.Sprintf("raw %s output chunks must use one total", phase)
+		}
+
+		c.skipBlanks()
+		occurrenceText, ok := c.consumeField("Unit occurrence")
+		if !ok {
+			return "", false, "raw output chunk must repeat Unit occurrence:"
+		}
+		occurrence, err := strconv.Atoi(occurrenceText)
+		if err != nil || occurrence < 1 {
+			return "", false, "raw output chunk Unit occurrence must be a positive integer"
+		}
+		c.skipBlanks()
+		chunkHeading, ok := c.consumeField("Unit heading")
+		if !ok || chunkHeading != expectedHeading {
+			return "", false, "raw output chunk Unit heading must match the receipt identity"
+		}
+		c.skipBlanks()
+		chunkDigest, ok := c.consumeField("unit digest")
+		if !ok || chunkDigest != expectedDigest {
+			return "", false, "raw output chunk unit digest must match the receipt identity"
+		}
+		if expectedIdentity != nil && occurrence != expectedIdentity.Occurrence {
+			return "", false, "raw output chunk Unit occurrence must match the receipt identity"
+		}
+
+		c.skipBlanks()
+		output, ok := c.consumeFence()
+		if !ok || strings.TrimSpace(output) == "" {
+			return "", false, fmt.Sprintf("raw %s output chunks must contain nonempty fenced payloads", phase)
+		}
+		reconstructed.WriteString(output)
+		if chunkNumber == totalChunks {
+			return reconstructed.String(), true, ""
+		}
+		wantedChunk++
+		c.skipBlanks()
+	}
+}
+
 func evidencePayload(text, verifyCmd string) string {
 	normalized := strings.ReplaceAll(text, "\r\n", "\n")
 	if strings.HasPrefix(strings.TrimLeft(normalized, "\n"), verifyCmd+"\n") {
@@ -673,6 +761,10 @@ func evidencePayload(text, verifyCmd string) string {
 }
 
 func evidenceReceiptIssues(text, verifyCmd, expectedDigest, source, heading string) []ValidationIssue {
+	return evidenceReceiptIssuesForIdentity(text, verifyCmd, expectedDigest, source, heading, nil)
+}
+
+func evidenceReceiptIssuesForIdentity(text, verifyCmd, expectedDigest, source, heading string, expectedIdentity *queueUnitIdentity) []ValidationIssue {
 	if strings.TrimSpace(text) == "" {
 		return []ValidationIssue{{
 			Severity: SeverityError,
@@ -732,9 +824,9 @@ func evidenceReceiptIssues(text, verifyCmd, expectedDigest, source, heading stri
 	}
 
 	cursor.skipBlanks()
-	preOutput, ok := cursor.consumeFence()
-	if !ok || strings.TrimSpace(preOutput) == "" {
-		fail("must include pre raw command output, or `<no output>`, in a fenced block")
+	_, ok, reason := cursor.consumeRawOutput("pre", expectedDigest, heading, expectedIdentity)
+	if !ok {
+		fail(reason)
 		return issues
 	}
 
@@ -780,9 +872,9 @@ func evidenceReceiptIssues(text, verifyCmd, expectedDigest, source, heading stri
 	}
 
 	cursor.skipBlanks()
-	postOutput, ok := cursor.consumeFence()
-	if !ok || strings.TrimSpace(postOutput) == "" {
-		fail("must include post raw command output, or `<no output>`, in a fenced block")
+	_, ok, reason = cursor.consumeRawOutput("post", expectedDigest, heading, expectedIdentity)
+	if !ok {
+		fail(reason)
 		return issues
 	}
 

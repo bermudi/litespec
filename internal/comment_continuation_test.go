@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -35,6 +36,49 @@ func continuedReceiptTail(verifyCmd string) string {
 		"```",
 		"Post-evidence scope: this command exited 0 at " + continuationPostSHA + "; nothing else is inferred.",
 	}, "\n")
+}
+
+func rawOutputChunk(phase string, number, total int, digest, payload string, marker bool) string {
+	lines := []string{
+		"Raw output chunk:",
+		"Output: " + phase,
+		fmt.Sprintf("Chunk: %d/%d", number, total),
+		"Unit occurrence: 1",
+		"Unit heading: My outcome",
+		"unit digest: " + digest,
+		"```",
+		payload,
+		"```",
+	}
+	if marker {
+		lines = append(lines, receiptContinuationMarker)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func chunkedReceiptComments(verifyCmd, digest string) []string {
+	first := strings.Join([]string{
+		"Unit occurrence: 1",
+		"Unit heading: My outcome",
+		"Evidence:",
+		verifyCmd,
+		"unit digest: " + digest,
+		"pre sha: " + continuationPreSHA,
+		"pre exit status: 1",
+		rawOutputChunk("pre", 1, 2, digest, "pre one\n", true),
+	}, "\n")
+	second := rawOutputChunk("pre", 2, 2, digest, "pre two", true)
+	third := strings.Join([]string{
+		"Pre-evidence scope: this command exited 1 at " + continuationPreSHA + "; nothing else is inferred.",
+		"post sha: " + continuationPostSHA,
+		"post exit status: 0",
+		rawOutputChunk("post", 1, 2, digest, "post one\n", true),
+	}, "\n")
+	fourth := strings.Join([]string{
+		rawOutputChunk("post", 2, 2, digest, "post two", false),
+		"Post-evidence scope: this command exited 0 at " + continuationPostSHA + "; nothing else is inferred.",
+	}, "\n")
+	return []string{first, second, third, fourth}
 }
 
 func TestMergeContinuedCommentsJoinsMarkerWithNextComment(t *testing.T) {
@@ -90,6 +134,31 @@ func TestMergeContinuedCommentsLeavesDanglingMarkerIntact(t *testing.T) {
 	}
 }
 
+func TestMergeContinuedCommentsDoesNotSkipBlankInterveningComment(t *testing.T) {
+	head := continuedReceiptHead("echo hi", "aaaa")
+	tail := continuedReceiptTail("echo hi")
+	merged := mergeContinuedComments([]string{head, "", tail})
+
+	if strings.Contains(merged[0], tail) || !strings.Contains(merged[0], receiptContinuationMarker) {
+		t.Fatalf("blank comment must interrupt continuation, got %q", merged[0])
+	}
+	if merged[2] != tail {
+		t.Fatalf("tail after blank comment must remain separate, got %q", merged[2])
+	}
+}
+
+func TestBlankInterveningCommentFailsReceiptValidation(t *testing.T) {
+	source := "GH issue #1"
+	units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", "")), source)
+	digest := unitContractDigest(units[0])
+	comments := []string{continuedReceiptHead("echo hi", digest), "", continuedReceiptTail("echo hi")}
+	result := &ValidationResult{Valid: true}
+	applyQueueIssues(result, "GitHub comments", units, issues, comments)
+	if len(result.Errors) == 0 {
+		t.Fatal("expected blank intervening comment to fail validation")
+	}
+}
+
 func TestMergeContinuedCommentsIsIdempotent(t *testing.T) {
 	comments := []string{
 		continuedReceiptHead("echo hi", "aaaa"),
@@ -115,6 +184,70 @@ func TestSplitReceiptSatisfiesCheckedUnit(t *testing.T) {
 	applyQueueIssues(result, "GitHub comments", units, issues, comments)
 	if len(result.Errors) > 0 {
 		t.Fatalf("expected split receipt to satisfy checked unit, got %v", result.Errors)
+	}
+}
+
+func TestChunkedRawOutputReceiptReconstructsAndSatisfiesCheckedUnit(t *testing.T) {
+	source := "GH issue #1"
+	units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", "")), source)
+	digest := unitContractDigest(units[0])
+	comments := chunkedReceiptComments("echo hi", digest)
+	merged := mergeContinuedComments(comments)
+	evidence := evidencePayload(merged[0], "echo hi")
+	identity := queueUnitIdentity{Occurrence: 1, Heading: "My outcome"}
+	cursor := newEvidenceCursor(evidence)
+	if !cursor.consumeVerifyCommand("echo hi") {
+		t.Fatal("expected Verify command")
+	}
+	cursor.skipBlanks()
+	if _, ok := cursor.consumeField("unit digest"); !ok {
+		t.Fatal("expected unit digest")
+	}
+	cursor.skipBlanks()
+	if _, ok := cursor.consumeField("pre sha"); !ok {
+		t.Fatal("expected pre sha")
+	}
+	cursor.skipBlanks()
+	if _, ok := cursor.consumeField("pre exit status"); !ok {
+		t.Fatal("expected pre exit status")
+	}
+	cursor.skipBlanks()
+	pre, ok, reason := cursor.consumeRawOutput("pre", digest, identity.Heading, &identity)
+	if !ok || pre != "pre one\npre two" {
+		t.Fatalf("pre raw output = %q, ok=%t, reason=%s", pre, ok, reason)
+	}
+
+	result := &ValidationResult{Valid: true}
+	applyQueueIssues(result, "GitHub comments", units, issues, comments)
+	if len(result.Errors) > 0 {
+		t.Fatalf("expected chunked receipt to satisfy checked unit, got %v", result.Errors)
+	}
+}
+
+func TestChunkedRawOutputDuplicateChunkFailsValidation(t *testing.T) {
+	source := "GH issue #1"
+	units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", "")), source)
+	digest := unitContractDigest(units[0])
+	comments := chunkedReceiptComments("echo hi", digest)
+	duplicate := rawOutputChunk("pre", 1, 2, digest, "duplicate", true)
+	comments[1] = strings.Replace(comments[1], rawOutputChunk("pre", 2, 2, digest, "pre two", true), duplicate, 1)
+	result := &ValidationResult{Valid: true}
+	applyQueueIssues(result, "GitHub comments", units, issues, comments)
+	if len(result.Errors) == 0 {
+		t.Fatal("expected duplicate raw output chunk to fail validation")
+	}
+}
+
+func TestChunkedRawOutputInterruptedByCommentFailsValidation(t *testing.T) {
+	source := "GH issue #1"
+	units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", "")), source)
+	digest := unitContractDigest(units[0])
+	comments := chunkedReceiptComments("echo hi", digest)
+	comments = []string{comments[0], "unrelated comment", comments[1], comments[2]}
+	result := &ValidationResult{Valid: true}
+	applyQueueIssues(result, "GitHub comments", units, issues, comments)
+	if len(result.Errors) == 0 {
+		t.Fatal("expected interrupted raw output continuation to fail validation")
 	}
 }
 

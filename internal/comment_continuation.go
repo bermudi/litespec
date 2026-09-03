@@ -8,9 +8,9 @@ const receiptContinuationMarker = "Receipt continues in next comment (GitHub com
 // receipt continuation marker with the immediately following comment, chaining
 // across as many comments as needed. GitHub caps issue comments at 65,536
 // characters; a verbatim red-green receipt that exceeds it splits at a field
-// boundary and continues in the next comment. Consumed comments are blanked so
-// comment indices and error numbering stay stable. A dangling marker (no
-// following comment) is left in place so receipt validation reports the
+// boundary or uses the explicit raw-output chunk form. Consumed comments are
+// blanked so comment indices and error numbering stay stable. A dangling marker
+// (no following comment) is left in place so receipt validation reports the
 // incomplete receipt. Marker text inside fenced output is raw content, never a
 // marker.
 func mergeContinuedComments(comments []string) []string {
@@ -20,19 +20,14 @@ func mergeContinuedComments(comments []string) []string {
 		if strings.TrimSpace(merged[i]) == "" {
 			continue
 		}
+		next := i + 1
 		for commentEndsWithContinuationMarker(merged[i]) {
-			next := -1
-			for j := i + 1; j < len(merged); j++ {
-				if strings.TrimSpace(merged[j]) != "" {
-					next = j
-					break
-				}
-			}
-			if next == -1 {
+			if next >= len(merged) || strings.TrimSpace(merged[next]) == "" {
 				break
 			}
 			merged[i] = stripContinuationMarker(merged[i]) + "\n" + strings.TrimSpace(merged[next])
 			merged[next] = ""
+			next++
 		}
 	}
 	return merged

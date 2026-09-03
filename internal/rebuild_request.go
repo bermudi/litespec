@@ -101,7 +101,7 @@ func parseRebuildComment(comment string, units []queueUnit) (queueUnitIdentity, 
 	if !ok {
 		return identity, rebuildCommentEvidence, declaredDigest, nil
 	}
-	issues := evidenceReceiptIssues(evidence, unitVerifyCommand(unit.Body), unitContractDigest(unit), "comment", identity.Heading)
+	issues := evidenceReceiptIssuesForIdentity(evidence, unitVerifyCommand(unit.Body), unitContractDigest(unit), "comment", identity.Heading, &identity)
 	switch {
 	case len(issues) == 0:
 		return identity, rebuildCommentEvidence, declaredDigest, nil
