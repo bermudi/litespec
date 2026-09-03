@@ -697,9 +697,9 @@ func (c *evidenceCursor) consumeRawOutput(phase, expectedDigest, expectedHeading
 		if match == nil {
 			return "", false, "raw output chunk must declare Chunk: <number>/<total>"
 		}
-		chunkNumber, _ := strconv.Atoi(match[1])
-		chunkTotal, _ := strconv.Atoi(match[2])
-		if chunkTotal < 2 || chunkNumber != wantedChunk {
+		chunkNumber, numberErr := strconv.Atoi(match[1])
+		chunkTotal, totalErr := strconv.Atoi(match[2])
+		if numberErr != nil || totalErr != nil || chunkTotal < 2 || chunkNumber != wantedChunk {
 			return "", false, fmt.Sprintf("raw %s output chunks must be numbered consecutively from 1", phase)
 		}
 		if totalChunks == 0 {
