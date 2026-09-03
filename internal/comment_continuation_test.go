@@ -289,6 +289,29 @@ func TestSplitReceiptResolvesAmendmentRequest(t *testing.T) {
 	}
 }
 
+func TestChunkedPreAmendmentReceiptClassifiesAsStaleEvidence(t *testing.T) {
+	body := func(doneMeans string) string {
+		return ownedQueue("## My outcome\nDone means: " + doneMeans + "\nVerify:\n```\necho hi\n```\n- [x] done\n")
+	}
+	oldUnits, _ := ValidateQueueBody(body("something"), "fixture")
+	newUnits, _ := ValidateQueueBody(body("something tighter"), "fixture")
+	oldDigest := unitContractDigest(oldUnits[0])
+	newDigest := unitContractDigest(newUnits[0])
+	identity := queueUnitIdentity{Occurrence: 1, Heading: "My outcome"}
+
+	records := mergeContinuedCommentRecords(chunkedReceiptComments("echo hi", oldDigest))
+	gotIdentity, kind, digest, err := parseRebuildCommentRecord(records[0], newUnits)
+	if err != nil {
+		t.Fatalf("chunked pre-amendment receipt returned an error: %v", err)
+	}
+	if gotIdentity != identity || kind != rebuildCommentStaleEvidence || digest != oldDigest {
+		t.Fatalf("chunked pre-amendment receipt = identity %v, kind %d, digest %q; want %v, stale evidence, %q", gotIdentity, kind, digest, identity, oldDigest)
+	}
+	if newDigest == oldDigest {
+		t.Fatal("fixture digests must differ across the amendment")
+	}
+}
+
 func TestDanglingSplitReceiptStillFailsValidation(t *testing.T) {
 	source := "GH issue #1"
 	units, issues := ValidateQueueBody(ownedQueue(checkedUnit("echo hi", "")), source)

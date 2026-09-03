@@ -741,7 +741,7 @@ func (c *evidenceCursor) consumeFence() (string, bool) {
 // explicitly numbered raw-output chunks. Chunk payloads are concatenated
 // without inserting bytes; the repeated identity prevents a continuation from
 // being attached to another receipt.
-func (c *evidenceCursor) consumeRawOutput(phase, expectedDigest, expectedHeading string, expectedIdentity *queueUnitIdentity) (string, bool, string) {
+func (c *evidenceCursor) consumeRawOutput(phase, declaredDigest, expectedHeading string, expectedIdentity *queueUnitIdentity) (string, bool, string) {
 	if c.at >= len(c.lines) {
 		return "", false, fmt.Sprintf("must include %s raw command output in a fenced block", phase)
 	}
@@ -811,7 +811,7 @@ func (c *evidenceCursor) consumeRawOutput(phase, expectedDigest, expectedHeading
 		}
 		c.skipBlanks()
 		chunkDigest, ok := c.consumeField("unit digest")
-		if !ok || chunkDigest != expectedDigest {
+		if !ok || chunkDigest != declaredDigest {
 			return "", false, "raw output chunk unit digest must match the receipt identity"
 		}
 		if expectedIdentity != nil && occurrence != expectedIdentity.Occurrence {
@@ -936,7 +936,7 @@ func evidenceReceiptIssuesForDocument(document evidenceDocument, verifyCmd, expe
 	}
 
 	cursor.skipBlanks()
-	_, ok, reason := cursor.consumeRawOutput("pre", expectedDigest, heading, expectedIdentity)
+	_, ok, reason := cursor.consumeRawOutput("pre", digestText, heading, expectedIdentity)
 	if !ok {
 		fail(reason)
 		return issues
@@ -984,7 +984,7 @@ func evidenceReceiptIssuesForDocument(document evidenceDocument, verifyCmd, expe
 	}
 
 	cursor.skipBlanks()
-	_, ok, reason = cursor.consumeRawOutput("post", expectedDigest, heading, expectedIdentity)
+	_, ok, reason = cursor.consumeRawOutput("post", digestText, heading, expectedIdentity)
 	if !ok {
 		fail(reason)
 		return issues
