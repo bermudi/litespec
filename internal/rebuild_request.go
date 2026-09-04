@@ -140,10 +140,10 @@ func parseRebuildComment(comment string, units []queueUnit) (queueUnitIdentity, 
 	return parseRebuildCommentRecord(continuedComment{text: comment, parts: []continuedCommentPart{{text: comment}}}, units)
 }
 
-func parseHeadingFormEvidenceCommentRecord(comment continuedComment, units []queueUnit) (queueUnitIdentity, rebuildCommentKind, string, bool) {
+func parseHeadingFormEvidenceCommentRecord(comment continuedComment, units []queueUnit) (queueUnitIdentity, rebuildCommentKind, string, bool, error) {
 	identities := queueUnitIdentities(units)
 	for i, unit := range units {
-		if !commentNamesUnit(comment.text, unit.Heading) {
+		if !commentNamesUnit(comment.text, unit.Heading) || !commentHasEvidenceAfterHeading(comment, unit.Heading) {
 			continue
 		}
 		document, ok := commentEvidenceDocument(comment, unit.Heading)
@@ -165,15 +165,16 @@ func parseHeadingFormEvidenceCommentRecord(comment continuedComment, units []que
 			if declaredDigest != currentDigest && declaredDigest == expectedDigest {
 				declaredDigest = currentDigest
 			}
-			return identity, rebuildCommentEvidence, declaredDigest, true
+			return identity, rebuildCommentEvidence, declaredDigest, true, nil
 		}
 
 		declarations := validEvidenceReceiptDeclarations(document, "comment", identity.Heading, &identity)
 		if len(declarations) == 1 && declarations[0].digest != currentDigest {
-			return identity, rebuildCommentStaleEvidence, declarations[0].digest, true
+			return identity, rebuildCommentStaleEvidence, declarations[0].digest, true, nil
 		}
+		return identity, rebuildCommentOther, "", true, fmt.Errorf("malformed heading-form evidence: %s", issues[0].Message)
 	}
-	return queueUnitIdentity{}, rebuildCommentOther, "", false
+	return queueUnitIdentity{}, rebuildCommentOther, "", false, nil
 }
 
 func parseRebuildCommentRecord(comment continuedComment, units []queueUnit) (queueUnitIdentity, rebuildCommentKind, string, error) {
@@ -200,8 +201,11 @@ func parseRebuildCommentRecord(comment continuedComment, units []queueUnit) (que
 	hasOccurrence := strings.HasPrefix(lines[0], "Unit occurrence:")
 	hasHeading := len(lines) > 1 && strings.HasPrefix(lines[1], "Unit heading:")
 	if !hasOccurrence && !hasHeading {
-		identity, kind, digest, ok := parseHeadingFormEvidenceCommentRecord(comment, units)
-		if ok {
+		identity, kind, digest, shaped, err := parseHeadingFormEvidenceCommentRecord(comment, units)
+		if err != nil {
+			return queueUnitIdentity{}, rebuildCommentOther, "", err
+		}
+		if shaped {
 			return identity, kind, digest, nil
 		}
 		return queueUnitIdentity{}, rebuildCommentOther, "", nil

@@ -979,6 +979,28 @@ func matchingEvidenceCommentRecordsForUnit(
 	return 0, false
 }
 
+func commentHasEvidenceAfterHeading(comment continuedComment, heading string) bool {
+	document := newEvidenceDocumentFromComment(comment)
+	openFence := ""
+	foundHeading := false
+	for _, line := range document.lines {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if !foundHeading {
+			if trimmed == heading || trimmed == "## "+heading {
+				foundHeading = true
+			}
+			continue
+		}
+		if trimmed == "Evidence:" || strings.HasPrefix(trimmed, "Evidence: ") || receiptVersionField(trimmed) || strings.HasPrefix(trimmed, "unit digest:") || strings.HasPrefix(trimmed, "pre sha:") || strings.HasPrefix(trimmed, "post sha:") {
+			return true
+		}
+	}
+	return false
+}
+
 func commentEvidenceDocument(comment continuedComment, heading string) (evidenceDocument, bool) {
 	document := newEvidenceDocumentFromComment(comment)
 	openFence := ""
@@ -1072,6 +1094,11 @@ func applyQueueIssues(result *ValidationResult, commentSource string, units []qu
 	usedComments := make(map[int]bool)
 	commentEvidence := make(map[int]bool)
 	identities := queueUnitIdentities(units)
+	bodyEvidence := bodyEvidenceReceiptObservations(units)
+	bodyEvidenceUnits := make(map[queueUnitIdentity]bool, len(bodyEvidence))
+	for _, observation := range bodyEvidence {
+		bodyEvidenceUnits[observation.identity] = true
+	}
 	for unitIndex, unit := range units {
 		if !isCheckedUnit(unit.Body) {
 			continue
@@ -1097,8 +1124,10 @@ func applyQueueIssues(result *ValidationResult, commentSource string, units []qu
 		commentEvidence[unitIndex] = true
 	}
 
+	scan := scanQueueCommentsWithInitialReceipts(units, comments, bodyEvidence)
 	for _, iss := range unitIssues {
-		if strings.Contains(iss.Message, "Evidence receipt") && commentEvidence[iss.queueUnitIndex] {
+		bodyEvidenceUnit := iss.queueUnitIndex >= 0 && iss.queueUnitIndex < len(identities) && bodyEvidenceUnits[identities[iss.queueUnitIndex]]
+		if strings.Contains(iss.Message, "Evidence receipt") && (commentEvidence[iss.queueUnitIndex] || (bodyEvidenceUnit && len(scan.errors) == 0)) {
 			continue
 		}
 		if iss.Severity == SeverityWarning {
@@ -1108,7 +1137,6 @@ func applyQueueIssues(result *ValidationResult, commentSource string, units []qu
 		}
 	}
 
-	scan := scanQueueCommentsWithInitialReceipts(units, comments, bodyEvidenceReceiptObservations(units))
 	for _, err := range scan.errors {
 		result.Errors = append(result.Errors, ValidationIssue{
 			Severity: SeverityError,

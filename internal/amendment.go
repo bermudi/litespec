@@ -531,7 +531,9 @@ func scanQueueCommentsWithInitialReceipts(
 	for i, observation := range initialReceipts {
 		if err := registry.add(observation); err != nil {
 			scan.errors = append(scan.errors, fmt.Errorf("queue evidence %d: %w", i+1, err))
+			continue
 		}
+		scan.observed[observation.identity] = append(scan.observed[observation.identity], observation.receipt.digest)
 	}
 
 	var sightings []amendmentSighting
@@ -657,6 +659,9 @@ func scanQueueCommentsWithInitialReceipts(
 		identity, kind, digest, err := parseRebuildCommentRecord(commentRecord, units)
 		if err != nil {
 			scan.errors = append(scan.errors, fmt.Errorf("comment %d: %w", commentIndex+1, err))
+			if commentContainsRawOutputChunk(commentRecord) && !commentHasValidHeadingEvidence(commentRecord, units) {
+				scan.errors = append(scan.errors, fmt.Errorf("comment %d: orphan raw output chunk", commentIndex+1))
+			}
 			continue
 		}
 		for _, observation := range completeEvidenceReceiptObservationsForComment(commentRecord, units) {
