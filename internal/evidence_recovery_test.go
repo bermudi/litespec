@@ -267,6 +267,153 @@ func TestAppendOnlyEvidenceRecovery(t *testing.T) {
 		}
 	})
 
+	t.Run("amendment history normalizes renamed receipt identities before recovery comparison", func(t *testing.T) {
+		oldBody := ownedQueue(strings.Join([]string{
+			"## Old outcome",
+			"Done means: old interpretation",
+			"Verify:",
+			"```",
+			"echo old",
+			"```",
+			"- [x] done",
+		}, "\n"))
+		currentBody := ownedQueue(strings.Join([]string{
+			"## Renamed outcome",
+			"Done means: current interpretation",
+			"Verify:",
+			"```",
+			"echo current",
+			"```",
+			"- [x] done",
+		}, "\n"))
+		oldUnits, _ := ValidateQueueBody(oldBody, "GH issue #15")
+		currentUnits, currentIssues := ValidateQueueBody(currentBody, "GH issue #15")
+		if len(currentIssues) == 0 || len(currentUnits) != 1 {
+			t.Fatalf("current fixture should need evidence, units=%d issues=%v", len(currentUnits), currentIssues)
+		}
+		oldIdentity := recoveryTestIdentity("Old outcome", 1)
+		currentIdentity := recoveryTestIdentity("Renamed outcome", 1)
+		oldDigest := unitContractDigest(oldUnits[0])
+		currentDigest := unitContractDigest(currentUnits[0])
+		oldEvidence := recoveryTestLegacyReceipt(oldDigest, "echo old")
+		oldID := recoveryTestReceiptID(t, oldEvidence, "echo old", oldIdentity, oldDigest)
+		oldHeadingReceipt := recoveryTestHeadingFormEvidence(oldIdentity.Heading, oldEvidence)
+		amendment := recoveryTestAmendment(currentIdentity, oldDigest, currentDigest)
+		recovery := recoveryTestVersionedReceipt(currentIdentity, currentDigest, "echo current", oldID)
+
+		result := &ValidationResult{Valid: true}
+		applyQueueIssues(result, "GitHub comments", currentUnits, currentIssues, []string{
+			oldHeadingReceipt,
+			amendment,
+			recovery,
+		})
+		if len(result.Errors) > 0 {
+			t.Fatalf("renamed recovery was rejected: %v", result.Errors)
+		}
+	})
+
+	t.Run("malformed superseded heading evidence remains visible after renamed recovery", func(t *testing.T) {
+		oldBody := ownedQueue(strings.Join([]string{
+			"## Old outcome",
+			"Done means: old interpretation",
+			"Verify:",
+			"```",
+			"echo old",
+			"```",
+			"- [x] done",
+		}, "\n"))
+		currentBody := ownedQueue(strings.Join([]string{
+			"## Renamed outcome",
+			"Done means: current interpretation",
+			"Verify:",
+			"```",
+			"echo current",
+			"```",
+			"- [x] done",
+		}, "\n"))
+		oldUnits, _ := ValidateQueueBody(oldBody, "GH issue #15")
+		currentUnits, currentIssues := ValidateQueueBody(currentBody, "GH issue #15")
+		oldIdentity := recoveryTestIdentity("Old outcome", 1)
+		currentIdentity := recoveryTestIdentity("Renamed outcome", 1)
+		oldDigest := unitContractDigest(oldUnits[0])
+		currentDigest := unitContractDigest(currentUnits[0])
+		oldEvidence := recoveryTestLegacyReceipt(oldDigest, "echo old")
+		oldID := recoveryTestReceiptID(t, oldEvidence, "echo old", oldIdentity, oldDigest)
+		validOld := recoveryTestHeadingFormEvidence(oldIdentity.Heading, oldEvidence)
+		malformedOld := recoveryTestHeadingFormEvidence(oldIdentity.Heading, strings.TrimSuffix(
+			oldEvidence,
+			"Post-evidence scope: this command exited 0 at "+recoveryTestPostSHA+"; nothing else is inferred.\n",
+		))
+		amendment := recoveryTestAmendment(currentIdentity, oldDigest, currentDigest)
+		recovery := recoveryTestVersionedReceipt(currentIdentity, currentDigest, "echo current", oldID)
+
+		result := &ValidationResult{Valid: true}
+		applyQueueIssues(result, "GitHub comments", currentUnits, currentIssues, []string{
+			validOld,
+			malformedOld,
+			amendment,
+			recovery,
+		})
+		if !recoveryTestHasErrorContaining(result, "comment 2: malformed heading-form evidence") {
+			t.Fatalf("malformed superseded evidence was hidden by recovery: %v", result.Errors)
+		}
+	})
+
+	t.Run("local trailing metadata keeps coverage and recovery independently composable", func(t *testing.T) {
+		body := recoveryTestQueueBody("", true)
+		units, issues := ValidateQueueBody(body, "GH issue #15")
+		identity := recoveryTestIdentity("My outcome", 1)
+		digest := unitContractDigest(units[0])
+		oldReceipt, oldID := recoveryTestLegacyIdentityReceipt(t, identity, digest, "echo hi")
+		body = recoveryTestQueueBody(oldReceipt, true)
+		units, issues = ValidateQueueBody(body, "GH issue #15")
+		if len(issues) > 0 {
+			t.Fatalf("initial body evidence was rejected: %v", issues)
+		}
+		recovery := recoveryTestVersionedReceipt(identity, digest, "echo hi", oldID)
+		coverage := strings.Join([]string{
+			"Review coverage:",
+			"HEAD: " + recoveryTestPostSHA,
+			"Unit occurrence: 1",
+			"Unit heading: My outcome",
+			"Exercised:",
+			"- recovery: local composability",
+			"Not exercised:",
+			"- none",
+			"Uncertain:",
+			"- none",
+		}, "\n")
+
+		for _, order := range [][]string{{coverage, recovery}, {recovery, coverage}} {
+			root := t.TempDir()
+			queuePath := filepath.Join(root, "specs", "queues", "recovery.md")
+			if err := os.MkdirAll(filepath.Dir(queuePath), 0o755); err != nil {
+				t.Fatalf("mkdir queue: %v", err)
+			}
+			localBody := strings.Join(append([]string{body}, order...), "\n\n")
+			if err := os.WriteFile(queuePath, []byte(localBody), 0o644); err != nil {
+				t.Fatalf("write queue: %v", err)
+			}
+			result, err := ValidateQueueFile(queuePath)
+			if err != nil {
+				t.Fatalf("ValidateQueueFile: %v", err)
+			}
+			if !result.Valid || len(result.Errors) > 0 {
+				t.Fatalf("local metadata order was rejected: %v", result.Errors)
+			}
+			stripped, metadata := splitLocalQueueMetadataBlocks(localBody)
+			if !strings.Contains(stripped, oldReceipt) || strings.Contains(stripped, recovery) || strings.Contains(stripped, coverage) {
+				t.Fatalf("split stripped the wrong content: %q", stripped)
+			}
+			if len(metadata) != 2 {
+				t.Fatalf("local metadata blocks = %q, want coverage and recovery", metadata)
+			}
+			if metadata[0] != order[0] || metadata[1] != order[1] {
+				t.Fatalf("local metadata blocks = %q, want %q", metadata, order)
+			}
+		}
+	})
+
 	t.Run("malformed heading-form evidence remains visible after recovery", func(t *testing.T) {
 		body := recoveryTestQueueBody("", true)
 		units, _ := ValidateQueueBody(body, "GH issue #15")
