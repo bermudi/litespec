@@ -145,8 +145,8 @@ func parseReplanMarkerComment(comment string) (queueReplanMarker, bool, error) {
 func localMetadataBlockStart(lines []string, index int, metadataStream bool, lastNonEmpty string) bool {
 	trimmed := strings.TrimSpace(lines[index])
 	switch trimmed {
-	case "Amendment:", "Re-plan required:":
-		return true
+	case "Amendment:", "Re-plan required:", "Review coverage:":
+		return metadataStream || isCheckboxLine(lastNonEmpty)
 	}
 	if !strings.HasPrefix(lines[index], "Unit occurrence:") {
 		return false
@@ -527,15 +527,6 @@ func scanQueueCommentsWithInitialReceipts(
 		edges:                  make(map[queueUnitIdentity][]digestEdge),
 		completedRebuildCycles: make(map[queueUnitIdentity]map[string]int),
 	}
-	registry := newEvidenceReceiptRegistry()
-	for i, observation := range initialReceipts {
-		if err := registry.add(observation); err != nil {
-			scan.errors = append(scan.errors, fmt.Errorf("queue evidence %d: %w", i+1, err))
-			continue
-		}
-		scan.observed[observation.identity] = append(scan.observed[observation.identity], observation.contractDigest)
-	}
-
 	var sightings []amendmentSighting
 	amendmentShaped := make(map[int]bool)
 	amendmentsAt := make(map[int]contractAmendment)
@@ -580,6 +571,20 @@ func scanQueueCommentsWithInitialReceipts(
 
 	resolveIdentity := history.resolveReceiptIdentity
 	digestBelongsToIdentity := history.digestBelongsToIdentity
+
+	registry := newEvidenceReceiptRegistry()
+	for i, observation := range initialReceipts {
+		normalized, err := normalizeEvidenceReceiptObservation(history, observation)
+		if err != nil {
+			scan.errors = append(scan.errors, fmt.Errorf("queue evidence %d: %w", i+1, err))
+			continue
+		}
+		if err := registry.add(normalized); err != nil {
+			scan.errors = append(scan.errors, fmt.Errorf("queue evidence %d: %w", i+1, err))
+			continue
+		}
+		scan.observed[normalized.identity] = append(scan.observed[normalized.identity], normalized.contractDigest)
+	}
 
 	unresolved := make(map[queueUnitIdentity]bool)
 	latestAmendmentDigest := make(map[queueUnitIdentity]string)
@@ -656,7 +661,7 @@ func scanQueueCommentsWithInitialReceipts(
 			continue
 		}
 
-		identity, kind, digest, err := parseRebuildCommentRecord(commentRecord, units)
+		identity, kind, digest, err := parseRebuildCommentRecordWithHistory(commentRecord, units, &history)
 		if err != nil {
 			scan.errors = append(scan.errors, fmt.Errorf("comment %d: %w", commentIndex+1, err))
 			if commentContainsRawOutputChunk(commentRecord) && !commentHasValidHeadingEvidence(commentRecord, units) {
@@ -664,8 +669,13 @@ func scanQueueCommentsWithInitialReceipts(
 			}
 			continue
 		}
-		for _, observation := range completeEvidenceReceiptObservationsForComment(commentRecord, units) {
-			if err := registry.add(observation); err != nil {
+		for _, observation := range completeEvidenceReceiptObservationsForCommentWithHistory(commentRecord, units, &history) {
+			normalized, err := normalizeEvidenceReceiptObservation(history, observation)
+			if err != nil {
+				scan.errors = append(scan.errors, fmt.Errorf("comment %d: %w", commentIndex+1, err))
+				continue
+			}
+			if err := registry.add(normalized); err != nil {
 				scan.errors = append(scan.errors, fmt.Errorf("comment %d: %w", commentIndex+1, err))
 			}
 		}

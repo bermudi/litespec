@@ -141,40 +141,152 @@ func parseRebuildComment(comment string, units []queueUnit) (queueUnitIdentity, 
 }
 
 func parseHeadingFormEvidenceCommentRecord(comment continuedComment, units []queueUnit) (queueUnitIdentity, rebuildCommentKind, string, bool, error) {
-	identities := queueUnitIdentities(units)
-	for i, unit := range units {
-		if !commentNamesUnit(comment.text, unit.Heading) || !commentHasEvidenceAfterHeading(comment, unit.Heading) {
-			continue
-		}
-		document, ok := commentEvidenceDocument(comment, unit.Heading)
+	return parseHeadingFormEvidenceCommentRecordWithHistory(comment, units, nil)
+}
+
+func parseHeadingFormEvidenceCommentRecordWithHistory(
+	comment continuedComment,
+	units []queueUnit,
+	history *amendmentHistory,
+) (queueUnitIdentity, rebuildCommentKind, string, bool, error) {
+	for _, identity := range headingFormEvidenceIdentities(comment, units, history) {
+		document, ok := commentEvidenceDocument(comment, identity.Heading)
 		if !ok {
 			continue
 		}
-		identity := identities[i]
-		currentDigest := unitContractDigest(unit)
-		expectedDigest := evidenceReceiptExpectedDigest(unit, document)
-		receipt, issues := parseEvidenceReceiptDocument(
-			document,
-			unitVerifyCommand(unit.Body),
-			expectedDigest,
-			"comment",
-			identity.Heading,
-			&identity,
-		)
-		if len(issues) == 0 {
-			return identity, rebuildCommentEvidence, normalizedEvidenceReceiptDigest(unit, receipt), true, nil
+		unit, hasUnit := findQueueUnit(units, identity)
+		if hasUnit {
+			currentDigest := unitContractDigest(unit)
+			expectedDigest := evidenceReceiptExpectedDigest(unit, document)
+			receipt, issues := parseEvidenceReceiptDocument(
+				document,
+				unitVerifyCommand(unit.Body),
+				expectedDigest,
+				"comment",
+				identity.Heading,
+				&identity,
+			)
+			if len(issues) == 0 {
+				return identity, rebuildCommentEvidence, normalizedEvidenceReceiptDigest(unit, receipt), true, nil
+			}
+
+			declarations := validEvidenceReceiptDeclarations(document, "comment", identity.Heading, &identity)
+			if len(declarations) == 1 && declarations[0].digest != currentDigest {
+				return identity, rebuildCommentStaleEvidence, declarations[0].digest, true, nil
+			}
+			return identity, rebuildCommentOther, "", true, fmt.Errorf("malformed heading-form evidence: %s", issues[0].Message)
 		}
 
 		declarations := validEvidenceReceiptDeclarations(document, "comment", identity.Heading, &identity)
-		if len(declarations) == 1 && declarations[0].digest != currentDigest {
-			return identity, rebuildCommentStaleEvidence, declarations[0].digest, true, nil
+		if len(declarations) == 1 {
+			return identity, rebuildCommentEvidence, declarations[0].digest, true, nil
 		}
-		return identity, rebuildCommentOther, "", true, fmt.Errorf("malformed heading-form evidence: %s", issues[0].Message)
+		return identity, rebuildCommentOther, "", true, fmt.Errorf("malformed heading-form evidence: incomplete receipt")
 	}
 	return queueUnitIdentity{}, rebuildCommentOther, "", false, nil
 }
 
+func headingFormEvidenceIdentities(
+	comment continuedComment,
+	units []queueUnit,
+	history *amendmentHistory,
+) []queueUnitIdentity {
+	var identities []queueUnitIdentity
+	seen := make(map[queueUnitIdentity]bool)
+	appendIdentity := func(identity queueUnitIdentity) {
+		if seen[identity] {
+			return
+		}
+		seen[identity] = true
+		identities = append(identities, identity)
+	}
+
+	currentIdentities := queueUnitIdentities(units)
+	for i, unit := range units {
+		if commentNamesUnit(comment.text, unit.Heading) && commentHasEvidenceAfterHeading(comment, unit.Heading) {
+			appendIdentity(currentIdentities[i])
+		}
+	}
+	if history == nil {
+		return identities
+	}
+
+	for _, heading := range commentHeadingFormNames(comment) {
+		if !commentHasEvidenceAfterHeading(comment, heading) {
+			continue
+		}
+		document, ok := commentEvidenceDocument(comment, heading)
+		if !ok {
+			continue
+		}
+		for _, digest := range evidenceReceiptDigests(document) {
+			for occurrence := 1; occurrence <= len(units); occurrence++ {
+				candidate := queueUnitIdentity{Occurrence: occurrence, Heading: heading}
+				if _, ok := history.resolveReceiptIdentity(candidate, digest); ok {
+					appendIdentity(candidate)
+				}
+			}
+		}
+		for identity := range history.aliases {
+			if identity.Heading == heading {
+				appendIdentity(identity)
+			}
+		}
+	}
+	return identities
+}
+
+func commentHeadingFormNames(comment continuedComment) []string {
+	document := newEvidenceDocumentFromComment(comment)
+	openFence := ""
+	var headings []string
+	seen := make(map[string]bool)
+	for _, line := range document.lines {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "## ") {
+			continue
+		}
+		heading := strings.TrimSpace(strings.TrimPrefix(trimmed, "## "))
+		if heading != "" && !seen[heading] {
+			seen[heading] = true
+			headings = append(headings, heading)
+		}
+	}
+	return headings
+}
+
+func evidenceReceiptDigests(document evidenceDocument) []string {
+	openFence := ""
+	var digests []string
+	seen := make(map[string]bool)
+	for _, line := range document.lines {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		if !strings.HasPrefix(line, "unit digest:") {
+			continue
+		}
+		digest := strings.TrimSpace(strings.TrimPrefix(line, "unit digest:"))
+		if unitDigestPattern.MatchString(digest) && !seen[digest] {
+			seen[digest] = true
+			digests = append(digests, digest)
+		}
+	}
+	return digests
+}
+
 func parseRebuildCommentRecord(comment continuedComment, units []queueUnit) (queueUnitIdentity, rebuildCommentKind, string, error) {
+	return parseRebuildCommentRecordWithHistory(comment, units, nil)
+}
+
+func parseRebuildCommentRecordWithHistory(
+	comment continuedComment,
+	units []queueUnit,
+	history *amendmentHistory,
+) (queueUnitIdentity, rebuildCommentKind, string, error) {
 	document := newEvidenceDocumentFromComment(comment).trimSpace()
 	lines := document.lines
 	if len(lines) == 0 {
@@ -198,7 +310,7 @@ func parseRebuildCommentRecord(comment continuedComment, units []queueUnit) (que
 	hasOccurrence := strings.HasPrefix(lines[0], "Unit occurrence:")
 	hasHeading := len(lines) > 1 && strings.HasPrefix(lines[1], "Unit heading:")
 	if !hasOccurrence && !hasHeading {
-		identity, kind, digest, shaped, err := parseHeadingFormEvidenceCommentRecord(comment, units)
+		identity, kind, digest, shaped, err := parseHeadingFormEvidenceCommentRecordWithHistory(comment, units, history)
 		if err != nil {
 			return queueUnitIdentity{}, rebuildCommentOther, "", err
 		}

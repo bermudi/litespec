@@ -125,6 +125,14 @@ func completeEvidenceReceiptObservationsForComment(
 	comment continuedComment,
 	units []queueUnit,
 ) []evidenceReceiptObservation {
+	return completeEvidenceReceiptObservationsForCommentWithHistory(comment, units, nil)
+}
+
+func completeEvidenceReceiptObservationsForCommentWithHistory(
+	comment continuedComment,
+	units []queueUnit,
+	history *amendmentHistory,
+) []evidenceReceiptObservation {
 	document := newEvidenceDocumentFromComment(comment).trimSpace()
 	if len(document.lines) >= 3 &&
 		strings.HasPrefix(document.lines[0], "Unit occurrence:") &&
@@ -146,21 +154,34 @@ func completeEvidenceReceiptObservationsForComment(
 		return []evidenceReceiptObservation{observation}
 	}
 
-	identities := queueUnitIdentities(units)
 	observations := make([]evidenceReceiptObservation, 0, 1)
-	for i, unit := range units {
-		if !commentNamesUnit(comment.text, unit.Heading) {
-			continue
-		}
-		document, ok := commentEvidenceDocument(comment, unit.Heading)
+	for _, identity := range headingFormEvidenceIdentities(comment, units, history) {
+		document, ok := commentEvidenceDocument(comment, identity.Heading)
 		if !ok {
 			continue
 		}
-		observation, ok := completeEvidenceReceiptObservation(document, identities[i], units, "comment")
+		observation, ok := completeEvidenceReceiptObservation(document, identity, units, "comment")
 		if ok {
 			observations = append(observations, observation)
 			break
 		}
 	}
 	return observations
+}
+
+func normalizeEvidenceReceiptObservation(
+	history amendmentHistory,
+	observation evidenceReceiptObservation,
+) (evidenceReceiptObservation, error) {
+	resolved, ok := history.resolveReceiptIdentity(observation.identity, observation.contractDigest)
+	if !ok {
+		return evidenceReceiptObservation{}, fmt.Errorf(
+			"receipt %s with occurrence %d and heading %q does not identify one unit in its valid amendment history",
+			observation.receipt.header.receiptID,
+			observation.identity.Occurrence,
+			observation.identity.Heading,
+		)
+	}
+	observation.identity = resolved
+	return observation, nil
 }
