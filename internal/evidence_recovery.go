@@ -6,8 +6,9 @@ import (
 )
 
 type evidenceReceiptObservation struct {
-	identity queueUnitIdentity
-	receipt  parsedEvidenceReceipt
+	identity       queueUnitIdentity
+	receipt        parsedEvidenceReceipt
+	contractDigest string
 }
 
 type evidenceReceiptRegistry struct {
@@ -79,7 +80,11 @@ func completeEvidenceReceiptObservation(
 			&identity,
 		)
 		if len(issues) == 0 {
-			return evidenceReceiptObservation{identity: identity, receipt: receipt}, true
+			return evidenceReceiptObservation{
+				identity:       identity,
+				receipt:        receipt,
+				contractDigest: normalizedEvidenceReceiptDigest(unit, receipt),
+			}, true
 		}
 	}
 
@@ -90,7 +95,15 @@ func completeEvidenceReceiptObservation(
 	if !hasUnit && digestMatchesAnyUnit(declarations[0].digest, units) {
 		return evidenceReceiptObservation{}, false
 	}
-	return evidenceReceiptObservation{identity: identity, receipt: declarations[0].receipt}, true
+	observation := evidenceReceiptObservation{
+		identity:       identity,
+		receipt:        declarations[0].receipt,
+		contractDigest: declarations[0].digest,
+	}
+	if hasUnit {
+		observation.contractDigest = normalizedEvidenceReceiptDigest(unit, observation.receipt)
+	}
+	return observation, true
 }
 
 func bodyEvidenceReceiptObservations(units []queueUnit) []evidenceReceiptObservation {

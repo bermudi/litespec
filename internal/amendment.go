@@ -533,7 +533,7 @@ func scanQueueCommentsWithInitialReceipts(
 			scan.errors = append(scan.errors, fmt.Errorf("queue evidence %d: %w", i+1, err))
 			continue
 		}
-		scan.observed[observation.identity] = append(scan.observed[observation.identity], observation.receipt.digest)
+		scan.observed[observation.identity] = append(scan.observed[observation.identity], observation.contractDigest)
 	}
 
 	var sightings []amendmentSighting

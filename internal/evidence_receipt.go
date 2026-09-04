@@ -162,6 +162,14 @@ func evidenceReceiptExpectedDigest(unit queueUnit, document evidenceDocument) st
 	return unitContractDigest(unit)
 }
 
+func normalizedEvidenceReceiptDigest(unit queueUnit, receipt parsedEvidenceReceipt) string {
+	algorithmDigest, ok := unitContractDigestForAlgorithm(unit, receipt.header.digestAlgorithm)
+	if !ok || receipt.digest != algorithmDigest {
+		return receipt.digest
+	}
+	return unitContractDigest(unit)
+}
+
 func (c *evidenceCursor) consumeContinuationReceiptHeader(expectedIdentity *queueUnitIdentity) error {
 	if c.receiptHeader == nil || !c.trackCommentBoundaries || c.at >= len(c.lines) {
 		return nil

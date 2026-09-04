@@ -153,7 +153,7 @@ func parseHeadingFormEvidenceCommentRecord(comment continuedComment, units []que
 		identity := identities[i]
 		currentDigest := unitContractDigest(unit)
 		expectedDigest := evidenceReceiptExpectedDigest(unit, document)
-		issues, declaredDigest := evidenceReceiptIssuesForDocument(
+		receipt, issues := parseEvidenceReceiptDocument(
 			document,
 			unitVerifyCommand(unit.Body),
 			expectedDigest,
@@ -162,10 +162,7 @@ func parseHeadingFormEvidenceCommentRecord(comment continuedComment, units []que
 			&identity,
 		)
 		if len(issues) == 0 {
-			if declaredDigest != currentDigest && declaredDigest == expectedDigest {
-				declaredDigest = currentDigest
-			}
-			return identity, rebuildCommentEvidence, declaredDigest, true, nil
+			return identity, rebuildCommentEvidence, normalizedEvidenceReceiptDigest(unit, receipt), true, nil
 		}
 
 		declarations := validEvidenceReceiptDeclarations(document, "comment", identity.Heading, &identity)
@@ -233,7 +230,7 @@ func parseRebuildCommentRecord(comment continuedComment, units []queueUnit) (que
 
 	currentDigest := unitContractDigest(unit)
 	expectedDigest := evidenceReceiptExpectedDigest(unit, evidenceDocument)
-	issues, declaredDigest := evidenceReceiptIssuesForDocument(
+	receipt, issues := parseEvidenceReceiptDocument(
 		evidenceDocument,
 		unitVerifyCommand(unit.Body),
 		expectedDigest,
@@ -242,10 +239,7 @@ func parseRebuildCommentRecord(comment continuedComment, units []queueUnit) (que
 		&identity,
 	)
 	if len(issues) == 0 {
-		if declaredDigest != currentDigest && declaredDigest == expectedDigest {
-			return identity, rebuildCommentEvidence, currentDigest, nil
-		}
-		return identity, rebuildCommentEvidence, declaredDigest, nil
+		return identity, rebuildCommentEvidence, normalizedEvidenceReceiptDigest(unit, receipt), nil
 	}
 
 	declarations := validEvidenceReceiptDeclarations(evidenceDocument, "comment", identity.Heading, &identity)
