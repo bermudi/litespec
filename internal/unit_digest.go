@@ -10,6 +10,8 @@ import (
 
 var unitDigestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
+// Digest algorithm identifiers. Unversioned receipts always dispatch to v1;
+// v0 is retained and applies only when a receipt declares it explicitly.
 const (
 	digestAlgorithmV0 = "unit-contract-sha256-v0"
 	digestAlgorithmV1 = "unit-contract-sha256-v1"

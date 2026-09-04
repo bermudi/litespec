@@ -232,6 +232,32 @@ func TestVersionedEvidenceProtocol(t *testing.T) {
 		if len(issues) > 0 {
 			t.Fatalf("legacy receipt with a Protocol payload line was rejected: %v", issues)
 		}
+
+		v0Digest := protocolTestDigestV0(units[0])
+		if v0Digest == digest {
+			t.Fatal("v0 fixture must produce a distinct digest")
+		}
+		unversionedV0 := strings.Join([]string{
+			"Evidence:",
+			"echo hi",
+			"unit digest: " + v0Digest,
+			"pre sha: " + protocolTestPreSHA,
+			"pre exit status: 1",
+			"```",
+			"missing outcome",
+			"```",
+			protocolTestScope("Pre", "1", protocolTestPreSHA),
+			"post sha: " + protocolTestPostSHA,
+			"post exit status: 0",
+			"```",
+			"output",
+			"```",
+			protocolTestScope("Post", "0", protocolTestPostSHA),
+		}, "\n") + "\n"
+		_, issues = ValidateQueueBody(ownedQueue(checkedUnit("echo hi", unversionedV0)), source)
+		if !containsIssue(issues, "unit digest mismatch") {
+			t.Fatalf("unversioned receipt with a unit-contract-sha256-v0 digest was not rejected as a digest mismatch: %v", issues)
+		}
 	})
 
 	t.Run("unknown or partial receipt versions fail without legacy fallback", func(t *testing.T) {
