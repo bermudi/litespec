@@ -617,3 +617,65 @@ func TestLocalQueueReplanMarkerMetadata(t *testing.T) {
 		t.Errorf("local metadata = %q, want the exact marker", metadata)
 	}
 }
+
+func TestLocalQueueMetadataSplitsContinuationsAndRequests(t *testing.T) {
+	body := amendmentTestBody(amendmentTestOldDoneMeans, "First unit")
+	identity := queueUnitIdentity{Occurrence: 1, Heading: "First unit"}
+	chunk := func(number int, continued bool) string {
+		lines := []string{
+			"Raw output chunk:",
+			"Output: pre",
+			fmt.Sprintf("Chunk: %d/2", number),
+			"Unit occurrence: 1",
+			"Unit heading: First unit",
+			"unit digest: " + strings.Repeat("a", 64),
+			"```",
+			fmt.Sprintf("chunk %d payload", number),
+			"```",
+		}
+		if continued {
+			lines = append(lines, receiptContinuationMarker)
+		}
+		return strings.Join(lines, "\n")
+	}
+	receiptHead := strings.Join([]string{
+		"Unit occurrence: 1",
+		"Unit heading: First unit",
+		"Evidence:",
+		"echo first",
+		"unit digest: " + strings.Repeat("a", 64),
+		"pre sha: " + strings.Repeat("b", 40),
+		"pre exit status: 1",
+		chunk(1, true),
+	}, "\n")
+	request := formatRebuildRequest(identity)
+	trailing := chunk(2, false)
+	markerInsideFence := strings.Join([]string{
+		"Unit occurrence: 1",
+		"Unit heading: First unit",
+		"Evidence:",
+		"echo first",
+		"```",
+		receiptContinuationMarker,
+		"```",
+	}, "\n")
+
+	stripped, metadata := splitLocalQueueMetadataBlocks(strings.Join([]string{body, receiptHead, trailing, request}, "\n\n"))
+	if strings.Contains(stripped, "Raw output chunk:") || strings.Contains(stripped, "Rebuild request:") {
+		t.Error("continuation or request record remained in the queue contract body")
+	}
+	if len(metadata) != 3 || metadata[0] != receiptHead || metadata[1] != trailing || metadata[2] != request {
+		t.Errorf("local metadata = %q, want the receipt head, its continuation, and the rebuild request as separate blocks", metadata)
+	}
+	if got := mergeContinuedComments(metadata[:2]); len(got) != 2 || !strings.Contains(got[0], "chunk 1 payload") || !strings.Contains(got[0], "chunk 2 payload") || strings.Contains(got[0], receiptContinuationMarker) {
+		t.Errorf("merged continuation = %q, want one reconstructed receipt record without the marker", got)
+	}
+
+	kept, fencedMetadata := splitLocalQueueMetadataBlocks(body + "\n\n" + markerInsideFence)
+	if len(fencedMetadata) != 1 || !strings.Contains(fencedMetadata[0], receiptContinuationMarker) {
+		t.Errorf("fenced marker metadata = %q, want the marker preserved inside its block", fencedMetadata)
+	}
+	if strings.Contains(kept, receiptContinuationMarker) {
+		t.Error("marker inside a fence leaked into the queue contract body")
+	}
+}

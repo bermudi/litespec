@@ -145,7 +145,7 @@ func parseReplanMarkerComment(comment string) (queueReplanMarker, bool, error) {
 func localMetadataBlockStart(lines []string, index int, metadataStream bool, lastNonEmpty string) bool {
 	trimmed := strings.TrimSpace(lines[index])
 	switch trimmed {
-	case "Amendment:", "Re-plan required:", "Review coverage:":
+	case "Amendment:", "Re-plan required:", "Review coverage:", "Rebuild request:":
 		return metadataStream || isCheckboxLine(lastNonEmpty)
 	}
 	if !strings.HasPrefix(lines[index], "Unit occurrence:") {
@@ -172,6 +172,7 @@ func splitLocalQueueMetadataBlocks(body string) (string, []string) {
 	lines := strings.Split(strings.ReplaceAll(body, "\r\n", "\n"), "\n")
 	openFence := ""
 	metadataStream := false
+	continueMetadata := false
 	lastNonEmpty := ""
 	var blocks []string
 	kept := make([]string, 0, len(lines))
@@ -184,20 +185,31 @@ func splitLocalQueueMetadataBlocks(body string) (string, []string) {
 			}
 			continue
 		}
-		if !localMetadataBlockStart(lines, i, metadataStream, lastNonEmpty) {
+		trimmed := strings.TrimSpace(line)
+		if continueMetadata {
+			if trimmed == "" {
+				continue
+			}
+		} else if !localMetadataBlockStart(lines, i, metadataStream, lastNonEmpty) {
 			kept = append(kept, line)
-			if trimmed := strings.TrimSpace(line); trimmed != "" {
+			if trimmed != "" {
 				lastNonEmpty = trimmed
 			}
 			continue
 		}
 
 		blockFence := ""
+		continues := false
 		j := i + 1
 		for j < len(lines) {
 			if consumeMarkdownFenceLine(&blockFence, lines[j]) {
 				j++
 				continue
+			}
+			if strings.TrimSpace(lines[j]) == receiptContinuationMarker {
+				continues = true
+				j++
+				break
 			}
 			if localMetadataBlockStart(lines, j, true, "") {
 				break
@@ -206,6 +218,7 @@ func splitLocalQueueMetadataBlocks(body string) (string, []string) {
 		}
 		blocks = append(blocks, strings.TrimRight(strings.Join(lines[i:j], "\n"), "\n"))
 		metadataStream = true
+		continueMetadata = continues
 		i = j - 1
 	}
 	return strings.Join(kept, "\n"), blocks
