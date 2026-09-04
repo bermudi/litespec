@@ -152,6 +152,49 @@ func protocolTestChunkedReceiptComments(digest string) []string {
 	return []string{first, second, third, fourth}
 }
 
+func protocolTestFieldBoundaryIdentityPrefix(receiptID string) string {
+	return strings.Join([]string{
+		"Protocol: evidence/v1",
+		"Digest algorithm: unit-contract-sha256-v1",
+		"Receipt ID: " + receiptID,
+		"Unit occurrence: 1",
+		"Unit heading: My outcome",
+	}, "\n")
+}
+
+func protocolTestFieldBoundaryReceiptComments(digest string) []string {
+	preOutput := "pre output"
+	postOutput := "post output"
+	receiptID := protocolTestReceiptID("evidence/v1", "unit-contract-sha256-v1", 1, "My outcome", "echo hi", digest, preOutput, postOutput)
+	first := strings.Join([]string{
+		"Unit occurrence: 1",
+		"Unit heading: My outcome",
+		"Evidence:",
+		"Protocol: evidence/v1",
+		"Digest algorithm: unit-contract-sha256-v1",
+		"Receipt ID: " + receiptID,
+		"echo hi",
+		"unit digest: " + digest,
+		"pre sha: " + protocolTestPreSHA,
+		"pre exit status: 1",
+		"```",
+		preOutput,
+		"```",
+		protocolTestScope("Pre", "1", protocolTestPreSHA),
+		receiptContinuationMarker,
+	}, "\n")
+	second := strings.Join([]string{
+		protocolTestFieldBoundaryIdentityPrefix(receiptID),
+		"post sha: " + protocolTestPostSHA,
+		"post exit status: 0",
+		"```",
+		postOutput,
+		"```",
+		protocolTestScope("Post", "0", protocolTestPostSHA),
+	}, "\n")
+	return []string{first, second}
+}
+
 func TestVersionedEvidenceProtocol(t *testing.T) {
 	source := "GH issue #1"
 	body := ownedQueue("## My outcome\nDone means: something\nVerify:\n```\necho hi\n```\n- [x] done\n")
@@ -172,6 +215,21 @@ func TestVersionedEvidenceProtocol(t *testing.T) {
 		_, issues = ValidateQueueBody(ownedQueue(legacy), source)
 		if len(issues) > 0 {
 			t.Fatalf("legacy receipt was rejected: %v", issues)
+		}
+
+		legacyVerify := strings.Join([]string{"echo legacy", "Protocol: payload", "echo complete"}, "\n")
+		legacy = checkedUnit(legacyVerify, redGreenEvidenceReceipt(
+			legacyVerify,
+			evidenceTestSHA,
+			"1",
+			"missing outcome",
+			evidencePostTestSHA,
+			"0",
+			"output",
+		))
+		_, issues = ValidateQueueBody(ownedQueue(legacy), source)
+		if len(issues) > 0 {
+			t.Fatalf("legacy receipt with a Protocol payload line was rejected: %v", issues)
 		}
 	})
 
@@ -230,6 +288,86 @@ func TestVersionedEvidenceProtocol(t *testing.T) {
 		applyQueueIssues(result, "GitHub comments", units, unitIssues, changed)
 		if len(result.Errors) == 0 {
 			t.Fatal("changed chunk identity must fail validation")
+		}
+	})
+
+	t.Run("marked versioned field-boundary continuations repeat exact receipt identity", func(t *testing.T) {
+		validComments := protocolTestFieldBoundaryReceiptComments(digest)
+		result := &ValidationResult{Valid: true}
+		applyQueueIssues(result, "GitHub comments", units, unitIssues, validComments)
+		if len(result.Errors) > 0 {
+			t.Fatalf("valid field-boundary continuation was rejected: %v", result.Errors)
+		}
+
+		receiptID := protocolTestReceiptID("evidence/v1", "unit-contract-sha256-v1", 1, "My outcome", "echo hi", digest, "pre output", "post output")
+		continuationPrefix := protocolTestFieldBoundaryIdentityPrefix(receiptID)
+		cases := map[string]func(string) string{
+			"missing header": func(second string) string {
+				return strings.TrimPrefix(second, continuationPrefix+"\n")
+			},
+			"missing protocol": func(second string) string {
+				return strings.Replace(second, "Protocol: evidence/v1\n", "", 1)
+			},
+			"missing digest algorithm": func(second string) string {
+				return strings.Replace(second, "Digest algorithm: unit-contract-sha256-v1\n", "", 1)
+			},
+			"missing receipt ID": func(second string) string {
+				return strings.Replace(second, "Receipt ID: "+receiptID+"\n", "", 1)
+			},
+			"missing unit occurrence": func(second string) string {
+				return strings.Replace(second, "Unit occurrence: 1\n", "", 1)
+			},
+			"missing unit heading": func(second string) string {
+				return strings.Replace(second, "Unit heading: My outcome\n", "", 1)
+			},
+			"mismatched protocol": func(second string) string {
+				return strings.Replace(second, "Protocol: evidence/v1", "Protocol: evidence/v99", 1)
+			},
+			"mismatched digest algorithm": func(second string) string {
+				return strings.Replace(second, "Digest algorithm: unit-contract-sha256-v1", "Digest algorithm: unit-contract-sha256-v0", 1)
+			},
+			"mismatched receipt ID": func(second string) string {
+				return strings.Replace(second, "Receipt ID: "+receiptID, "Receipt ID: receipt-sha256-v1:"+strings.Repeat("0", 64), 1)
+			},
+			"mismatched unit occurrence": func(second string) string {
+				return strings.Replace(second, "Unit occurrence: 1", "Unit occurrence: 2", 1)
+			},
+			"mismatched unit heading": func(second string) string {
+				return strings.Replace(second, "Unit heading: My outcome", "Unit heading: Other outcome", 1)
+			},
+			"duplicate header field": func(second string) string {
+				return strings.Replace(second, "Protocol: evidence/v1\n", "Protocol: evidence/v1\nProtocol: evidence/v1\n", 1)
+			},
+			"duplicate unit identity": func(second string) string {
+				return strings.Replace(second, "Unit heading: My outcome\n", "Unit heading: My outcome\nUnit heading: My outcome\n", 1)
+			},
+		}
+		for name, mutate := range cases {
+			t.Run(name, func(t *testing.T) {
+				comments := append([]string(nil), validComments...)
+				comments[1] = mutate(comments[1])
+				result := &ValidationResult{Valid: true}
+				applyQueueIssues(result, "GitHub comments", units, unitIssues, comments)
+				if len(result.Errors) == 0 {
+					t.Fatal("invalid continuation identity was accepted")
+				}
+			})
+		}
+	})
+
+	t.Run("accepted heading-form receipts enter rebuild observations", func(t *testing.T) {
+		identity := queueUnitIdentity{Occurrence: 1, Heading: "My outcome"}
+		receipt := protocolTestVersionedReceipt("unit-contract-sha256-v1", digest, identity.Occurrence, identity.Heading, "missing outcome", "output")
+		headingForm := "## " + identity.Heading + "\n" + strings.TrimPrefix(receipt, "Evidence:\n")
+		unresolved, errors := unresolvedRebuildRequests(units, []string{
+			formatRebuildRequest(identity),
+			headingForm,
+		})
+		if len(errors) > 0 {
+			t.Fatalf("heading-form receipt returned errors: %v", errors)
+		}
+		if len(unresolved) > 0 {
+			t.Fatalf("heading-form receipt left rebuild request unresolved: %v", unresolved)
 		}
 	})
 }
