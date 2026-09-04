@@ -479,27 +479,278 @@ func TestLittleGoblinEvidenceRegressionFixtures(t *testing.T) {
 	})
 
 	t.Run("little-goblin-shaped regression pins execute as named validation scenarios", func(t *testing.T) {
+		archiveHeading := "Pin archive"
+		indexHeading := "Pin index"
+		routingHeading := "Pin routing"
+		chunkHeading := "Pin chunk target"
+		routingVerify := "echo pin routing current"
+		chunkVerify := "echo pin chunk target current"
 		body := littleGoblinQueueBody(
 			littleGoblinUnitSpec{
-				heading:  "Pin source",
-				done:     "the source pin is structurally valid",
-				scenario: "source pin is structurally valid",
-				verify:   "echo source pin",
+				heading:  archiveHeading,
+				done:     "the pin archive is available",
+				scenario: "pin archive is available",
+				verify:   "echo pin archive",
 			},
 			littleGoblinUnitSpec{
-				heading:  "Pin target",
-				depends:  "Pin source",
-				done:     "the target pin is structurally valid",
+				heading:  indexHeading,
+				depends:  archiveHeading,
+				done:     "the pin index is assembled",
+				scenario: "pin index is assembled",
+				verify:   "echo pin index",
+			},
+			littleGoblinUnitSpec{
+				heading:  routingHeading,
+				depends:  indexHeading,
+				done:     "historical pin routing receipts stay recoverable",
 				scenario: "little-goblin-shaped regression pins execute as named validation scenarios",
-				verify:   "echo target pin",
+				verify:   routingVerify,
+				checked:  true,
+			},
+			littleGoblinUnitSpec{
+				heading:  chunkHeading,
+				depends:  indexHeading,
+				done:     "the oversized historical pin receipt stays recoverable",
+				scenario: "the oversized historical pin receipt stays recoverable",
+				verify:   chunkVerify,
+				checked:  true,
 			},
 		)
-		units, issues := ValidateQueueBody(body, "synthetic little-goblin regression pins")
-		if len(issues) > 0 {
-			t.Fatalf("named regression queue was rejected: %v", issues)
+		units, unitIssues := ValidateQueueBody(body, "synthetic little-goblin regression pins")
+		if len(units) != 4 {
+			t.Fatalf("expected four pinned units, got %d", len(units))
 		}
-		if len(units) != 2 || len(units[1].Depends) != 1 || units[1].Depends[0] != "Pin source" {
+		if len(units[1].Depends) != 1 || units[1].Depends[0] != archiveHeading || len(units[2].Depends) != 1 || units[2].Depends[0] != indexHeading || len(units[3].Depends) != 1 || units[3].Depends[0] != indexHeading {
 			t.Fatalf("named regression queue lost its dependency shape: %+v", units)
 		}
+		if len(unitIssues) != 2 {
+			t.Fatalf("expected only the two checked-unit evidence gaps before comments, got %v", unitIssues)
+		}
+		for _, issue := range unitIssues {
+			if !strings.Contains(issue.Message, "missing Evidence receipt") {
+				t.Fatalf("unexpected pre-comment issue: %v", unitIssues)
+			}
+		}
+
+		routingIdentity := queueUnitIdentity{Occurrence: 1, Heading: routingHeading}
+		chunkIdentity := queueUnitIdentity{Occurrence: 1, Heading: chunkHeading}
+		routingDigest := unitContractDigest(units[2])
+		chunkDigest := unitContractDigest(units[3])
+
+		routingHistoricalOne := littleGoblinHistoricalUnit(littleGoblinUnitSpec{
+			heading:  routingHeading,
+			depends:  indexHeading,
+			done:     "the first routing interpretation is retained",
+			scenario: "routing interpretation one",
+			verify:   "echo pin routing one",
+		})
+		routingHistoricalTwo := littleGoblinHistoricalUnit(littleGoblinUnitSpec{
+			heading:  routingHeading,
+			depends:  indexHeading,
+			done:     "the second routing interpretation is retained",
+			scenario: "routing interpretation two",
+			verify:   "echo pin routing two",
+		})
+		routingOldDigest := unitContractDigest(routingHistoricalOne)
+		routingMiddleDigest := unitContractDigest(routingHistoricalTwo)
+		routingOldReceipt, routingOldID := littleGoblinReceipt(
+			routingIdentity,
+			routingOldDigest,
+			"echo pin routing one",
+			"",
+			"routing interpretation one failure",
+			"routing interpretation one success",
+			false,
+		)
+		routingMiddleReceipt, _ := littleGoblinReceipt(
+			routingIdentity,
+			routingMiddleDigest,
+			"echo pin routing two",
+			"",
+			"routing interpretation two failure",
+			"routing interpretation two success",
+			false,
+		)
+		routingAmendOne := littleGoblinAmendment(routingIdentity, routingOldDigest, routingMiddleDigest, "record the first pinned routing interpretation change")
+		routingAmendTwo := littleGoblinAmendment(routingIdentity, routingMiddleDigest, routingDigest, "record the second pinned routing interpretation change")
+		routingRequest := formatRebuildRequest(routingIdentity)
+		routingRecovery, routingRecoveryID := littleGoblinReceipt(
+			routingIdentity,
+			routingDigest,
+			routingVerify,
+			routingOldID,
+			"routing recovery failure",
+			"routing recovery success",
+			true,
+		)
+
+		chunkHistorical := littleGoblinHistoricalUnit(littleGoblinUnitSpec{
+			heading:  chunkHeading,
+			depends:  indexHeading,
+			done:     "the chunked interpretation is retained",
+			scenario: "chunk interpretation one",
+			verify:   "echo pin chunk historical",
+		})
+		chunkOldDigest := unitContractDigest(chunkHistorical)
+		preOutput := strings.Repeat("pinned pre output line\n", 1800)
+		postOutput := strings.Repeat("pinned post output line\n", 1500)
+		if len(preOutput)+len(postOutput) <= 65536 {
+			t.Fatal("pinned #53 fixture must model an oversized logical receipt")
+		}
+		chunks, chunkOldID := littleGoblinChunkedLegacyReceipt(chunkIdentity, chunkOldDigest, "echo pin chunk historical", preOutput, postOutput)
+		chunkAmendment := littleGoblinAmendment(chunkIdentity, chunkOldDigest, chunkDigest, "record the pinned chunk interpretation change")
+		chunkRecovery, chunkRecoveryID := littleGoblinReceipt(
+			chunkIdentity,
+			chunkDigest,
+			chunkVerify,
+			chunkOldID,
+			"chunk recovery failure",
+			"chunk recovery success",
+			true,
+		)
+
+		if !strings.HasPrefix(routingOldID, legacyReceiptIDPrefix) || !strings.HasPrefix(chunkOldID, legacyReceiptIDPrefix) || !strings.HasPrefix(routingRecoveryID, receiptIDPrefix) || !strings.HasPrefix(chunkRecoveryID, receiptIDPrefix) {
+			t.Fatalf("pinned receipts used unexpected IDs: routing legacy=%q chunk legacy=%q routing recovery=%q chunk recovery=%q", routingOldID, chunkOldID, routingRecoveryID, chunkRecoveryID)
+		}
+
+		comments := []string{
+			routingOldReceipt,
+			routingMiddleReceipt,
+			routingAmendOne,
+			routingAmendTwo,
+			routingRequest,
+			chunks[0],
+			chunks[1],
+			chunks[2],
+			chunks[3],
+			chunkAmendment,
+			routingRecovery,
+			chunkRecovery,
+		}
+		result := littleGoblinValidationResult(t, body, comments)
+		if len(result.Errors) > 0 {
+			t.Fatalf("pinned GH comment history was rejected: %v", result.Errors)
+		}
+		unresolved, scanErrors := unresolvedRebuildRequests(units, comments)
+		if len(scanErrors) > 0 || len(unresolved) > 0 {
+			t.Fatalf("pinned rebuild routing remained unresolved: unresolved=%v errors=%v", unresolved, scanErrors)
+		}
+
+		localHistory := strings.Join(append([]string{body}, comments...), "\n\n")
+		root := t.TempDir()
+		queuePath := filepath.Join(root, "specs", "queues", "little-goblin-pins.md")
+		if err := os.MkdirAll(filepath.Dir(queuePath), 0o755); err != nil {
+			t.Fatalf("mkdir pinned queue: %v", err)
+		}
+		if err := os.WriteFile(queuePath, []byte(localHistory), 0o644); err != nil {
+			t.Fatalf("write pinned queue: %v", err)
+		}
+		localResult, err := ValidateQueueFile(queuePath)
+		if err != nil {
+			t.Fatalf("ValidateQueueFile pinned queue: %v", err)
+		}
+		if !localResult.Valid || len(localResult.Errors) > 0 {
+			t.Fatalf("pinned local queue history was rejected: %v", localResult.Errors)
+		}
+		stripped, metadata := splitLocalQueueMetadataBlocks(localHistory)
+		if strings.Contains(stripped, "Raw output chunk:") || strings.Contains(stripped, "unit digest: ") {
+			t.Fatal("pinned local queue leaked receipt records into the contract body")
+		}
+		if len(metadata) != len(comments) {
+			t.Fatalf("pinned local metadata = %d blocks, want the %d appended records", len(metadata), len(comments))
+		}
+		for i := range comments {
+			if metadata[i] != comments[i] {
+				t.Fatalf("pinned local metadata block %d did not mirror its appended record", i+1)
+			}
+		}
+
+		t.Run("unamended pinned digest transition fails", func(t *testing.T) {
+			unamended := []string{routingOldReceipt, routingMiddleReceipt, routingRequest, routingRecovery, chunkAmendment, chunkRecovery}
+			unamendedResult := littleGoblinValidationResult(t, body, unamended)
+			if !littleGoblinErrorContains(unamendedResult, "not bridged by an amendment") {
+				t.Fatalf("pinned unamended digest transition was not rejected: %v", unamendedResult.Errors)
+			}
+		})
+
+		t.Run("dangling pinned recovery reference fails", func(t *testing.T) {
+			dangling, _ := littleGoblinReceipt(
+				chunkIdentity,
+				chunkDigest,
+				chunkVerify,
+				legacyReceiptIDPrefix+strings.Repeat("0", 64),
+				"chunk recovery failure",
+				"chunk recovery success",
+				true,
+			)
+			danglingComments := append(append([]string{}, comments[:len(comments)-1]...), dangling)
+			danglingResult := littleGoblinValidationResult(t, body, danglingComments)
+			if !littleGoblinErrorContains(danglingResult, "does not identify an earlier complete receipt") {
+				t.Fatalf("pinned dangling recovery reference was not rejected: %v", danglingResult.Errors)
+			}
+		})
+
+		t.Run("unauthenticated supersession text does not repair broken pins", func(t *testing.T) {
+			supersession := strings.Join([]string{
+				"Supersedes: receipt-sha256-v1:" + strings.Repeat("a", 64),
+				"Quarantined: yes",
+				"Authorized by: synthetic actor",
+			}, "\n")
+			repaired := append(append([]string{}, comments...), supersession)
+			unbridged := make([]string, 0, len(repaired))
+			for _, comment := range repaired {
+				if comment != routingAmendOne && comment != routingAmendTwo {
+					unbridged = append(unbridged, comment)
+				}
+			}
+			repairedResult := littleGoblinValidationResult(t, body, unbridged)
+			if !littleGoblinErrorContains(repairedResult, "not bridged by an amendment") {
+				t.Fatalf("supersession text changed pinned validation state: %v", repairedResult.Errors)
+			}
+		})
+
+		t.Run("local chunk identity drift fails", func(t *testing.T) {
+			driftedChunks := append([]string{}, chunks...)
+			driftedChunks[1] = strings.Replace(driftedChunks[1], "Unit heading: "+chunkHeading, "Unit heading: Drifted chunk identity", 1)
+			driftedComments := append(append([]string{}, comments[:5]...), driftedChunks...)
+			driftedComments = append(driftedComments, chunkAmendment, routingRecovery, chunkRecovery)
+			driftedHistory := strings.Join(append([]string{body}, driftedComments...), "\n\n")
+			driftedPath := filepath.Join(root, "specs", "queues", "little-goblin-pins-drift.md")
+			if err := os.WriteFile(driftedPath, []byte(driftedHistory), 0o644); err != nil {
+				t.Fatalf("write drifted queue: %v", err)
+			}
+			driftedResult, err := ValidateQueueFile(driftedPath)
+			if err != nil {
+				t.Fatalf("ValidateQueueFile drifted queue: %v", err)
+			}
+			if driftedResult.Valid || len(driftedResult.Errors) == 0 {
+				t.Fatal("pinned local chunk identity drift was accepted")
+			}
+		})
+
+		t.Run("interrupted local chunk chain fails", func(t *testing.T) {
+			coverage := strings.Join([]string{
+				"Review coverage:",
+				"HEAD: " + littleGoblinPostSHA,
+				"Unit occurrence: 1",
+				"Unit heading: " + chunkHeading,
+				"Exercised:",
+				"interrupting coverage record",
+			}, "\n")
+			interruptedComments := append(append([]string{}, comments[:6]...), coverage)
+			interruptedComments = append(interruptedComments, comments[6:]...)
+			interruptedHistory := strings.Join(append([]string{body}, interruptedComments...), "\n\n")
+			interruptedPath := filepath.Join(root, "specs", "queues", "little-goblin-pins-interrupted.md")
+			if err := os.WriteFile(interruptedPath, []byte(interruptedHistory), 0o644); err != nil {
+				t.Fatalf("write interrupted queue: %v", err)
+			}
+			interruptedResult, err := ValidateQueueFile(interruptedPath)
+			if err != nil {
+				t.Fatalf("ValidateQueueFile interrupted queue: %v", err)
+			}
+			if interruptedResult.Valid || len(interruptedResult.Errors) == 0 {
+				t.Fatal("pinned interrupted local chunk chain was accepted")
+			}
+		})
 	})
 }
