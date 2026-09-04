@@ -244,6 +244,9 @@ func TestLittleGoblinEvidenceRegressionFixtures(t *testing.T) {
 			checked:  true,
 		}
 		body := littleGoblinQueueBody(current)
+		t.Run("observed early heading-form history and witnessed digest transitions", func(t *testing.T) {
+			t.Fatal("heading-form history fixture not implemented")
+		})
 		units, unitIssues := ValidateQueueBody(body, "synthetic little-goblin #52")
 		if len(units) != 1 {
 			t.Fatalf("expected one #52-shaped unit, got %d", len(units))
