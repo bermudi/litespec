@@ -141,6 +141,7 @@ func protocolTestChunkedReceiptComments(digest string) []string {
 	second := protocolTestChunk("pre", 2, 2, "unit-contract-sha256-v1", receiptID, digest, "pre two", true)
 	third := strings.Join([]string{
 		protocolTestScope("Pre", "1", protocolTestPreSHA),
+		protocolTestFieldBoundaryIdentityPrefix(receiptID),
 		"post sha: " + protocolTestPostSHA,
 		"post exit status: 0",
 		protocolTestChunk("post", 1, 2, "unit-contract-sha256-v1", receiptID, digest, "post one\n", true),

@@ -140,6 +140,42 @@ func parseRebuildComment(comment string, units []queueUnit) (queueUnitIdentity, 
 	return parseRebuildCommentRecord(continuedComment{text: comment, parts: []continuedCommentPart{{text: comment}}}, units)
 }
 
+func parseHeadingFormEvidenceCommentRecord(comment continuedComment, units []queueUnit) (queueUnitIdentity, rebuildCommentKind, string, bool) {
+	identities := queueUnitIdentities(units)
+	for i, unit := range units {
+		if !commentNamesUnit(comment.text, unit.Heading) {
+			continue
+		}
+		document, ok := commentEvidenceDocument(comment, unit.Heading)
+		if !ok {
+			continue
+		}
+		identity := identities[i]
+		currentDigest := unitContractDigest(unit)
+		expectedDigest := evidenceReceiptExpectedDigest(unit, document)
+		issues, declaredDigest := evidenceReceiptIssuesForDocument(
+			document,
+			unitVerifyCommand(unit.Body),
+			expectedDigest,
+			"comment",
+			identity.Heading,
+			&identity,
+		)
+		if len(issues) == 0 {
+			if declaredDigest != currentDigest && declaredDigest == expectedDigest {
+				declaredDigest = currentDigest
+			}
+			return identity, rebuildCommentEvidence, declaredDigest, true
+		}
+
+		declarations := validEvidenceReceiptDeclarations(document, "comment", identity.Heading, &identity)
+		if len(declarations) == 1 && declarations[0].digest != currentDigest {
+			return identity, rebuildCommentStaleEvidence, declarations[0].digest, true
+		}
+	}
+	return queueUnitIdentity{}, rebuildCommentOther, "", false
+}
+
 func parseRebuildCommentRecord(comment continuedComment, units []queueUnit) (queueUnitIdentity, rebuildCommentKind, string, error) {
 	document := newEvidenceDocumentFromComment(comment).trimSpace()
 	lines := document.lines
@@ -164,6 +200,10 @@ func parseRebuildCommentRecord(comment continuedComment, units []queueUnit) (que
 	hasOccurrence := strings.HasPrefix(lines[0], "Unit occurrence:")
 	hasHeading := len(lines) > 1 && strings.HasPrefix(lines[1], "Unit heading:")
 	if !hasOccurrence && !hasHeading {
+		identity, kind, digest, ok := parseHeadingFormEvidenceCommentRecord(comment, units)
+		if ok {
+			return identity, kind, digest, nil
+		}
 		return queueUnitIdentity{}, rebuildCommentOther, "", nil
 	}
 	if !hasOccurrence || !hasHeading || len(lines) < 4 || strings.TrimSpace(lines[2]) != "Evidence:" {

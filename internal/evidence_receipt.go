@@ -52,16 +52,8 @@ func receiptVersionField(line string) bool {
 }
 
 func receiptVersionFieldsPresent(document evidenceDocument) bool {
-	openFence := ""
-	for _, line := range document.lines {
-		if consumeMarkdownFenceLine(&openFence, line) {
-			continue
-		}
-		if receiptVersionField(line) {
-			return true
-		}
-	}
-	return false
+	document = document.trimSpace()
+	return len(document.lines) > 0 && receiptVersionField(document.lines[0])
 }
 
 func consumeReceiptHeaderField(cursor *evidenceCursor, label string) (string, error) {
@@ -178,8 +170,9 @@ func (c *evidenceCursor) consumeContinuationReceiptHeader(expectedIdentity *queu
 	if part < 1 || part-1 >= len(c.partContinued) || !c.partContinued[part-1] {
 		return nil
 	}
-	if !strings.HasPrefix(c.lines[c.at], "Protocol:") {
-		return nil
+	c.skipBlanks()
+	if c.at >= len(c.lines) || !strings.HasPrefix(c.lines[c.at], "Protocol:") {
+		return fmt.Errorf("continuation receipt must repeat its version metadata")
 	}
 	repeated, err := consumeVersionedReceiptHeader(c)
 	if err != nil {
@@ -189,16 +182,11 @@ func (c *evidenceCursor) consumeContinuationReceiptHeader(expectedIdentity *queu
 		return fmt.Errorf("continuation receipt header must match the top-level receipt")
 	}
 	if expectedIdentity == nil {
-		return nil
-	}
-	c.skipBlanks()
-	occurrenceText, ok := c.consumeField("Unit occurrence")
-	if !ok {
 		return fmt.Errorf("continuation receipt must repeat Unit occurrence:")
 	}
-	occurrence, err := strconv.Atoi(occurrenceText)
-	if err != nil || occurrence != expectedIdentity.Occurrence {
-		return fmt.Errorf("continuation receipt Unit occurrence must match the receipt identity")
+	c.skipBlanks()
+	if !c.consumeExactLines(fmt.Sprintf("Unit occurrence: %d", expectedIdentity.Occurrence)) {
+		return fmt.Errorf("continuation receipt Unit occurrence must match the receipt identity exactly")
 	}
 	c.skipBlanks()
 	if !c.consumeExactLines("Unit heading: " + expectedIdentity.Heading) {
