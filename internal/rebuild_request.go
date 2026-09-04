@@ -62,19 +62,24 @@ type evidenceReceiptDeclaration struct {
 }
 
 func receiptVerifyCommand(lines []string) (string, bool) {
-	end := len(lines)
-	for end > 0 && strings.TrimSpace(lines[end-1]) == "" {
-		end--
-	}
-	if end == 0 {
+	document := newEvidenceDocument(strings.Join(lines, "\n")).trimSpace()
+	_, headerEnd, err := parseEvidenceReceiptHeader(document)
+	if err != nil {
 		return "", false
 	}
-	if end == 1 {
-		if command, ok := verifyCommandFromLabel(lines[0]); ok {
+	candidate := document.lines[headerEnd:]
+	for len(candidate) > 0 && strings.TrimSpace(candidate[len(candidate)-1]) == "" {
+		candidate = candidate[:len(candidate)-1]
+	}
+	if len(candidate) == 1 {
+		if command, ok := verifyCommandFromLabel(candidate[0]); ok {
 			return command, command != ""
 		}
 	}
-	return strings.Join(lines[:end], "\n"), true
+	if len(candidate) == 0 {
+		return "", false
+	}
+	return strings.Join(candidate, "\n"), true
 }
 
 func validEvidenceReceiptDeclarations(
@@ -182,15 +187,19 @@ func parseRebuildCommentRecord(comment continuedComment, units []queueUnit) (que
 	}
 
 	currentDigest := unitContractDigest(unit)
+	expectedDigest := evidenceReceiptExpectedDigest(unit, evidenceDocument)
 	issues, declaredDigest := evidenceReceiptIssuesForDocument(
 		evidenceDocument,
 		unitVerifyCommand(unit.Body),
-		currentDigest,
+		expectedDigest,
 		"comment",
 		identity.Heading,
 		&identity,
 	)
 	if len(issues) == 0 {
+		if declaredDigest != currentDigest && declaredDigest == expectedDigest {
+			return identity, rebuildCommentEvidence, currentDigest, nil
+		}
 		return identity, rebuildCommentEvidence, declaredDigest, nil
 	}
 

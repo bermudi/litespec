@@ -77,7 +77,7 @@ If a fix needs a new decision, report "needs decision: <question>" instead of in
 - Flag Verify that would pass without the outcome.
 
 #### Evidence
-For every checked unit: a complete red-green receipt exists (verbatim command; labeled pre and post SHAs and statuses; two nonempty fences; matching pre/post scope lines); a receipt declaring the current digest matches the unit's `Verify:` verbatim; a superseded receipt is checked against its own declared command and digest and must be connected to the current digest by valid amendment edges; the SHAs differ; pre is an ancestor of post and post is an ancestor of `HEAD`.
+For every checked unit: a complete red-green receipt exists (verbatim command; labeled pre and post SHAs and statuses; two nonempty fences; matching pre/post scope lines); new receipts begin immediately after `Evidence:` with `Protocol: evidence/v1`, `Digest algorithm: unit-contract-sha256-v1`, and a content-derived `Receipt ID:` (plus optional `Recovered from:`); a receipt declaring the current digest matches the unit's `Verify:` verbatim; a superseded receipt is checked with its declared protocol/parser and digest algorithm against its own command and digest and must be connected to the current digest by valid amendment edges; legacy receipts with no version fields use the preserved legacy grammar; the SHAs differ; pre is an ancestor of post and post is an ancestor of `HEAD`.
 
 The history from pre to post may contain one or more implementation/fix commits; do not require post to be the immediate child of pre. Post is the final clean commit where `Verify:` passes for the unit. Build's commits are immutable: fixes belong in new commits, never amendments.
 
@@ -88,7 +88,7 @@ Replay the exact command at all three trees:
 
 Before creating a worktree, install cleanup that runs on every path, such as a shell trap or the harness equivalent, covering pre, post, and `HEAD`. The reviewer must never check out an evidence SHA in the reviewer's current worktree. A green pre run, irrelevant pre failure, failed post or `HEAD`, missing/malformed receipt, edited command, or invalid ancestry is a CRITICAL finding breaking that unit's contract (triage rule 2).
 
-Red-green evidence proves only that Verify discriminates the recorded trees. It does not prove that Verify targets the correct behavior. Probe the command and outcome adversarially beyond the receipt. The scope lines are the ceiling: evidence never claims beyond them.
+Red-green evidence proves only that Verify discriminates the recorded trees. It does not prove that Verify targets the correct behavior. Probe the command and outcome adversarially beyond the receipt. The scope lines are the ceiling: evidence never claims beyond them. Receipt IDs are content addresses, not authorization; continuation chunks must preserve the protocol, algorithm, Receipt ID, and routing identity.
 
 ### Verdict
 `PASS` or `CHANGES REQUESTED`. The verdict is about the issue-owned branch, not the whole repo. Severity says how confident you are it is wrong; scope says whether this issue owns it.

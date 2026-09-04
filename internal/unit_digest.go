@@ -10,11 +10,31 @@ import (
 
 var unitDigestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
+const (
+	digestAlgorithmV0 = "unit-contract-sha256-v0"
+	digestAlgorithmV1 = "unit-contract-sha256-v1"
+)
+
 // unitContractDigest binds a unit's contract text: heading, optional Read
 // first/Constraints/Depends/Boundary values, Done means clauses, scenario
 // mappings, risk cases, and Verify content, each length-prefixed in order.
 // Status checkbox, Evidence content, and every other unit line are excluded.
 func unitContractDigest(unit queueUnit) string {
+	return digestLengthPrefixed(unitContractFields(unit))
+}
+
+func unitContractDigestForAlgorithm(unit queueUnit, algorithm string) (string, bool) {
+	switch algorithm {
+	case digestAlgorithmV1:
+		return unitContractDigest(unit), true
+	case digestAlgorithmV0:
+		return digestNulSeparated(unitContractFields(unit)), true
+	default:
+		return "", false
+	}
+}
+
+func unitContractFields(unit queueUnit) [][]byte {
 	fields := [][]byte{contractFieldBytes(unit.Heading)}
 	if v, ok := queueUnitFieldValue(unit.Body, "Read first:"); ok {
 		fields = append(fields, contractFieldBytes(v))
@@ -37,11 +57,26 @@ func unitContractDigest(unit queueUnit) string {
 		fields = append(fields, contractFieldBytes(strings.Join(risks, "\n")))
 	}
 	fields = append(fields, contractFieldBytes(unitVerifyCommand(unit.Body)))
+	return fields
+}
 
+func digestLengthPrefixed(fields [][]byte) string {
 	var b strings.Builder
 	for _, f := range fields {
 		b.WriteString(strconv.Itoa(len(f)))
 		b.WriteByte(':')
+		b.Write(f)
+	}
+	sum := sha256.Sum256([]byte(b.String()))
+	return hex.EncodeToString(sum[:])
+}
+
+func digestNulSeparated(fields [][]byte) string {
+	var b strings.Builder
+	for i, f := range fields {
+		if i > 0 {
+			b.WriteByte(0)
+		}
 		b.Write(f)
 	}
 	sum := sha256.Sum256([]byte(b.String()))
