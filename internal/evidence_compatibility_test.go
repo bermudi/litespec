@@ -139,6 +139,23 @@ func littleGoblinReceipt(identity queueUnitIdentity, digest, verify, recoveredFr
 	return littleGoblinIdentityEvidence(identity, strings.Join(lines, "\n")), receipt.header.receiptID
 }
 
+func littleGoblinHeadingFormReceipt(identity queueUnitIdentity, receipt string) string {
+	prefix := strings.Join([]string{
+		fmt.Sprintf("Unit occurrence: %d", identity.Occurrence),
+		"Unit heading: " + identity.Heading,
+	}, "\n") + "\n"
+	return "## " + identity.Heading + "\n" + strings.TrimPrefix(receipt, prefix)
+}
+
+func littleGoblinErrorContains(result *ValidationResult, text string) bool {
+	for _, issue := range result.Errors {
+		if strings.Contains(issue.Message, text) {
+			return true
+		}
+	}
+	return false
+}
+
 func littleGoblinAmendment(identity queueUnitIdentity, oldDigest, newDigest, reason string) string {
 	return strings.Join([]string{
 		"Amendment:",
@@ -244,9 +261,6 @@ func TestLittleGoblinEvidenceRegressionFixtures(t *testing.T) {
 			checked:  true,
 		}
 		body := littleGoblinQueueBody(current)
-		t.Run("observed early heading-form history and witnessed digest transitions", func(t *testing.T) {
-			t.Fatal("heading-form history fixture not implemented")
-		})
 		units, unitIssues := ValidateQueueBody(body, "synthetic little-goblin #52")
 		if len(units) != 1 {
 			t.Fatalf("expected one #52-shaped unit, got %d", len(units))
@@ -303,9 +317,19 @@ func TestLittleGoblinEvidenceRegressionFixtures(t *testing.T) {
 			"current post-run after append-only recovery",
 			true,
 		)
-		comments := []string{oldReceipt, middleReceipt, amendOne, amendTwo, request, recovery}
-		result := &ValidationResult{Valid: true}
-		applyQueueIssues(result, "synthetic #52 comments", units, unitIssues, comments)
+		oldHeadingReceipt := littleGoblinHeadingFormReceipt(identity, oldReceipt)
+		middleHeadingReceipt := littleGoblinHeadingFormReceipt(identity, middleReceipt)
+
+		t.Run("unamended digest transition fails", func(t *testing.T) {
+			comments := []string{oldHeadingReceipt, middleHeadingReceipt, request, recovery}
+			result := littleGoblinValidationResult(t, body, comments)
+			if !littleGoblinErrorContains(result, "not bridged by an amendment") {
+				t.Fatalf("#52 unamended digest transition was not rejected: %v", result.Errors)
+			}
+		})
+
+		comments := []string{oldHeadingReceipt, middleHeadingReceipt, amendOne, amendTwo, request, recovery}
+		result := littleGoblinValidationResult(t, body, comments)
 		if len(result.Errors) > 0 {
 			t.Fatalf("#52 comment-shaped history was rejected: %v", result.Errors)
 		}
@@ -319,9 +343,21 @@ func TestLittleGoblinEvidenceRegressionFixtures(t *testing.T) {
 		if !strings.Contains(recovery, "Recovered from: "+oldID) {
 			t.Fatal("#52 recovery did not retain provenance to the first historical receipt")
 		}
-		if !strings.Contains(comments[0], oldReceipt) || !strings.Contains(comments[1], middleReceipt) {
-			t.Fatal("#52 comment history was not append-only")
+		if comments[0] != oldHeadingReceipt || comments[1] != middleHeadingReceipt {
+			t.Fatal("#52 heading-form comment history was not append-only")
 		}
+
+		t.Run("malformed heading history remains visible after recovery", func(t *testing.T) {
+			malformed := strings.TrimSuffix(
+				oldHeadingReceipt,
+				"Post-evidence scope: this command exited 0 at "+littleGoblinPostSHA+"; nothing else is inferred.",
+			)
+			malformedComments := []string{oldHeadingReceipt, malformed, middleHeadingReceipt, amendOne, amendTwo, request, recovery}
+			malformedResult := littleGoblinValidationResult(t, body, malformedComments)
+			if !littleGoblinErrorContains(malformedResult, "comment 2: malformed heading-form evidence") {
+				t.Fatalf("#52 malformed heading history was hidden by recovery: %v", malformedResult.Errors)
+			}
+		})
 
 		root := t.TempDir()
 		queuePath := filepath.Join(root, "specs", "queues", "little-goblin-52.md")
