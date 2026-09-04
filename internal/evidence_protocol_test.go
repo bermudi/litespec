@@ -273,6 +273,41 @@ func TestVersionedEvidenceProtocol(t *testing.T) {
 		if len(scanQueueComments(changedUnits, []string{comments[1]}).errors) == 0 {
 			t.Fatal("real contract change must still require an amendment edge")
 		}
+
+		t.Run("algorithm-equivalent queue-body receipts normalize without changing provenance", func(t *testing.T) {
+			identity := queueUnitIdentity{Occurrence: 1, Heading: "My outcome"}
+			bodyAlgorithm := digestAlgorithmV0
+			bodyDigest := protocolTestDigestV0(units[0])
+			bodyReceipt := protocolTestVersionedReceipt(bodyAlgorithm, bodyDigest, identity.Occurrence, identity.Heading, "missing outcome", "output")
+			bodyReceiptID := protocolTestReceiptID("evidence/v1", bodyAlgorithm, identity.Occurrence, identity.Heading, "echo hi", bodyDigest, "missing outcome", "output")
+			variants := map[string]string{
+				"bare Verify command": bodyReceipt,
+				"Verify label form":   strings.Replace(bodyReceipt, "\necho hi\nunit digest: ", "\nVerify: echo hi\nunit digest: ", 1),
+			}
+			for name, evidence := range variants {
+				t.Run(name, func(t *testing.T) {
+					queueBody := ownedQueue(checkedUnit("echo hi", evidence))
+					bodyUnits, bodyIssues := ValidateQueueBody(queueBody, source)
+					if len(bodyIssues) > 0 {
+						t.Fatalf("algorithm-equivalent body receipt was rejected before routing: %v", bodyIssues)
+					}
+					result := &ValidationResult{Valid: true}
+					applyQueueIssues(result, "GitHub comments", bodyUnits, bodyIssues, nil)
+					if len(result.Errors) > 0 {
+						t.Fatalf("algorithm-equivalent body receipt fabricated a contract transition: %v", result.Errors)
+					}
+				})
+			}
+
+			queueBody := ownedQueue(checkedUnit("echo hi", bodyReceipt))
+			bodyUnits, bodyIssues := ValidateQueueBody(queueBody, source)
+			recovery := recoveryTestVersionedReceipt(identity, digest, "echo hi", bodyReceiptID)
+			result := &ValidationResult{Valid: true}
+			applyQueueIssues(result, "GitHub comments", bodyUnits, bodyIssues, []string{recovery})
+			if len(result.Errors) > 0 {
+				t.Fatalf("recovery could not resolve the original body receipt identity: %v", result.Errors)
+			}
+		})
 	})
 
 	t.Run("stable receipt identity survives continuation and chunking", func(t *testing.T) {
