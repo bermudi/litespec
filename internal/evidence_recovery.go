@@ -95,6 +95,9 @@ func completeEvidenceReceiptObservation(
 	if !hasUnit && digestMatchesAnyUnit(declarations[0].digest, units) {
 		return evidenceReceiptObservation{}, false
 	}
+	if hasUnit && normalizedEvidenceReceiptDigest(unit, declarations[0].receipt) == unitContractDigest(unit) {
+		return evidenceReceiptObservation{}, false
+	}
 	observation := evidenceReceiptObservation{
 		identity:       identity,
 		receipt:        declarations[0].receipt,
