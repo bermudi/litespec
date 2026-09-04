@@ -142,6 +142,44 @@ func recoveryTestResult(t *testing.T, body string, comments []string) *Validatio
 	return result
 }
 
+func recoveryTestSupersededContract(unit queueUnit) (string, string) {
+	historical := unit
+	historical.Body = append([]string(nil), unit.Body...)
+	for i, line := range historical.Body {
+		switch line {
+		case "Done means: something":
+			historical.Body[i] = "Done means: historical something"
+		case "echo hi":
+			historical.Body[i] = "echo historical"
+		}
+	}
+	return unitContractDigest(historical), "echo historical"
+}
+
+func recoveryTestAmendment(identity queueUnitIdentity, oldDigest, newDigest string) string {
+	return strings.Join([]string{
+		"Amendment:",
+		fmt.Sprintf("Unit occurrence: %d", identity.Occurrence),
+		"Unit heading: " + identity.Heading,
+		"Old digest: " + oldDigest,
+		"New digest: " + newDigest,
+		"Reason: restore the current recovery contract",
+	}, "\n")
+}
+
+func recoveryTestHeadingFormEvidence(heading, evidence string) string {
+	return "## " + heading + "\n" + evidence
+}
+
+func recoveryTestHasErrorContaining(result *ValidationResult, text string) bool {
+	for _, issue := range result.Errors {
+		if strings.Contains(issue.Message, text) {
+			return true
+		}
+	}
+	return false
+}
+
 func TestAppendOnlyEvidenceRecovery(t *testing.T) {
 	t.Run("append-only recovery resolves prior complete evidence in both queue lanes", func(t *testing.T) {
 		body := recoveryTestQueueBody("", true)
@@ -187,6 +225,63 @@ func TestAppendOnlyEvidenceRecovery(t *testing.T) {
 		}
 		if len(metadata) != 1 || metadata[0] != recovery {
 			t.Fatalf("local metadata = %q, want the appended recovery receipt", metadata)
+		}
+	})
+
+	t.Run("superseded complete local body evidence enters the ordered recovery stream", func(t *testing.T) {
+		body := recoveryTestQueueBody("", true)
+		units, _ := ValidateQueueBody(body, "GH issue #15")
+		identity := recoveryTestIdentity("My outcome", 1)
+		currentDigest := unitContractDigest(units[0])
+		oldDigest, oldVerify := recoveryTestSupersededContract(units[0])
+		oldEvidence := recoveryTestLegacyReceipt(oldDigest, oldVerify)
+		oldID := recoveryTestReceiptID(t, oldEvidence, oldVerify, identity, oldDigest)
+		body = recoveryTestQueueBody(oldEvidence, true)
+		recovery := recoveryTestVersionedReceipt(identity, currentDigest, "echo hi", oldID)
+
+		result := recoveryTestResult(t, body, []string{recovery})
+		if !recoveryTestHasErrorContaining(result, "observed receipt digests") {
+			t.Fatalf("superseded body receipt was not included in the ordered observation stream: %v", result.Errors)
+		}
+
+		amendment := recoveryTestAmendment(identity, oldDigest, currentDigest)
+		root := t.TempDir()
+		queuePath := filepath.Join(root, "specs", "queues", "superseded.md")
+		if err := os.MkdirAll(filepath.Dir(queuePath), 0o755); err != nil {
+			t.Fatalf("mkdir queue: %v", err)
+		}
+		localBody := strings.Join([]string{body, amendment, recovery}, "\n\n")
+		if err := os.WriteFile(queuePath, []byte(localBody), 0o644); err != nil {
+			t.Fatalf("write queue: %v", err)
+		}
+		localResult, err := ValidateQueueFile(queuePath)
+		if err != nil {
+			t.Fatalf("ValidateQueueFile: %v", err)
+		}
+		if !localResult.Valid || len(localResult.Errors) > 0 {
+			t.Fatalf("superseded local body recovery was rejected: %v", localResult.Errors)
+		}
+		_, metadata := splitLocalQueueMetadataBlocks(localBody)
+		if len(metadata) != 2 || metadata[0] != amendment || metadata[1] != recovery {
+			t.Fatalf("local metadata = %q, want amendment followed by recovery", metadata)
+		}
+	})
+
+	t.Run("malformed heading-form evidence remains visible after recovery", func(t *testing.T) {
+		body := recoveryTestQueueBody("", true)
+		units, _ := ValidateQueueBody(body, "GH issue #15")
+		identity := recoveryTestIdentity("My outcome", 1)
+		digest := unitContractDigest(units[0])
+		oldReceipt, oldID := recoveryTestLegacyIdentityReceipt(t, identity, digest, "echo hi")
+		malformed := recoveryTestHeadingFormEvidence(identity.Heading, strings.TrimSuffix(
+			recoveryTestLegacyReceipt(digest, "echo hi"),
+			"Post-evidence scope: this command exited 0 at "+recoveryTestPostSHA+"; nothing else is inferred.\n",
+		))
+		recovery := recoveryTestVersionedReceipt(identity, digest, "echo hi", oldID)
+
+		result := recoveryTestResult(t, body, []string{oldReceipt, malformed, recovery})
+		if !recoveryTestHasErrorContaining(result, "comment 2:") || !recoveryTestHasErrorContaining(result, "Evidence receipt") {
+			t.Fatalf("malformed heading-form evidence was hidden by later recovery: %v", result.Errors)
 		}
 	})
 
