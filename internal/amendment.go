@@ -659,11 +659,9 @@ func scanQueueCommentsWithInitialReceipts(
 			scan.errors = append(scan.errors, fmt.Errorf("comment %d: %w", commentIndex+1, err))
 			continue
 		}
-		if kind == rebuildCommentEvidence || kind == rebuildCommentStaleEvidence {
-			if observation, ok := completeEvidenceReceiptObservationRecord(commentRecord, units); ok {
-				if err := registry.add(observation); err != nil {
-					scan.errors = append(scan.errors, fmt.Errorf("comment %d: %w", commentIndex+1, err))
-				}
+		for _, observation := range completeEvidenceReceiptObservationsForComment(commentRecord, units) {
+			if err := registry.add(observation); err != nil {
+				scan.errors = append(scan.errors, fmt.Errorf("comment %d: %w", commentIndex+1, err))
 			}
 		}
 		if kind == rebuildCommentOther {

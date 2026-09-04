@@ -297,6 +297,14 @@ func TestAppendOnlyEvidenceRecovery(t *testing.T) {
 				t.Fatalf("control %q hid the malformed historical record", control)
 			}
 		}
+
+		bodyWithMalformedEvidence := recoveryTestQueueBody(malformed, true)
+		bodyUnits, bodyIssues := ValidateQueueBody(bodyWithMalformedEvidence, "GH issue #15")
+		result := &ValidationResult{Valid: true}
+		applyQueueIssues(result, "GitHub comments", bodyUnits, bodyIssues, []string{oldReceipt, recovery})
+		if len(result.Errors) == 0 {
+			t.Fatal("appended recovery hid malformed evidence in the queue body")
+		}
 	})
 }
 

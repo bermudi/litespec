@@ -1079,6 +1079,9 @@ func applyQueueIssues(result *ValidationResult, commentSource string, units []qu
 		if len(validateCheckedUnitEvidenceForIdentity(unit, "queue", &identities[unitIndex])) == 0 {
 			continue
 		}
+		if strings.TrimSpace(extractEvidenceText(unit.Body)) != "" {
+			continue
+		}
 		commentIndex, ok := matchingEvidenceCommentForUnit(
 			identities[unitIndex],
 			unit,

@@ -108,25 +108,46 @@ func bodyEvidenceReceiptObservations(units []queueUnit) []evidenceReceiptObserva
 	return observations
 }
 
-func completeEvidenceReceiptObservationRecord(
+func completeEvidenceReceiptObservationsForComment(
 	comment continuedComment,
 	units []queueUnit,
-) (evidenceReceiptObservation, bool) {
+) []evidenceReceiptObservation {
 	document := newEvidenceDocumentFromComment(comment).trimSpace()
-	if len(document.lines) < 3 {
-		return evidenceReceiptObservation{}, false
+	if len(document.lines) >= 3 &&
+		strings.HasPrefix(document.lines[0], "Unit occurrence:") &&
+		strings.HasPrefix(document.lines[1], "Unit heading:") &&
+		strings.TrimSpace(document.lines[2]) == "Evidence:" {
+		identity, err := parseIdentityLines(document.lines[0], document.lines[1])
+		if err != nil {
+			return nil
+		}
+		observation, ok := completeEvidenceReceiptObservation(
+			evidencePayloadDocument(document.afterLine(2)),
+			identity,
+			units,
+			"comment",
+		)
+		if !ok {
+			return nil
+		}
+		return []evidenceReceiptObservation{observation}
 	}
-	if !strings.HasPrefix(document.lines[0], "Unit occurrence:") || !strings.HasPrefix(document.lines[1], "Unit heading:") || strings.TrimSpace(document.lines[2]) != "Evidence:" {
-		return evidenceReceiptObservation{}, false
+
+	identities := queueUnitIdentities(units)
+	observations := make([]evidenceReceiptObservation, 0, 1)
+	for i, unit := range units {
+		if !commentNamesUnit(comment.text, unit.Heading) {
+			continue
+		}
+		document, ok := commentEvidenceDocument(comment, unit.Heading)
+		if !ok {
+			continue
+		}
+		observation, ok := completeEvidenceReceiptObservation(document, identities[i], units, "comment")
+		if ok {
+			observations = append(observations, observation)
+			break
+		}
 	}
-	identity, err := parseIdentityLines(document.lines[0], document.lines[1])
-	if err != nil {
-		return evidenceReceiptObservation{}, false
-	}
-	return completeEvidenceReceiptObservation(
-		evidencePayloadDocument(document.afterLine(2)),
-		identity,
-		units,
-		"comment",
-	)
+	return observations
 }
