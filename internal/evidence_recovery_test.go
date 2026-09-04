@@ -145,13 +145,15 @@ func recoveryTestResult(t *testing.T, body string, comments []string) *Validatio
 func TestAppendOnlyEvidenceRecovery(t *testing.T) {
 	t.Run("append-only recovery resolves prior complete evidence in both queue lanes", func(t *testing.T) {
 		body := recoveryTestQueueBody("", true)
-		units, issues := ValidateQueueBody(body, "GH issue #15")
-		if len(issues) == 0 {
-			t.Fatal("checked fixture must initially need evidence")
-		}
+		units, _ := ValidateQueueBody(body, "GH issue #15")
 		identity := recoveryTestIdentity("My outcome", 1)
 		digest := unitContractDigest(units[0])
 		oldReceipt, oldID := recoveryTestLegacyIdentityReceipt(t, identity, digest, "echo hi")
+		body = recoveryTestQueueBody(oldReceipt, true)
+		units, issues := ValidateQueueBody(body, "GH issue #15")
+		if len(issues) > 0 {
+			t.Fatalf("historical body receipt was rejected: %v", issues)
+		}
 		recovery := recoveryTestVersionedReceipt(identity, digest, "echo hi", oldID)
 
 		result := &ValidationResult{Valid: true}
@@ -201,6 +203,7 @@ func TestAppendOnlyEvidenceRecovery(t *testing.T) {
 		}
 
 		otherIdentity := recoveryTestIdentity("Other outcome", 1)
+		myIdentity := recoveryTestIdentity("My outcome", 1)
 		otherBody := ownedQueue(strings.Join([]string{
 			"## Other outcome",
 			"Done means: other",
@@ -218,10 +221,35 @@ func TestAppendOnlyEvidenceRecovery(t *testing.T) {
 			"```",
 			"- [x] done",
 		}, "\n"))
-		otherUnits, otherIssues := ValidateQueueBody(otherBody, "GH issue #15")
+		otherUnits, _ := ValidateQueueBody(otherBody, "GH issue #15")
 		otherDigest := unitContractDigest(otherUnits[0])
-		_, otherID := recoveryTestLegacyIdentityReceipt(t, otherIdentity, otherDigest, "echo hi")
-		mismatched := recoveryTestVersionedReceipt(recoveryTestIdentity("My outcome", 1), unitContractDigest(otherUnits[1]), "echo hi", otherID)
+		myDigest := unitContractDigest(otherUnits[1])
+		otherReceipt, otherID := recoveryTestLegacyIdentityReceipt(t, otherIdentity, otherDigest, "echo hi")
+		myReceipt, _ := recoveryTestLegacyIdentityReceipt(t, myIdentity, myDigest, "echo hi")
+		otherBody = ownedQueue(strings.Join([]string{
+			"## Other outcome",
+			"Done means: other",
+			"Verify:",
+			"```",
+			"echo hi",
+			"```",
+			otherReceipt,
+			"- [x] done",
+			"",
+			"## My outcome",
+			"Done means: something",
+			"Verify:",
+			"```",
+			"echo hi",
+			"```",
+			myReceipt,
+			"- [x] done",
+		}, "\n"))
+		otherUnits, otherIssues := ValidateQueueBody(otherBody, "GH issue #15")
+		if len(otherIssues) > 0 {
+			t.Fatalf("historical two-unit body was rejected: %v", otherIssues)
+		}
+		mismatched := recoveryTestVersionedReceipt(myIdentity, myDigest, "echo hi", otherID)
 		result := &ValidationResult{Valid: true}
 		applyQueueIssues(result, "GitHub comments", otherUnits, otherIssues, []string{mismatched})
 		if len(result.Errors) == 0 {

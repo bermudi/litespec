@@ -142,36 +142,71 @@ func parseReplanMarkerComment(comment string) (queueReplanMarker, bool, error) {
 	return queueReplanMarker{identity: identity, digest: digest, reason: reason}, true, nil
 }
 
+func localMetadataBlockStart(lines []string, index int, metadataStream bool, lastNonEmpty string) bool {
+	trimmed := strings.TrimSpace(lines[index])
+	switch trimmed {
+	case "Amendment:", "Re-plan required:":
+		return true
+	}
+	if !strings.HasPrefix(lines[index], "Unit occurrence:") {
+		return false
+	}
+	if !metadataStream && !isCheckboxLine(lastNonEmpty) {
+		return false
+	}
+	next := index + 1
+	for next < len(lines) && strings.TrimSpace(lines[next]) == "" {
+		next++
+	}
+	if next >= len(lines) || !strings.HasPrefix(lines[next], "Unit heading:") {
+		return false
+	}
+	next++
+	for next < len(lines) && strings.TrimSpace(lines[next]) == "" {
+		next++
+	}
+	return next < len(lines) && strings.TrimSpace(lines[next]) == "Evidence:"
+}
+
 func splitLocalQueueMetadataBlocks(body string) (string, []string) {
 	lines := strings.Split(strings.ReplaceAll(body, "\r\n", "\n"), "\n")
 	openFence := ""
+	metadataStream := false
+	lastNonEmpty := ""
 	var blocks []string
 	kept := make([]string, 0, len(lines))
 	for i := 0; i < len(lines); i++ {
 		line := lines[i]
 		if consumeMarkdownFenceLine(&openFence, line) {
 			kept = append(kept, line)
-			continue
-		}
-		metadataLines := 0
-		switch strings.TrimSpace(line) {
-		case "Amendment:":
-			metadataLines = 6
-		case "Re-plan required:":
-			metadataLines = 5
-		}
-		if openFence == "" && metadataLines > 0 {
-			block := []string{line}
-			j := i + 1
-			for j < len(lines) && len(block) < metadataLines && strings.TrimSpace(lines[j]) != "" {
-				block = append(block, lines[j])
-				j++
+			if trimmed := strings.TrimSpace(line); trimmed != "" {
+				lastNonEmpty = trimmed
 			}
-			blocks = append(blocks, strings.Join(block, "\n"))
-			i = j - 1
 			continue
 		}
-		kept = append(kept, line)
+		if !localMetadataBlockStart(lines, i, metadataStream, lastNonEmpty) {
+			kept = append(kept, line)
+			if trimmed := strings.TrimSpace(line); trimmed != "" {
+				lastNonEmpty = trimmed
+			}
+			continue
+		}
+
+		blockFence := ""
+		j := i + 1
+		for j < len(lines) {
+			if consumeMarkdownFenceLine(&blockFence, lines[j]) {
+				j++
+				continue
+			}
+			if localMetadataBlockStart(lines, j, true, "") {
+				break
+			}
+			j++
+		}
+		blocks = append(blocks, strings.TrimRight(strings.Join(lines[i:j], "\n"), "\n"))
+		metadataStream = true
+		i = j - 1
 	}
 	return strings.Join(kept, "\n"), blocks
 }
@@ -472,6 +507,14 @@ func (h amendmentHistory) digestBelongsToIdentity(identity queueUnitIdentity, di
 }
 
 func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
+	return scanQueueCommentsWithInitialReceipts(units, comments, nil)
+}
+
+func scanQueueCommentsWithInitialReceipts(
+	units []queueUnit,
+	comments []string,
+	initialReceipts []evidenceReceiptObservation,
+) queueCommentScan {
 	commentRecords := mergeContinuedCommentRecords(comments)
 	identities := queueUnitIdentities(units)
 	validUnit := make(map[queueUnitIdentity]int, len(identities))
@@ -483,6 +526,12 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 		observed:               make(map[queueUnitIdentity][]string),
 		edges:                  make(map[queueUnitIdentity][]digestEdge),
 		completedRebuildCycles: make(map[queueUnitIdentity]map[string]int),
+	}
+	registry := newEvidenceReceiptRegistry()
+	for i, observation := range initialReceipts {
+		if err := registry.add(observation); err != nil {
+			scan.errors = append(scan.errors, fmt.Errorf("queue evidence %d: %w", i+1, err))
+		}
 	}
 
 	var sightings []amendmentSighting
@@ -609,6 +658,13 @@ func scanQueueComments(units []queueUnit, comments []string) queueCommentScan {
 		if err != nil {
 			scan.errors = append(scan.errors, fmt.Errorf("comment %d: %w", commentIndex+1, err))
 			continue
+		}
+		if kind == rebuildCommentEvidence || kind == rebuildCommentStaleEvidence {
+			if observation, ok := completeEvidenceReceiptObservationRecord(commentRecord, units); ok {
+				if err := registry.add(observation); err != nil {
+					scan.errors = append(scan.errors, fmt.Errorf("comment %d: %w", commentIndex+1, err))
+				}
+			}
 		}
 		if kind == rebuildCommentOther {
 			if commentContainsRawOutputChunk(commentRecord) && !commentHasValidHeadingEvidence(commentRecord, units) {

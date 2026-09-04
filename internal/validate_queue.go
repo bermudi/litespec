@@ -1105,7 +1105,7 @@ func applyQueueIssues(result *ValidationResult, commentSource string, units []qu
 		}
 	}
 
-	scan := scanQueueComments(units, comments)
+	scan := scanQueueCommentsWithInitialReceipts(units, comments, bodyEvidenceReceiptObservations(units))
 	for _, err := range scan.errors {
 		result.Errors = append(result.Errors, ValidationIssue{
 			Severity: SeverityError,

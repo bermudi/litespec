@@ -58,7 +58,8 @@ const (
 )
 
 type evidenceReceiptDeclaration struct {
-	digest string
+	digest  string
+	receipt parsedEvidenceReceipt
 }
 
 func receiptVerifyCommand(lines []string) (string, bool) {
@@ -106,7 +107,7 @@ func validEvidenceReceiptDeclarations(
 		if !ok {
 			continue
 		}
-		issues, _ := evidenceReceiptIssuesForDocument(
+		receipt, issues := parseEvidenceReceiptDocument(
 			document,
 			verifyCmd,
 			digest,
@@ -115,7 +116,7 @@ func validEvidenceReceiptDeclarations(
 			expectedIdentity,
 		)
 		if len(issues) == 0 {
-			declarations = append(declarations, evidenceReceiptDeclaration{digest: digest})
+			declarations = append(declarations, evidenceReceiptDeclaration{digest: digest, receipt: receipt})
 		}
 	}
 	return declarations
