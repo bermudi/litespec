@@ -82,6 +82,19 @@ var CommandSpecs = []CommandSpec{
 		},
 	},
 	{
+		Name:        "issue",
+		Description: "Managed GH issue body operations",
+		Positional: &PositionalSpec{
+			Description: "subcommand",
+			Resolver:    func(root string) []Completion { return completeIssueSubcommands() },
+		},
+		Flags: []FlagSpec{
+			{Name: "--issue", Description: "GH issue number", TakesValue: true},
+			{Name: "--heading", Description: "Exact unit heading", TakesValue: true},
+			{Name: "--occurrence", Description: "1-based same-heading occurrence", TakesValue: true},
+		},
+	},
+	{
 		Name:        "view",
 		Description: "Dashboard overview",
 		Flags: []FlagSpec{

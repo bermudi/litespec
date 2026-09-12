@@ -167,9 +167,19 @@ func TestIssueCheckTicksExactlyOneCheckbox(t *testing.T) {
 		if !strings.Contains(writtenBodies[0], "Done means: second twin") || !strings.Contains(writtenBodies[0], "- [x] pending") {
 			t.Errorf("occurrence 2 tick must flip the second twin's checkbox:\n%s", writtenBodies[0])
 		}
-		firstHalf, secondHalf, found := strings.Cut(writtenBodies[0], "## Twin unit\n")
-		if !found || !strings.Contains(firstHalf, "- [ ] pending") || !strings.Contains(secondHalf, "- [x] pending") {
-			t.Errorf("only the second twin may flip:\n%s", writtenBodies[0])
+		_, rest, found := strings.Cut(writtenBodies[0], "## Twin unit\n")
+		if !found {
+			t.Fatalf("written body lost the twin headings:\n%s", writtenBodies[0])
+		}
+		firstTwin, secondTwin, found := strings.Cut(rest, "## Twin unit\n")
+		if !found {
+			t.Fatalf("written body lost the second twin:\n%s", writtenBodies[0])
+		}
+		if !strings.Contains(firstTwin, "- [ ] pending") || strings.Contains(firstTwin, "- [x] pending") {
+			t.Errorf("the first twin must stay unchecked:\n%s", firstTwin)
+		}
+		if !strings.Contains(secondTwin, "- [x] pending") {
+			t.Errorf("only the second twin may flip:\n%s", secondTwin)
 		}
 	})
 

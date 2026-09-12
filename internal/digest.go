@@ -46,6 +46,34 @@ type ResolvedQueueUnit struct {
 	Verify     string
 }
 
+// resolveQueueUnitIndex locates one unit with the same identity semantics
+// as the digest command: exact heading match, disambiguated by a positive
+// same-heading occurrence when the heading repeats. Ambiguous, unknown, or
+// out-of-range resolution is a visible refusal.
+func resolveQueueUnitIndex(units []queueUnit, identities []queueUnitIdentity, source, heading string, occurrence int) (int, error) {
+	matches := make([]int, 0, 1)
+	for i, unit := range units {
+		if unit.Heading == heading {
+			matches = append(matches, i)
+		}
+	}
+	if len(matches) == 0 {
+		return 0, fmt.Errorf("no unit with heading %q in %s", heading, source)
+	}
+	if occurrence >= 1 {
+		for _, i := range matches {
+			if identities[i].Occurrence == occurrence {
+				return i, nil
+			}
+		}
+		return 0, fmt.Errorf("heading %q has no occurrence %d in %s (valid: 1..%d)", heading, occurrence, source, len(matches))
+	}
+	if len(matches) > 1 {
+		return 0, fmt.Errorf("heading %q matches %d occurrences in %s; pass --occurrence between 1 and %d", heading, len(matches), source, len(matches))
+	}
+	return matches[0], nil
+}
+
 // ResolveQueueUnit locates one queue unit with the same identity semantics
 // as the digest command: exact heading match, disambiguated by a positive
 // same-heading occurrence when the heading repeats. Ambiguous, unknown, or
@@ -61,31 +89,9 @@ func ResolveQueueUnit(root string, issueNumber int, queuePath, heading string, o
 	}
 
 	identities := queueUnitIdentities(units)
-	matches := make([]int, 0, 1)
-	for i, unit := range units {
-		if unit.Heading == heading {
-			matches = append(matches, i)
-		}
-	}
-	if len(matches) == 0 {
-		return ResolvedQueueUnit{}, fmt.Errorf("no unit with heading %q in %s", heading, source)
-	}
-	index := -1
-	if occurrence >= 1 {
-		for _, i := range matches {
-			if identities[i].Occurrence == occurrence {
-				index = i
-				break
-			}
-		}
-		if index < 0 {
-			return ResolvedQueueUnit{}, fmt.Errorf("heading %q has no occurrence %d in %s (valid: 1..%d)", heading, occurrence, source, len(matches))
-		}
-	} else {
-		if len(matches) > 1 {
-			return ResolvedQueueUnit{}, fmt.Errorf("heading %q matches %d occurrences in %s; pass --occurrence between 1 and %d", heading, len(matches), source, len(matches))
-		}
-		index = matches[0]
+	index, err := resolveQueueUnitIndex(units, identities, source, heading, occurrence)
+	if err != nil {
+		return ResolvedQueueUnit{}, err
 	}
 	verify := locateVerifyCommand(units[index].Body)
 	if !verify.found {
