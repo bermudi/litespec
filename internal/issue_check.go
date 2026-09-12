@@ -198,6 +198,12 @@ func verifyOwnershipLinesUnchanged(before, after []string, source string) error 
 // writeIssueBody writes the edited body back through gh issue edit. A gh
 // failure is a visible refusal naming the command; nothing is retried.
 func writeIssueBody(root string, issueNumber int, body string) error {
+	// GitHub stores every written issue body with exactly one appended
+	// trailing newline; without compensation each managed tick grows the
+	// stored body by one newline, unbounded. Normalize the written body to
+	// a single trailing newline so the platform's append lands on a stable
+	// value and repeated round trips stop changing the trailing bytes.
+	body = strings.TrimRight(body, "\n") + "\n"
 	file, err := os.CreateTemp("", "litespec-issue-body-*.md")
 	if err != nil {
 		return fmt.Errorf("create body file: %w", err)
