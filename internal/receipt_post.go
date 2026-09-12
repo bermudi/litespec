@@ -3,8 +3,10 @@ package internal
 import (
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 var ghIssueComment = func(root string, number int, bodyFile string) ([]byte, error) {
@@ -14,9 +16,26 @@ var ghIssueComment = func(root string, number int, bodyFile string) ([]byte, err
 }
 
 // ReceiptCommentCommand is the exact gh command that posts one receipt
-// comment file; the receipt command prints it and the poster runs it.
+// comment file; the receipt command prints it and the poster runs it. The
+// body-file argument is shell-quoted when needed so the rendered command
+// stays pasteable for paths containing spaces or shell metacharacters.
 func ReceiptCommentCommand(number int, bodyFile string) string {
-	return fmt.Sprintf("gh issue comment %d --body-file %s", number, bodyFile)
+	return fmt.Sprintf("gh issue comment %d --body-file %s", number, shellQuote(bodyFile))
+}
+
+// shellQuote returns s unchanged when a POSIX shell would read it as a
+// single word, and a single-quoted form (with embedded quotes escaped)
+// otherwise.
+func shellQuote(s string) string {
+	if s == "" {
+		return "''"
+	}
+	for _, r := range s {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && !strings.ContainsRune("/._-=:,%+@~", r) {
+			return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+		}
+	}
+	return s
 }
 
 // PostReceiptComments posts numbered receipt comment files in strict posting
@@ -43,5 +62,9 @@ func receiptFileList(files []string) string {
 	if len(files) == 0 {
 		return "(none)"
 	}
-	return strings.Join(files, ", ")
+	bases := make([]string, len(files))
+	for i, file := range files {
+		bases[i] = filepath.Base(file)
+	}
+	return strings.Join(bases, ", ")
 }

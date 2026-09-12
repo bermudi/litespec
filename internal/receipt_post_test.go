@@ -6,6 +6,18 @@ import (
 	"testing"
 )
 
+func TestReceiptCommandQuotesBodyFilePath(t *testing.T) {
+	if got, want := ReceiptCommentCommand(42, "/tmp/receipts/receipt-0001.md"), "gh issue comment 42 --body-file /tmp/receipts/receipt-0001.md"; got != want {
+		t.Errorf("plain path rendered %q, want %q", got, want)
+	}
+	if got, want := ReceiptCommentCommand(42, "/tmp/rec dir/receipt-0001.md"), "gh issue comment 42 --body-file '/tmp/rec dir/receipt-0001.md'"; got != want {
+		t.Errorf("spaced path rendered %q, want %q", got, want)
+	}
+	if got, want := ReceiptCommentCommand(42, "/tmp/it's/receipt-0001.md"), "gh issue comment 42 --body-file '/tmp/it'\\''s/receipt-0001.md'"; got != want {
+		t.Errorf("apostrophe path rendered %q, want %q", got, want)
+	}
+}
+
 func TestReceiptPostsCommentsOnlyWhenAsked(t *testing.T) {
 	t.Run("opt-in flag posts the numbered comments in order", func(t *testing.T) {
 		var calls []string

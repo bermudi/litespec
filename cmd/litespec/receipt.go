@@ -137,14 +137,22 @@ func cmdReceipt(args []string) error {
 		return err
 	}
 
+	absOut := outDir
+	if absOut == "" {
+		absOut = "."
+	}
+	absOut, err = filepath.Abs(absOut)
+	if err != nil {
+		return fmt.Errorf("resolve output directory %s: %w", outDir, err)
+	}
 	if outDir != "" {
-		if err := os.MkdirAll(outDir, 0o755); err != nil {
+		if err := os.MkdirAll(absOut, 0o755); err != nil {
 			return fmt.Errorf("create output directory %s: %w", outDir, err)
 		}
 	}
 	names := make([]string, len(comments))
 	for i, text := range comments {
-		name := filepath.Join(outDir, fmt.Sprintf("receipt-%04d.md", i+1))
+		name := filepath.Join(absOut, fmt.Sprintf("receipt-%04d.md", i+1))
 		if err := os.WriteFile(name, []byte(text), 0o644); err != nil {
 			return emitWriteFailure(name, err, names[:i])
 		}
@@ -220,8 +228,10 @@ The unit is resolved by exact heading and positive same-heading occurrence,
 with the same identity semantics as litespec digest. Ambiguous, unknown, or
 out-of-range headings, unreadable output files, and ancestry violations are
 refused before any file is written; the assembled receipt self-parses
-through the existing evidence grammar. A mid-sequence write failure removes
-the already-written files so no partial set is left behind.
+through the existing evidence grammar. Emitted file paths and printed
+commands are absolute, so posting and pasted commands work from any
+directory. A mid-sequence write failure removes the already-written files
+so no partial set is left behind.
 
 Flags:
   --issue <N>            Fetch the GH issue by number (requires gh)

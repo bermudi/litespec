@@ -341,7 +341,7 @@ func TestReceiptCommandEmitsCommentFiles(t *testing.T) {
 		if err != nil {
 			t.Fatalf("receipt failed: %v\n%s", err, out)
 		}
-		if string(out) != "gh issue comment 42 --body-file receipt-0001.md\n" {
+		if string(out) != "gh issue comment 42 --body-file "+filepath.Join(root, "receipt-0001.md")+"\n" {
 			t.Fatalf("stdout = %q, want the single exact gh command", string(out))
 		}
 		content, err := os.ReadFile(filepath.Join(root, "receipt-0001.md"))
@@ -393,8 +393,7 @@ func TestReceiptCommandEmitsCommentFiles(t *testing.T) {
 		}
 		var wantCommands []string
 		for i := range files {
-			name := fmt.Sprintf("receipt-%04d.md", i+1)
-			wantCommands = append(wantCommands, "gh issue comment 42 --body-file "+name)
+			wantCommands = append(wantCommands, "gh issue comment 42 --body-file "+files[i])
 		}
 		if string(out) != strings.Join(wantCommands, "\n")+"\n" {
 			t.Fatalf("stdout = %q, want gh commands in posting order %v", string(out), wantCommands)
@@ -461,7 +460,7 @@ func TestReceiptCommandEmitsCommentFiles(t *testing.T) {
 		}
 		wantCommands := make([]string, len(files))
 		for i := range files {
-			wantCommands[i] = fmt.Sprintf("gh issue comment 42 --body-file out/receipt-%04d.md", i+1)
+			wantCommands[i] = fmt.Sprintf("gh issue comment 42 --body-file %s", filepath.Join(root, "out", fmt.Sprintf("receipt-%04d.md", i+1)))
 		}
 		if stdout != strings.Join(wantCommands, "\n")+"\n" {
 			t.Fatalf("stdout = %q, want gh commands referencing out/: %v", stdout, wantCommands)
@@ -580,9 +579,8 @@ func TestReceiptPostsCommentsWhenAsked(t *testing.T) {
 		var wantReport []string
 		var wantCalls []string
 		for _, name := range files {
-			base := filepath.Base(name)
-			wantReport = append(wantReport, fmt.Sprintf("posted %s (gh issue comment 42 --body-file %s)", base, base))
-			wantCalls = append(wantCalls, "gh issue comment 42 --body-file "+base)
+			wantReport = append(wantReport, fmt.Sprintf("posted %s (gh issue comment 42 --body-file %s)", name, name))
+			wantCalls = append(wantCalls, "gh issue comment 42 --body-file "+name)
 		}
 		if !strings.Contains(out, strings.Join(wantReport, "\n")) {
 			t.Fatalf("stdout must report each posted comment in posting order:\n%s", out)
@@ -606,7 +604,7 @@ func TestReceiptPostsCommentsWhenAsked(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("emit-only receipt failed: exit %d\n%s", code, out)
 		}
-		if !strings.Contains(out, "gh issue comment 42 --body-file receipt-0001.md") {
+		if !strings.Contains(out, "gh issue comment 42 --body-file "+filepath.Join(root, "receipt-0001.md")) {
 			t.Fatalf("emit mode must print the exact gh commands:\n%s", out)
 		}
 		if _, err := os.Stat(logPath); !os.IsNotExist(err) {
@@ -637,9 +635,9 @@ func TestReceiptPostsCommentsWhenAsked(t *testing.T) {
 		if len(files) < 2 {
 			t.Fatalf("expected at least two comment files, got %v", files)
 		}
-		failing := filepath.Base(files[1])
 
 		bin, root, fakePath, logPath, pre, post := newScenario(t)
+		failing := filepath.Join(root, "receipt-0002.md")
 		cmd := exec.Command(bin, emitArgs(pre, post, "--post")...)
 		cmd.Dir = root
 		cmd.Env = append(append(os.Environ(), "HOME="+root), "PATH="+fakePath, "FAIL_MARKER="+failing)
@@ -652,7 +650,7 @@ func TestReceiptPostsCommentsWhenAsked(t *testing.T) {
 		for _, want := range []string{
 			"gh issue comment 42 --body-file " + failing,
 			"posted: receipt-0001.md",
-			"not posted: " + failing,
+			"not posted: " + filepath.Base(failing),
 		} {
 			if !strings.Contains(out, want) {
 				t.Errorf("failure output must name %q:\n%s", want, out)
@@ -664,9 +662,51 @@ func TestReceiptPostsCommentsWhenAsked(t *testing.T) {
 		}
 		lines := strings.Split(strings.TrimSpace(string(logged)), "\n")
 		if len(lines) != 2 ||
-			lines[0] != "gh issue comment 42 --body-file receipt-0001.md" ||
+			lines[0] != "gh issue comment 42 --body-file "+filepath.Join(root, "receipt-0001.md") ||
 			lines[1] != "gh issue comment 42 --body-file "+failing {
 			t.Fatalf("gh calls = %q, want exactly two: post receipt-0001.md then fail on %s with no retry", string(logged), failing)
+		}
+	})
+
+	t.Run("posting from a subdirectory posts absolute body-file paths", func(t *testing.T) {
+		bin, root, fakePath, logPath, pre, post := newScenario(t)
+		sub := filepath.Join(root, "sub")
+		if err := os.MkdirAll(sub, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		writeReceiptRunOutput(t, sub, "pre.txt", strings.Repeat("0123456789", 14000)+"\n")
+		writeReceiptRunOutput(t, sub, "post.txt", "outcome present\n")
+
+		cmd := exec.Command(bin, "receipt", "--issue", "42", "--heading", "Only unit",
+			"--pre-sha", pre, "--pre-status", "1", "--pre-out", filepath.Join(sub, "pre.txt"),
+			"--post-sha", post, "--post-out", filepath.Join(sub, "post.txt"), "--post")
+		cmd.Dir = sub
+		cmd.Env = append(append(os.Environ(), "HOME="+root), "PATH="+fakePath)
+		raw, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("posting from a subdirectory must work with absolute paths: %v\n%s", err, raw)
+		}
+		files, err := filepath.Glob(filepath.Join(sub, "receipt-*.md"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		sort.Strings(files)
+		if len(files) < 2 {
+			t.Fatalf("files must land in the invoking directory, got %v", files)
+		}
+		if stray := receiptCommentFiles(t, root); len(stray) != 0 {
+			t.Fatalf("project root must stay clean when invoked from a subdirectory, found %v", stray)
+		}
+		logged, err := os.ReadFile(logPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var wantCalls []string
+		for _, name := range files {
+			wantCalls = append(wantCalls, "gh issue comment 42 --body-file "+name)
+		}
+		if strings.TrimSpace(string(logged)) != strings.Join(wantCalls, "\n") {
+			t.Fatalf("gh calls = %q, want absolute body-file paths %v", string(logged), wantCalls)
 		}
 	})
 }
