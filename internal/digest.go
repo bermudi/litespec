@@ -93,14 +93,7 @@ func ResolveQueueUnit(root string, issueNumber int, queuePath, heading string, o
 	if err != nil {
 		return ResolvedQueueUnit{}, err
 	}
-	verify := locateVerifyCommand(units[index].Body)
-	if !verify.found {
-		return ResolvedQueueUnit{}, fmt.Errorf("unit %q in %s has no Verify command", heading, source)
-	}
-	command := verify.fenced
-	if !verify.hasFenced {
-		command = verify.inline
-	}
+	command := unitVerifyCommand(units[index].Body)
 	if strings.TrimSpace(command) == "" {
 		return ResolvedQueueUnit{}, fmt.Errorf("unit %q in %s has no Verify command", heading, source)
 	}

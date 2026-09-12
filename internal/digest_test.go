@@ -128,6 +128,101 @@ func TestDigestQueueUnitsGHIssueMatchesLocalCanonicalization(t *testing.T) {
 	}
 }
 
+// Review finding F1, shape 1: a Verify: line inside an earlier fenced
+// Constraints block. The validator-bound extractor reads past it as garbage
+// body text; the resolver must quote exactly that, not the structural
+// extractor's cleaner answer.
+func TestResolveQueueUnitQuotesValidatorVerifyThroughFencedConstraints(t *testing.T) {
+	body := strings.Join([]string{
+		"Base: 0000000000000000000000000000000000000001",
+		"Branch: litespec/demo",
+		"",
+		"## First unit",
+		"",
+		"Done means: it works",
+		"",
+		"Constraints: keep them simple",
+		digestTestFence + "text",
+		"Verify: `echo decoy`",
+		digestTestFence,
+		"",
+		"Verify:",
+		digestTestFence + "bash",
+		"echo real",
+		digestTestFence,
+		"",
+		"- [ ] pending",
+	}, "\n")
+	path := filepath.Join(t.TempDir(), "demo.md")
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	resolved, err := ResolveQueueUnit("", 0, path, "First unit", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	units, err := queueUnitsFromBody(body, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonical := unitVerifyCommand(units[0].Body)
+	if resolved.Verify != canonical {
+		t.Errorf("resolver Verify = %q, want validator extraction %q", resolved.Verify, canonical)
+	}
+	want := "\nVerify:\n" + digestTestFence + "bash\necho real"
+	if resolved.Verify != want {
+		t.Errorf("resolver Verify = %q, want canonical garbage %q", resolved.Verify, want)
+	}
+	if locate := locateVerifyCommand(units[0].Body); locate.fenced != "echo real" {
+		t.Errorf("structural extractor fenced = %q, want the real command (documented divergence)", locate.fenced)
+	}
+}
+
+// Review finding F1, shape 2: prose between the Verify: label and its fence.
+// The validator-bound extractor yields nothing, so the resolver must refuse
+// rather than quote the structural extractor's answer.
+func TestResolveQueueUnitRefusesWhenProseSeparatesVerifyFromFence(t *testing.T) {
+	body := strings.Join([]string{
+		"Base: 0000000000000000000000000000000000000001",
+		"Branch: litespec/demo",
+		"",
+		"## Only unit",
+		"",
+		"Done means: it runs",
+		"",
+		"Verify: run the fenced command",
+		"The command:",
+		digestTestFence + "bash",
+		"echo real",
+		digestTestFence,
+		"",
+		"- [ ] pending",
+	}, "\n")
+	path := filepath.Join(t.TempDir(), "demo.md")
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := ResolveQueueUnit("", 0, path, "Only unit", 1); err == nil {
+		t.Fatal("resolver should refuse when the validator extraction yields no command")
+	} else if !strings.Contains(err.Error(), "has no Verify command") {
+		t.Fatalf("refusal = %v, want a no-Verify-command error", err)
+	}
+
+	units, err := queueUnitsFromBody(body, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := unitVerifyCommand(units[0].Body); got != "" {
+		t.Errorf("validator extraction = %q, want empty (prose between label and fence)", got)
+	}
+	if locate := locateVerifyCommand(units[0].Body); locate.fenced != "echo real" {
+		t.Errorf("structural extractor fenced = %q, want the real command (documented divergence)", locate.fenced)
+	}
+}
+
 func TestFormatUnitDigestLinesIsTSV(t *testing.T) {
 	out := FormatUnitDigestLines([]UnitDigestLine{
 		{Occurrence: 1, Heading: "First unit", Digest: "abc123"},
