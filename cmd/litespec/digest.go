@@ -11,8 +11,10 @@ func cmdDigest(args []string) error {
 	fs := newFlagSet("digest", printDigestHelp)
 	var issueNumber int
 	var queuePath string
+	var heading string
 	fs.IntVar(&issueNumber, "issue", 0, "print unit digests for a single GH issue by number")
 	fs.StringVar(&queuePath, "queue", "", "print unit digests for a single local queue markdown file")
+	fs.StringVar(&heading, "heading", "", "print only the digest lines whose unit heading equals this text exactly")
 
 	ok, err := parseFlagSet(fs, args)
 	if !ok {
@@ -21,12 +23,15 @@ func cmdDigest(args []string) error {
 
 	issueSet := false
 	queueSet := false
+	headingSet := false
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "issue":
 			issueSet = true
 		case "queue":
 			queueSet = true
+		case "heading":
+			headingSet = true
 		}
 	})
 
@@ -56,6 +61,19 @@ func cmdDigest(args []string) error {
 		return err
 	}
 
+	if headingSet {
+		filtered := make([]internal.UnitDigestLine, 0, len(lines))
+		for _, line := range lines {
+			if line.Heading == heading {
+				filtered = append(filtered, line)
+			}
+		}
+		if len(filtered) == 0 {
+			return fmt.Errorf("no unit with heading %q", heading)
+		}
+		lines = filtered
+	}
+
 	fmt.Print(internal.FormatUnitDigestLines(lines))
 	return nil
 }
@@ -65,10 +83,13 @@ func printDigestHelp() {
 
 Print each queue unit's identity (occurrence and heading) and its expected
 contract digest, one tab-separated line per unit. Paste the digest into an
-evidence receipt without transformation.
+evidence receipt without transformation. With --heading, print only the
+lines whose unit heading equals the given text exactly; every occurrence
+of a duplicated heading is listed with its own occurrence number.
 
 Options:
   --issue <N>     Fetch the GH issue by number (requires gh)
   --queue <path>  Read a local specs/queues/<name>.md file
+  --heading <t>   Print only lines whose unit heading matches exactly
 `)
 }

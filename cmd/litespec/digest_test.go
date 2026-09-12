@@ -50,6 +50,107 @@ func writeDigestQueueFixture(t *testing.T, root string) string {
 	return path
 }
 
+func writeDuplicateHeadingQueueFixture(t *testing.T, root string) string {
+	t.Helper()
+	dir := filepath.Join(root, "specs", "queues")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "duplicates.md")
+	body := `Base: 0000000000000000000000000000000000000001
+Branch: litespec/demo
+
+## Repeated unit
+
+Done means: it works
+
+Verify:
+` + "```bash\necho one\n```\n" + `
+- [ ] pending
+
+## Other unit
+
+Done means: it differs
+
+Verify:
+` + "```bash\necho two\n```\n" + `
+- [ ] pending
+
+## Repeated unit
+
+Done means: it also works
+
+Verify:
+` + "```bash\necho three\n```\n" + `
+- [ ] pending
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestDigestHeadingFilter(t *testing.T) {
+	bin, root := setupCLITest(t)
+	path := writeDuplicateHeadingQueueFixture(t, root)
+
+	t.Run("heading filter lists every occurrence of a duplicated heading", func(t *testing.T) {
+		lines, err := internal.DigestQueueUnits(root, 0, path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var want []internal.UnitDigestLine
+		for _, line := range lines {
+			if line.Heading == "Repeated unit" {
+				want = append(want, line)
+			}
+		}
+		if len(want) != 2 {
+			t.Fatalf("fixture must carry two Repeated unit occurrences, got %d", len(want))
+		}
+		if want[0].Occurrence != 1 || want[1].Occurrence != 2 {
+			t.Fatalf("occurrences = %d,%d; want 1,2", want[0].Occurrence, want[1].Occurrence)
+		}
+
+		out, code := runCLI(t, bin, root, "digest", "--queue", path, "--heading", "Repeated unit")
+		if code != 0 {
+			t.Fatalf("exit %d: %s", code, out)
+		}
+		if wantOut := internal.FormatUnitDigestLines(want); out != wantOut {
+			t.Errorf("output = %q, want %q", out, wantOut)
+		}
+	})
+
+	t.Run("zero-match heading fails visibly and completion offers the flag", func(t *testing.T) {
+		out, code := runCLI(t, bin, root, "digest", "--queue", path, "--heading", "Missing unit")
+		if code == 0 {
+			t.Fatal("zero-match heading must exit non-zero")
+		}
+		if !strings.Contains(out, "Missing unit") {
+			t.Errorf("failure must name the heading; out=%s", out)
+		}
+
+		hasHeading := false
+		for _, spec := range internal.CommandSpecs {
+			if spec.Name != "digest" {
+				continue
+			}
+			for _, f := range spec.Flags {
+				if f.Name == "--heading" {
+					hasHeading = true
+				}
+			}
+		}
+		if !hasHeading {
+			t.Error("CommandSpecs does not register --heading on digest")
+		}
+		compOut, code := runCLI(t, bin, root, "completion", "bash")
+		if code != 0 || !strings.Contains(compOut, "--heading") {
+			t.Errorf("bash completion does not offer --heading; exit=%d", code)
+		}
+	})
+}
+
 func TestDigestCommandPrintsUnitDigests(t *testing.T) {
 	bin, root := setupCLITest(t)
 

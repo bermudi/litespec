@@ -60,6 +60,7 @@ var CommandSpecs = []CommandSpec{
 		Flags: []FlagSpec{
 			{Name: "--issue", Description: "GH issue number", TakesValue: true},
 			{Name: "--queue", Description: "Local queue markdown file", TakesValue: true},
+			{Name: "--heading", Description: "Filter to lines with this exact unit heading", TakesValue: true},
 		},
 	},
 	{
