@@ -46,7 +46,7 @@ Byte-exact evidence assembly and queue-body bookkeeping are CLI responsibilities
 
 ### Requirement: Managed Unit Checkbox Tick
 
-`litespec issue check` SHALL tick exactly one unit checkbox in a GH issue body: it SHALL resolve the unit by exact heading and positive same-heading occurrence, write back a body differing from the fetched body by exactly that one checkbox flip, and verify the ownership lines are byte-unchanged after the edit. It SHALL refuse, without issuing any write, when any other body content would change, when the heading does not resolve to exactly one unchecked unit, or when gh is unavailable.
+`litespec issue check` SHALL tick exactly one unit checkbox in a GH issue body: it SHALL resolve the unit by exact heading and positive same-heading occurrence, write back a body differing from the fetched body by exactly that one checkbox flip plus trailing-newline normalization (the written body carries exactly one trailing newline), and verify the ownership lines are byte-unchanged after the edit. GitHub's API appends one trailing newline to every stored body, so the stored body converges to two trailing newlines and stays there; at steady state the fetch-to-fetch delta is exactly the flip. It SHALL refuse, without issuing any write, when any other body content would change, when the heading does not resolve to exactly one unchecked unit, or when gh is unavailable.
 
 #### Scenario: Single tick preserves ownership
 
