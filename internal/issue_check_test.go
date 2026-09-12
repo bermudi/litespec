@@ -183,6 +183,52 @@ func TestIssueCheckTicksExactlyOneCheckbox(t *testing.T) {
 		}
 	})
 
+	t.Run("managed tick round trip does not grow trailing newlines", func(t *testing.T) {
+		stored := issueCheckTwinsFixtureBody
+		var writtenBodies []string
+		originalView, originalEdit := ghIssueView, ghIssueEdit
+		defer func() { ghIssueView, ghIssueEdit = originalView, originalEdit }()
+		// GitHub stores every written issue body with exactly one appended
+		// trailing newline (measured on the live API: writing a body with
+		// N trailing newlines stores N+1). Each uncompensated managed tick
+		// therefore grows the stored body by one newline.
+		ghIssueView = func(root string, number int) ([]byte, error) {
+			bodyJSON, err := json.Marshal(stored)
+			if err != nil {
+				t.Fatal(err)
+			}
+			payload := fmt.Sprintf(`{"number":42,"title":"t","body":%s,"url":"","comments":[]}`, bodyJSON)
+			return []byte(payload), nil
+		}
+		ghIssueEdit = func(root string, number int, bodyFile string) ([]byte, error) {
+			data, err := os.ReadFile(bodyFile)
+			if err != nil {
+				t.Fatalf("read written body file: %v", err)
+			}
+			writtenBodies = append(writtenBodies, string(data))
+			stored = string(data) + "\n"
+			return []byte("https://example.invalid/issues/42\n"), nil
+		}
+
+		for tick := 1; tick <= 2; tick++ {
+			fetched := stored
+			writtenBodies = nil
+			if _, err := IssueCheckTicksOneUnit("/repo", 42, "Twin unit", tick); err != nil {
+				t.Fatalf("managed tick %d failed: %v", tick, err)
+			}
+			if len(writtenBodies) != 1 {
+				t.Fatalf("managed tick %d issued %d writes, want exactly one", tick, len(writtenBodies))
+			}
+			issueCheckAssertOneCheckboxFlip(t, strings.TrimRight(fetched, "\n"), strings.TrimRight(writtenBodies[0], "\n"))
+			if trailing := len(writtenBodies[0]) - len(strings.TrimRight(writtenBodies[0], "\n")); trailing != 1 {
+				t.Fatalf("managed tick %d wrote %d trailing newlines; the platform appends one per write, so the written body must normalize to exactly one", tick, trailing)
+			}
+			if trailing := len(stored) - len(strings.TrimRight(stored, "\n")); trailing != 2 {
+				t.Fatalf("after managed tick %d the stored body carries %d trailing newlines; the round trip must stabilize at the written one plus the platform's appended one", tick, trailing)
+			}
+		}
+	})
+
 	t.Run("refusals issue no write and leave the remote body untouched", func(t *testing.T) {
 		var editCalls int
 		originalView, originalEdit := ghIssueView, ghIssueEdit
