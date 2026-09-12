@@ -26,6 +26,7 @@ func cmdReceipt(args []string) error {
 		postOutPath   string
 		rebuild       bool
 		recoveredFrom string
+		post          bool
 	)
 	fs.IntVar(&issueNumber, "issue", 0, "GH issue number")
 	fs.StringVar(&queuePath, "queue", "", "local queue markdown file")
@@ -39,6 +40,7 @@ func cmdReceipt(args []string) error {
 	fs.StringVar(&postOutPath, "post-out", "", "file holding the raw post output")
 	fs.BoolVar(&rebuild, "rebuild", false, "include the rebuild routing identity")
 	fs.StringVar(&recoveredFrom, "recovered-from", "", "recovery provenance receipt ID")
+	fs.BoolVar(&post, "post", false, "run the printed gh issue comment commands in posting order")
 
 	ok, err := parseFlagSet(fs, args)
 	if !ok {
@@ -69,6 +71,9 @@ func cmdReceipt(args []string) error {
 	}
 	if setFlags["occurrence"] && occurrence < 1 {
 		return fmt.Errorf("--occurrence must be a positive integer, got %d", occurrence)
+	}
+	if post && !issueSet {
+		return fmt.Errorf("--post requires --issue <N>; queue mode has no issue to comment on")
 	}
 	if preSHA == "" {
 		return fmt.Errorf("--pre-sha is required")
@@ -135,8 +140,18 @@ func cmdReceipt(args []string) error {
 		names[i] = name
 	}
 	if issueSet {
-		for _, name := range names {
-			fmt.Printf("gh issue comment %d --body-file %s\n", issueNumber, name)
+		if !post {
+			for _, name := range names {
+				fmt.Println(internal.ReceiptCommentCommand(issueNumber, name))
+			}
+			return nil
+		}
+		posted, err := internal.PostReceiptComments(root, issueNumber, names)
+		if err != nil {
+			return err
+		}
+		for _, name := range posted {
+			fmt.Printf("posted %s (%s)\n", name, internal.ReceiptCommentCommand(issueNumber, name))
 		}
 	}
 	return nil
@@ -164,8 +179,11 @@ func printReceiptHelp() {
 Assemble one validator-clean evidence receipt for a resolved queue unit and
 emit numbered comment files (receipt-0001.md, receipt-0002.md, ...). Issue
 mode also prints the exact gh issue comment commands in posting order; queue
-mode emits files only. The command never posts by itself and never ticks
-checkboxes.
+mode emits files only. By default the command never posts and never ticks
+checkboxes. Opt-in --post runs the printed gh issue comment commands itself,
+strictly in posting order, reporting each posted comment; a failing gh
+invocation stops the chain naming the posted and unposted parts, with no
+retry or reordering. Posting never ticks checkboxes.
 
 The unit is resolved by exact heading and positive same-heading occurrence,
 with the same identity semantics as litespec digest. Ambiguous, unknown, or
@@ -186,5 +204,6 @@ Flags:
   --post-out <file>      File holding the raw post output
   --rebuild              Include the rebuild routing identity
   --recovered-from <id>  Recovery provenance receipt ID
+  --post                 Run the printed gh issue comment commands in order
 `)
 }

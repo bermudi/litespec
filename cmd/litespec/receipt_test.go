@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -146,6 +147,39 @@ func receiptFakeGH(t *testing.T, issueNumber int, body string) string {
 	payload := fmt.Sprintf(`{"number":%d,"title":"t","body":%s,"url":"","comments":[]}`, issueNumber, bodyJSON)
 	fakeBin := t.TempDir()
 	script := "#!/bin/sh\ncat " + filepath.Join(fakeBin, "payload.json") + "\n"
+	if err := os.WriteFile(filepath.Join(fakeBin, "gh"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(fakeBin, "payload.json"), []byte(payload), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return fakeBin + ":" + os.Getenv("PATH")
+}
+
+// receiptPostingFakeGH installs a gh shim that serves the given issue body
+// for `issue view`, records every other invocation (the comment writes) to
+// logPath, and fails any invocation containing $FAIL_MARKER when set.
+func receiptPostingFakeGH(t *testing.T, issueNumber int, body, logPath string) string {
+	t.Helper()
+	bodyJSON, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fakeBin := t.TempDir()
+	payload := fmt.Sprintf(`{"number":%d,"title":"t","body":%s,"url":"","comments":[]}`, issueNumber, bodyJSON)
+	script := "#!/bin/sh\n" +
+		"case \"$*\" in\n" +
+		"*\"issue view\"*)\n" +
+		"  cat " + filepath.Join(fakeBin, "payload.json") + "\n" +
+		"  exit 0\n" +
+		"  ;;\n" +
+		"esac\n" +
+		"echo \"gh $*\" >> " + logPath + "\n" +
+		"if [ -n \"$FAIL_MARKER\" ] && echo \"$*\" | grep -q \"$FAIL_MARKER\"; then\n" +
+		"  echo 'gh: simulated failure' >&2\n" +
+		"  exit 1\n" +
+		"fi\n" +
+		"exit 0\n"
 	if err := os.WriteFile(filepath.Join(fakeBin, "gh"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -426,6 +460,150 @@ func TestReceiptCommandEmitsCommentFiles(t *testing.T) {
 		compOut, code := runCLI(t, bin, root, "completion", "bash")
 		if code != 0 || !strings.Contains(compOut, "receipt") {
 			t.Errorf("bash completion does not offer receipt; exit=%d", code)
+		}
+	})
+}
+
+func TestReceiptPostsCommentsWhenAsked(t *testing.T) {
+	newScenario := func(t *testing.T) (bin, root, fakePath, logPath, pre, post string) {
+		t.Helper()
+		bin, root = setupCLITest(t)
+		writeReceiptQueueFixture(t, root, receiptFixtureBody)
+		logPath = filepath.Join(t.TempDir(), "gh-calls.log")
+		fakePath = receiptPostingFakeGH(t, 42, receiptFixtureBody, logPath)
+		pre, post = receiptGitCommits(t, root)
+		writeReceiptRunOutput(t, root, "pre.txt", strings.Repeat("0123456789", 14000)+"\n")
+		writeReceiptRunOutput(t, root, "post.txt", "outcome present\n")
+		return bin, root, fakePath, logPath, pre, post
+	}
+
+	emitArgs := func(pre, post string, extra ...string) []string {
+		args := []string{
+			"receipt", "--issue", "42", "--heading", "Only unit",
+			"--pre-sha", pre, "--pre-status", "1", "--pre-out", "pre.txt",
+			"--post-sha", post, "--post-out", "post.txt",
+		}
+		return append(args, extra...)
+	}
+
+	runReceipt := func(t *testing.T, bin, root, fakePath string, args ...string) (string, int) {
+		t.Helper()
+		cmd := exec.Command(bin, args...)
+		cmd.Dir = root
+		cmd.Env = append(append(os.Environ(), "HOME="+root), "PATH="+fakePath)
+		out, err := cmd.CombinedOutput()
+		code := 0
+		if err != nil {
+			var exitErr *exec.ExitError
+			if !errors.As(err, &exitErr) {
+				t.Fatalf("receipt: %v\n%s", err, out)
+			}
+			code = exitErr.ExitCode()
+		}
+		return string(out), code
+	}
+
+	t.Run("opt-in flag posts the numbered comments in order", func(t *testing.T) {
+		bin, root, fakePath, logPath, pre, post := newScenario(t)
+
+		out, code := runReceipt(t, bin, root, fakePath, emitArgs(pre, post, "--post")...)
+		if code != 0 {
+			t.Fatalf("posting receipt failed: exit %d\n%s", code, out)
+		}
+		files := receiptCommentFiles(t, root)
+		if len(files) < 3 {
+			t.Fatalf("expected the oversized output to split into at least three files, got %v", files)
+		}
+		var wantReport []string
+		var wantCalls []string
+		for _, name := range files {
+			base := filepath.Base(name)
+			wantReport = append(wantReport, fmt.Sprintf("posted %s (gh issue comment 42 --body-file %s)", base, base))
+			wantCalls = append(wantCalls, "gh issue comment 42 --body-file "+base)
+		}
+		if !strings.Contains(out, strings.Join(wantReport, "\n")) {
+			t.Fatalf("stdout must report each posted comment in posting order:\n%s", out)
+		}
+		if strings.Contains(out, "\ngh issue comment ") {
+			t.Errorf("post mode must report posted comments, not print bare commands:\n%s", out)
+		}
+		logged, err := os.ReadFile(logPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.TrimSpace(string(logged)) != strings.Join(wantCalls, "\n") {
+			t.Fatalf("gh calls = %q, want exactly %q in posting order", string(logged), strings.Join(wantCalls, "\n"))
+		}
+	})
+
+	t.Run("default stays emit-only without any gh write", func(t *testing.T) {
+		bin, root, fakePath, logPath, pre, post := newScenario(t)
+
+		out, code := runReceipt(t, bin, root, fakePath, emitArgs(pre, post)...)
+		if code != 0 {
+			t.Fatalf("emit-only receipt failed: exit %d\n%s", code, out)
+		}
+		if !strings.Contains(out, "gh issue comment 42 --body-file receipt-0001.md") {
+			t.Fatalf("emit mode must print the exact gh commands:\n%s", out)
+		}
+		if _, err := os.Stat(logPath); !os.IsNotExist(err) {
+			t.Errorf("emit mode must not invoke gh comment writes, log present: %v", err)
+		}
+	})
+
+	t.Run("queue mode refuses --post", func(t *testing.T) {
+		bin, root, fakePath, _, pre, post := newScenario(t)
+		queuePath := filepath.Join(root, "specs", "queues", "receipt-fixture.md")
+		args := emitArgs(pre, post, "--post")
+		args[1] = "--queue"
+		args[2] = queuePath
+
+		out, code := runReceipt(t, bin, root, fakePath, args...)
+		if code == 0 || !strings.Contains(out, "--post") {
+			t.Errorf("--post with --queue must be refused naming the flag: exit=%d out=%s", code, out)
+		}
+	})
+
+	t.Run("mid-chain gh failure stops visibly with posted and unposted parts named", func(t *testing.T) {
+		bin, root, fakePath, _, pre, post := newScenario(t)
+		out, code := runReceipt(t, bin, root, fakePath, emitArgs(pre, post)...)
+		if code != 0 {
+			t.Fatalf("emit run failed: exit %d\n%s", code, out)
+		}
+		files := receiptCommentFiles(t, root)
+		if len(files) < 2 {
+			t.Fatalf("expected at least two comment files, got %v", files)
+		}
+		failing := filepath.Base(files[1])
+
+		bin, root, fakePath, logPath, pre, post := newScenario(t)
+		cmd := exec.Command(bin, emitArgs(pre, post, "--post")...)
+		cmd.Dir = root
+		cmd.Env = append(append(os.Environ(), "HOME="+root), "PATH="+fakePath, "FAIL_MARKER="+failing)
+		raw, err := cmd.CombinedOutput()
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) || exitErr.ExitCode() == 0 {
+			t.Fatalf("mid-chain failure must exit non-zero, got %v\n%s", err, raw)
+		}
+		out = string(raw)
+		for _, want := range []string{
+			"gh issue comment 42 --body-file " + failing,
+			"posted: receipt-0001.md",
+			"not posted: " + failing,
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("failure output must name %q:\n%s", want, out)
+			}
+		}
+		logged, err := os.ReadFile(logPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lines := strings.Split(strings.TrimSpace(string(logged)), "\n")
+		if len(lines) != 2 ||
+			lines[0] != "gh issue comment 42 --body-file receipt-0001.md" ||
+			lines[1] != "gh issue comment 42 --body-file "+failing {
+			t.Fatalf("gh calls = %q, want exactly two: post receipt-0001.md then fail on %s with no retry", string(logged), failing)
 		}
 	})
 }

@@ -78,6 +78,7 @@ var CommandSpecs = []CommandSpec{
 			{Name: "--post-out", Description: "File with raw post output", TakesValue: true},
 			{Name: "--rebuild", Description: "Include rebuild routing identity", TakesValue: false},
 			{Name: "--recovered-from", Description: "Recovery provenance receipt ID", TakesValue: true},
+			{Name: "--post", Description: "Run the printed gh issue comment commands in order", TakesValue: false},
 		},
 	},
 	{

@@ -185,7 +185,7 @@ Generated via `litespec update` from `internal/skill/templates/` (embed.FS). `.a
 | `litespec update [--tools <ids>]` | regenerate skills and adapters |
 | `litespec upgrade` | check for and install the latest version via `go install` |
 | `litespec digest --issue <N> \| --queue <path>` | print expected unit contract digests, one tab-separated line per queue unit |
-| `litespec receipt --issue <N> \| --queue <path> --heading "<text>" [flags]` | resolve one queue unit and assemble its validator-clean evidence receipt into numbered comment files (exact `gh issue comment` commands in issue mode, files only in queue mode); emit-only — it never posts and never ticks checkboxes |
+| `litespec receipt --issue <N> \| --queue <path> --heading "<text>" [flags]` | resolve one queue unit and assemble its validator-clean evidence receipt into numbered comment files (exact `gh issue comment` commands in issue mode, files only in queue mode); emit-only by default — opt-in `--post` runs the printed commands in posting order and stops visibly on the first gh failure; it never ticks checkboxes |
 | `litespec completion <shell>` | generate shell completion script (bash, zsh, fish) |
 
 ## GH issues as the change
