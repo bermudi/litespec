@@ -167,7 +167,7 @@ func TestReceiptAssemblyEngine(t *testing.T) {
 			request := assemblyTestRequest()
 			request.Pre.Output = strings.Repeat("pre line\n", 30)
 			request.Post.Output = strings.Repeat("post line\n", 30)
-			const limit = 700
+			const limit = 820
 			request.CommentLimit = limit
 			comments, err := AssembleEvidenceReceiptComments(request)
 			if err != nil {
@@ -200,7 +200,7 @@ func TestReceiptAssemblyEngine(t *testing.T) {
 			request := assemblyTestRequest()
 			request.Pre.Output = strings.Repeat("0123456789", 200) + "\n"
 			request.Post.Output = strings.Repeat("abcdef\n", 120)
-			const limit = 600
+			const limit = 800
 			request.CommentLimit = limit
 			comments, err := AssembleEvidenceReceiptComments(request)
 			if err != nil {
@@ -214,16 +214,48 @@ func TestReceiptAssemblyEngine(t *testing.T) {
 			assemblyAssertFenceDelimiters(t, comments)
 
 			joined := strings.Join(comments, "\n")
-			chunkTotal := regexp.MustCompile(`(?m)^Chunk: (\d+)/(\d+)$`).FindAllStringSubmatch(joined, -1)
-			if len(chunkTotal) < 2 {
-				t.Fatalf("expected explicit chunk records, got %d", len(chunkTotal))
+			type chunkRecord struct {
+				phase  string
+				number int
+				total  int
 			}
-			for i, record := range chunkTotal {
-				if record[2] != chunkTotal[0][2] {
-					t.Fatalf("chunk %d declares a different total", i+1)
+			var records []chunkRecord
+			lastPhase := ""
+			for _, line := range strings.Split(joined, "\n") {
+				trimmed := strings.TrimSpace(line)
+				if phase, ok := strings.CutPrefix(trimmed, "Output: "); ok {
+					lastPhase = phase
+					continue
 				}
-				if record[1] != strconv.Itoa(i+1) {
-					t.Fatalf("chunk numbers are not consecutive from 1: record %d declares %s", i+1, record[1])
+				number, total, ok := strings.Cut(trimmed, "/")
+				if !ok || !strings.HasPrefix(trimmed, "Chunk: ") {
+					continue
+				}
+				chunkNumber, err := strconv.Atoi(strings.TrimPrefix(number, "Chunk: "))
+				if err != nil {
+					t.Fatalf("chunk record has a non-numeric number: %s", trimmed)
+				}
+				chunkTotal, err := strconv.Atoi(total)
+				if err != nil {
+					t.Fatalf("chunk record has a non-numeric total: %s", trimmed)
+				}
+				records = append(records, chunkRecord{phase: lastPhase, number: chunkNumber, total: chunkTotal})
+			}
+			if len(records) < 2 {
+				t.Fatalf("expected explicit chunk records, got %d", len(records))
+			}
+			seenPhase := map[string]int{}
+			for _, record := range records {
+				seenPhase[record.phase]++
+				if record.number != seenPhase[record.phase] {
+					t.Fatalf("chunk numbers are not consecutive from 1 for %s: got %d", record.phase, record.number)
+				}
+			}
+			for phase, count := range seenPhase {
+				for _, record := range records {
+					if record.phase == phase && record.total != count {
+						t.Fatalf("%s chunks declare total %d but %d exist", phase, record.total, count)
+					}
 				}
 			}
 			for _, comment := range comments {
@@ -337,7 +369,7 @@ func TestReceiptAssemblyEngine(t *testing.T) {
 
 		body := ownedQueue(checkedUnit(assemblyTestVerify, ""))
 		units, _ := ValidateQueueBody(body, "queue")
-		identity, kind, _, err := parseRebuildCommentRecord(comments[0], units)
+		identity, kind, _, err := parseRebuildComment(comments[0], units)
 		if err != nil {
 			t.Fatalf("assembled rebuild receipt does not parse: %v", err)
 		}
