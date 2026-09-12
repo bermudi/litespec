@@ -1267,6 +1267,53 @@ func isUnit(unit queueUnit) bool {
 	return false
 }
 
+// verifyCommandSpan records how a unit declares its Verify command, with
+// exactly the semantics validate applies: the first Verify: label outside
+// code fences, then either an inline backtick command or the first
+// terminated fenced block after the label.
+type verifyCommandSpan struct {
+	found     bool
+	inline    string
+	fenced    string
+	hasFenced bool
+}
+
+func locateVerifyCommand(body []string) verifyCommandSpan {
+	var span verifyCommandSpan
+	openFence := ""
+	for i, line := range body {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		if !strings.HasPrefix(line, "Verify:") {
+			continue
+		}
+		span.found = true
+		rest := strings.TrimSpace(line[len("Verify:"):])
+		firstBacktick := strings.Index(rest, "`")
+		lastBacktick := strings.LastIndex(rest, "`")
+		if firstBacktick >= 0 && lastBacktick > firstBacktick {
+			span.inline = strings.TrimSpace(rest[firstBacktick+1 : lastBacktick])
+		}
+		for j := i + 1; j < len(body); j++ {
+			delimiter := fenceDelimiter(body[j])
+			if delimiter == "" {
+				continue
+			}
+			for k := j + 1; k < len(body); k++ {
+				if strings.TrimSpace(body[k]) == delimiter {
+					span.hasFenced = true
+					span.fenced = strings.Join(body[j+1:k], "\n")
+					break
+				}
+			}
+			break
+		}
+		break
+	}
+	return span
+}
+
 func isCheckboxLine(line string) bool {
 	trimmed := strings.TrimSpace(line)
 	for _, checkbox := range []string{"- [ ]", "- [x]", "- [X]"} {
@@ -1395,12 +1442,7 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 		}
 
 		doneFound := false
-		verifyFound := false
 		checkboxFound := false
-		inlineVerify := false
-		inlineVerifyContent := ""
-		hasFencedBlock := false
-		var verifyBlock string
 		fencedBlock := ""
 		constraintsCount := 0
 		readFirstCount := 0
@@ -1431,40 +1473,17 @@ func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIss
 			if strings.HasPrefix(line, "Done means:") {
 				doneFound = true
 			}
-			if !verifyFound && strings.HasPrefix(line, "Verify:") {
-				verifyFound = true
-				rest := strings.TrimSpace(line[len("Verify:"):])
-				firstBacktick := strings.Index(rest, "`")
-				lastBacktick := strings.LastIndex(rest, "`")
-				if firstBacktick >= 0 && lastBacktick > firstBacktick {
-					span := strings.TrimSpace(rest[firstBacktick+1 : lastBacktick])
-					if span != "" {
-						inlineVerify = true
-						inlineVerifyContent = span
-					}
-				}
-				for j := i + 1; j < len(unit.Body); j++ {
-					delimiter := fenceDelimiter(unit.Body[j])
-					if delimiter != "" {
-						var blockLines []string
-						for k := j + 1; k < len(unit.Body); k++ {
-							if strings.TrimSpace(unit.Body[k]) == delimiter {
-								hasFencedBlock = true
-								break
-							}
-							blockLines = append(blockLines, unit.Body[k])
-						}
-						if hasFencedBlock {
-							verifyBlock = strings.Join(blockLines, "\n")
-						}
-						break
-					}
-				}
-			}
 			if isCheckboxLine(line) {
 				checkboxFound = true
 			}
 		}
+
+		verify := locateVerifyCommand(unit.Body)
+		verifyFound := verify.found
+		inlineVerify := verify.inline != ""
+		inlineVerifyContent := verify.inline
+		hasFencedBlock := verify.hasFenced
+		verifyBlock := verify.fenced
 
 		issues = append(issues, validateOptionalField(unit.Body, "Constraints", constraintsCount, constraintsIdx, constraintsRest, source, unit.Heading)...)
 		issues = append(issues, validateOptionalField(unit.Body, "Read first", readFirstCount, readFirstIdx, readFirstRest, source, unit.Heading)...)

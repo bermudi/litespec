@@ -65,7 +65,7 @@ func writeReceiptRunOutput(t *testing.T, root, name, content string) {
 	}
 }
 
-func receiptGitCommits(t *testing.T, root string, unrelated bool) (string, string) {
+func receiptGitCommits(t *testing.T, root string) (string, string) {
 	t.Helper()
 	git := func(args ...string) string {
 		cmd := exec.Command("git", args...)
@@ -86,9 +86,6 @@ func receiptGitCommits(t *testing.T, root string, unrelated bool) (string, strin
 	git("add", ".")
 	git("commit", "-q", "-m", "pre")
 	pre := git("rev-parse", "HEAD")
-	if unrelated {
-		git("checkout", "-q", "--orphan", "isolated")
-	}
 	if err := os.WriteFile(filepath.Join(root, "seed.txt"), []byte("post\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -99,6 +96,33 @@ func receiptGitCommits(t *testing.T, root string, unrelated bool) (string, strin
 		t.Fatal("expected two distinct commits")
 	}
 	return pre, post
+}
+
+func receiptOrphanCommit(t *testing.T, root string) string {
+	t.Helper()
+	git := func(args ...string) {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = root
+		cmd.Env = append(os.Environ(), "HOME="+root)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	git("checkout", "-q", "--orphan", "isolated")
+	if err := os.WriteFile(filepath.Join(root, "seed.txt"), []byte("unrelated\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git("add", ".")
+	git("commit", "-q", "-m", "unrelated")
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "HOME="+root)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git rev-parse: %v\n%s", err, out)
+	}
+	return strings.TrimSpace(string(out))
 }
 
 func receiptCommentFiles(t *testing.T, root string) []string {
@@ -185,7 +209,7 @@ func TestReceiptCommandEmitsCommentFiles(t *testing.T) {
 			t.Fatalf("refusals wrote comment files: %v", files)
 		}
 
-		pre, post := receiptGitCommits(t, root, false)
+		pre, post := receiptGitCommits(t, root)
 		writeReceiptRunOutput(t, root, "pre.txt", "missing outcome\n")
 		writeReceiptRunOutput(t, root, "post.txt", "outcome present\n")
 		out, code = runCLI(t, bin, root, base("Twin unit", "--occurrence", "2", "--pre-sha", pre, "--post-sha", post)...)
@@ -214,7 +238,8 @@ func TestReceiptCommandEmitsCommentFiles(t *testing.T) {
 		queuePath := writeReceiptQueueFixture(t, root, receiptFixtureBody)
 		writeReceiptRunOutput(t, root, "pre.txt", "missing outcome\n")
 		writeReceiptRunOutput(t, root, "post.txt", "outcome present\n")
-		pre, post := receiptGitCommits(t, root, true)
+		pre, post := receiptGitCommits(t, root)
+		unrelated := receiptOrphanCommit(t, root)
 
 		args := func(preSHA, postSHA string, extra ...string) []string {
 			all := []string{
@@ -225,7 +250,7 @@ func TestReceiptCommandEmitsCommentFiles(t *testing.T) {
 			return append(all, extra...)
 		}
 
-		out, code := runCLI(t, bin, root, args(pre, post)...)
+		out, code := runCLI(t, bin, root, args(pre, unrelated)...)
 		if code == 0 {
 			t.Fatalf("non-ancestor pre must be refused, got exit 0: %s", out)
 		}
@@ -269,7 +294,7 @@ func TestReceiptCommandEmitsCommentFiles(t *testing.T) {
 		bin, root := setupCLITest(t)
 		queuePath := writeReceiptQueueFixture(t, root, receiptFixtureBody)
 		fakePath := receiptFakeGH(t, 42, receiptFixtureBody)
-		pre, post := receiptGitCommits(t, root, false)
+		pre, post := receiptGitCommits(t, root)
 		writeReceiptRunOutput(t, root, "pre.txt", "missing outcome\n")
 		writeReceiptRunOutput(t, root, "post.txt", "outcome present\n")
 
@@ -315,7 +340,7 @@ func TestReceiptCommandEmitsCommentFiles(t *testing.T) {
 		bin, root = setupCLITest(t)
 		writeReceiptQueueFixture(t, root, receiptFixtureBody)
 		fakePath = receiptFakeGH(t, 42, receiptFixtureBody)
-		pre, post = receiptGitCommits(t, root, false)
+		pre, post = receiptGitCommits(t, root)
 		writeReceiptRunOutput(t, root, "pre.txt", strings.Repeat("0123456789", 7000)+"\n")
 		writeReceiptRunOutput(t, root, "post.txt", "outcome present\n")
 
@@ -341,7 +366,7 @@ func TestReceiptCommandEmitsCommentFiles(t *testing.T) {
 			t.Fatalf("stdout = %q, want gh commands in posting order %v", string(out), wantCommands)
 		}
 		for _, name := range files {
-			info, err := os.Stat(filepath.Join(root, name))
+			info, err := os.Stat(name)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -353,7 +378,7 @@ func TestReceiptCommandEmitsCommentFiles(t *testing.T) {
 		// Queue mode stays emit-only: files without gh commands.
 		bin, root = setupCLITest(t)
 		queuePath = writeReceiptQueueFixture(t, root, receiptFixtureBody)
-		pre, post = receiptGitCommits(t, root, false)
+		pre, post = receiptGitCommits(t, root)
 		writeReceiptRunOutput(t, root, "pre.txt", "missing outcome\n")
 		writeReceiptRunOutput(t, root, "post.txt", "outcome present\n")
 		queueOut, code := runCLI(t, bin, root, "receipt", "--queue", queuePath, "--heading", "Only unit",

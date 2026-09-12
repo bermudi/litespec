@@ -63,6 +63,24 @@ var CommandSpecs = []CommandSpec{
 		},
 	},
 	{
+		Name:        "receipt",
+		Description: "Assemble validator-clean evidence receipt comment files",
+		Flags: []FlagSpec{
+			{Name: "--issue", Description: "GH issue number", TakesValue: true},
+			{Name: "--queue", Description: "Local queue markdown file", TakesValue: true},
+			{Name: "--heading", Description: "Exact unit heading", TakesValue: true},
+			{Name: "--occurrence", Description: "1-based same-heading occurrence", TakesValue: true},
+			{Name: "--pre-sha", Description: "Pre commit SHA", TakesValue: true},
+			{Name: "--pre-status", Description: "Pre exit status (non-zero)", TakesValue: true},
+			{Name: "--pre-out", Description: "File with raw pre output", TakesValue: true},
+			{Name: "--post-sha", Description: "Post commit SHA", TakesValue: true},
+			{Name: "--post-status", Description: "Post exit status (default 0)", TakesValue: true},
+			{Name: "--post-out", Description: "File with raw post output", TakesValue: true},
+			{Name: "--rebuild", Description: "Include rebuild routing identity", TakesValue: false},
+			{Name: "--recovered-from", Description: "Recovery provenance receipt ID", TakesValue: true},
+		},
+	},
+	{
 		Name:        "view",
 		Description: "Dashboard overview",
 		Flags: []FlagSpec{

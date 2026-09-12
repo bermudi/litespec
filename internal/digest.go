@@ -15,39 +15,13 @@ type UnitDigestLine struct {
 }
 
 func DigestQueueUnits(root string, issueNumber int, queuePath string) ([]UnitDigestLine, error) {
-	var body, source string
-	if queuePath != "" {
-		raw, err := os.ReadFile(queuePath)
-		if err != nil {
-			return nil, err
-		}
-		body = string(raw)
-		source = fmt.Sprintf("queue file %s", queuePath)
-	} else {
-		if _, err := lookPathGh("gh"); err != nil {
-			return nil, fmt.Errorf("gh not available")
-		}
-		out, err := ghIssueView(root, issueNumber)
-		if err != nil {
-			return nil, fmt.Errorf("gh issue view %d failed: %w", issueNumber, err)
-		}
-		var issue ghIssue
-		if err := json.Unmarshal(out, &issue); err != nil {
-			return nil, fmt.Errorf("parse gh issue: %w", err)
-		}
-		body = issue.Body
-		source = fmt.Sprintf("GH issue #%d", issue.Number)
+	body, source, err := queueBody(root, issueNumber, queuePath)
+	if err != nil {
+		return nil, err
 	}
-
-	allSections := parseQueueUnits(body)
-	units := make([]queueUnit, 0, len(allSections))
-	for _, section := range allSections {
-		if isUnit(section) {
-			units = append(units, section)
-		}
-	}
-	if len(units) == 0 {
-		return nil, fmt.Errorf("%s contains no queue units", source)
+	units, err := queueUnitsFromBody(body, source)
+	if err != nil {
+		return nil, err
 	}
 
 	identities := queueUnitIdentities(units)
@@ -60,6 +34,112 @@ func DigestQueueUnits(root string, issueNumber int, queuePath string) ([]UnitDig
 		})
 	}
 	return lines, nil
+}
+
+// ResolvedQueueUnit is one queue unit located by exact heading and positive
+// same-heading occurrence, carrying its current contract digest and Verify
+// command exactly as validate reads them.
+type ResolvedQueueUnit struct {
+	Occurrence int
+	Heading    string
+	Digest     string
+	Verify     string
+}
+
+// ResolveQueueUnit locates one queue unit with the same identity semantics
+// as the digest command: exact heading match, disambiguated by a positive
+// same-heading occurrence when the heading repeats. Ambiguous, unknown, or
+// out-of-range resolution is a visible refusal.
+func ResolveQueueUnit(root string, issueNumber int, queuePath, heading string, occurrence int) (ResolvedQueueUnit, error) {
+	body, source, err := queueBody(root, issueNumber, queuePath)
+	if err != nil {
+		return ResolvedQueueUnit{}, err
+	}
+	units, err := queueUnitsFromBody(body, source)
+	if err != nil {
+		return ResolvedQueueUnit{}, err
+	}
+
+	identities := queueUnitIdentities(units)
+	matches := make([]int, 0, 1)
+	for i, unit := range units {
+		if unit.Heading == heading {
+			matches = append(matches, i)
+		}
+	}
+	if len(matches) == 0 {
+		return ResolvedQueueUnit{}, fmt.Errorf("no unit with heading %q in %s", heading, source)
+	}
+	index := -1
+	if occurrence >= 1 {
+		for _, i := range matches {
+			if identities[i].Occurrence == occurrence {
+				index = i
+				break
+			}
+		}
+		if index < 0 {
+			return ResolvedQueueUnit{}, fmt.Errorf("heading %q has no occurrence %d in %s (valid: 1..%d)", heading, occurrence, source, len(matches))
+		}
+	} else {
+		if len(matches) > 1 {
+			return ResolvedQueueUnit{}, fmt.Errorf("heading %q matches %d occurrences in %s; pass --occurrence between 1 and %d", heading, len(matches), source, len(matches))
+		}
+		index = matches[0]
+	}
+	verify := locateVerifyCommand(units[index].Body)
+	if !verify.found {
+		return ResolvedQueueUnit{}, fmt.Errorf("unit %q in %s has no Verify command", heading, source)
+	}
+	command := verify.fenced
+	if !verify.hasFenced {
+		command = verify.inline
+	}
+	if strings.TrimSpace(command) == "" {
+		return ResolvedQueueUnit{}, fmt.Errorf("unit %q in %s has no Verify command", heading, source)
+	}
+	return ResolvedQueueUnit{
+		Occurrence: identities[index].Occurrence,
+		Heading:    units[index].Heading,
+		Digest:     unitContractDigest(units[index]),
+		Verify:     command,
+	}, nil
+}
+
+func queueBody(root string, issueNumber int, queuePath string) (string, string, error) {
+	if queuePath != "" {
+		raw, err := os.ReadFile(queuePath)
+		if err != nil {
+			return "", "", err
+		}
+		return string(raw), fmt.Sprintf("queue file %s", queuePath), nil
+	}
+	if _, err := lookPathGh("gh"); err != nil {
+		return "", "", fmt.Errorf("gh not available")
+	}
+	out, err := ghIssueView(root, issueNumber)
+	if err != nil {
+		return "", "", fmt.Errorf("gh issue view %d failed: %w", issueNumber, err)
+	}
+	var issue ghIssue
+	if err := json.Unmarshal(out, &issue); err != nil {
+		return "", "", fmt.Errorf("parse gh issue: %w", err)
+	}
+	return issue.Body, fmt.Sprintf("GH issue #%d", issue.Number), nil
+}
+
+func queueUnitsFromBody(body, source string) ([]queueUnit, error) {
+	allSections := parseQueueUnits(body)
+	units := make([]queueUnit, 0, len(allSections))
+	for _, section := range allSections {
+		if isUnit(section) {
+			units = append(units, section)
+		}
+	}
+	if len(units) == 0 {
+		return nil, fmt.Errorf("%s contains no queue units", source)
+	}
+	return units, nil
 }
 
 func FormatUnitDigestLines(lines []UnitDigestLine) string {

@@ -95,6 +95,7 @@ These came from deliberate debate. Respect the reasoning — and when a ruling c
 - No comments unless absolutely necessary for non-obvious logic
 - When changes affect workflow, skills, or core concepts, update `AGENTS.md` and `DESIGN.md` to match. These are living documents — if the system changes, they change too
 - When adding or modifying CLI commands/flags, update `internal/commandspec.go` — the completion system is auto-generated from the `CommandSpecs` registry. The registry is the single source of truth; `internal/completion.go` derives all completions from it
+- **`litespec receipt`** assembles one validator-clean evidence receipt for a resolved queue unit: it resolves the unit by exact heading and positive same-heading occurrence (digest identity semantics), reads raw run outputs from `--pre-out`/`--post-out` files, enforces red-green invariants plus `git merge-base --is-ancestor` ancestry before writing anything, and emits numbered `receipt-NNNN.md` comment files that pass the existing evidence grammar by construction. `--issue <N>` also prints the exact `gh issue comment` commands in posting order; `--queue <path>` emits files only. It never posts and never ticks checkboxes — the build skill's hand-assembly protocol remains valid until a later change mandates the CLI. Optional `--rebuild` and `--recovered-from` assemble rebuild routing identity and recovery provenance into the same canonical Receipt ID
 
 ### Skill Generation
 
