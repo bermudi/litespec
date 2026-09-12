@@ -429,6 +429,69 @@ func TestReceiptCommandEmitsCommentFiles(t *testing.T) {
 		}
 	})
 
+	t.Run("out directory receives files and failed writes leave no partial set", func(t *testing.T) {
+		bin, root := setupCLITest(t)
+		writeReceiptQueueFixture(t, root, receiptFixtureBody)
+		fakePath := receiptFakeGH(t, 42, receiptFixtureBody)
+		pre, post := receiptGitCommits(t, root)
+		writeReceiptRunOutput(t, root, "pre.txt", strings.Repeat("0123456789", 14000)+"\n")
+		writeReceiptRunOutput(t, root, "post.txt", "outcome present\n")
+
+		runReceipt := func() (string, error) {
+			cmd := exec.Command(bin, "receipt", "--issue", "42", "--heading", "Only unit",
+				"--pre-sha", pre, "--pre-status", "1", "--pre-out", "pre.txt",
+				"--post-sha", post, "--post-out", "post.txt", "--out", "out")
+			cmd.Dir = root
+			cmd.Env = append(append(os.Environ(), "HOME="+root), "PATH="+fakePath)
+			out, err := cmd.CombinedOutput()
+			return string(out), err
+		}
+
+		stdout, err := runReceipt()
+		if err != nil {
+			t.Fatalf("receipt with --out failed: %v\n%s", err, stdout)
+		}
+		files, err := filepath.Glob(filepath.Join(root, "out", "receipt-*.md"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		sort.Strings(files)
+		if len(files) < 2 {
+			t.Fatalf("expected the oversized output to split across files in out/, got %v", files)
+		}
+		wantCommands := make([]string, len(files))
+		for i := range files {
+			wantCommands[i] = fmt.Sprintf("gh issue comment 42 --body-file out/receipt-%04d.md", i+1)
+		}
+		if stdout != strings.Join(wantCommands, "\n")+"\n" {
+			t.Fatalf("stdout = %q, want gh commands referencing out/: %v", stdout, wantCommands)
+		}
+		if stray := receiptCommentFiles(t, root); len(stray) != 0 {
+			t.Fatalf("--out must keep the working directory clean, found %v", stray)
+		}
+
+		// A mid-sequence write failure removes the already-written files.
+		bin, root = setupCLITest(t)
+		writeReceiptQueueFixture(t, root, receiptFixtureBody)
+		fakePath = receiptFakeGH(t, 42, receiptFixtureBody)
+		pre, post = receiptGitCommits(t, root)
+		writeReceiptRunOutput(t, root, "pre.txt", strings.Repeat("0123456789", 14000)+"\n")
+		writeReceiptRunOutput(t, root, "post.txt", "outcome present\n")
+		if err := os.MkdirAll(filepath.Join(root, "out", "receipt-0002.md"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		stdout, err = runReceipt()
+		if err == nil {
+			t.Fatalf("mid-sequence write failure must exit non-zero: %s", stdout)
+		}
+		if !strings.Contains(stdout, "receipt-0002.md") || !strings.Contains(stdout, "removed") {
+			t.Fatalf("failure must name the failing file and the cleanup: %s", stdout)
+		}
+		if _, statErr := os.Stat(filepath.Join(root, "out", "receipt-0001.md")); !os.IsNotExist(statErr) {
+			t.Fatalf("partial set must be removed; receipt-0001.md stat err=%v", statErr)
+		}
+	})
+
 	t.Run("completion registry carries the receipt command and flags", func(t *testing.T) {
 		bin, root := setupCLITest(t)
 		found := false
@@ -436,7 +499,7 @@ func TestReceiptCommandEmitsCommentFiles(t *testing.T) {
 			"--issue", "--queue", "--heading", "--occurrence",
 			"--pre-sha", "--pre-status", "--pre-out",
 			"--post-sha", "--post-status", "--post-out",
-			"--rebuild", "--recovered-from",
+			"--rebuild", "--recovered-from", "--out",
 		}
 		for _, spec := range internal.CommandSpecs {
 			if spec.Name != "receipt" {

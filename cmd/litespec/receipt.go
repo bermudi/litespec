@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/bermudi/litespec/v2/internal"
@@ -27,6 +28,7 @@ func cmdReceipt(args []string) error {
 		rebuild       bool
 		recoveredFrom string
 		post          bool
+		outDir        string
 	)
 	fs.IntVar(&issueNumber, "issue", 0, "GH issue number")
 	fs.StringVar(&queuePath, "queue", "", "local queue markdown file")
@@ -41,6 +43,7 @@ func cmdReceipt(args []string) error {
 	fs.BoolVar(&rebuild, "rebuild", false, "include the rebuild routing identity")
 	fs.StringVar(&recoveredFrom, "recovered-from", "", "recovery provenance receipt ID")
 	fs.BoolVar(&post, "post", false, "run the printed gh issue comment commands in posting order")
+	fs.StringVar(&outDir, "out", "", "directory for emitted comment files (default: current directory)")
 
 	ok, err := parseFlagSet(fs, args)
 	if !ok {
@@ -74,6 +77,9 @@ func cmdReceipt(args []string) error {
 	}
 	if post && !issueSet {
 		return fmt.Errorf("--post requires --issue <N>; queue mode has no issue to comment on")
+	}
+	if setFlags["out"] && outDir == "" {
+		return fmt.Errorf("--out requires a non-empty path")
 	}
 	if preSHA == "" {
 		return fmt.Errorf("--pre-sha is required")
@@ -131,11 +137,16 @@ func cmdReceipt(args []string) error {
 		return err
 	}
 
+	if outDir != "" {
+		if err := os.MkdirAll(outDir, 0o755); err != nil {
+			return fmt.Errorf("create output directory %s: %w", outDir, err)
+		}
+	}
 	names := make([]string, len(comments))
 	for i, text := range comments {
-		name := fmt.Sprintf("receipt-%04d.md", i+1)
+		name := filepath.Join(outDir, fmt.Sprintf("receipt-%04d.md", i+1))
 		if err := os.WriteFile(name, []byte(text), 0o644); err != nil {
-			return fmt.Errorf("write %s: %w", name, err)
+			return emitWriteFailure(name, err, names[:i])
 		}
 		names[i] = name
 	}
@@ -155,6 +166,26 @@ func cmdReceipt(args []string) error {
 		}
 	}
 	return nil
+}
+
+// emitWriteFailure reports a failed comment-file write and removes the
+// already-written files so no partial receipt set is left behind. A cleanup
+// failure surfaces alongside the write failure.
+func emitWriteFailure(name string, writeErr error, written []string) error {
+	failure := fmt.Errorf("write %s: %w", name, writeErr)
+	if len(written) == 0 {
+		return failure
+	}
+	var cleanupFailures []string
+	for _, file := range written {
+		if err := os.Remove(file); err != nil {
+			cleanupFailures = append(cleanupFailures, fmt.Sprintf("%s: %v", file, err))
+		}
+	}
+	if len(cleanupFailures) > 0 {
+		return fmt.Errorf("%w; cleanup also failed, partial files may remain: %s", failure, strings.Join(cleanupFailures, "; "))
+	}
+	return fmt.Errorf("%v; removed %d already-written comment file(s) so no partial set is left", failure, len(written))
 }
 
 // verifyGitAncestry refuses unless preSHA is an ancestor of postSHA in the
@@ -189,7 +220,8 @@ The unit is resolved by exact heading and positive same-heading occurrence,
 with the same identity semantics as litespec digest. Ambiguous, unknown, or
 out-of-range headings, unreadable output files, and ancestry violations are
 refused before any file is written; the assembled receipt self-parses
-through the existing evidence grammar.
+through the existing evidence grammar. A mid-sequence write failure removes
+the already-written files so no partial set is left behind.
 
 Flags:
   --issue <N>            Fetch the GH issue by number (requires gh)
@@ -205,5 +237,7 @@ Flags:
   --rebuild              Include the rebuild routing identity
   --recovered-from <id>  Recovery provenance receipt ID
   --post                 Run the printed gh issue comment commands in order
+  --out <dir>            Directory for the emitted comment files (default:
+                        current directory; created when missing)
 `)
 }
