@@ -57,6 +57,10 @@ func run() error {
 		return cmdUpdate(os.Args[2:])
 	case "digest":
 		return cmdDigest(os.Args[2:])
+	case "receipt":
+		return cmdReceipt(os.Args[2:])
+	case "issue":
+		return cmdIssue(os.Args[2:])
 	case "upgrade":
 		return cmdUpgrade(os.Args[2:])
 	case "completion":
@@ -83,6 +87,8 @@ Commands:
   view                              Dashboard overview
   update [--tools <ids>]            Regenerate skills and adapters
   digest --issue <N> | --queue <p>  Print expected unit contract digests for a queue
+  receipt --issue <N> | --queue <p> --heading "<h>"  Assemble evidence receipt comment files
+  issue check --issue <N> --heading "<h>"  Tick exactly one unit checkbox (managed)
   upgrade                           Check for and install the latest version
   completion <shell>                Generate shell completion script (bash, zsh, fish)
 

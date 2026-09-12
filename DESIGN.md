@@ -184,6 +184,9 @@ Generated via `litespec update` from `internal/skill/templates/` (embed.FS). `.a
 | `litespec view` | product + features + open `litespec` GH issues (via `gh` if present) + decisions (spine starred) |
 | `litespec update [--tools <ids>]` | regenerate skills and adapters |
 | `litespec upgrade` | check for and install the latest version via `go install` |
+| `litespec digest --issue <N> \| --queue <path>` | print expected unit contract digests, one tab-separated line per queue unit |
+| `litespec receipt --issue <N> \| --queue <path> --heading "<text>" [flags]` | resolve one queue unit and assemble its validator-clean evidence receipt into numbered comment files (exact `gh issue comment` commands in issue mode, files only in queue mode); emit-only by default — opt-in `--post` runs the printed commands in posting order and stops visibly on the first gh failure; `--out <dir>` selects the emission directory (default: current directory), emitted paths are absolute so posting works from any directory, and a mid-sequence write failure removes the already-written files so no partial set is left; it never ticks checkboxes |
+| `litespec issue check --issue <N> --heading "<text>" [--occurrence <K>]` | managed single-checkbox tick: resolves the queue unit by digest identity semantics, flips exactly one `- [ ]` to `- [x]`, and writes back only when the result differs from the fetched body by that single flip with the `Base:`/`Branch:` ownership lines byte-unchanged; any other body delta, ambiguous or unknown heading, already-checked target, or gh failure is a refusal that issues no write — hand-edited issue bodies are retired |
 | `litespec completion <shell>` | generate shell completion script (bash, zsh, fish) |
 
 ## GH issues as the change

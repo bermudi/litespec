@@ -134,6 +134,12 @@ func completeShells() []Completion {
 	}
 }
 
+func completeIssueSubcommands() []Completion {
+	return []Completion{
+		{"check", "Tick exactly one unit checkbox"},
+	}
+}
+
 func completeToolIDs() []Completion {
 	var result []Completion
 	for _, a := range Adapters {
