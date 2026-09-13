@@ -69,7 +69,7 @@ func TestGeneratedReviewRoutesRebuildRequests(t *testing.T) {
 			t.Errorf("build missing request-selection rule %q", required)
 		}
 	}
-	const closureRule = "The issue closes only when every unit checkbox is checked, every rebuild request is resolved, and review returns `PASS`."
+	const closureRule = "The issue closes only when every unit checkbox is checked, every rebuild request is resolved, review returns `PASS`, and the issue's `Branch:` is merged (decision 0008) — merge first, then close."
 	for _, path := range []string{"../AGENTS.md", "../docs/project-structure.md"} {
 		content, err := os.ReadFile(path)
 		if err != nil {

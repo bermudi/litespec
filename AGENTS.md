@@ -65,7 +65,7 @@ Review's auto-loaded harness/system instructions, `AGENTS.md`, and review `SKILL
 3. **CRITICAL or WARNING inside review scope, outside units** → blocking direct fix if trivial, append a blocking unit to the parent if non-trivial, or `plan` if the shape is wrong.
 4. **CRITICAL or WARNING outside review scope and units** → non-blocking small fix, or draft for a later `plan[clear]` that creates its own queue/branch.
 
-`needs decision` is reported before applying the matching route and does not alter blocking status. The issue closes only when every unit checkbox is checked, every rebuild request is resolved, and review returns `PASS`. An unresolved re-plan marker or amendment also blocks closure. Closure additionally requires every observed receipt `unit digest:` to chain to its current contract through plan-authored amendments (decision 0006) — validate fails on unbridged digest transitions.
+`needs decision` is reported before applying the matching route and does not alter blocking status. The issue closes only when every unit checkbox is checked, every rebuild request is resolved, review returns `PASS`, and the issue's `Branch:` is merged (decision 0008) — merge first, then close. An unresolved re-plan marker or amendment also blocks closure. Closure additionally requires every observed receipt `unit digest:` to chain to its current contract through plan-authored amendments (decision 0006) — validate fails on unbridged digest transitions.
 
 ## Key Design Decisions
 

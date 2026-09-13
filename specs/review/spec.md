@@ -284,12 +284,17 @@ When the change contains stateful code paths, `litespec-review` SHALL load `refe
 
 ### Requirement: Issue Closure Condition
 
-A GH issue SHALL close only when every unit checkbox is checked, no rebuild request, re-plan marker, or amendment is unresolved, and `litespec-review` returns `PASS`. Routed non-blocking findings SHALL NOT prevent closure or reopen the issue.
+A GH issue SHALL close only when every unit checkbox is checked, no rebuild request, re-plan marker, or amendment is unresolved, `litespec-review` returns `PASS`, and the issue's `Branch:` is merged. Routed non-blocking findings SHALL NOT prevent closure or reopen the issue.
 
 #### Scenario: Checked units and pass permit closure
 
-- **WHEN** every unit checkbox is checked, every rebuild request, re-plan marker, and amendment is resolved, and review returns `PASS`
+- **WHEN** every unit checkbox is checked, every rebuild request, re-plan marker, and amendment is resolved, review returns `PASS`, and the issue's `Branch:` is merged
 - **THEN** the issue may close
+
+#### Scenario: Unmerged branch blocks closure
+
+- **WHEN** every unit checkbox is checked, all routing metadata is resolved, and review returns `PASS`, but the issue's `Branch:` is not merged
+- **THEN** the issue remains open until the branch merges
 
 #### Scenario: Checked unit with unresolved rebuild request stays open
 

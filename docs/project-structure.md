@@ -119,6 +119,6 @@ The same structure supports both speeds:
   ```
   plan[fuzzy] → plan[clear]
   ```
-  `litespec-plan` starts from a clean tree, creates `litespec/<change-name>`, and records `Base:` + `Branch:` with proposal, design, and units in the labeled GH issue body (or local queue). `litespec-build` implements one unit at a time on that branch. After its trusted auto-loaded instruction bootstrap, `litespec-review` screens every additional local queue, contract, implementation, and reference path before reading it. The issue closes only when every unit checkbox is checked, every rebuild request is resolved, and review returns `PASS`.
+  `litespec-plan` starts from a clean tree, creates `litespec/<change-name>`, and records `Base:` + `Branch:` with proposal, design, and units in the labeled GH issue body (or local queue). `litespec-build` implements one unit at a time on that branch. After its trusted auto-loaded instruction bootstrap, `litespec-review` screens every additional local queue, contract, implementation, and reference path before reading it. The issue closes only when every unit checkbox is checked, every rebuild request is resolved, review returns `PASS`, and the issue's `Branch:` is merged (decision 0008) — merge first, then close.
 
 The queue lives in the GitHub issue in the normal workflow; local queue files are the offline fallback.

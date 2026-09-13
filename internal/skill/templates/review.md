@@ -159,7 +159,7 @@ Appending a unit to the parent queue and recording rule-2 routing are the only p
 
 Before returning the closure verdict, reread the Proposal and Design prose and re-inventory every scope or preservation sentence against the units: a sentence no unit's `Done means:` or `Constraints:` enforces, yet the implementation can violate in a reachable state, is a finding routed by scope — not decoration. The issue body's prose is part of the review scope.
 
-The issue closes only when every unit checkbox is checked, no rebuild request, re-plan marker, or amendment is unresolved, **and** review returns `PASS`. Routed non-blocking findings never block closure.
+The issue closes only when every unit checkbox is checked, no rebuild request, re-plan marker, or amendment is unresolved, review returns `PASS`, **and** the issue's `Branch:` is merged — merge first, then close. The merged PR is the test, not git ancestry: squash merges break ancestry checks, and a merge into a release branch counts once its PR lands. A closed issue leaves no work stranded on a branch. Routed non-blocking findings never block closure.
 
 ---
 
