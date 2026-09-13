@@ -19,8 +19,8 @@ Greenfield, API shape, CLI behavior, anything that outlasts the issue. Unidirect
 1. **`litespec-plan` fuzzy** — read code, grill with two or three questions, maybe spike. No files. (`references/fuzzy.md`, grilling by default.)
 2. **`litespec-plan` clear** — clean tree required. Capture `Base:`, create `litespec/<change-name>`, record `Branch:`, write the labeled GH issue (proposal + design + queue), draft the spec if load-bearing. (`references/clear.md` owns the Verify rule.) Offline: same body in `specs/queues/<name>.md`.
 3. **Grill-me (optional)** — adversarial shaping via `references/grilling.md`, plus codebase-design or domain-modeling when the branch applies.
-4. **`litespec-build`** — one unit per session: meaningful red at a clean pre commit, immutable implementation commits, green at the final clean post commit, receipt posted, box ticked, stop.
-5. **`litespec-review`** — replay Verify at pre, post, and `HEAD` in detached worktrees; adversarial probe; route findings.
+4. **`litespec-build`** — one unit per session: meaningful red at a clean pre commit, one or more implementation/fix commits (immutable), green at the final clean commit where `Verify:` passes, receipt posted, box ticked, stop.
+5. **`litespec-review`** — replay Verify at pre, post, and `HEAD`, each in a detached temporary worktree including a detached temporary worktree at `HEAD`; each worktree is removed even when Verify fails; adversarial probe; route findings. Red-green evidence does not prove that Verify targets the correct behavior.
 6. **Merge the `Branch:`, then close the issue** — only when every box is ticked, every rebuild request / re-plan marker / amendment resolved, and review returns `PASS`.
 
 ## Units
@@ -70,16 +70,16 @@ Build proves the unit twice with one exact command, then review replays both run
 
 **Build, per unit:**
 
-1. Clean tree. Run the exact `Verify:` — it must exit non-zero *because the outcome is absent*. Unrelated failures (typo, missing dependency, broken environment) stop the unit.
+1. Clean tree, with at most one verifier-only commit before it when the unit introduces its own verifier. Run the exact `Verify:` on the clean starting commit before implementation — it must exit non-zero *because the outcome is absent*. Unrelated failures (typo, missing dependency, broken environment) stop the unit.
 2. If the verifier doesn't exist yet, commit just the verifier first (at most one verifier-only commit; loud not-implemented stubs keep gates green while pre stays red) and use that as pre. Otherwise the starting commit is pre.
-3. Implement in one or more commits. Never amend pre or any implementation commit.
+3. Implement in one or more implementation/fix commits. Never amend pre or any implementation commit.
 4. Clean tree. Run the same `Verify:` — exit 0 with the outcome present. That final clean commit is post.
 5. Assemble the receipt with `litespec receipt` (see [CLI Reference](cli-reference.md)): exact command, `unit digest:` from `litespec digest`, labeled pre/post SHAs and statuses, both raw outputs in unedited fences (`<no output>` if empty), matching scope lines, opening with `Protocol: evidence/v1`, `Digest algorithm: unit-contract-sha256-v1`, and a content-derived `Receipt ID:`. Pre must ancestor post.
 6. Post it — GitHub comment, or `Evidence:` block under the unit for local queues — then tick the box with `litespec issue check` (GitHub) or a separate metadata commit (local). A prose `Evidence:` label is not a receipt. Then stop; one unit per session.
 
 Oversized receipts split, never truncate: field-boundary splits after a scope line, or identity-bearing `Raw output chunk:` records for a single giant output — every non-final comment ending with the literal continuation marker. `validate` joins only the literal next comment; anything else is an incomplete-receipt error.
 
-**Review, per checked unit:** detached throwaway worktrees at pre (must fail for the absent outcome), post (must pass), and `HEAD` (must still pass) — each removed even on failure, evidence SHAs never checked out in the working tree. Red-green proves Verify distinguishes the trees; the adversarial probe decides whether it tests the right behavior. Superseded receipts validate against their own declared protocol, command, and digest; current-digest receipts must match current Verify exactly.
+**Review, per checked unit:** a detached temporary worktree at pre (must fail for the absent outcome), a detached temporary worktree at post (must pass), and a detached temporary worktree at `HEAD` (must still pass) — each worktree removed even when Verify fails, evidence SHAs never checked out in the working tree. Red-green evidence does not prove that Verify targets the correct behavior; the adversarial probe decides whether it tests the right thing. Superseded receipts validate against their own declared protocol, command, and digest; current-digest receipts must match current Verify exactly.
 
 **Rebuilds:** a checked unit with an unresolved rebuild request is selectable again; its fresh receipt carries the same heading + occurrence and resolves all earlier requests for that identity. After two completed rebuild cycles against one digest, the next unit-breaking finding records `Re-plan required:` instead — build refuses the marked contract until plan reshapes it through an `Amendment:` (old digest → new digest, witnessed append-only), which resets the count and stays unresolved until fresh evidence lands on the new digest. Only plan authors or alters contracts; silent edits followed by fresh receipts fail the digest chain.
 
@@ -96,7 +96,7 @@ A finding needing a durable ruling reports `needs decision: <question>` first �
 
 ## Closure
 
-The issue closes only when **all** hold: every box ticked, every rebuild request / re-plan marker / amendment resolved (every observed digest chains to the current contract), review returns `PASS`, and the issue's `Branch:` is merged. Merge first, then close. Non-blocking routed findings never prevent closure — they already have their own lane.
+The issue closes only when every unit checkbox is checked, every rebuild request is resolved, review returns `PASS`, and the issue's `Branch:` is merged (decision 0008) — merge first, then close. Every re-plan marker and amendment must also be resolved (every observed digest chains to the current contract). Non-blocking routed findings never prevent closure — they already have their own lane.
 
 ## Skills and adapters
 

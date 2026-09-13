@@ -18,8 +18,8 @@ Work is either a small fix or a new feature. The lanes differ in ceremony, not r
 
 1. **Plan fuzzy** — `litespec-plan` reads the codebase, grills you with two or three questions, maybe runs a tiny spike. Writes nothing. Ephemeral.
 2. **Plan clear** — `litespec-plan` writes the GitHub issue: `Base:` + `Branch:` ownership, proposal, design, queue of units. Drafts `specs/<feature>/spec.md` if the feature is load-bearing.
-3. **Build one unit** — `litespec-build` records the exact `Verify:` failing at a clean pre commit, implements the unit in immutable commits, records the same command passing at the final clean post commit, posts the receipt, ticks the box, stops. One unit per session.
-4. **Review** — `litespec-review` replays Verify at pre, post, and `HEAD` in detached worktrees, then adversarially checks issue + spec against implementation. Red-green evidence proves Verify distinguishes the two trees — it never proves Verify targets the right behavior. That judgment is the review.
+3. **Build one unit** — `litespec-build` records the exact `Verify:` failing at a clean pre commit, implements the unit in one or more implementation/fix commits, records the same command passing at the final clean commit where `Verify:` passes, posts the receipt, ticks the box, stops. One unit per session.
+4. **Review** — `litespec-review` replays Verify at pre, post, and `HEAD`, each in a detached temporary worktree including a detached temporary worktree at `HEAD`, with each removed even when Verify fails. Then it adversarially checks issue + spec against implementation. Red-green evidence does not prove that Verify targets the correct behavior — it only proves Verify distinguishes the two trees. That judgment is the review.
 5. **Close** — merge the issue's `Branch:` first, then close the issue. The spec stays; the issue is disposable.
 
 One direction only. If the plan shifts, rewrite the issue, not the durable spec.

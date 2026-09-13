@@ -87,4 +87,4 @@ Canonical generated skills — one `SKILL.md` plus `references/` per skill, rege
 ## The two lanes on this structure
 
 - **Small fix:** read product + relevant spec + decisions/glossary, edit code and spec in place, stop. No issue, no branch.
-- **New feature:** `plan[clear]` records `Base:` + `Branch:` and creates `litespec/<change-name>` — all branch work belongs to the issue. `build` implements one unit at a time there; `review` screens every local path before reading it. Merge the branch first, then close the issue.
+- **New feature:** `plan[clear]` records `Base:` + `Branch:` and creates `litespec/<change-name>` — all branch work belongs to the issue. `build` implements one unit at a time there; `review` screens every local path before reading it. The issue closes only when every unit checkbox is checked, every rebuild request is resolved, review returns `PASS`, and the issue's `Branch:` is merged (decision 0008) — merge first, then close.

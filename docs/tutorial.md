@@ -118,7 +118,7 @@ Grilling may tighten the spec or record a durable decision. Cheap now, expensive
 
 > **You:** build unit 1
 >
-> **Build:** Reads the issue, the spec, product, glossary. On the issue's branch, from a clean tree, runs the exact Verify — it fails because the counter is absent. That clean commit is pre. (If the unit introduces its own test, build commits just the verifier first and uses that as pre.) Then implements the sliding window, commits without amending, and re-runs the same Verify at the final clean commit — green. That commit is post.
+> **Build:** Reads the issue, the spec, product, glossary. On the issue's branch, from a clean tree, runs the exact Verify — it fails because the counter is absent. That clean commit is pre. (If the unit introduces its own test, build commits just the verifier first — at most one verifier-only commit — and uses that as pre.) Then implements the sliding window in one or more implementation/fix commits without amending, and re-runs the same Verify at the final clean commit where `Verify:` passes — green. That commit is post.
 
 Then the receipt. Build runs `litespec digest` for the unit's contract digest and `litespec receipt` to assemble the evidence — exact command, digest, pre/post SHAs and statuses, both raw outputs unedited, scope lines — into numbered comment files, posts them, and ticks the box with `litespec issue check` (exactly one flip, ownership lines untouched). Then it stops. Re-invoke for unit 2.
 
@@ -128,7 +128,7 @@ Never amend pre or any implementation commit; fixes go in new commits.
 
 > **You:** review
 >
-> **Review:** Reads the issue body first, screens every local path before touching it, then fetches comments. Replays the exact Verify in detached throwaway worktrees at pre, post, and `HEAD` — removing each even on failure, never checking out evidence SHAs in your tree. Then the adversarial pass: does the 101st request really return 429? Does the window reset? Concurrent access? Empty headers?
+> **Review:** Reads the issue body first, screens every local path before touching it, then fetches comments. Replays the exact Verify in a detached temporary worktree at pre, a detached temporary worktree at post, and a detached temporary worktree at `HEAD` — each removed even when Verify fails, never checking out evidence SHAs in your tree. Red-green evidence does not prove that Verify targets the correct behavior. Then the adversarial pass: does the 101st request really return 429? Does the window reset? Concurrent access? Empty headers?
 
 A passing Verify proves only its scope, so review probes beyond the receipt. Findings route in order: suggestions ride the small-fix lane; unit violations rebuild the unit via build (at most twice per contract — the third routes to plan to reshape it); in-scope findings outside units become a direct fix or a new unit on this issue; out-of-scope findings route without blocking.
 
@@ -148,7 +148,7 @@ Merge first, then close — a closed issue leaves no work stranded on a branch. 
 
 1. `litespec-plan` grilled the idea, then wrote `Base:`/`Branch:` plus proposal, design, and queue into the issue.
 2. `litespec-plan` drafted the load-bearing spec with `SHALL`/`MUST` and `WHEN`/`THEN`.
-3. `litespec-build` implemented one unit at a time — red at pre, green at post, receipt, tick, stop.
+3. `litespec-build` implemented one unit at a time in one or more implementation/fix commits — red at pre, green at the final clean commit where `Verify:` passes, receipt, tick, stop.
 4. `litespec validate` confirmed structure (it never claims the code is correct).
 5. `litespec-review` replayed the evidence and probed the behavior.
 6. You merged the branch, then closed the issue.
