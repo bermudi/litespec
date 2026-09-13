@@ -3,40 +3,29 @@ package internal
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 )
 
 const (
-	CanonDirName       = "canon"
-	ChangeSpecsDirName = "specs"
-	ChangesDirName     = "changes"
-	ArchiveDirName     = "archive"
-	MetaFileName       = ".litespec.yaml"
-	ProjectDirName     = "specs"
-	SkillsDir          = ".agents/skills"
-	BacklogFileName    = "backlog.md"
+	ProjectDirName = "specs"
+	SkillsDir      = ".agents/skills"
+	ChangesDirName = "changes"
 )
 
 var Skills = []SkillInfo{
 	{
-		ID:          "think",
-		Name:        "litespec-think",
-		Description: "Explore ideas, stress-test plans, and grill unresolved design decisions. Use when the user says 'explore', 'grill', 'grill me', 'let's think about', 'stress-test', 'help me decide', or 'what should I do next'. Covers exploration, grilling, and workflow routing modes.",
-	},
-	{
 		ID:          "plan",
 		Name:        "litespec-plan",
-		Description: "Create or update litespec change proposals, patches, and adopt existing code. Use when the user wants to propose a new change, create a change, patch a small fix, adopt existing code into specs, or says 'propose', 'patch', 'adopt', or 'new change'.",
+		Description: "Shape intent into a bounded GH issue (+ spec if load-bearing). Use fuzzy mode for half-baked ideas/questions/research and clear mode to nail the issue. Handles grilling ('grill-me'), codebase design, and glossary. Use when the user wants to plan, shape, explore, grill, or says 'plan', 'shape', 'grill-me', or 'let's think about'.",
 	},
 	{
 		ID:          "build",
 		Name:        "litespec-build",
-		Description: "Implement litespec changes phase by phase, fix review findings, and research knowledge gaps. Use when the user wants to start coding, implement tasks, fix review feedback, research external dependencies, or says 'apply', 'implement', 'fix', or 'research'.",
+		Description: "Implement one GH issue unit at a time, satisfying Done means and Verify. Use when the user wants to build, implement a unit, fix review findings, or says 'build', 'implement', or 'fix'.",
 	},
 	{
 		ID:          "review",
 		Name:        "litespec-review",
-		Description: "Adversarial review of litespec artifacts or implementation. Use when the user wants to review a change, check completeness, stress-test implementation against specs, or says 'review' or 'check this'.",
+		Description: "Adversarial review of GH issue + spec vs implementation. Use when the user wants to review a change, check Verify strength, or says 'review' or 'check this'.",
 	},
 }
 
@@ -66,24 +55,16 @@ func FindProjectRoot() (string, error) {
 	}
 }
 
-func CanonPath(root string) string {
-	return filepath.Join(root, ProjectDirName, CanonDirName)
+func ProductPath(root string) string {
+	return filepath.Join(root, ProjectDirName, "product.md")
 }
 
-func ChangesPath(root string) string {
-	return filepath.Join(root, ProjectDirName, ChangesDirName)
+func GlossaryPath(root string) string {
+	return filepath.Join(root, ProjectDirName, "glossary.md")
 }
 
-func ArchivePath(root string) string {
-	return filepath.Join(root, ProjectDirName, ChangesDirName, ArchiveDirName)
-}
-
-func ChangePath(root, name string) string {
-	return filepath.Join(root, ProjectDirName, ChangesDirName, name)
-}
-
-func ChangeSpecsPath(root, name string) string {
-	return filepath.Join(ChangePath(root, name), ChangeSpecsDirName)
+func FeatureSpecPath(root, feature string) string {
+	return filepath.Join(root, ProjectDirName, feature, "spec.md")
 }
 
 func ValidToolIDs() []string {
@@ -92,14 +73,4 @@ func ValidToolIDs() []string {
 		ids[i] = a.ID
 	}
 	return ids
-}
-
-var ArchivedNameRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}-(.+)$`)
-
-func ParseArchivedName(name string) string {
-	m := ArchivedNameRe.FindStringSubmatch(name)
-	if len(m) == 2 {
-		return m[1]
-	}
-	return name
 }

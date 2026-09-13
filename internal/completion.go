@@ -70,7 +70,32 @@ func CompletionScript(shell string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(data), nil
+	script := string(data)
+	if shell == "bash" {
+		script = strings.Replace(script, "{{CANDIDATES}}", allCompletionCandidates(), 1)
+	}
+	return script, nil
+}
+
+func allCompletionCandidates() string {
+	seen := make(map[string]bool)
+	var candidates []string
+	for _, c := range CommandSpecs {
+		if c.Hidden {
+			continue
+		}
+		if !seen[c.Name] {
+			seen[c.Name] = true
+			candidates = append(candidates, c.Name)
+		}
+		for _, f := range c.Flags {
+			if !seen[f.Name] {
+				seen[f.Name] = true
+				candidates = append(candidates, f.Name)
+			}
+		}
+	}
+	return strings.Join(candidates, " ")
 }
 
 var errInvalidShell = invalidShellError{}
@@ -101,15 +126,6 @@ func completeCommands() []Completion {
 	return result
 }
 
-func completeArtifactIDs() []Completion {
-	return []Completion{
-		{"proposal", "Why and what — motivation, scope, approach"},
-		{"specs", "Delta specifications — ADDED/MODIFIED/REMOVED/RENAMED"},
-		{"design", "How — technical approach, architecture decisions"},
-		{"tasks", "What to do — phased implementation checklist"},
-	}
-}
-
 func completeShells() []Completion {
 	return []Completion{
 		{"bash", "Bash completion"},
@@ -118,22 +134,16 @@ func completeShells() []Completion {
 	}
 }
 
+func completeIssueSubcommands() []Completion {
+	return []Completion{
+		{"check", "Tick exactly one unit checkbox"},
+	}
+}
+
 func completeToolIDs() []Completion {
 	var result []Completion
 	for _, a := range Adapters {
 		result = append(result, Completion{Candidate: a.ID, Description: a.Name})
-	}
-	return result
-}
-
-func completeChangeNames(root string) []Completion {
-	changes, err := ListChanges(root)
-	if err != nil {
-		return nil
-	}
-	var result []Completion
-	for _, c := range changes {
-		result = append(result, Completion{Candidate: c.Name, Description: "change"})
 	}
 	return result
 }

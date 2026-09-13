@@ -1,4 +1,8 @@
 #!/bin/bash
+#
+# litespec bash completion (auto-generated from internal/commandspec.go).
+# Candidates: {{CANDIDATES}}
+#
 _litespec() {
 	local words cword
 	if type _get_comp_words_by_ref &>/dev/null; then

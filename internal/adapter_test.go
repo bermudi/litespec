@@ -41,6 +41,17 @@ func TestGenerateAdapterCommands_UnknownToolID(t *testing.T) {
 	}
 }
 
+func TestGenerateAdapterCommands_InvalidToolDoesNotMutate(t *testing.T) {
+	root := t.TempDir()
+	err := GenerateAdapterCommands(root, []string{"claude", "bogus-tool"})
+	if err == nil {
+		t.Fatal("expected error for unknown tool")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".claude")); !os.IsNotExist(err) {
+		t.Error("expected invalid tool list to leave adapter directory untouched")
+	}
+}
+
 func TestGenerateAdapterCommands_ClaudeCreatesSymlinks(t *testing.T) {
 	root := t.TempDir()
 
@@ -95,11 +106,15 @@ func TestValidToolIDs(t *testing.T) {
 }
 
 func TestCleanStaleSymlinks_RemovesStale(t *testing.T) {
-	dir := t.TempDir()
-	os.Symlink("/nonexistent/stale-link", filepath.Join(dir, "litespec-old-skill"))
+	root := t.TempDir()
+	dir := filepath.Join(root, ".claude", "skills")
+	canonicalSkills := filepath.Join(root, SkillsDir)
+	os.MkdirAll(dir, 0o755)
+	os.MkdirAll(canonicalSkills, 0o755)
+	os.Symlink(filepath.Join(canonicalSkills, "litespec-old-skill"), filepath.Join(dir, "litespec-old-skill"))
 	os.WriteFile(filepath.Join(dir, "regular-file.txt"), []byte("data"), 0o644)
 
-	err := cleanStaleSymlinks(dir)
+	err := cleanStaleSymlinks(dir, canonicalSkills)
 	if err != nil {
 		t.Fatalf("cleanStaleSymlinks: %v", err)
 	}
@@ -113,12 +128,16 @@ func TestCleanStaleSymlinks_RemovesStale(t *testing.T) {
 }
 
 func TestCleanStaleSymlinks_PreservesValid(t *testing.T) {
-	dir := t.TempDir()
+	root := t.TempDir()
+	dir := filepath.Join(root, ".claude", "skills")
+	canonicalSkills := filepath.Join(root, SkillsDir)
+	os.MkdirAll(dir, 0o755)
+	os.MkdirAll(canonicalSkills, 0o755)
 	for _, si := range Skills {
-		os.Symlink("/nonexistent", filepath.Join(dir, si.Name))
+		os.Symlink(filepath.Join(canonicalSkills, si.Name), filepath.Join(dir, si.Name))
 	}
 
-	err := cleanStaleSymlinks(dir)
+	err := cleanStaleSymlinks(dir, canonicalSkills)
 	if err != nil {
 		t.Fatalf("cleanStaleSymlinks: %v", err)
 	}
@@ -130,19 +149,25 @@ func TestCleanStaleSymlinks_PreservesValid(t *testing.T) {
 }
 
 func TestCleanStaleSymlinks_EmptyDir(t *testing.T) {
-	dir := t.TempDir()
-	if err := cleanStaleSymlinks(dir); err != nil {
+	root := t.TempDir()
+	dir := filepath.Join(root, ".claude", "skills")
+	canonicalSkills := filepath.Join(root, SkillsDir)
+	os.MkdirAll(dir, 0o755)
+	if err := cleanStaleSymlinks(dir, canonicalSkills); err != nil {
 		t.Fatalf("cleanStaleSymlinks on empty dir: %v", err)
 	}
 }
 
 func TestCleanStaleSymlinks_SkipsNonSymlinks(t *testing.T) {
-	dir := t.TempDir()
+	root := t.TempDir()
+	dir := filepath.Join(root, ".claude", "skills")
+	canonicalSkills := filepath.Join(root, SkillsDir)
+	os.MkdirAll(dir, 0o755)
 	os.Mkdir(filepath.Join(dir, "subdir"), 0o755)
 	os.WriteFile(filepath.Join(dir, "file.txt"), []byte("data"), 0o644)
-	os.Symlink("/nonexistent/stale", filepath.Join(dir, "stale-link"))
+	os.Symlink(filepath.Join(canonicalSkills, "stale-link"), filepath.Join(dir, "stale-link"))
 
-	if err := cleanStaleSymlinks(dir); err != nil {
+	if err := cleanStaleSymlinks(dir, canonicalSkills); err != nil {
 		t.Fatalf("cleanStaleSymlinks: %v", err)
 	}
 
@@ -154,6 +179,21 @@ func TestCleanStaleSymlinks_SkipsNonSymlinks(t *testing.T) {
 	}
 	if _, err := os.Lstat(filepath.Join(dir, "stale-link")); !os.IsNotExist(err) {
 		t.Error("expected stale symlink to be removed")
+	}
+}
+
+func TestCleanStaleSymlinks_PreservesUnmanagedSymlink(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, ".claude", "skills")
+	canonicalSkills := filepath.Join(root, SkillsDir)
+	os.MkdirAll(dir, 0o755)
+	os.Symlink(filepath.Join(root, "other-skill"), filepath.Join(dir, "independent-skill"))
+
+	if err := cleanStaleSymlinks(dir, canonicalSkills); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(filepath.Join(dir, "independent-skill")); err != nil {
+		t.Errorf("expected unmanaged symlink to be preserved: %v", err)
 	}
 }
 
@@ -237,8 +277,8 @@ func TestGenerateAdapterCommands_CleansStaleSymlinks(t *testing.T) {
 
 	claudeDir := filepath.Join(root, ".claude", "skills")
 	os.MkdirAll(claudeDir, 0o755)
-	os.Symlink("/nonexistent/stale", filepath.Join(claudeDir, "litespec-archive"))
-	os.Symlink("/nonexistent/stale", filepath.Join(claudeDir, "litespec-continue"))
+	os.Symlink(filepath.Join(skillsDir, "litespec-archive"), filepath.Join(claudeDir, "litespec-archive"))
+	os.Symlink(filepath.Join(skillsDir, "litespec-continue"), filepath.Join(claudeDir, "litespec-continue"))
 	os.WriteFile(filepath.Join(claudeDir, "user-notes.txt"), []byte("keep me"), 0o644)
 
 	err := GenerateAdapterCommands(root, []string{"claude"})

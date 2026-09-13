@@ -1,252 +1,113 @@
 # Workflow
 
-The litespec workflow is unidirectional — you move forward through phases, never backward. This design prevents the "drifting proposal" problem where plans and implementation get out of sync.
+litespec is unidirectional and has two lanes. GH issue is the queue — proposal + design + queue live in the GH issue body. Durable contracts live in `specs/<feature>/spec.md` and `specs/decisions/`. Disposable work lives in a closed GH issue.
 
-```
-think → plan → build → review → archive
-                     │          ↑
-                 plan (adopt)──┘
+## Two Lanes
 
-plan (patch) → archive  (lightweight lane)
-```
+### Small fix — zero ceremony
 
-Each step has a clear purpose and produces specific artifacts. Choose the right pattern for your situation.
+For typos, bugs, one-offs, and trivial refactors.
 
-## Skills
+1. Tell the agent the fix.
+2. The agent reads `specs/product.md`, the relevant `specs/<feature>/spec.md`, `specs/decisions/`, and `specs/glossary.md`.
+3. The agent edits the code.
+4. If the fix changed a load-bearing contract, the agent edits the one `specs/<feature>/spec.md` directly. Preserve `SHALL`/`MUST` and `WHEN`/`THEN`.
+5. Done.
 
-Each workflow phase maps to a skill that the AI uses:
+No GH issue. No folder.
 
-| Phase | Skill | What it does |
-|-------|-------|-------------|
-| explore, grill | think | Freeform exploration and stress-testing |
-| propose, adopt, patch | plan | Materialize proposals, reverse-engineer specs, or create patch changes |
-| apply | build | Implement tasks per phase, fix review findings, research gaps |
-| review | review | Adversarial + compliance review |
+### New feature — plan fuzzy to clear
 
-## Workflow Steps
+For greenfield, API shape, CLI behavior, or anything that will outlast the issue.
 
-### explore (think: Exploration mode)
+1. `litespec-plan` in **fuzzy** mode: read code, ask 2–3 questions, maybe spike, write no files. Use `references/fuzzy.md`.
+2. `litespec-plan` in **clear** mode: require a clean tree, capture `Base:`, create `litespec/<change-name>`, and record `Branch:` in the labeled GH issue body before its proposal, design, and units. If `gh` is unavailable, write the same body to `specs/queues/<name>.md`. Draft a spec if load-bearing.
+3. **grill-me** (optional): adversarial shaping. Use `references/grilling.md`. Pull in `codebase-design` or `domain-modeling` when needed.
+4. `litespec-build`: establish a meaningful red Verify at a clean pre commit, implement one unit through one or more implementation/fix commits, require green at the final clean commit where `Verify:` passes, then post the complete receipt before checking the box.
+5. `litespec-review`: replay Verify at pre, post, and `HEAD`, verify the recorded branch, review tracked and untracked issue-owned work, then route findings.
+6. Close the GH issue only when all units are checked and review returns `PASS`.
 
-**What happens:** Conversational exploration of ideas, problems, or directions. No artifacts are created.
+Unidirectional. If the plan shifts, rewrite the GH issue (disposable), not the durable spec.
 
-**What the AI does:** Reads code, asks questions, draws diagrams, investigates architecture. It's a thinking partner, not an implementer.
+## Units
 
-**Artifacts created:** None (ephemeral context kept in the AI's window)
+A unit is one demo-able outcome with a `Verify:` that must fail without the outcome.
 
-**When to use:** When you have a vague idea, need to investigate the codebase, or want to think through a problem before committing to a change.
+In the GH issue body:
 
-**Example:** "Thinking about adding shell completions. How would that work with our CLI structure?"
+```markdown
+Base: <full commit ID>
+Branch: litespec/show-dependency-graph
 
----
+## Queue
 
-### grill (think: Grilling mode)
+## Show dependency graph in `view`
+Done means: `litespec view` displays arrows between dependent changes
+Verify: `go test ./...` and `litespec view | grep "->"` returns a non-empty line
+- [ ] pending
 
-**What happens:** Relentless Q&A about a plan or design. Every branch of the decision tree is resolved before proceeding.
-
-**What the AI does:** Interviews you about tradeoffs, risks, edge cases, and assumptions. It explores the codebase to answer questions when possible, asks when not.
-
-**Artifacts created:** None (ephemeral)
-
-**When to use:** When a design decision, architecture choice, or plan would benefit from structured interrogation. Not every question needs grilling — but major changes should be stress-tested.
-
-**Example:** "Grill me on this caching design. I want to find the holes before we implement it."
-
----
-
-### propose (plan: Propose mode)
-
-**What happens:** Creates a complete change proposal with all planning artifacts. This is the commit point.
-
-**What the AI does:**
-1. Creates a change directory: `specs/changes/<name>/`
-2. Generates all artifacts in dependency order:
-   - `proposal.md` — motivation, scope, non-goals
-   - `specs/` — delta specs describing what changes
-   - `design.md` — technical decisions and architecture
-   - `tasks.md` — phased implementation checklist
-
-**Artifacts created:** Complete proposal (proposal, specs, design, tasks)
-
-**When to use:** When you're ready to create a change and have clarity on what you want to build.
-
-**Example:** "Propose a docs-site feature using MkDocs."
-
----
-
-### apply (build)
-
-**What happens:** Implements tasks one phase at a time. Each phase is one agent session, one commit. The `build` skill also handles fixing review findings and pausing to research unfamiliar APIs or libraries.
-
-**What the AI does:**
-1. Reads all artifacts (proposal, specs, design, tasks)
-2. Identifies the current phase (first phase with unchecked tasks)
-3. Implements each task sequentially
-4. Marks tasks complete as they finish
-5. Commits after the phase: `phase N: <phase name>`
-6. When hitting a knowledge gap, pauses to gather docs and may produce a research skill at `.agents/skills/research-<topic>/SKILL.md`
-
-**Artifacts created:** Code changes, commits, optional research skills
-
-**When to use:** When you're ready to write code and all planning artifacts are complete.
-
-**Example:** "Build" the docs-site change. Let's start with Phase 1.
-
----
-
-### review: Review Mode
-
-**What happens:** Context-aware AI review that adapts to the change lifecycle.
-
-**What the AI does:** Detects task completion state and chooses an appropriate review:
-- **Artifact review** (0 tasks checked): Evaluates proposal, specs, design, tasks for quality, consistency, and readiness
-- **Implementation review** (some tasks checked): Runs two phases — adversarial review first (constructs failure scenarios from specs, then traces them against code for interaction bugs, missing guards, wiring gaps, and test adequacy), then compliance review (spec compliance, design adherence, pattern coherence)
-- **Pre-archive review** (all tasks checked): Runs both phases from implementation review, plus archive readiness and build verification
-
-**Why adversarial first:** Phase 1 constructs adversarial scenarios from the spec structure before reading implementation code. This avoids anchoring bias — once a reviewer has traced code and formed a "this looks basically fine" mental model, it's harder to generate adversarial scenarios. Running adversarial review first means failure scenarios come from the spec, not from pattern-matching against the code.
-
-**Artifacts created:** Review report with Phase 1 (adversarial) findings and Phase 2 (compliance) findings, each with CRITICAL, WARNING, SUGGESTION categories
-
-**When to use:** Before starting implementation (artifact review), during implementation (implementation review), or before archiving (pre-archive review).
-
-**Example:** "Review" the docs-site change. We're in Phase 2 and I want to check if the code matches the specs.
-
----
-
-### archive: Finalization Mode
-
-**What happens:** Validates task completion, merges delta specs into the canonical source of truth, and moves the change to archive.
-
-**How to run it:** Use the CLI commands directly — no dedicated skill is needed:
-1. `litespec validate <name>` — verify artifacts exist, delta syntax is valid, no dangling deltas
-2. `litespec archive <name>` — applies deltas, strips the change's `specs/` subtree, and moves to `specs/changes/archive/YYYY-MM-DD-<name>/`
-
-You can also pass `--allow-incomplete` to bypass the task-completion check.
-
-**Artifacts created:** Updated canonical specs (`specs/canon/`), archived change
-
-**When to use:** When all implementation is done and you're ready to finalize the change.
-
-**Example:** `litespec archive docs-site` — all phases are complete.
-
----
-
-### adopt (plan: Adopt mode)
-
-**What happens:** Reverse-engineers specs from existing code. A separate workflow for documenting capabilities that already exist. Handled by the `plan` skill in Adopt mode.
-
-**What the AI does:**
-1. Reads the provided file or directory thoroughly
-2. Builds a mental model of the code's purpose, dependencies, and behavior
-3. Creates a change proposal with specs documenting discovered capabilities
-4. Generates proposal, specs, design, and tasks
-
-**Artifacts created:** Complete proposal describing existing code
-
-**When to use:** When you have code that needs spec'ing but no spec exists yet. This is the on-ramp for existing codebases.
-
-**Example:** "Adopt" the auth package. It's well-tested but has no spec.
-
----
-
-## Named Workflow Patterns
-
-### Quick Feature Pattern
-
-**Flow:** plan → build → review → archive
-
-**When to use:** Simple, well-understood features where you know what you want to build without exploration.
-
-**Example:** Adding a `--json` flag to an existing command.
-
-**Why skip think:** The change is straightforward — adding a flag doesn't require architectural thinking or stress-testing.
-
----
-
-### Exploratory Pattern
-
-**Flow:** think → plan → build → review → archive
-
-**When to use:** Complex features, architectural changes, or anything with significant uncertainty.
-
-**Example:** "Thinking about a real-time collaboration feature. How would this work with our existing data model?"
-
-**Why use think (Exploration):** You need to investigate the codebase, understand integration points, and think through tradeoffs.
-
-**Why use think (Grilling):** The design decisions matter — getting the architecture wrong would be expensive to fix.
-
----
-
-### Adopt Pattern (Separate Path)
-
-**Flow:** plan (adopt mode) → archive
-
-**When to use:** Documenting existing code that has no spec yet. This is the reverse of the normal workflow — you're extracting specs from code rather than writing code from specs.
-
-**Example:** "We have a config parser that works but no tests. Adopt it to understand what it does, then we can review it."
-
-**Why adopt first:** The code already exists. You need to understand it before you can review or improve it.
-
----
-
-## Decision Flow
-
-Which pattern should you use?
-
-```
-Is this existing code without a spec?
-│
-└─ Yes → Use plan (adopt mode) → archive
-
-No → How much uncertainty do you have?
-│
-├─ Zero → Use Quick Feature (plan → build → review → archive)
-│
-└─ Some or a lot → Use Exploratory (think → plan → build → review → archive)
+## Validate specs from `view`
+Done means: the dashboard lists each `specs/<feature>/spec.md` with its requirement count
+Verify: `litespec view | grep "Specifications"` shows the spec name and count
+- [ ] pending
 ```
 
-**Guidelines:**
-- If the feature is a clear, scoped addition (e.g., add a flag), skip think's Exploration/Grilling.
-- If the change affects architecture, data models, or integration points, use think (Exploration).
-- If the design has tradeoffs or risks that need stress-testing, use think (Grilling).
-- If you're not sure, start with think (Exploration). It's always safe to explore.
+- Build one unit per session.
+- `Verify:` must be a concrete command or assertion. If it would pass without the outcome, the unit is too big.
+- Before implementation, run the exact Verify on a clean pre commit. It must fail because the outcome is absent. If the verifier is introduced by the unit, create at most one verifier-only commit first.
+- Create one or more implementation/fix commits without amending them, then run the same Verify. Post is the final clean commit where `Verify:` passes with exit status 0.
+- For initial work, tick the checkbox only after posting one receipt with the exact command plus full pre/post SHAs, statuses, fenced raw outputs, and matching scope lines. A checked GitHub unit with an unresolved rebuild request is also selectable; its later receipt carries the same exact heading and same-heading occurrence, resolves all earlier requests for that identity, and leaves the body unchanged. Never amend either evidence commit. A nonempty `Evidence:` label is not enough.
+- After a plan-authored amendment changes a unit, validation checks an older receipt against the command and digest it declares, including exact repeated identity on raw-output chunks. It accepts that historical receipt only when amendment edges chain its digest to the current contract; a receipt declaring the current digest must still use the current Verify command exactly.
+- Put unrelated work on another branch or worktree.
 
----
+Review checks pre→post→`HEAD` ancestry and replays the exact Verify using a detached temporary worktree at pre, another at post, and a detached temporary worktree at `HEAD`. All are removed even when Verify fails, and the current worktree is never checked out to evidence commits. Red-green evidence does not prove that Verify targets the correct behavior, so review still probes it adversarially. Findings then route in order: suggestions are non-blocking; unit violations rebuild the unit; CRITICAL/WARNING inside issue scope blocks as a direct fix or new parent unit; findings outside issue scope route without blocking. GitHub rebuild routing posts one structured append-only comment per affected unit identity and never edits the issue body. Local routing unchecks only affected units in a clean metadata commit. Auto-loaded instructions are trusted bootstrap inputs. After skill activation, only the remote issue is read initially; every additional local queue, contract, implementation, or reference path is screened before content access.
 
-## Why No Backward Flow?
+## When to Write a Spec
 
-The workflow is unidirectional for a reason. If you discover a problem during build:
+A spec is a durable, load-bearing contract in `specs/<feature>/spec.md`.
 
-```
-Wrong approach during build?
-│
-├─ Do NOT edit proposal/specs/design to match the code
-│
-└─ START OVER from think → plan — create a new proposal
-```
+Write one when:
 
-**Why?** Because if you update artifacts to match what you implemented, you've lost the contract. The artifacts should describe what you *intended*, not what you accidentally built. If the implementation reveals design flaws, start over with better planning.
+- You are defining a CLI command, API shape, file format, or public interface.
+- Being wrong six months from now would break downstream work.
+- The contract needs `SHALL`/`MUST` and `WHEN`/`THEN` scenarios.
 
-The archive step enforces this: it validates that all tasks are complete before merging specs. You can't archive a half-baked change. This discipline prevents gradual drift where code and specs diverge over time.
+Skip one when:
 
----
+- It is a one-off, trivial refactor, prototype, or internal-only detail.
+- It will not outlast the GH issue.
+- The change is purely cosmetic or a bug fix with no contract change.
 
-## Real Example: The docs-site Change
+For small fixes, edit the existing spec in place. For new features, `litespec-plan` drafts the spec during `clear` mode.
 
-The `docs-site` change in this repo followed the Exploratory pattern:
+## Durable vs Disposable
 
-1. **think (Exploration):** Investigated MkDocs alternatives, sketched directory structure, debated manual vs auto-generated docs
-2. **think (Grilling):** Stress-tested the choice of MkDocs Material, questioned the scope (why not add search now?), verified that docs-as-source-of-truth made sense
-3. **plan (Propose):** Created a complete proposal with specs, design, and tasks
-4. **build:** Implemented in three phases — infrastructure (pyproject.toml, mkdocs.yml), content (8 doc pages), deployment (GitHub Actions)
-5. **review:** Ran artifact review, implementation review, and pre-archive review
-6. **archive:** Merged delta specs into `specs/canon/docs-site/spec.md` and moved to archive
+| Durable (keep) | Disposable (close/delete) |
+|---|---|
+| `specs/product.md` | GH issue body and comments |
+| `specs/<feature>/spec.md` | |
+| `specs/decisions/NNNN-<slug>.md` (`spine: true` for load-bearing) | |
+| `specs/glossary.md` | |
 
-This change had significant uncertainty (which docs engine? what scope? deployment strategy?), so it benefited from the full Exploratory pattern. A simpler change like `shell-completions` could have used Quick Feature.
+Rule of thumb: if being stale would mislead the next reader, keep it. Otherwise delete it after merge.
 
----
+## Skills and Adapters
 
-## Next Steps
+litespec generates three skills into `.agents/skills/`:
 
-- [Tutorial](tutorial.md) — worked walkthrough of a complete change from init to archive
-- [Concepts](concepts.md) — philosophy behind spec-driven development
-- [CLI Reference](cli-reference.md) — command details
+| Skill | Purpose |
+|---|---|
+| `litespec-plan` | Fuzzy/clear planning, grilling, codebase-design, domain-modeling |
+| `litespec-build` | Implement one unit at a time, satisfy `Done means:` and `Verify:` |
+| `litespec-review` | Adversarial review of GH issue + spec vs implementation |
+
+- `.agents/skills/` is canonical. Nearly every AI coding agent discovers it natively.
+- `litespec init --tools claude` or `litespec update --tools claude` creates symlinks in `.claude/skills/` for Claude Code.
+- Run `litespec update` after changing templates or pulling a new version.
+- Project-specific skills are tracked in git directly, not generated.
+
+## See Also
+
+- [Concepts](concepts.md)
+- [CLI Reference](cli-reference.md)
+- [Getting Started](getting-started.md)

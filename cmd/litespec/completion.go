@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bermudi/litespec/internal"
+	"github.com/bermudi/litespec/v2/internal"
 )
 
 const completionHelp = `Usage: litespec completion <shell>

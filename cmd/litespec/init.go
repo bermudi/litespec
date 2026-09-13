@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bermudi/litespec/internal"
+	"github.com/bermudi/litespec/v2/internal"
 )
 
 func cmdInit(args []string) error {
@@ -18,6 +18,14 @@ func cmdInit(args []string) error {
 	ok, err := parseFlagSet(fs, args)
 	if !ok {
 		return err
+	}
+
+	var toolIDs []string
+	if tools != "" {
+		toolIDs = splitCSV(tools)
+		if err := validateToolIDs(toolIDs); err != nil {
+			return err
+		}
 	}
 
 	root, err := internal.FindProjectRoot()
@@ -40,13 +48,7 @@ func cmdInit(args []string) error {
 		fmt.Println("Generated .agents/skills/")
 	}
 
-	var toolIDs []string
-	if tools != "" {
-		toolIDs = splitCSV(tools)
-		if err := validateToolIDs(toolIDs); err != nil {
-			return err
-		}
-	} else {
+	if tools == "" {
 		toolIDs = internal.DetectActiveAdapters(root)
 	}
 
@@ -78,12 +80,12 @@ func cmdInit(args []string) error {
 	return Render(Response{
 		Full: initResultJSON{
 			Initialized: true,
-			Directories: []string{"specs/canon/", "specs/changes/"},
+			Directories: []string{"specs/product.md", "specs/glossary.md", "specs/decisions/"},
 			Skills:      skillNames,
 			Adapters:    toolIDs,
 		},
 		Minimal:     initMinimalJSON{Initialized: true},
-		Text:        "Project initialized.\n\nTip: Create specs/backlog.md with ## Deferred, ## Open Questions, and ## Future Versions sections to surface backlog counts in `litespec view`.\n",
+		Text:        "Project initialized.\n\nGH issue is the queue — proposal + design + queue live in the GH issue body. Run `litespec view` to see product + specs + GH issues.\n",
 		MinimalText: "initialized",
 	}, asJSON, asMinimal)
 }

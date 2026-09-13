@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 type DecisionStatus string
@@ -36,12 +38,34 @@ type Decision struct {
 	Consequences string
 	Supersedes   []string
 	SupersededBy []string
+	Spine        bool
 	FilePath     string
 	LastModified time.Time
 }
 
 func DecisionsPath(root string) string {
 	return filepath.Join(root, ProjectDirName, "decisions")
+}
+
+func decisionFiles(root string) ([]string, error) {
+	dir := DecisionsPath(root)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read decisions directory: %w", err)
+	}
+
+	var paths []string
+	for _, entry := range entries {
+		if entry.IsDir() || !decisionFileRe.MatchString(entry.Name()) {
+			continue
+		}
+		paths = append(paths, filepath.Join(dir, entry.Name()))
+	}
+	sort.Strings(paths)
+	return paths, nil
 }
 
 func ParseDecision(path string) (*Decision, error) {
@@ -61,6 +85,8 @@ func ParseDecision(path string) (*Decision, error) {
 	}
 
 	content := string(data)
+	spine := parseSpineFrontmatter(content)
+	content = stripFrontmatter(content)
 	title := extractH1(content)
 	if title == "" {
 		return nil, fmt.Errorf("decision file %q has no H1 title", base)
@@ -111,27 +137,19 @@ func ParseDecision(path string) (*Decision, error) {
 		Consequences: consequences,
 		Supersedes:   supersedes,
 		SupersededBy: supersededBy,
+		Spine:        spine,
 		FilePath:     path,
 		LastModified: lastMod,
 	}, nil
 }
 
 func ListDecisions(root string) ([]*Decision, error) {
-	dir := DecisionsPath(root)
-	entries, err := os.ReadDir(dir)
+	paths, err := decisionFiles(root)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("read decisions directory: %w", err)
+		return nil, err
 	}
-
 	var result []*Decision
-	for _, entry := range entries {
-		if entry.IsDir() || !decisionFileRe.MatchString(entry.Name()) {
-			continue
-		}
-		path := filepath.Join(dir, entry.Name())
+	for _, path := range paths {
 		d, err := ParseDecision(path)
 		if err != nil {
 			continue
@@ -229,4 +247,55 @@ func parseSlugList(content string) []string {
 		}
 	}
 	return slugs
+}
+
+func parseSpineFrontmatter(content string) bool {
+	trimmed := strings.TrimSpace(content)
+	if !strings.HasPrefix(trimmed, "---") {
+		return false
+	}
+	lines := strings.Split(trimmed, "\n")
+	if len(lines) < 3 {
+		return false
+	}
+	end := -1
+	for i := 1; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) == "---" {
+			end = i
+			break
+		}
+	}
+	if end == -1 {
+		return false
+	}
+	fmContent := strings.Join(lines[1:end], "\n")
+	var fm struct {
+		Spine bool `yaml:"spine"`
+	}
+	if err := yaml.Unmarshal([]byte(fmContent), &fm); err != nil {
+		return false
+	}
+	return fm.Spine
+}
+
+func stripFrontmatter(content string) string {
+	trimmed := strings.TrimLeft(content, "\r\n \t")
+	if !strings.HasPrefix(trimmed, "---") {
+		return content
+	}
+	lines := strings.Split(content, "\n")
+	start := -1
+	for i, l := range lines {
+		if strings.TrimSpace(l) == "---" {
+			if start == -1 {
+				start = i
+			} else {
+				return strings.Join(lines[i+1:], "\n")
+			}
+		}
+		if start != -1 && i > 20 {
+			break
+		}
+	}
+	return content
 }

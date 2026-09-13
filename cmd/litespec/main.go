@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime/debug"
 	"strings"
@@ -50,20 +49,18 @@ func run() error {
 		return nil
 	case "init":
 		return cmdInit(os.Args[2:])
-	case "list":
-		return cmdList(os.Args[2:])
-	case "status":
-		return cmdStatus(os.Args[2:])
 	case "validate":
 		return cmdValidate(os.Args[2:])
-	case "instructions":
-		return cmdInstructions(os.Args[2:])
-	case "archive":
-		return cmdArchive(os.Args[2:])
-	case "new":
-		return cmdNew(os.Args[2:])
+	case "view":
+		return cmdView(os.Args[2:])
 	case "update":
 		return cmdUpdate(os.Args[2:])
+	case "digest":
+		return cmdDigest(os.Args[2:])
+	case "receipt":
+		return cmdReceipt(os.Args[2:])
+	case "issue":
+		return cmdIssue(os.Args[2:])
 	case "upgrade":
 		return cmdUpgrade(os.Args[2:])
 	case "completion":
@@ -71,16 +68,6 @@ func run() error {
 	case "__complete":
 		cmdComplete()
 		return nil
-	case "preview":
-		return cmdPreview(os.Args[2:])
-	case "view":
-		return cmdView(os.Args[2:])
-	case "decide":
-		return cmdDecide(os.Args[2:])
-	case "import":
-		return cmdImport(os.Args[2:])
-	case "patch":
-		return cmdPatch(os.Args[2:])
 	default:
 		printUsage()
 		return fmt.Errorf("unknown command: %s", os.Args[1])
@@ -90,26 +77,20 @@ func run() error {
 func printUsage() {
 	fmt.Print(`Usage: litespec <command> [options]
 
-Workflow:
-  explore → grill → propose → apply → archive
-  Thinking → stress-test → materialize → implement → commit to specs
+Workflow (two lanes):
+  Small fix: read product/spec/decisions -> edit code -> update spec if contract
+  New feature: plan[fuzzy] -> plan[clear] (GH issue) -> grill-me -> build -> review -> close
 
 Commands:
-  init [--tools <ids>]                                        Initialize project structure
-  new <name>                                                  Create a new change
-  patch <name> <capability>                                   Create a patch-mode change (delta-only)
-  list [--specs|--changes|--decisions|--backlog] [--sort recent|name|deps|number] [--status <state>]   List specs, changes, decisions, or backlog
-  status [<name>]                                             Show artifact states
-  validate [<name>] [--all|--changes|--specs|--decisions] [--type T]      Validate changes, specs, and decisions
-  instructions <artifact>                                     Get artifact instructions
-  archive <name>                                              Apply deltas and archive change
-  preview <name> [--json]                                     Preview what archive would do to canon specs
-  view                                                        Dashboard overview with dependency graph
-  decide <slug>                                              Create a new architectural decision record
-  import [--source <dir>] [--dry-run] [--force]               Import OpenSpec project to litespec
-  update [--tools <ids>]                                      Regenerate skills and adapters
-  upgrade                                                     Check for and install the latest version
-  completion <shell>                                          Generate shell completion script (bash, zsh, fish)
+  init [--tools <ids>]              Initialize project structure
+  validate [--all|--specs|--decisions|--issue <N>|--queue <path>] [--type T]   Validate specs, decisions, and queues
+  view                              Dashboard overview
+  update [--tools <ids>]            Regenerate skills and adapters
+  digest --issue <N> | --queue <p>  Print expected unit contract digests for a queue
+  receipt --issue <N> | --queue <p> --heading "<h>"  Assemble evidence receipt comment files
+  issue check --issue <N> --heading "<h>"  Tick exactly one unit checkbox (managed)
+  upgrade                           Check for and install the latest version
+  completion <shell>                Generate shell completion script (bash, zsh, fish)
 
 Tools:
   claude    Symlink skills into .claude/skills/ for Claude Code
@@ -117,14 +98,14 @@ Tools:
 Flags:
    --version    Print version
    --help       Print this help message
-   --json       Output structured JSON (status, validate, list, instructions)
+   --json       Output structured JSON (validate, view)
    --strict     Treat warnings as errors (validate)
-   --all        Validate all changes, specs, and decisions
-   --changes    Validate all changes only
+   --all        Validate all specs, decisions, and queues
    --specs      Validate all specs only
    --decisions  Validate all decisions only
-   --type       Disambiguate name type: change|spec|decision (validate)
-    --sort       Sort changes by recent, name, or deps (list, default: recent)
+   --issue <N>  Fetch and validate one GH queue issue
+   --queue <path>  Validate one local queue file
+   --type       Disambiguate name type: spec|decision (validate)
 `)
 }
 
@@ -147,7 +128,7 @@ func maybeBackgroundUpgrade() {
 		return
 	}
 
-	modulePath, err := getModulePath()
+	modulePath, err := modulePathFn()
 	if err != nil {
 		return
 	}
@@ -157,8 +138,17 @@ func maybeBackgroundUpgrade() {
 	}
 	_ = os.WriteFile(stampFile, nil, 0o644)
 
-	cmd := exec.Command("go", "install", modulePath+"@latest")
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	_ = cmd.Start()
+	local := version
+	if local == "dev" || local == "" {
+		local = "0.0.0"
+	}
+	latest, err := fetchLatestVersionFor(local)
+	if err != nil {
+		return
+	}
+	cmp, err := compareSemver(local, latest)
+	if err != nil || cmp >= 0 {
+		return
+	}
+	startBackgroundInstall(modulePath, latest)
 }

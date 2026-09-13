@@ -1,0 +1,1637 @@
+package internal
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+)
+
+type ghIssue struct {
+	Number   int    `json:"number"`
+	Title    string `json:"title"`
+	Body     string `json:"body"`
+	URL      string `json:"url"`
+	Comments []struct {
+		Body string `json:"body"`
+	} `json:"comments"`
+}
+
+type queueUnit struct {
+	Heading string
+	Body    []string
+	Depends []string
+}
+
+func ValidateGHIssueQueues(root string) (*ValidationResult, error) {
+	result := &ValidationResult{Valid: true}
+
+	if _, err := lookPathGh("gh"); err != nil {
+		result.Warnings = append(result.Warnings, ValidationIssue{
+			Severity:     SeverityWarning,
+			Message:      "gh not available — issue queue not validated",
+			StrictExempt: true,
+		})
+		return result, nil
+	}
+
+	out, err := ghIssueList(root)
+	if err != nil {
+		result.Warnings = append(result.Warnings, ValidationIssue{
+			Severity:     SeverityWarning,
+			Message:      fmt.Sprintf("gh issue list failed — issue queue not validated: %v", err),
+			StrictExempt: true,
+		})
+		return result, nil
+	}
+
+	if len(out) == 0 {
+		result.Warnings = append(result.Warnings, ValidationIssue{
+			Severity:     SeverityWarning,
+			Message:      "gh issue list returned empty output — issue queue not validated",
+			StrictExempt: true,
+		})
+	} else {
+		var issues []ghIssue
+		if err := json.Unmarshal(out, &issues); err != nil {
+			result.Warnings = append(result.Warnings, ValidationIssue{
+				Severity:     SeverityWarning,
+				Message:      fmt.Sprintf("parse gh issue list output: %v — issue queue not validated", err),
+				StrictExempt: true,
+			})
+			return result, nil
+		}
+
+		for _, issue := range issues {
+			source := fmt.Sprintf("GH issue #%d", issue.Number)
+			units, unitIssues := ValidateQueueBody(issue.Body, source)
+			result.UnitsCount += len(units)
+			var commentBodies []string
+			for _, c := range issue.Comments {
+				commentBodies = append(commentBodies, c.Body)
+			}
+			applyQueueIssues(result, "GitHub comments", units, unitIssues, commentBodies)
+		}
+	}
+
+	result.Valid = len(result.Errors) == 0
+	return result, nil
+}
+
+func parseQueueUnits(body string) []queueUnit {
+	lines := strings.Split(body, "\n")
+	var units []queueUnit
+	var current *queueUnit
+	openFence := ""
+
+	for _, line := range lines {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			if current != nil {
+				current.Body = append(current.Body, line)
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "## ") {
+			if current != nil {
+				units = append(units, *current)
+			}
+			heading := strings.TrimSpace(line[3:])
+			current = &queueUnit{Heading: heading}
+			continue
+		}
+		if current != nil {
+			current.Body = append(current.Body, line)
+		}
+	}
+
+	if current != nil {
+		units = append(units, *current)
+	}
+
+	return units
+}
+
+var lookPathBash = exec.LookPath
+var lookPathGh = exec.LookPath
+var queueBasePattern = regexp.MustCompile(`^[0-9a-fA-F]{40}([0-9a-fA-F]{24})?$`)
+var queueBranchPattern = regexp.MustCompile(`^litespec/[a-z0-9]+(?:-[a-z0-9]+)*$`)
+var vacuousVerifyPattern = regexp.MustCompile(`^(?:true|:|exit[ \t]+0)[ \t]*;?[ \t]*(?:#.*)?$`)
+
+func isObviouslyVacuous(command string) bool {
+	lines := strings.Split(command, "\n")
+	var meaningful []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if strings.HasPrefix(strings.TrimLeft(line, " \t"), "#") {
+			continue
+		}
+		meaningful = append(meaningful, trimmed)
+	}
+	if len(meaningful) == 0 {
+		return true
+	}
+	if len(meaningful) != 1 {
+		return false
+	}
+	return vacuousVerifyPattern.MatchString(meaningful[0])
+}
+
+var placeholderSet = map[string]bool{
+	"-": true, "--": true, "n/a": true, "na": true,
+	"none": true, "tbd": true, "todo": true, "null": true, "nil": true,
+}
+
+var identifiedQueueEntryPattern = regexp.MustCompile(`^[-*][ \t]+\[([^][ \t]+)\](?:[ \t]+(.*))?$`)
+
+func queueUnitFieldLines(body []string, prefix string) ([]string, bool) {
+	openFence := ""
+	for i, line := range body {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, prefix) {
+			continue
+		}
+		var values []string
+		if rest := strings.TrimSpace(strings.TrimPrefix(trimmed, prefix)); rest != "" {
+			values = append(values, rest)
+		}
+		for _, nextLine := range body[i+1:] {
+			next := strings.TrimSpace(nextLine)
+			if next == "" {
+				continue
+			}
+			if isQueueUnitFieldLine(next) || isCheckboxLine(next) {
+				break
+			}
+			values = append(values, next)
+		}
+		return values, true
+	}
+	return nil, false
+}
+
+func isQueueUnitFieldLine(line string) bool {
+	for _, prefix := range []string{
+		"Read first:", "Constraints:", "Depends:", "Boundary:", "Done means:",
+		"Scenarios:", "Risk cases:", "Verify:", "Evidence:",
+	} {
+		if strings.HasPrefix(line, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func queueUnitFieldCount(body []string, prefix string) int {
+	count := 0
+	openFence := ""
+	for _, line := range body {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		if strings.HasPrefix(strings.TrimSpace(line), prefix) {
+			count++
+		}
+	}
+	return count
+}
+
+func validateUnitScenarioMapping(unit queueUnit, source string) []ValidationIssue {
+	doneLines, doneFound := queueUnitFieldLines(unit.Body, "Done means:")
+	if !doneFound {
+		return nil
+	}
+
+	var issues []ValidationIssue
+	fail := func(message string) {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: unit %q %s", source, unit.Heading, message),
+			File:     source,
+		})
+	}
+
+	if queueUnitFieldCount(unit.Body, "Done means:") > 1 {
+		fail("has duplicate Done means: fields (only one allowed)")
+	}
+
+	clauseIDs := make(map[string]bool)
+	for _, line := range doneLines {
+		match := identifiedQueueEntryPattern.FindStringSubmatch(line)
+		if match == nil || strings.TrimSpace(match[2]) == "" {
+			fail("must contain a nonempty identified Done means clause bullet")
+			continue
+		}
+		id := match[1]
+		if clauseIDs[id] {
+			fail(fmt.Sprintf("has duplicate Done means clause ID %q", id))
+			continue
+		}
+		clauseIDs[id] = true
+	}
+	if len(doneLines) == 0 {
+		fail("must contain at least one identified Done means clause")
+	}
+
+	scenarioLines, scenariosFound := queueUnitFieldLines(unit.Body, "Scenarios:")
+	if !scenariosFound {
+		fail("missing Scenarios: mapping")
+		return issues
+	}
+	if queueUnitFieldCount(unit.Body, "Scenarios:") > 1 {
+		fail("has duplicate Scenarios: fields (only one allowed)")
+	}
+	if len(scenarioLines) == 0 {
+		fail("Scenarios: mapping must be nonempty")
+		return issues
+	}
+
+	mapped := make(map[string]bool)
+	for _, line := range scenarioLines {
+		match := identifiedQueueEntryPattern.FindStringSubmatch(line)
+		if match == nil {
+			fail("Scenarios: must contain identified mapping bullets")
+			continue
+		}
+		id := match[1]
+		if strings.TrimSpace(match[2]) == "" {
+			fail(fmt.Sprintf("scenario mapping for clause ID %q must name a test scenario", id))
+			continue
+		}
+		if !clauseIDs[id] {
+			fail(fmt.Sprintf("scenario mapping references unknown Done means clause ID %q", id))
+			continue
+		}
+		mapped[id] = true
+	}
+	for id := range clauseIDs {
+		if !mapped[id] {
+			fail(fmt.Sprintf("Done means clause ID %q has no scenario mapping", id))
+		}
+	}
+	return issues
+}
+
+var requiredBoundaryRisks = []string{
+	"timeout",
+	"cleanup",
+	"non-ENOENT errors",
+	"concurrency",
+	"optional configured dependencies",
+}
+
+var riskScenarioPattern = regexp.MustCompile(`^\[([^][ \t]+)\]$`)
+
+func validateUnitBoundaryRiskAccounting(unit queueUnit, source string) []ValidationIssue {
+	var issues []ValidationIssue
+	fail := func(message string) {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: unit %q %s", source, unit.Heading, message),
+			File:     source,
+		})
+	}
+
+	boundary, boundaryFound := queueUnitFieldValue(unit.Body, "Boundary:")
+	if boundaryCount := queueUnitFieldCount(unit.Body, "Boundary:"); boundaryCount > 1 {
+		fail("has duplicate Boundary: fields (only one allowed)")
+	}
+	if boundaryFound && strings.TrimSpace(boundary) == "" {
+		fail("Boundary: must be nonempty")
+	}
+	if !boundaryFound || boundary == "" {
+		return issues
+	}
+	switch boundary {
+	case "filesystem", "process", "network":
+	default:
+		fail(fmt.Sprintf("Boundary: must be one of %q, %q, %q (closed, case-sensitive vocabulary); got %q", "filesystem", "process", "network", boundary))
+		return issues
+	}
+
+	riskLines, risksFound := queueUnitFieldLines(unit.Body, "Risk cases:")
+	if riskCount := queueUnitFieldCount(unit.Body, "Risk cases:"); riskCount > 1 {
+		fail("has duplicate Risk cases: fields (only one allowed)")
+	}
+	if !risksFound {
+		fail(fmt.Sprintf("missing Risk cases: for %s boundary", boundary))
+		return issues
+	}
+
+	scenarioIDs := make(map[string]bool)
+	scenarioLines, _ := queueUnitFieldLines(unit.Body, "Scenarios:")
+	for _, line := range scenarioLines {
+		if match := identifiedQueueEntryPattern.FindStringSubmatch(line); match != nil {
+			scenarioIDs[match[1]] = true
+		}
+	}
+
+	seenRisks := make(map[string]bool)
+	for _, line := range riskLines {
+		if !strings.HasPrefix(line, "- ") && !strings.HasPrefix(line, "* ") {
+			fail("Risk cases: must contain bullet entries")
+			continue
+		}
+		name, value, ok := strings.Cut(strings.TrimSpace(line[2:]), ":")
+		name = strings.TrimSpace(name)
+		value = strings.TrimSpace(value)
+		if !ok || name == "" || value == "" {
+			fail("Risk cases: entries must use `<risk>: [scenario-id]` or `<risk>: N/A — <reason>`")
+			continue
+		}
+		if seenRisks[name] {
+			fail(fmt.Sprintf("Risk cases: has duplicate %q entry", name))
+			continue
+		}
+		seenRisks[name] = true
+
+		if strings.HasPrefix(value, "N/A") {
+			reason := strings.TrimSpace(strings.TrimPrefix(value, "N/A —"))
+			if !strings.HasPrefix(value, "N/A —") || reason == "" {
+				fail(fmt.Sprintf("Risk cases: risk %q must include a nonempty N/A reason", name))
+			}
+			continue
+		}
+		match := riskScenarioPattern.FindStringSubmatch(value)
+		if match == nil {
+			fail(fmt.Sprintf("Risk cases: risk %q must map to a scenario ID or use N/A — <reason>", name))
+			continue
+		}
+		if !scenarioIDs[match[1]] {
+			fail(fmt.Sprintf("Risk cases: risk %q references unknown scenario ID %q", name, match[1]))
+		}
+	}
+	for _, risk := range requiredBoundaryRisks {
+		if !seenRisks[risk] {
+			fail(fmt.Sprintf("Risk cases: missing %q entry", risk))
+		}
+	}
+	return issues
+}
+
+func isPlaceholderValue(s string) bool {
+	return placeholderSet[strings.ToLower(strings.TrimSpace(s))]
+}
+
+func hasBulletAfter(body []string, idx int) bool {
+	for j := idx + 1; j < len(body); j++ {
+		t := strings.TrimSpace(body[j])
+		if t == "" {
+			continue
+		}
+		if strings.HasPrefix(t, "```") {
+			break
+		}
+		if strings.HasPrefix(t, "Done means:") || strings.HasPrefix(t, "Verify:") || strings.HasPrefix(t, "Depends:") || strings.HasPrefix(t, "Read first:") || strings.HasPrefix(t, "Constraints:") || isCheckboxLine(t) {
+			break
+		}
+		if strings.HasPrefix(t, "- ") || strings.HasPrefix(t, "* ") {
+			return true
+		}
+		break
+	}
+	return false
+}
+
+func validateOptionalField(body []string, fieldName string, count int, idx int, rest string, source, heading string) []ValidationIssue {
+	if count > 1 {
+		return []ValidationIssue{{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: unit %q has duplicate %s: (only one allowed)", source, heading, fieldName),
+			File:     source,
+		}}
+	}
+	if count == 1 {
+		trimmed := strings.TrimSpace(rest)
+		if isPlaceholderValue(trimmed) {
+			return []ValidationIssue{{
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("%s: unit %q %s: must be nonempty — omit rather than placeholder %q", source, heading, fieldName, trimmed),
+				File:     source,
+			}}
+		}
+		if trimmed == "" && !hasBulletAfter(body, idx) {
+			return []ValidationIssue{{
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("%s: unit %q %s: must be nonempty — omit rather than placeholder", source, heading, fieldName),
+				File:     source,
+			}}
+		}
+	}
+	return nil
+}
+
+var evidenceCommitPattern = regexp.MustCompile(`^[0-9a-fA-F]{40}(?:[0-9a-fA-F]{24})?$`)
+var preEvidenceScopePattern = regexp.MustCompile(`^Pre-evidence scope: this command exited (-?\d+) at ([0-9a-fA-F]{40}(?:[0-9a-fA-F]{24})?); nothing else is inferred\.$`)
+var postEvidenceScopePattern = regexp.MustCompile(`^Post-evidence scope: this command exited (-?\d+) at ([0-9a-fA-F]{40}(?:[0-9a-fA-F]{24})?); nothing else is inferred\.$`)
+var rawOutputChunkCountPattern = regexp.MustCompile(`^([1-9][0-9]*)/([1-9][0-9]*)$`)
+
+func isCheckedLine(trimmed string) bool {
+	for _, cb := range []string{"- [x]", "- [X]"} {
+		if trimmed == cb || strings.HasPrefix(trimmed, cb+" ") {
+			return true
+		}
+	}
+	return false
+}
+
+func isCheckedUnit(body []string) bool {
+	openFence := ""
+	for _, line := range body {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		if isCheckedLine(strings.TrimSpace(line)) {
+			return true
+		}
+	}
+	return false
+}
+
+func unitVerifyCommand(body []string) string {
+	for i, line := range body {
+		if !strings.HasPrefix(line, "Verify:") {
+			continue
+		}
+		rest := strings.TrimSpace(line[len("Verify:"):])
+		firstBacktick := strings.Index(rest, "`")
+		lastBacktick := strings.LastIndex(rest, "`")
+		inline := ""
+		if firstBacktick >= 0 && lastBacktick > firstBacktick {
+			inline = strings.TrimSpace(rest[firstBacktick+1 : lastBacktick])
+		}
+		for j := i + 1; j < len(body); j++ {
+			trimmed := strings.TrimSpace(body[j])
+			if trimmed == "" {
+				continue
+			}
+			delimiter := fenceDelimiter(trimmed)
+			if delimiter == "" {
+				return inline
+			}
+			var blockLines []string
+			for k := j + 1; k < len(body); k++ {
+				if strings.TrimSpace(body[k]) == delimiter {
+					return strings.Join(blockLines, "\n")
+				}
+				blockLines = append(blockLines, body[k])
+			}
+			break
+		}
+		return inline
+	}
+	return ""
+}
+
+func extractEvidenceText(body []string) string {
+	seenVerify := false
+	verifyFence := ""
+	for i, line := range body {
+		trimmed := strings.TrimSpace(line)
+		if !seenVerify {
+			if strings.HasPrefix(line, "Verify:") {
+				seenVerify = true
+			}
+			continue
+		}
+		if consumeMarkdownFenceLine(&verifyFence, line) {
+			continue
+		}
+		if isCheckboxLine(trimmed) {
+			break
+		}
+		if !strings.HasPrefix(trimmed, "Evidence:") {
+			continue
+		}
+		var parts []string
+		if rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "Evidence:")); rest != "" {
+			parts = append(parts, rest)
+		}
+		receiptFence := ""
+		for j := i + 1; j < len(body); j++ {
+			t := strings.TrimSpace(body[j])
+			if consumeMarkdownFenceLine(&receiptFence, body[j]) {
+				parts = append(parts, body[j])
+				continue
+			}
+			if isCheckboxLine(t) {
+				break
+			}
+			parts = append(parts, body[j])
+		}
+		return strings.Join(parts, "\n")
+	}
+	return ""
+}
+
+type evidenceDocument struct {
+	lines                  []string
+	partIndexes            []int
+	partContinued          []bool
+	trackCommentBoundaries bool
+}
+
+func newEvidenceDocument(text string) evidenceDocument {
+	normalized := strings.ReplaceAll(text, "\r\n", "\n")
+	lines := strings.Split(normalized, "\n")
+	indexes := make([]int, len(lines))
+	return evidenceDocument{lines: lines, partIndexes: indexes, partContinued: []bool{false}}
+}
+
+func newEvidenceDocumentFromComment(comment continuedComment) evidenceDocument {
+	if len(comment.parts) == 0 {
+		return newEvidenceDocument(comment.text)
+	}
+	var lines []string
+	var indexes []int
+	continued := make([]bool, len(comment.parts))
+	for partIndex, part := range comment.parts {
+		partLines := strings.Split(strings.ReplaceAll(part.text, "\r\n", "\n"), "\n")
+		lines = append(lines, partLines...)
+		for range partLines {
+			indexes = append(indexes, partIndex)
+		}
+		continued[partIndex] = part.continued
+	}
+	return evidenceDocument{lines: lines, partIndexes: indexes, partContinued: continued, trackCommentBoundaries: true}
+}
+
+func (d evidenceDocument) trimSpace() evidenceDocument {
+	start := 0
+	for start < len(d.lines) && strings.TrimSpace(d.lines[start]) == "" {
+		start++
+	}
+	end := len(d.lines)
+	for end > start && strings.TrimSpace(d.lines[end-1]) == "" {
+		end--
+	}
+	return evidenceDocument{
+		lines:                  d.lines[start:end],
+		partIndexes:            d.partIndexes[start:end],
+		partContinued:          d.partContinued,
+		trackCommentBoundaries: d.trackCommentBoundaries,
+	}
+}
+
+func (d evidenceDocument) afterLine(index int) evidenceDocument {
+	if index >= len(d.lines) {
+		return evidenceDocument{partContinued: d.partContinued, trackCommentBoundaries: d.trackCommentBoundaries}
+	}
+	return evidenceDocument{
+		lines:                  d.lines[index:],
+		partIndexes:            d.partIndexes[index:],
+		partContinued:          d.partContinued,
+		trackCommentBoundaries: d.trackCommentBoundaries,
+	}
+}
+
+func evidencePayloadDocument(document evidenceDocument) evidenceDocument {
+	openFence := ""
+	for i, line := range document.lines {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		if strings.TrimSpace(line) == "Evidence:" {
+			return document.afterLine(i + 1)
+		}
+	}
+	return document
+}
+
+func newEvidenceCursor(text string) *evidenceCursor {
+	return newEvidenceCursorFromDocument(newEvidenceDocument(text))
+}
+
+func newEvidenceCursorFromDocument(document evidenceDocument) *evidenceCursor {
+	document = document.trimSpace()
+	return &evidenceCursor{
+		lines:                  document.lines,
+		partIndexes:            document.partIndexes,
+		partContinued:          document.partContinued,
+		trackCommentBoundaries: document.trackCommentBoundaries,
+	}
+}
+
+type evidenceCursor struct {
+	lines                  []string
+	partIndexes            []int
+	partContinued          []bool
+	trackCommentBoundaries bool
+	receiptHeader          *evidenceReceiptHeader
+	at                     int
+}
+
+func (c *evidenceCursor) consumeExactLines(value string) bool {
+	wanted := strings.Split(strings.ReplaceAll(value, "\r\n", "\n"), "\n")
+	if c.at+len(wanted) > len(c.lines) {
+		return false
+	}
+	for i, line := range wanted {
+		if c.lines[c.at+i] != line {
+			return false
+		}
+	}
+	c.at += len(wanted)
+	return true
+}
+
+func (c *evidenceCursor) skipBlanks() {
+	for c.at < len(c.lines) && strings.TrimSpace(c.lines[c.at]) == "" {
+		c.at++
+	}
+}
+
+func verifyCommandFromLabel(line string) (string, bool) {
+	trimmed := strings.TrimSpace(line)
+	if !strings.HasPrefix(trimmed, "Verify:") {
+		return "", false
+	}
+	rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "Verify:"))
+	if len(rest) >= 2 && strings.HasPrefix(rest, "`") && strings.HasSuffix(rest, "`") {
+		rest = rest[1 : len(rest)-1]
+	}
+	return rest, true
+}
+
+// consumeVerifyCommand accepts the exact bare command or the queue's own
+// `Verify:` label form, with or without backticks; the command text itself
+// must still match verbatim.
+func (c *evidenceCursor) consumeVerifyCommand(verifyCmd string) bool {
+	c.skipBlanks()
+	if c.consumeExactLines(verifyCmd) {
+		return true
+	}
+	if c.at >= len(c.lines) {
+		return false
+	}
+	declared, ok := verifyCommandFromLabel(c.lines[c.at])
+	if !ok || declared != verifyCmd {
+		return false
+	}
+	c.at++
+	return true
+}
+
+func (c *evidenceCursor) consumeField(label string) (string, bool) {
+	if c.at >= len(c.lines) {
+		return "", false
+	}
+	prefix := label + ":"
+	if !strings.HasPrefix(c.lines[c.at], prefix) {
+		return "", false
+	}
+	value := strings.TrimSpace(strings.TrimPrefix(c.lines[c.at], prefix))
+	c.at++
+	return value, true
+}
+
+func fenceDelimiter(line string) string {
+	trimmed := strings.TrimSpace(line)
+	count := 0
+	for count < len(trimmed) && trimmed[count] == '`' {
+		count++
+	}
+	if count < 3 {
+		return ""
+	}
+	return trimmed[:count]
+}
+
+func consumeMarkdownFenceLine(open *string, line string) bool {
+	trimmed := strings.TrimSpace(line)
+	if *open != "" {
+		if trimmed == *open {
+			*open = ""
+		}
+		return true
+	}
+	delimiter := fenceDelimiter(trimmed)
+	if delimiter == "" {
+		return false
+	}
+	*open = delimiter
+	return true
+}
+
+func (c *evidenceCursor) consumeFence() (string, bool) {
+	if c.at >= len(c.lines) {
+		return "", false
+	}
+	delimiter := fenceDelimiter(c.lines[c.at])
+	if delimiter == "" {
+		return "", false
+	}
+	c.at++
+	start := c.at
+	for c.at < len(c.lines) {
+		if strings.TrimSpace(c.lines[c.at]) == delimiter {
+			output := strings.Join(c.lines[start:c.at], "\n")
+			c.at++
+			return output, true
+		}
+		c.at++
+	}
+	return "", false
+}
+
+// consumeRawOutput accepts either the ordinary output fence or a sequence of
+// explicitly numbered raw-output chunks. Chunk payloads are concatenated
+// without inserting bytes; the repeated identity prevents a continuation from
+// being attached to another receipt.
+func (c *evidenceCursor) consumeRawOutput(phase, declaredDigest, expectedHeading string, expectedIdentity *queueUnitIdentity) (string, bool, string) {
+	if c.at >= len(c.lines) {
+		return "", false, fmt.Sprintf("must include %s raw command output in a fenced block", phase)
+	}
+	if c.lines[c.at] != "Raw output chunk:" {
+		output, ok := c.consumeFence()
+		if !ok || strings.TrimSpace(output) == "" {
+			return "", false, fmt.Sprintf("must include %s raw command output, or `<no output>`, in a fenced block", phase)
+		}
+		return output, true, ""
+	}
+
+	var reconstructed strings.Builder
+	wantedChunk := 1
+	totalChunks := 0
+	previousPart := -1
+	for {
+		if c.at >= len(c.lines) || c.lines[c.at] != "Raw output chunk:" {
+			return "", false, fmt.Sprintf("raw %s output chunks must be consecutive and complete", phase)
+		}
+		chunkPart := c.partAt(c.at)
+		if c.trackCommentBoundaries && c.rawChunkCountInPart(chunkPart) != 1 {
+			return "", false, fmt.Sprintf("raw %s output chunks must contain exactly one chunk per comment", phase)
+		}
+		if c.trackCommentBoundaries && previousPart >= 0 && chunkPart != previousPart+1 {
+			return "", false, fmt.Sprintf("raw %s output chunks must continue in the immediately following marked comment", phase)
+		}
+		previousPart = chunkPart
+		c.at++
+
+		if c.receiptHeader != nil {
+			repeatedHeader, err := consumeVersionedReceiptHeader(c)
+			if err != nil {
+				return "", false, fmt.Sprintf("raw %s output chunk has invalid repeated receipt header: %v", phase, err)
+			}
+			if repeatedHeader != *c.receiptHeader {
+				return "", false, fmt.Sprintf("raw %s output chunk receipt header must match the top-level receipt", phase)
+			}
+		}
+
+		c.skipBlanks()
+		outputPhase, ok := c.consumeField("Output")
+		if !ok || outputPhase != phase {
+			return "", false, fmt.Sprintf("raw output chunk must declare Output: %s", phase)
+		}
+		c.skipBlanks()
+		chunkText, ok := c.consumeField("Chunk")
+		if !ok {
+			return "", false, "raw output chunk must declare Chunk: <number>/<total>"
+		}
+		match := rawOutputChunkCountPattern.FindStringSubmatch(chunkText)
+		if match == nil {
+			return "", false, "raw output chunk must declare Chunk: <number>/<total>"
+		}
+		chunkNumber, numberErr := strconv.Atoi(match[1])
+		chunkTotal, totalErr := strconv.Atoi(match[2])
+		if numberErr != nil || totalErr != nil || chunkTotal < 2 || chunkNumber != wantedChunk {
+			return "", false, fmt.Sprintf("raw %s output chunks must be numbered consecutively from 1", phase)
+		}
+		if totalChunks == 0 {
+			totalChunks = chunkTotal
+		} else if chunkTotal != totalChunks {
+			return "", false, fmt.Sprintf("raw %s output chunks must use one total", phase)
+		}
+
+		c.skipBlanks()
+		occurrenceText, ok := c.consumeField("Unit occurrence")
+		if !ok {
+			return "", false, "raw output chunk must repeat Unit occurrence:"
+		}
+		occurrence, err := strconv.Atoi(occurrenceText)
+		if err != nil || occurrence < 1 {
+			return "", false, "raw output chunk Unit occurrence must be a positive integer"
+		}
+		if expectedIdentity == nil {
+			return "", false, "raw output chunk must have a receipt identity"
+		}
+		c.skipBlanks()
+		if !c.consumeExactLines("Unit heading: " + expectedIdentity.Heading) {
+			return "", false, "raw output chunk Unit heading must match the receipt identity exactly"
+		}
+		c.skipBlanks()
+		chunkDigest, ok := c.consumeField("unit digest")
+		if !ok || chunkDigest != declaredDigest {
+			return "", false, "raw output chunk unit digest must match the receipt identity"
+		}
+		if occurrence != expectedIdentity.Occurrence {
+			return "", false, "raw output chunk Unit occurrence must match the receipt identity"
+		}
+
+		c.skipBlanks()
+		output, ok := c.consumeFence()
+		if !ok || strings.TrimSpace(output) == "" {
+			return "", false, fmt.Sprintf("raw %s output chunks must contain nonempty fenced payloads", phase)
+		}
+		reconstructed.WriteString(output)
+		if chunkNumber == totalChunks {
+			return reconstructed.String(), true, ""
+		}
+		if c.trackCommentBoundaries && (chunkPart >= len(c.partContinued) || !c.partContinued[chunkPart] || chunkPart+1 >= len(c.partContinued)) {
+			return "", false, fmt.Sprintf("raw %s output chunks must continue in the immediately following marked comment", phase)
+		}
+		wantedChunk++
+		c.skipBlanks()
+	}
+}
+
+func (c *evidenceCursor) partAt(line int) int {
+	if line >= 0 && line < len(c.partIndexes) {
+		return c.partIndexes[line]
+	}
+	return 0
+}
+
+func (c *evidenceCursor) rawChunkCountInPart(part int) int {
+	openFence := ""
+	count := 0
+	for i, line := range c.lines {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		if c.partAt(i) == part && line == "Raw output chunk:" {
+			count++
+		}
+	}
+	return count
+}
+
+func evidencePayload(text, verifyCmd string) string {
+	document := evidencePayloadDocument(newEvidenceDocument(text))
+	return strings.Join(document.lines, "\n")
+}
+
+func evidenceReceiptIssues(text, verifyCmd, expectedDigest, source, heading string) []ValidationIssue {
+	return evidenceReceiptIssuesForIdentity(text, verifyCmd, expectedDigest, source, heading, nil)
+}
+
+func evidenceReceiptIssuesForIdentity(text, verifyCmd, expectedDigest, source, heading string, expectedIdentity *queueUnitIdentity) []ValidationIssue {
+	issues, _ := evidenceReceiptIssuesForDocument(
+		evidencePayloadDocument(newEvidenceDocument(text)),
+		verifyCmd,
+		expectedDigest,
+		source,
+		heading,
+		expectedIdentity,
+	)
+	return issues
+}
+
+func validateCheckedUnitEvidence(unit queueUnit, source string) []ValidationIssue {
+	return validateCheckedUnitEvidenceForIdentity(unit, source, nil)
+}
+
+func validateCheckedUnitEvidenceForIdentity(unit queueUnit, source string, identity *queueUnitIdentity) []ValidationIssue {
+	if !isCheckedUnit(unit.Body) {
+		return nil
+	}
+	document := evidencePayloadDocument(newEvidenceDocument(extractEvidenceText(unit.Body)))
+	issues, _ := evidenceReceiptIssuesForDocument(
+		document,
+		unitVerifyCommand(unit.Body),
+		evidenceReceiptExpectedDigest(unit, document),
+		source,
+		unit.Heading,
+		identity,
+	)
+	return issues
+}
+
+func commentSatisfiesEvidence(heading, verifyCmd, expectedDigest string, comments []string) bool {
+	_, ok := matchingEvidenceComment(heading, verifyCmd, expectedDigest, comments, nil)
+	return ok
+}
+
+func matchingEvidenceComment(heading, verifyCmd, expectedDigest string, comments []string, used map[int]bool) (int, bool) {
+	return matchingEvidenceCommentRecords(heading, verifyCmd, expectedDigest, mergeContinuedCommentRecords(comments), used, nil)
+}
+
+func matchingEvidenceCommentRecords(heading, verifyCmd, expectedDigest string, comments []continuedComment, used map[int]bool, expectedIdentity *queueUnitIdentity) (int, bool) {
+	for i, comment := range comments {
+		if used[i] {
+			continue
+		}
+		if !commentNamesUnit(comment.text, heading) {
+			continue
+		}
+		document, ok := commentEvidenceDocument(comment, heading)
+		if !ok {
+			continue
+		}
+		issues, _ := evidenceReceiptIssuesForDocument(document, verifyCmd, expectedDigest, "comment", heading, expectedIdentity)
+		if len(issues) == 0 {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+func matchingEvidenceCommentRecordsForUnit(
+	heading string,
+	unit queueUnit,
+	verifyCmd string,
+	comments []continuedComment,
+	used map[int]bool,
+	expectedIdentity *queueUnitIdentity,
+) (int, bool) {
+	for i, comment := range comments {
+		if used[i] {
+			continue
+		}
+		if !commentNamesUnit(comment.text, heading) {
+			continue
+		}
+		document, ok := commentEvidenceDocument(comment, heading)
+		if !ok {
+			continue
+		}
+		issues, _ := evidenceReceiptIssuesForDocument(
+			document,
+			verifyCmd,
+			evidenceReceiptExpectedDigest(unit, document),
+			"comment",
+			heading,
+			expectedIdentity,
+		)
+		if len(issues) == 0 {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+func commentHasEvidenceAfterHeading(comment continuedComment, heading string) bool {
+	document := newEvidenceDocumentFromComment(comment)
+	openFence := ""
+	foundHeading := false
+	for _, line := range document.lines {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if !foundHeading {
+			if trimmed == heading || trimmed == "## "+heading {
+				foundHeading = true
+			}
+			continue
+		}
+		if trimmed == "Evidence:" || strings.HasPrefix(trimmed, "Evidence: ") || receiptVersionField(trimmed) || strings.HasPrefix(trimmed, "unit digest:") || strings.HasPrefix(trimmed, "pre sha:") || strings.HasPrefix(trimmed, "post sha:") {
+			return true
+		}
+	}
+	return false
+}
+
+func commentEvidenceDocument(comment continuedComment, heading string) (evidenceDocument, bool) {
+	document := newEvidenceDocumentFromComment(comment)
+	openFence := ""
+	for i, line := range document.lines {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		if line == "Raw output chunk:" {
+			return evidenceDocument{}, false
+		}
+		trimmed := strings.TrimSpace(line)
+		if trimmed == heading || trimmed == "## "+heading {
+			return evidencePayloadDocument(document.afterLine(i + 1)), true
+		}
+	}
+	return evidencePayloadDocument(document), false
+}
+
+func commentTextAfterUnitHeading(comment, heading string) (string, bool) {
+	document := newEvidenceDocument(comment)
+	openFence := ""
+	for i, line := range document.lines {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if trimmed == heading || trimmed == "## "+heading {
+			return strings.Join(document.afterLine(i+1).lines, "\n"), true
+		}
+	}
+	return "", false
+}
+
+func commentNamesUnit(comment, heading string) bool {
+	openFence := ""
+	for _, line := range strings.Split(strings.ReplaceAll(comment, "\r\n", "\n"), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		if trimmed == "Evidence:" || strings.HasPrefix(trimmed, "Evidence: ") {
+			return false
+		}
+		if trimmed == heading || trimmed == "## "+heading {
+			return true
+		}
+	}
+	return false
+}
+
+func commentHasValidHeadingEvidence(comment continuedComment, units []queueUnit) bool {
+	identities := queueUnitIdentities(units)
+	for i, unit := range units {
+		if !commentNamesUnit(comment.text, unit.Heading) {
+			continue
+		}
+		document, ok := commentEvidenceDocument(comment, unit.Heading)
+		if !ok {
+			continue
+		}
+		issues, _ := evidenceReceiptIssuesForDocument(
+			document,
+			unitVerifyCommand(unit.Body),
+			evidenceReceiptExpectedDigest(unit, document),
+			"comment",
+			unit.Heading,
+			&identities[i],
+		)
+		if len(issues) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func commentContainsRawOutputChunk(comment continuedComment) bool {
+	openFence := ""
+	for _, line := range strings.Split(strings.ReplaceAll(comment.text, "\r\n", "\n"), "\n") {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		if line == "Raw output chunk:" {
+			return true
+		}
+	}
+	return false
+}
+
+func applyQueueIssues(result *ValidationResult, commentSource string, units []queueUnit, unitIssues []ValidationIssue, comments []string) {
+	commentRecords := mergeContinuedCommentRecords(comments)
+	usedComments := make(map[int]bool)
+	commentEvidence := make(map[int]bool)
+	identities := queueUnitIdentities(units)
+	bodyEvidence := bodyEvidenceReceiptObservations(units)
+	bodyEvidenceUnits := make(map[queueUnitIdentity]bool, len(bodyEvidence))
+	for _, observation := range bodyEvidence {
+		bodyEvidenceUnits[observation.identity] = true
+	}
+	for unitIndex, unit := range units {
+		if !isCheckedUnit(unit.Body) {
+			continue
+		}
+		if len(validateCheckedUnitEvidenceForIdentity(unit, "queue", &identities[unitIndex])) == 0 {
+			continue
+		}
+		if strings.TrimSpace(extractEvidenceText(unit.Body)) != "" {
+			continue
+		}
+		commentIndex, ok := matchingEvidenceCommentForUnit(
+			identities[unitIndex],
+			unit,
+			unitContractDigest(unit),
+			units,
+			commentRecords,
+			usedComments,
+		)
+		if !ok {
+			continue
+		}
+		usedComments[commentIndex] = true
+		commentEvidence[unitIndex] = true
+	}
+
+	scan := scanQueueCommentsWithInitialReceipts(units, comments, bodyEvidence)
+	for _, iss := range unitIssues {
+		bodyEvidenceUnit := iss.queueUnitIndex >= 0 && iss.queueUnitIndex < len(identities) && bodyEvidenceUnits[identities[iss.queueUnitIndex]]
+		if strings.Contains(iss.Message, "Evidence receipt") && (commentEvidence[iss.queueUnitIndex] || (bodyEvidenceUnit && len(scan.errors) == 0)) {
+			continue
+		}
+		if iss.Severity == SeverityWarning {
+			result.Warnings = append(result.Warnings, iss)
+		} else {
+			result.Errors = append(result.Errors, iss)
+		}
+	}
+
+	for _, err := range scan.errors {
+		result.Errors = append(result.Errors, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("queue rebuild routing: %v", err),
+			File:     commentSource,
+		})
+	}
+	for _, identity := range scan.unresolved {
+		result.Errors = append(result.Errors, ValidationIssue{
+			Severity: SeverityError,
+			Message: fmt.Sprintf(
+				"unit occurrence %d with heading %q has an unresolved rebuild request",
+				identity.Occurrence,
+				identity.Heading,
+			),
+			File: commentSource,
+		})
+	}
+	for _, identity := range scan.replanRequired {
+		result.Errors = append(result.Errors, ValidationIssue{
+			Severity: SeverityError,
+			Message: fmt.Sprintf(
+				"unit occurrence %d with heading %q has an unresolved re-plan marker",
+				identity.Occurrence,
+				identity.Heading,
+			),
+			File: commentSource,
+		})
+	}
+}
+
+func matchingEvidenceCommentForUnit(
+	identity queueUnitIdentity,
+	unit queueUnit,
+	expectedDigest string,
+	units []queueUnit,
+	comments []continuedComment,
+	used map[int]bool,
+) (int, bool) {
+	for i, comment := range comments {
+		if used[i] {
+			continue
+		}
+		commentIdentity, kind, _, err := parseRebuildCommentRecord(comment, units)
+		if err == nil && kind == rebuildCommentEvidence && commentIdentity == identity {
+			return i, true
+		}
+	}
+	return matchingEvidenceCommentRecordsForUnit(
+		unit.Heading,
+		unit,
+		unitVerifyCommand(unit.Body),
+		comments,
+		used,
+		&identity,
+	)
+}
+
+var ghIssueView = func(root string, number int) ([]byte, error) {
+	cmd := exec.Command("gh", "issue", "view", strconv.Itoa(number),
+		"--json", "number,title,body,url,comments")
+	cmd.Dir = root
+	return cmd.Output()
+}
+
+var ghIssueList = func(root string) ([]byte, error) {
+	cmd := exec.Command("gh", "issue", "list",
+		"--label", "litespec",
+		"--state", "open",
+		"--json", "number,title,body,url,comments",
+		"--limit", "10000",
+	)
+	cmd.Dir = root
+	return cmd.Output()
+}
+
+func lintVerifyShell(block string, source string, unitHeading string) []ValidationIssue {
+	// Blank is "Verify block is empty" (existing contract, tested); isObviouslyVacuous handles comment-only and single true/: /exit 0.
+	if strings.TrimSpace(block) == "" {
+		return []ValidationIssue{{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: unit %q Verify block is empty", source, unitHeading),
+			File:     source,
+		}}
+	}
+
+	if isObviouslyVacuous(block) {
+		return []ValidationIssue{{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: unit %q Verify command is obviously vacuous; assert the unit outcome", source, unitHeading),
+			File:     source,
+		}}
+	}
+
+	bashPath, err := lookPathBash("bash")
+	if err != nil {
+		return []ValidationIssue{{
+			Severity: SeverityWarning,
+			Message:  fmt.Sprintf("%s: unit %q Verify block not syntax-checked (bash unavailable)", source, unitHeading),
+			File:     source,
+		}}
+	}
+
+	cmd := exec.Command(bashPath, "-n", "-c", block)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		trimmed := strings.TrimSpace(string(out))
+		return []ValidationIssue{{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: unit %q Verify shell syntax error: %s", source, unitHeading, trimmed),
+			File:     source,
+		}}
+	}
+
+	return nil
+}
+
+func isUnit(unit queueUnit) bool {
+	openFence := ""
+	for _, line := range unit.Body {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		if strings.HasPrefix(line, "Done means:") || strings.HasPrefix(line, "Verify:") {
+			return true
+		}
+	}
+	return false
+}
+
+// verifyCommandSpan records how a unit declares its Verify command, with
+// exactly the semantics validate applies: the first Verify: label outside
+// code fences, then either an inline backtick command or the first
+// terminated fenced block after the label.
+type verifyCommandSpan struct {
+	found     bool
+	inline    string
+	fenced    string
+	hasFenced bool
+}
+
+func locateVerifyCommand(body []string) verifyCommandSpan {
+	var span verifyCommandSpan
+	openFence := ""
+	for i, line := range body {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		if !strings.HasPrefix(line, "Verify:") {
+			continue
+		}
+		span.found = true
+		rest := strings.TrimSpace(line[len("Verify:"):])
+		firstBacktick := strings.Index(rest, "`")
+		lastBacktick := strings.LastIndex(rest, "`")
+		if firstBacktick >= 0 && lastBacktick > firstBacktick {
+			span.inline = strings.TrimSpace(rest[firstBacktick+1 : lastBacktick])
+		}
+		for j := i + 1; j < len(body); j++ {
+			delimiter := fenceDelimiter(body[j])
+			if delimiter == "" {
+				continue
+			}
+			for k := j + 1; k < len(body); k++ {
+				if strings.TrimSpace(body[k]) == delimiter {
+					span.hasFenced = true
+					span.fenced = strings.Join(body[j+1:k], "\n")
+					break
+				}
+			}
+			break
+		}
+		break
+	}
+	return span
+}
+
+func isCheckboxLine(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	for _, checkbox := range []string{"- [ ]", "- [x]", "- [X]"} {
+		if trimmed == checkbox || strings.HasPrefix(trimmed, checkbox+" ") {
+			return true
+		}
+	}
+	return false
+}
+
+func parseDepends(body []string) []string {
+	var deps []string
+	openFence := ""
+	for _, line := range body {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		if !strings.HasPrefix(line, "Depends:") {
+			continue
+		}
+		rest := strings.TrimSpace(line[len("Depends:"):])
+		for _, part := range strings.Split(rest, ",") {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				deps = append(deps, part)
+			}
+		}
+		break
+	}
+	return deps
+}
+
+func validateQueueOwnership(body string, source string) []ValidationIssue {
+	type ownershipLine struct {
+		value         string
+		beforeHeading bool
+	}
+
+	var bases []ownershipLine
+	var branches []ownershipLine
+	beforeHeading := true
+	openFence := ""
+	for _, line := range strings.Split(body, "\n") {
+		if consumeMarkdownFenceLine(&openFence, line) {
+			continue
+		}
+		if strings.HasPrefix(line, "## ") {
+			beforeHeading = false
+		}
+		if strings.HasPrefix(line, "Base:") {
+			bases = append(bases, ownershipLine{
+				value:         strings.TrimSpace(strings.TrimPrefix(line, "Base:")),
+				beforeHeading: beforeHeading,
+			})
+		}
+		if strings.HasPrefix(line, "Branch:") {
+			branches = append(branches, ownershipLine{
+				value:         strings.TrimSpace(strings.TrimPrefix(line, "Branch:")),
+				beforeHeading: beforeHeading,
+			})
+		}
+	}
+
+	var issues []ValidationIssue
+	if len(bases) != 1 {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: expected exactly one Base: ownership line in the queue", source),
+			File:     source,
+		})
+	} else if !bases[0].beforeHeading {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: Base: ownership line must appear before the first ## heading", source),
+			File:     source,
+		})
+	} else if !queueBasePattern.MatchString(bases[0].value) {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: Base: must contain a full 40- or 64-character hexadecimal commit ID", source),
+			File:     source,
+		})
+	}
+
+	if len(branches) != 1 {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: expected exactly one Branch: ownership line in the queue", source),
+			File:     source,
+		})
+	} else if !branches[0].beforeHeading {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: Branch: ownership line must appear before the first ## heading", source),
+			File:     source,
+		})
+	} else if !queueBranchPattern.MatchString(branches[0].value) {
+		issues = append(issues, ValidationIssue{
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("%s: Branch: must match litespec/<kebab-change-name>", source),
+			File:     source,
+		})
+	}
+
+	return issues
+}
+
+func ValidateQueueBody(body string, source string) ([]queueUnit, []ValidationIssue) {
+	all := parseQueueUnits(body)
+	units := make([]queueUnit, 0, len(all))
+	for _, u := range all {
+		if isUnit(u) {
+			units = append(units, u)
+		}
+	}
+	issues := validateQueueOwnership(body, source)
+	identities := queueUnitIdentities(units)
+
+	for unitIndex, unit := range units {
+		if strings.TrimSpace(unit.Heading) == "" {
+			issues = append(issues, ValidationIssue{
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("%s: empty unit heading", source),
+				File:     source,
+			})
+		}
+
+		doneFound := false
+		checkboxFound := false
+		fencedBlock := ""
+		constraintsCount := 0
+		readFirstCount := 0
+		constraintsIdx := -1
+		readFirstIdx := -1
+		constraintsRest := ""
+		readFirstRest := ""
+
+		for i, line := range unit.Body {
+			if consumeMarkdownFenceLine(&fencedBlock, line) {
+				continue
+			}
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "Constraints:") {
+				constraintsCount++
+				if constraintsIdx == -1 {
+					constraintsIdx = i
+					constraintsRest = strings.TrimSpace(strings.TrimPrefix(trimmed, "Constraints:"))
+				}
+			}
+			if strings.HasPrefix(trimmed, "Read first:") {
+				readFirstCount++
+				if readFirstIdx == -1 {
+					readFirstIdx = i
+					readFirstRest = strings.TrimSpace(strings.TrimPrefix(trimmed, "Read first:"))
+				}
+			}
+			if strings.HasPrefix(line, "Done means:") {
+				doneFound = true
+			}
+			if isCheckboxLine(line) {
+				checkboxFound = true
+			}
+		}
+
+		verify := locateVerifyCommand(unit.Body)
+		verifyFound := verify.found
+		inlineVerify := verify.inline != ""
+		inlineVerifyContent := verify.inline
+		hasFencedBlock := verify.hasFenced
+		verifyBlock := verify.fenced
+
+		issues = append(issues, validateOptionalField(unit.Body, "Constraints", constraintsCount, constraintsIdx, constraintsRest, source, unit.Heading)...)
+		issues = append(issues, validateOptionalField(unit.Body, "Read first", readFirstCount, readFirstIdx, readFirstRest, source, unit.Heading)...)
+		issues = append(issues, validateUnitScenarioMapping(unit, source)...)
+		issues = append(issues, validateUnitBoundaryRiskAccounting(unit, source)...)
+
+		if !doneFound {
+			issues = append(issues, ValidationIssue{
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("%s: unit %q missing Done means:", source, unit.Heading),
+				File:     source,
+			})
+		}
+		if !verifyFound {
+			issues = append(issues, ValidationIssue{
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("%s: unit %q missing Verify:", source, unit.Heading),
+				File:     source,
+			})
+		} else if !inlineVerify && !hasFencedBlock {
+			issues = append(issues, ValidationIssue{
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("%s: unit %q Verify: not followed by a command or fenced code block", source, unit.Heading),
+				File:     source,
+			})
+		} else if hasFencedBlock {
+			issues = append(issues, lintVerifyShell(verifyBlock, source, unit.Heading)...)
+		} else if inlineVerify {
+			if isObviouslyVacuous(inlineVerifyContent) {
+				issues = append(issues, ValidationIssue{
+					Severity: SeverityError,
+					Message:  fmt.Sprintf("%s: unit %q Verify command is obviously vacuous; assert the unit outcome", source, unit.Heading),
+					File:     source,
+				})
+			}
+		}
+		if !checkboxFound {
+			issues = append(issues, ValidationIssue{
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("%s: unit %q missing checkbox", source, unit.Heading),
+				File:     source,
+			})
+		}
+		evidenceIssues := validateCheckedUnitEvidenceForIdentity(unit, source, &identities[unitIndex])
+		for i := range evidenceIssues {
+			evidenceIssues[i].queueUnitIndex = unitIndex
+		}
+		issues = append(issues, evidenceIssues...)
+	}
+
+	headings := make(map[string]bool, len(units))
+	for _, u := range units {
+		headings[u.Heading] = true
+	}
+
+	for i := range units {
+		deps := parseDepends(units[i].Body)
+		units[i].Depends = deps
+		seen := make(map[string]bool, len(deps))
+		for _, dep := range deps {
+			if seen[dep] {
+				continue
+			}
+			seen[dep] = true
+			if !headings[dep] {
+				issues = append(issues, ValidationIssue{
+					Severity: SeverityError,
+					Message:  fmt.Sprintf("%s: unit %q depends on non-existent unit %q", source, units[i].Heading, dep),
+					File:     source,
+				})
+			}
+		}
+	}
+
+	return units, issues
+}
+
+func ValidateGHIssueByNumber(root string, number int) (*ValidationResult, error) {
+	result := &ValidationResult{Valid: true}
+
+	if _, err := lookPathGh("gh"); err != nil {
+		return nil, fmt.Errorf("gh not available")
+	}
+
+	out, err := ghIssueView(root, number)
+	if err != nil {
+		return nil, fmt.Errorf("gh issue view %d failed: %w", number, err)
+	}
+
+	var issue ghIssue
+	if err := json.Unmarshal(out, &issue); err != nil {
+		return nil, fmt.Errorf("parse gh issue: %w", err)
+	}
+
+	source := fmt.Sprintf("GH issue #%d", issue.Number)
+	units, unitIssues := ValidateQueueBody(issue.Body, source)
+	result.UnitsCount += len(units)
+	var commentBodies []string
+	for _, c := range issue.Comments {
+		commentBodies = append(commentBodies, c.Body)
+	}
+	applyQueueIssues(result, "GitHub comments", units, unitIssues, commentBodies)
+	result.Valid = len(result.Errors) == 0
+	return result, nil
+}
+
+func ValidateQueueFile(path string) (*ValidationResult, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	stripped, metadataBlocks := splitLocalQueueMetadataBlocks(string(raw))
+	result := &ValidationResult{Valid: true}
+	source := fmt.Sprintf("queue file %s", path)
+	units, unitIssues := ValidateQueueBody(stripped, source)
+	result.UnitsCount += len(units)
+	applyQueueIssues(result, source, units, unitIssues, metadataBlocks)
+	result.Valid = len(result.Errors) == 0
+	return result, nil
+}
+
+func ValidateLocalQueues(root string) (*ValidationResult, error) {
+	result := &ValidationResult{Valid: true}
+
+	dir := filepath.Join(root, "specs", "queues")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return result, nil
+		}
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		sub, err := ValidateQueueFile(path)
+		if err != nil {
+			return nil, err
+		}
+		result.Errors = append(result.Errors, sub.Errors...)
+		result.Warnings = append(result.Warnings, sub.Warnings...)
+		result.UnitsCount += sub.UnitsCount
+	}
+
+	result.Valid = len(result.Errors) == 0
+	return result, nil
+}

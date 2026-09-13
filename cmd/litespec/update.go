@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bermudi/litespec/internal"
+	"github.com/bermudi/litespec/v2/internal"
 )
-
 
 func cmdUpdate(args []string) error {
 	fs := newFlagSet("update", printUpdateHelp)
@@ -21,6 +20,14 @@ func cmdUpdate(args []string) error {
 		return err
 	}
 
+	var toolIDs []string
+	if tools != "" {
+		toolIDs = splitCSV(tools)
+		if err := validateToolIDs(toolIDs); err != nil {
+			return err
+		}
+	}
+
 	root, err := requireProjectRoot()
 	if err != nil {
 		return err
@@ -30,13 +37,7 @@ func cmdUpdate(args []string) error {
 		return err
 	}
 
-	var toolIDs []string
-	if tools != "" {
-		toolIDs = splitCSV(tools)
-		if err := validateToolIDs(toolIDs); err != nil {
-			return err
-		}
-	} else {
+	if tools == "" {
 		toolIDs = internal.DetectActiveAdapters(root)
 	}
 

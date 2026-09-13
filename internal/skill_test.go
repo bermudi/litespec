@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bermudi/litespec/internal/skill"
+	"github.com/bermudi/litespec/v2/internal/skill"
 )
 
 func registerAllTemplates(t *testing.T) {
@@ -22,8 +22,16 @@ func resetTemplates() {
 	}
 }
 
+func snapshotTemplates() map[string]string {
+	snapshot := make(map[string]string, len(skill.All()))
+	for id, template := range skill.All() {
+		snapshot[id] = template
+	}
+	return snapshot
+}
+
 func TestGenerateSkills_CreatesAllSkillFiles(t *testing.T) {
-	original := skill.All()
+	original := snapshotTemplates()
 	defer func() {
 		resetTemplates()
 		for k, v := range original {
@@ -64,7 +72,7 @@ func TestGenerateSkills_CreatesAllSkillFiles(t *testing.T) {
 }
 
 func TestGenerateSkills_FrontmatterFormat(t *testing.T) {
-	original := skill.All()
+	original := snapshotTemplates()
 	defer func() {
 		resetTemplates()
 		for k, v := range original {
@@ -108,7 +116,7 @@ func TestGenerateSkills_FrontmatterFormat(t *testing.T) {
 }
 
 func TestGenerateSkills_MissingTemplate(t *testing.T) {
-	original := skill.All()
+	original := snapshotTemplates()
 	defer func() {
 		resetTemplates()
 		for k, v := range original {
@@ -128,8 +136,52 @@ func TestGenerateSkills_MissingTemplate(t *testing.T) {
 	}
 }
 
+func TestGenerateSkills_RefusesSymlinkWithoutOverwritingTarget(t *testing.T) {
+	original := snapshotTemplates()
+	defer func() {
+		resetTemplates()
+		for k, v := range original {
+			skill.Register(k, v)
+		}
+	}()
+
+	registerAllTemplates(t)
+
+	root := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "sentinel")
+	const sentinelContent = "do not overwrite\n"
+	if err := os.WriteFile(outside, []byte(sentinelContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	skillDir := filepath.Join(root, SkillsDir, Skills[0].Name)
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	skillFile := filepath.Join(skillDir, "SKILL.md")
+	if err := os.Symlink(outside, skillFile); err != nil {
+		t.Fatal(err)
+	}
+
+	err := GenerateSkills(root)
+	if err == nil {
+		t.Fatal("expected GenerateSkills to reject symlink")
+	}
+	if !strings.Contains(err.Error(), "refusing to generate skills through symlink") {
+		t.Errorf("expected clear symlink error, got: %v", err)
+	}
+
+	data, err := os.ReadFile(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != sentinelContent {
+		t.Fatalf("sentinel changed: got %q, want %q", data, sentinelContent)
+	}
+}
+
 func TestGenerateSkills_WritesResourceFiles(t *testing.T) {
-	original := skill.All()
+	original := snapshotTemplates()
 	originalResources := skill.GetResources("review")
 	defer func() {
 		resetTemplates()
@@ -168,7 +220,7 @@ func TestGenerateSkills_WritesResourceFiles(t *testing.T) {
 }
 
 func TestGenerateSkills_CleansStaleResources(t *testing.T) {
-	original := skill.All()
+	original := snapshotTemplates()
 	defer func() {
 		resetTemplates()
 		for k, v := range original {
@@ -291,7 +343,7 @@ func TestCheckStaleSkills_MixedCurrentAndStale(t *testing.T) {
 }
 
 func TestGenerateSkills_ReadonlyDir(t *testing.T) {
-	original := skill.All()
+	original := snapshotTemplates()
 	defer func() {
 		resetTemplates()
 		for k, v := range original {
@@ -310,5 +362,283 @@ func TestGenerateSkills_ReadonlyDir(t *testing.T) {
 	err := GenerateSkills(readonlyDir)
 	if err == nil {
 		t.Fatal("expected error for read-only root directory")
+	}
+}
+
+func TestGeneratedSkillsUseRedGreenEvidence(t *testing.T) {
+	root := t.TempDir()
+	if err := GenerateSkills(root); err != nil {
+		t.Fatalf("GenerateSkills: %v", err)
+	}
+
+	readFile := func(path string) string {
+		t.Helper()
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		return string(data)
+	}
+	requireContains := func(name, content string, phrases ...string) {
+		t.Helper()
+		for _, phrase := range phrases {
+			if !strings.Contains(content, phrase) {
+				t.Errorf("%s missing %q", name, phrase)
+			}
+		}
+	}
+	requireOrdered := func(name, content string, phrases ...string) {
+		t.Helper()
+		previous := -1
+		for _, phrase := range phrases {
+			index := strings.Index(content, phrase)
+			if index == -1 {
+				t.Errorf("%s missing %q", name, phrase)
+				continue
+			}
+			if index <= previous {
+				t.Errorf("%s has %q out of order", name, phrase)
+			}
+			previous = index
+		}
+	}
+	requirePolicy := func(name, content string) {
+		t.Helper()
+		requireContains(name, content,
+			"one or more implementation/fix commits",
+			"final clean commit where `Verify:` passes",
+		)
+		lower := strings.ToLower(content)
+		for _, contradiction := range []string{
+			"exactly one implementation commit",
+			"single implementation commit",
+		} {
+			if strings.Contains(lower, contradiction) {
+				t.Errorf("%s still contains contradictory policy %q", name, contradiction)
+			}
+		}
+	}
+
+	build := readFile(filepath.Join(root, SkillsDir, "litespec-build", "SKILL.md"))
+	requireContains(t.Name()+"/build", build,
+		"Run the exact `Verify:` command on the clean starting commit before implementation.",
+		"one verifier-only commit",
+		"fails because the unit outcome is absent",
+		"pre sha:",
+		"pre exit status:",
+		"Pre-evidence scope:",
+		"post sha:",
+		"post exit status: 0",
+		"Post-evidence scope:",
+		"Never amend either recorded evidence commit.",
+	)
+	requirePolicy(t.Name()+"/build", build)
+
+	reviewFixing := readFile(filepath.Join(root, SkillsDir, "litespec-build", "references", "review-fixing.md"))
+	requireOrdered(t.Name()+"/review-fixing", reviewFixing,
+		"Establish and record a clean pre commit where the exact `Verify:` fails because the fix is absent.",
+		"Only after recording that pre run, create one or more implementation/fix commits.",
+	)
+	requireContains(t.Name()+"/review-fixing", reviewFixing,
+		"post a fresh evidence receipt with the GitHub request identity, or re-check only the affected local unit",
+		"Do not reshape the unit contract",
+	)
+
+	review := readFile(filepath.Join(root, SkillsDir, "litespec-review", "SKILL.md"))
+	requireContains(t.Name()+"/review", review,
+		"After that initial body-only safety step, fetch and inspect the issue comments",
+		"pre is an ancestor of post and post is an ancestor of `HEAD`",
+		"detached temporary Git worktree at pre",
+		"detached temporary Git worktree at post",
+		"detached temporary Git worktree at `HEAD`",
+		"Run the exact `Verify:` command again at `HEAD`",
+		"Remove the `HEAD` worktree afterward even when Verify fails.",
+		"must fail because the outcome is absent",
+		"must exit 0 with the outcome present",
+		"never check out an evidence SHA in the reviewer's current worktree",
+		"does not prove that Verify targets the correct behavior",
+	)
+	requirePolicy(t.Name()+"/review", review)
+
+	for _, path := range []string{"../AGENTS.md", "../DESIGN.md", "../docs/workflow.md"} {
+		content := readFile(path)
+		requireContains(path, content,
+			"pre",
+			"post",
+			"verifier-only commit",
+			"detached temporary worktree",
+			"detached temporary worktree at `HEAD`",
+			"removed even when Verify fails",
+			"does not prove",
+		)
+	}
+
+	reviewSpec := readFile("../specs/review/spec.md")
+	requireContains("../specs/review/spec.md", reviewSpec,
+		"its own detached temporary worktree at `HEAD`",
+		"cleanup SHALL remove the `HEAD` worktree even when Verify fails",
+	)
+
+	for _, path := range []string{
+		"../AGENTS.md",
+		"../DESIGN.md",
+		"../docs/concepts.md",
+		"../docs/tutorial.md",
+		"../docs/workflow.md",
+		"../specs/decisions/0004-units-require-red-green-evidence.md",
+		"../specs/review/spec.md",
+	} {
+		content := readFile(path)
+		requirePolicy(path, content)
+	}
+}
+
+func TestGeneratedPlanSkillShapesBoundaryUnits(t *testing.T) {
+	root := t.TempDir()
+	if err := GenerateSkills(root); err != nil {
+		t.Fatalf("GenerateSkills: %v", err)
+	}
+
+	readFile := func(path ...string) string {
+		t.Helper()
+		data, err := os.ReadFile(filepath.Join(path...))
+		if err != nil {
+			t.Fatalf("read generated plan instructions: %v", err)
+		}
+		return string(data)
+	}
+	plan := readFile(root, SkillsDir, "litespec-plan", "SKILL.md")
+	clear := readFile(root, SkillsDir, "litespec-plan", "references", "clear.md")
+	instructions := plan + "\n" + clear
+	for _, phrase := range []string{
+		"one external boundary or one failure policy",
+		"Split broad demos across independent boundaries into separate units.",
+		"Boundary: <filesystem | process | network — when applicable>",
+		"- [<clause-id>] <observable outcome>",
+		"- [<clause-id>] <named test scenario>",
+		"Risk cases:",
+		"timeout:",
+		"cleanup:",
+		"non-ENOENT errors:",
+		"concurrency:",
+		"optional configured dependencies:",
+	} {
+		if !strings.Contains(instructions, phrase) {
+			t.Errorf("generated plan instructions missing %q", phrase)
+		}
+	}
+}
+
+func TestGeneratedBuildSkillConsumesScenarioContract(t *testing.T) {
+	root := t.TempDir()
+	if err := GenerateSkills(root); err != nil {
+		t.Fatalf("GenerateSkills: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, SkillsDir, "litespec-build", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read generated build skill: %v", err)
+	}
+	content := string(data)
+	for _, phrase := range []string{
+		"Treat `Done means:`, `Scenarios:`, `Boundary:`, `Risk cases:`, and `Verify:` as fixed contract fields.",
+		"Do not add, remove, rename, or remap clause IDs, scenario mappings, boundary declarations, or risk cases.",
+	} {
+		if !strings.Contains(content, phrase) {
+			t.Errorf("generated build instructions missing %q", phrase)
+		}
+	}
+}
+
+func TestGeneratedSkillsRouteRepeatedFailureToPlan(t *testing.T) {
+	root := t.TempDir()
+	if err := GenerateSkills(root); err != nil {
+		t.Fatalf("GenerateSkills: %v", err)
+	}
+	readSkill := func(name string) string {
+		t.Helper()
+		data, err := os.ReadFile(filepath.Join(root, SkillsDir, name, "SKILL.md"))
+		if err != nil {
+			t.Fatalf("read generated %s skill: %v", name, err)
+		}
+		return string(data)
+	}
+	checks := map[string][]string{
+		"litespec-review": {
+			"After two completed review-requested rebuild cycles against the current digest, record a re-plan marker instead of another rebuild request.",
+			"Re-plan required:",
+			"Unit digest: <current 64 lowercase hex digest>",
+			"Do not post a duplicate unresolved marker",
+		},
+		"litespec-build": {
+			"An unresolved `Re-plan required:` marker makes that contract unavailable to build.",
+			"Stop and route it to `litespec-plan`; do not rebuild the marked contract.",
+		},
+		"litespec-plan": {
+			"An amendment resolves an outstanding re-plan marker only when its `Old digest:` equals the marker's `Unit digest:`.",
+		},
+	}
+	for name, phrases := range checks {
+		content := readSkill(name)
+		for _, phrase := range phrases {
+			if !strings.Contains(content, phrase) {
+				t.Errorf("generated %s instructions missing %q", name, phrase)
+			}
+		}
+	}
+}
+
+func TestGeneratedReviewSkillInventoriesBeforePriorCoverage(t *testing.T) {
+	content := generatedReviewSkill(t)
+	inventory := "Before reading any prior review coverage records, construct an independent risk inventory from the current contracts."
+	priorCoverage := "Only after writing that inventory, read prior coverage records"
+	requireSkillPhrases(t, content, inventory, priorCoverage)
+	if strings.Index(content, inventory) > strings.Index(content, priorCoverage) {
+		t.Error("generated review instructions read prior coverage before constructing an independent risk inventory")
+	}
+}
+
+func TestGeneratedReviewSkillPersistsCoverage(t *testing.T) {
+	content := generatedReviewSkill(t)
+	requireSkillPhrases(t, content,
+		"For every issue review, append one coverage record keyed by the reviewed full `HEAD` SHA and each covered unit identity.",
+		"Review coverage:",
+		"HEAD: <full HEAD SHA>",
+		"Exercised:",
+		"Not exercised:",
+		"Uncertain:",
+		"<scenario>: <probe performed>",
+		"GitHub queue: post the record as a new issue comment.",
+		"Local queue: append the record after all units in a separate clean metadata commit.",
+	)
+}
+
+func TestGeneratedReviewSkillTreatsCoverageAsAdvisory(t *testing.T) {
+	content := generatedReviewSkill(t)
+	requireSkillPhrases(t, content,
+		"Use prior coverage only to expand the independent inventory and target unexercised risks.",
+		"Prior coverage is advisory only.",
+		"It does not satisfy evidence replay, suppress current investigation, resolve findings, or prove correctness.",
+	)
+}
+
+func generatedReviewSkill(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	if err := GenerateSkills(root); err != nil {
+		t.Fatalf("GenerateSkills: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, SkillsDir, "litespec-review", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read generated review skill: %v", err)
+	}
+	return string(data)
+}
+
+func requireSkillPhrases(t *testing.T, content string, phrases ...string) {
+	t.Helper()
+	for _, phrase := range phrases {
+		if !strings.Contains(content, phrase) {
+			t.Errorf("generated litespec-review instructions missing %q", phrase)
+		}
 	}
 }

@@ -1,230 +1,123 @@
 # Concepts
 
-## What a Spec IS (and ISN'T)
+litespec is built for AI-native, spec-driven development. These concepts are the foundation. For the full design rationale, see [`DESIGN.md`](https://github.com/bermudi/litespec/blob/main/DESIGN.md).
 
-A spec in litespec is not a design document. It's not a technical blueprint. It's not an implementation guide.
+## Why spec-driven development for AI agents
 
-A spec is a **contract** between what you want and how you'll know when you've got it.
+AI coding agents are great at implementation, but context is lost between sessions. A spec is a durable contract that survives the chat window. It states **what** the system must do (requirements with `SHALL` or `MUST`) and **when** it matters (named `WHEN`/`THEN` scenarios), so the next agent can verify the same thing the first agent built.
 
-**A spec IS:**
+Specs are not roadmaps, design documents, or hand-wavy intentions. They are small, load-bearing contracts for the parts of the system that break if they are wrong: CLI shapes, API surfaces, file formats, and core workflows.
 
-- A list of behavioral requirements written as testable statements
-- Each requirement backed by concrete scenarios that describe expected behavior
-- The source of truth for what "done" means for a capability
-- Something that survives implementation decisions and architectural changes
-- Written in SHALL/MUST language for clarity and testability
+## The two-lane workflow
 
-**A spec ISN'T:**
+Work is either a small fix or a new feature. The lanes differ in ceremony, not rigor.
 
-- Code or pseudocode
-- Implementation details (database schema, function signatures, etc.)
-- Prose describing how something works internally
-- A list of tasks or to-do items
-- A user-facing manual or tutorial
+### Small fix — zero ceremony
 
-Here's a requirement from litespec's own validate command:
+"Fix the typo" or "rename this function." The agent reads `specs/product.md`, the relevant `specs/<feature>/spec.md`, and `specs/decisions/` / `specs/glossary.md`; edits the code; and updates the spec in place if the contract changed. No GitHub issue, no queue.
 
-```markdown
-### Requirement: JSON Output for Validate
+### New feature — plan, then build
 
-The `litespec validate` command MUST support a `--json` flag that returns structured JSON output containing a `valid` boolean, `errors` array, and `warnings` array. Each issue MUST include `severity`, `message`, and `file` fields.
+A fuzzy idea becomes a clear issue, then a demo-able unit at a time:
 
-#### Scenario: Validate single change with JSON flag
-- **WHEN** `litespec validate <change-name> --json` is run
-- **THEN** output is valid JSON with `valid`, `errors`, and `warnings` fields
-```
+1. **Plan fuzzy** — `litespec-plan` reads the codebase, asks two or three questions, does a quick spike, and writes nothing. Ephemeral.
+2. **Plan clear** — `litespec-plan` writes the GitHub issue body: proposal, design, and queue of units. It also drafts `specs/<feature>/spec.md` if the feature is load-bearing.
+3. **Grill-me** — stress-test the plan with `litespec-plan`, pulling in codebase-design and domain-modeling references when needed.
+4. **Build one unit** — `litespec-build` records the exact `Verify:` failing for the absent outcome at a clean pre commit, implements one `## <outcome>` in one or more implementation/fix commits without amendments, records the same command passing at the final clean commit where `Verify:` passes, posts the receipt, ticks the checkbox, and stops.
+5. **Review** — `litespec-review` replays Verify at pre, post, and `HEAD` in detached temporary worktrees with guaranteed cleanup, then adversarially checks the issue + spec against the implementation. Red-green evidence does not prove the command targets the right behavior.
+6. **Close the issue** — the issue is disposable. Durable specs, decisions, and glossary stay.
 
-This spec says nothing about *how* to implement JSON serialization. It doesn't mention structs, marshaling, or stdout writing. It only describes the observable behavior from the outside.
+Unidirectional. One unit per session.
 
-## Why Spec-Driven Development Works
+## GitHub issue as the queue
 
-Writing specs before code forces you to think about **what** you're building before worrying about **how**. This ordering matters for three reasons:
-
-### 1. You catch the wrong problem early
-
-If you skip specs and jump straight to code, you might build something beautifully that solves the wrong problem. Specs surface these mismatches before you've committed to an implementation.
-
-The grilling mode in litespec's think skill exists specifically for this — relentless Q&A that resolves every branch of the design tree before a single artifact is written to disk.
-
-### 2. You have a clear test for completion
-
-Specs give you an unambiguous answer to "are we done?" When the code satisfies all scenarios in the spec, you're done. No more vague "it feels ready" or "I think that's everything."
-
-### 3. You can change implementation without changing goals
-
-Because specs are behavioral, not structural, you can refactor, optimize, or even completely rewrite the implementation and still know whether the new version satisfies the same contract.
-
-## What Makes a Good Requirement
-
-A good requirement is **testable** and **unambiguous**. Here's how litespec enforces this:
-
-### SHALL and MUST
-
-Every requirement body text must contain SHALL or MUST. This isn't pedantry — it's the difference between a wish and a contract.
-
-**Bad:**
-```markdown
-### Requirement: The validate command should support JSON
-```
-
-"Should" is soft. Does it mean "nice to have" or "non-negotiable"? How would you test failure?
-
-**Good:**
-```markdown
-### Requirement: JSON Output for Validate
-
-The `litespec validate` command MUST support a `--json` flag that returns structured JSON output containing a `valid` boolean, `errors` array, and `warnings` array.
-```
-
-Now you know exactly what success looks like.
-
-### Scenarios describe behavior, not implementation
-
-Scenarios use WHEN/THEN format to describe expected behavior in specific situations.
-
-**Bad:**
-```markdown
-#### Scenario: JSON output
-- **WHEN** json flag is set
-- **THEN** serialize the ValidationResult struct to JSON and write to stdout
-```
-
-This describes implementation, not behavior. If you change how you represent validation results internally, the spec breaks.
-
-**Good:**
-```markdown
-#### Scenario: Validate single change with JSON flag
-- **WHEN** `litespec validate <change-name> --json` is run
-- **THEN** output is valid JSON with `valid`, `errors`, and `warnings` fields
-```
-
-This describes observable behavior from the command line. Implementation can change; the spec remains valid.
-
-### One clear responsibility
-
-Each requirement should address one coherent behavior.
-
-**Bad:**
-```markdown
-### Requirement: Validate command improvements
-
-The validate command MUST support JSON output, auto-detect change names, accept bulk flags like --all and --changes, and provide disambiguation when names collide.
-```
-
-Four distinct behaviors jammed into one requirement. Which part failed a test? How do you track partial progress?
-
-**Good:** Split into four focused requirements:
+The GitHub issue body is the change: proposal, design, and queue. Each queue item is a unit:
 
 ```markdown
-### Requirement: JSON Output for Validate
-[...scenarios for JSON output...]
-
-### Requirement: Positional Name Argument
-[...scenarios for name auto-detection...]
-
-### Requirement: Bulk Validation Flags
-[...scenarios for --all, --changes, --specs...]
-
-### Requirement: Type Disambiguation
-[...scenarios for --type flag...]
+## Show graph for 2 changes
+Done means: `litespec view` shows arrows between deps
+Verify: `go test ./...` and view output contains "->"
+- [ ] pending
 ```
 
-Now each requirement can be implemented, tested, and tracked independently.
+`plan[clear]` requires a clean tree, records `Base:`, creates `litespec/<change-name>`, and records `Branch:` in the labeled GH issue. If `gh` is unavailable, it writes the same body to `specs/queues/<name>.md`. All work on that branch belongs to the issue.
 
-## Progressive Rigor
+The 64 KiB issue limit is enough because the queue contains only units, not full designs. Durable design and reasoning live in `specs/product.md`, `specs/<feature>/spec.md`, and `specs/decisions/`.
 
-litespec's workflow acknowledges that not every change needs the same level of planning upfront. That's why we have patterns:
+## Durable specs vs. ephemeral issues
 
-**Quick Feature**: You know exactly what you need. Small scope. Run through think (grilling briefly), plan, build, done.
+**Durable (curated, small):**
 
-**Exploratory**: You're investigating a problem space. The first few iterations might be vague. Use think (exploration and grilling modes) heavily to figure out the shape before planning.
+- `specs/product.md` — mental models, flows, and what the project is and isn't.
+- `specs/<feature>/spec.md` — load-bearing contracts. Edited directly.
+- `specs/decisions/NNNN-<slug>.md` — durable rulings. `spine: true` marks load-bearing ones.
+- `specs/glossary.md` — ubiquitous language.
 
-**Adopt**: You have existing code with no spec. Work backward — reverse-engineer specs from the implementation (plan's adopt mode), then use those as baseline for future changes.
+**Disposable (closed after the work ships):**
 
-The key is that **rigor scales with uncertainty**. If you're adding a simple flag to an existing command, you don't need a week of grilling. If you're designing a new capability from scratch, you might need multiple explore sessions before you're ready to propose.
+- GitHub issues and their comments.
 
-## When to Use Litespec (and When Not To)
+Rule of thumb from `DESIGN.md`: if being stale would mislead a new person or agent, keep it. Otherwise it goes in the issue and is closed when done.
 
-### Use litespec for:
+## Direct spec edits
 
-- **Features and capabilities**: New commands, significant behavior changes, capabilities that will live for a while
-- **Projects with multiple contributors**: Specs become shared understanding and a contract that outlives any one person's memory
-- **Long-lived code**: If you'll be maintaining this code for months or years, invest in specs now to pay dividends later
-- **Teams where context transfer matters**: When someone new joins, specs are the fastest way to understand what the system does
+There is no staging file for spec changes. Small fixes and new features edit `specs/<feature>/spec.md` directly. If a requirement changes, change the file. If a feature is load-bearing, create the file.
 
-### Don't use litespec for:
+A spec uses this format:
 
-- **One-off scripts and throwaway code**: If it's running once and deleted, specs are overhead
-- **Trivial refactors**: Renaming a variable, extracting a helper — tests are sufficient
-- **Experiments and prototypes**: When you don't know what you're building yet, specs will just slow you down. Prototype first, spec later if it sticks
-- **Solo projects with short lifespans**: If you're the only person touching the code and it'll be gone in a week, your brain is the spec
-
-The threshold is: **will anyone else need to understand this code in 6 months?** If yes, write a spec.
-
-## Good Specs vs Bad Specs
-
-### Example 1: Adding a completion command
-
-**Bad:**
 ```markdown
-### Requirement: Shell completions
+# <feature>
 
-The tool should provide shell completions for bash, zsh, and fish to make it easier to use.
+## Requirements
+
+### Requirement: <name>
+Body must contain SHALL or MUST.
+
+#### Scenario: <short name>
+- **WHEN** <condition>
+- **THEN** <outcome>
 ```
 
-Vague. No SHALL/MUST. "Make it easier to use" is subjective. How do you test this?
+Each load-bearing requirement has a `SHALL` or `MUST` body and at least one named `WHEN`/`THEN` scenario.
 
-**Good:**
+Good specs make an observable promise; bad specs leave the implementation to guess:
+
 ```markdown
-### Requirement: Shell Completion Generation
+Bad: The dashboard should be fast and intuitive.
 
-The `litespec completion <shell>` command MUST print a valid shell completion script to stdout for the specified shell (bash, zsh, or fish). The script MUST provide completions for all commands and their arguments.
+Good:
+### Requirement: Queue-only dashboard
+`litespec view` SHALL list only open issues labeled `litespec`.
 
-#### Scenario: Bash completion script
-- **WHEN** `litespec completion bash` is run
-- **THEN** a valid bash completion script is printed to stdout
-
-#### Scenario: Invalid shell
-- **WHEN** `litespec completion invalid-shell` is run
-- **THEN** an error is printed listing supported shells
+#### Scenario: Unlabeled issue
+- **WHEN** the repository has an unrelated open issue
+- **THEN** `litespec view` does not list it
 ```
 
-Observable behavior. Testable. Clear success criteria.
+## Convention over configuration
 
-### Example 2: Status command changes
+litespec has no config file. Conventions are enough:
 
-**Bad:**
-```markdown
-### Requirement: Positional arguments
+- `specs/` is where durable docs live.
+- `.agents/skills/` is the canonical skill directory.
+- `.claude/skills/` is a symlink for Claude Code.
+- `litespec view` auto-detects `gh` and the GitHub remote.
+- Tool adapters are discovered by scanning symlinked skill directories.
 
-The status command should accept a positional argument instead of the --change flag to be consistent with other commands.
-```
+Adapters are added only when a concrete need appears.
 
-"Consistent with other commands" is design rationale, not behavior. What exactly does the command do?
+## Three lean skills
 
-**Good:**
-```markdown
-### Requirement: Positional Name for Status
+AI skills are generated by `litespec update` into `.agents/skills/`. They are short, directive, and progressive: details live in `references/` and are loaded only when the branch applies.
 
-The `litespec status` command MUST accept an optional positional `<name>` argument instead of `--change <name>`. When provided, it shows artifact state for that specific change. When omitted, it shows all changes.
+| Skill | What it does |
+|-------|--------------|
+| `litespec-plan` | Fuzzy exploration, clear issue writing, grilling, codebase design, and domain modeling. |
+| `litespec-build` | One unit at a time. Record red at pre and green at post, post the receipt, tick the box, stop. |
+| `litespec-review` | Replay pre/post/HEAD evidence, then adversarially review the issue + spec against the implementation. |
 
-#### Scenario: Status for a named change
-- **WHEN** `litespec status my-feature` is run
-- **THEN** artifact state for `my-feature` is shown
+These are the only generated skills. Project-specific skills are tracked directly in `.agents/skills/` and are not generated by the CLI.
 
-#### Scenario: Status with no arguments
-- **WHEN** `litespec status` is run
-- **THEN** all active changes are listed
+## The bottom line
 
-#### Scenario: Status for nonexistent change
-- **WHEN** `litespec status nonexistent` is run
-- **THEN** an error is printed to stderr indicating the change was not found with exit code 1
-```
-
-Every scenario describes concrete input and output. No ambiguity about what happens in each case.
-
-## The Bottom Line
-
-Specs aren't about ceremony. They're about **communication** — between your present self and your future self, between you and your teammates, between what you want and what you build.
-
-Write them like you're writing a contract. Test them like you're verifying that contract. When they're done, they become the foundation for everything that follows.
+litespec gives AI agents a durable, verifiable contract to work against and a lean workflow that keeps the contract aligned with the code. The GitHub issue carries the temporary plan; the `specs/` directory carries the durable truth.

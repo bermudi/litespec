@@ -1,246 +1,204 @@
-# litespec — Design Document
+# litespec v2 — Design (draft lean)
 
-AI-native spec-driven development tool. A leaner, opinionated reimagining of [OpenSpec](https://github.com/Fission-AI/OpenSpec).
+> Lean cut. Comment inline — this is for red pen.
 
 ## Stack
 
-- **Language:** Go
-- **Module:** `github.com/bermudi/litespec`
-- **Binary:** `litespec`
+- Go 1.26.1+, `github.com/bermudi/litespec/v2`, binary `litespec`
+- No config file. Convention over config.
 
-## Directory Structure
+## Directory
 
 ```
 project/
 ├── specs/
-│   ├── glossary.md              # ubiquitous language (optional)
-│   ├── backlog.md               # parked items and future ideas (optional)
-│   ├── canon/                    # source of truth (accepted capabilities)
-│   │   └── <capability>/
-│   │       └── spec.md
-│   ├── decisions/               # architectural decision records (optional)
-│   │   └── NNNN-<slug>.md
-│   └── changes/                  # active changes
-│       ├── <name>/
-│       │   ├── .litespec.yaml    # metadata (schema + timestamp)
-│       │   ├── proposal.md       # why & what
-│       │   ├── design.md         # how (technical decisions)
-│       │   ├── tasks.md          # phased implementation checklist
-│       │   └── specs/            # delta specs
-│       │       └── <capability>/
-│       │           └── spec.md
-│       └── archive/              # implemented changes (YYYY-MM-DD-<name>/)
-│           └── <date>-<name>/
-│               ├── .litespec.yaml
-│               ├── proposal.md
-│               ├── design.md
-│               └── tasks.md      # planning artifacts
-└── .agents/skills/               # generated skills (canonical)
-    ├── litespec-think/
-    ├── litespec-plan/
+│   ├── product.md          # mental models + 2-3 flows (human + agent, agent-maintained)
+│   ├── glossary.md         # optional, curated terms (from mattpocock)
+│   ├── decisions/
+│   │   └── NNNN-slug.md    # durable rulings, see below
+│   └── <feature>/
+│       └── spec.md         # only load-bearing features/contracts (optional)
+└── .agents/skills/
+    ├── litespec-plan/      # fuzzy + clear, see Skills
     ├── litespec-build/
-    ├── litespec-review/
-    └── research-<topic>/         # research skills (optional, produced during build)
+    └── litespec-review/
 ```
 
-## Workflow
+Notes:
+- No `canon/`. `specs/<feature>/spec.md` is the durable spec when needed.
+- No `backlog.md`. GH issues is the backlog.
+- No `QUEUE.md` in v2 lean. GH issue body is proposal + design + queue. Local queue fallback is `specs/queues/<name>.md` when `gh` is unavailable.
 
-Unidirectional flow:
+## What lives forever vs what gets deleted
 
+**Durable (curated, small):**
+- `product.md` — what we are, what we aren't, how we think, 2-3 flows
+- `specs/<feature>/spec.md` — promises that break things if wrong (CLI, API shape, file formats)
+- `decisions/` — why we chose a hard path
+- `glossary.md` — shared words
+
+**Disposable (deleted after merge):**
+- GH issues (closed) and issue comments
+
+Test: if being stale would mislead a new person/agent, keep it. Else delete after merge.
+
+## Two lanes
+
+**Small fix — zero ceremony:**
+You say "fix typo" -> agent reads product + relevant spec + decisions/glossary -> edits code -> updates the one `specs/<feature>/spec.md` if it was a contract change -> done. No issue required.
+
+**New feature / greenfield (plan fuzzy -> clear):**
 ```
-explore → grill → propose → apply → review → archive
-                                    │
-                                adopt (separate path)
-
-patch → archive  (lightweight lane for small, single-capability changes)
+you: "add X" -> plan[fuzzy] (read code, grill by default — references/fuzzy.md loads references/grilling.md; no files)
+          -> plan[clear] (start clean, create isolated branch, write GH issue + units; draft spec if load-bearing)
+          -> you: "looks good" (grilling happened in fuzzy) or "grill-me" (more grilling with references/grilling.md)
+          -> build: one unit at a time (see unit rule)
+          -> review: triage findings into lanes
+          -> fix per lane (rebuild unit via build, or small fix lane)
+          -> close GH issue
 ```
 
-No backward flow. If something is wrong after propose, start over from explore/grill. Research happens inline during apply — when the agent hits a knowledge gap, it pauses to gather docs and optionally produces a research skill file. Fix happens inline during build — addressing review findings is a workflow within the build skill, not a separate phase.
+Each queue issue owns a dedicated `litespec/<change-name>` branch. `plan[clear]` requires a clean tree, captures `Base:`, creates the branch, and records `Branch:`. Auto-loaded harness/repository instructions are review's trusted bootstrap boundary. After activation, review initially reads only the remote issue; every additional local queue, contract, implementation, and reference path is screened with its parent components before content access. Unsafe paths stop review. Unrelated work uses another branch or worktree.
 
-**Patch lane:** `litespec patch <name> <capability>` creates a delta-only change with `mode: patch` in `.litespec.yaml`. No planning artifacts (proposal, design, tasks). The delta is the contract. `IsPatchMode(root, name)` reads the metadata and returns true when `mode == "patch"`. Patch-mode changes are reflected in `LoadArtifactStates` (returns only `{specs: DONE}`), `status` (shows only specs line + "(patch mode)"), `view` (separate "Patch Changes" section with ◆ bullet), and JSON output (`mode: "patch"` field).
+Review routing is ordered: suggestion; unit violation; in-scope finding outside units; out-of-scope finding. DISPUTED is terminal non-blocking. CRITICAL/WARNING inside issue scope blocks even when no unit covers it. Evidence cross-check (red-green receipt, pre→post→HEAD ancestry, three re-runs) remains part of review. Review first constructs an independent risk inventory, then consults append-only HEAD-keyed coverage records and persists a new advisory record. A unit violation produces a rebuild request only while fewer than two rebuild cycles completed against the current unit digest. The next violation records `Re-plan required:` and plan must amend/reshape that contract before build continues. GitHub metadata lives in comments; local metadata is appended after all units in a clean metadata commit. The issue closes only when every unit is checked, every rebuild request, re-plan marker, and amendment is resolved, and review returns `PASS`.
 
-## Skills
+`grill-me` is a skill reference, not a CLI. `plan` owns spec drafting in clear mode: if the feature is load-bearing, it writes/updates `specs/<feature>/spec.md` alongside the issue.
 
-| Skill | Stance | Behavior |
-|-------|--------|----------|
-| `think` | No artifacts, freeform conversation | Explores ideas, stress-tests plans, detects workflow phase and suggests next steps. Merges former explore, grill, and workflow skills. |
-| `plan` | Materializes artifacts to disk | Creates or updates change proposals, specs, designs, tasks. Detects patch mode (skips planning artifacts) and adopt mode (reverse-engineers specs from code). Includes glossary management. Merges former propose, patch, adopt, and glossary skills. |
-| `build` | Implements code | Implements tasks per phase in `tasks.md`. One phase per invocation. Handles fix workflow for review findings (CRITICAL → WARNING → SUGGESTION). Pauses on knowledge gaps to gather docs and optionally produce research skills. Merges former apply and fix skills. |
-| `review` | Adversarial outsider | Context-aware review that adapts to change lifecycle: artifact review (0 tasks checked — evaluates planning artifacts), implementation review (some tasks checked — runs adversarial review then compliance review), pre-archive review (all tasks checked — adversarial + compliance + archive readiness + build verification). Adversarial review runs first to avoid anchoring bias. Pure AI review — no test/lint running (except build verification in pre-archive mode). |
+## Unit rule
 
-## Tasks (Phased)
+One unit = one external boundary or one failure policy + one `Verify:` that would fail if it is missing. A broad demo crossing independent boundaries must split.
 
-Tasks are organized into phases for focused implementation:
+Every `Done means:` clause is a bullet carrying a unique bracketed ID. Required `Scenarios:` entries map every clause ID to at least one named test scenario. Filesystem, process, and network units declare `Boundary:` and a `Risk cases:` matrix covering timeout, cleanup, non-ENOENT errors, concurrency, and optional configured dependencies; each risk maps to a scenario ID or gives a concrete N/A reason. Validate checks mapping shape and references, while plan/review judge whether boundaries were omitted and tests are adequate. Optional `Read first:`, `Constraints:`, and `Depends:` retain their current meanings. All contract fields participate in the unit digest. New receipts use the ordered `Protocol: evidence/v1`, `Digest algorithm: unit-contract-sha256-v1`, and content-derived `Receipt ID:` headers; complete unversioned receipts remain on the legacy parser and derive an in-memory legacy ID. Superseded receipts are validated against their own declared protocol, Verify command, and digest algorithm, with raw-output chunks repeating the parsed receipt identity; only an explicit amendment chain may connect them to the current contract, while current-digest receipts must match current Verify exactly.
+
+Evidence protocol remains one exact command: build records a meaningful non-zero run on a clean pre commit, creating at most one verifier-only commit when needed, then creates one or more implementation/fix commits. Post is the final clean commit where `Verify:` passes. New receipts declare their parser and digest versions immediately after `Evidence:`; their content-derived IDs exclude wrappers and continuation boundaries, while unknown or partial metadata never falls back and legacy receipts remain readable. Review replays Verify in a detached temporary worktree at pre, post, and a detached temporary worktree at `HEAD`; all are removed even when Verify fails. Red-green evidence does not prove that Verify targets the right behavior, so scenario mapping and adversarial review remain required. A unit may complete at most two review-requested rebuild cycles against one current contract digest. On the next unit-breaking finding, review records a digest-bound `Re-plan required:` marker instead of another rebuild request. Build refuses that marker. Plan resolves it only through an amendment from the marked digest, narrowing/renaming the unit and appending units as needed. The amendment resets rebuild counting for its new digest and remains unresolved until fresh evidence; that amendment evidence does not consume a review-requested rebuild cycle. Before any unit is filed, plan dry-runs its Verify on the base tree: an honest result is non-zero (outcome or verifier missing) or green only for a test run where every named file actually executed, because test runners silently skip named files that do not match their discovery patterns. A receipt that exceeds GitHub's 65,536-character comment limit continues into the immediately following comment: fields split after a scope line; a raw pre/post block that alone exceeds the limit uses repeated identity-bearing `Raw output chunk:` records with consecutive `Chunk: <n>/<total>` fields and closed fenced payloads concatenated without inserted bytes. Each full comment ends with the literal marker `Receipt continues in next comment (GitHub comment size limit).`; fenced output is never truncated. Validate joins only the literal next comment before scanning; a blank/intervening, dangling, duplicated, misordered, or wrong-identity continuation is a visible incomplete-receipt error. Before filing, plan cross-checks each unit outcome against earlier units in the same queue: an outcome an earlier unit delivers or is constrained to preserve is never re-delivered — it becomes a regression-pin unit whose outcome is the named tests, with a Verify that fails while the pin is absent, or it is dropped.
+
+Review coverage is append-only metadata keyed to reviewed HEAD and unit identity. A fresh reviewer drafts risks independently before reading earlier records, then uses them to expand unexercised paths. Coverage is advisory: it does not satisfy receipts, suppress current investigation, or prove correctness. GitHub stores metadata in comments; local queues use an append-only metadata stream after all units.
+
+In a queue body — immutable `Base:` and `Branch:` lines above the units, then:
+```markdown
+## Terminate timed-out probe process trees
+Boundary: process
+Done means:
+- [tree-timeout] A timed-out probe terminates its descendants
+Scenarios:
+- [tree-timeout] TestProbeTimeoutTerminatesDescendants
+Risk cases:
+- timeout: [tree-timeout]
+- cleanup: [tree-timeout]
+- non-ENOENT errors: N/A — no filesystem lookup
+- concurrency: N/A — each probe owns its process tree
+- optional configured dependencies: N/A — probe is mandatory once selected
+Verify: `go test ./... -run TestProbeTimeoutTerminatesDescendants`
+- [ ] pending
+```
+
+Agent ticks by checking the box. No `tasks.md`.
+
+## Spec format (only for load-bearing)
 
 ```markdown
-## Phase 1: Foundation
-- [ ] Set up database schema
-- [ ] Create migration
+# <feature>
 
-## Phase 2: Core Logic
-- [ ] Implement auth service
-- [ ] Add middleware
-
-## Phase 3: Integration
-- [ ] Wire up routes
-- [ ] Add error handling
-```
-
-Phase tracking is derived from `tasks.md` — no metadata field. The first phase with unchecked tasks is the current phase.
-
-## Delta Spec System
-
-Full delta operations with semantic merging:
-
-| Operation | Syntax | Merge Behavior |
-|-----------|--------|----------------|
-| `ADDED` | `## ADDED Requirements` | Append to end of main spec |
-| `MODIFIED` | `## MODIFIED Requirements` | Replace matching requirement by header |
-| `REMOVED` | `## REMOVED Requirements` | Delete from main spec |
-| `RENAMED` | `## RENAMED Requirements` | Change section header, preserve content |
-
-Applied in strict order at archive time:
-1. `RENAMED` — establishes correct headers for subsequent operations
-2. `REMOVED` — eliminates requirements before modifications
-3. `MODIFIED` — updates remaining requirements
-4. `ADDED` — appends new requirements
-
-### Improvement over OpenSpec: Dangling Delta Detection
-
-`validate` catches dangling deltas — MODIFIED/REMOVED operations referencing requirements that don't exist in the target spec. OpenSpec only fails on these at archive time. litespec catches them during validation.
-
-### Canonical Spec Format
-
-Canonical specs (`specs/canon/<capability>/spec.md`) use this structure:
-
-```markdown
-# <capability>
-
-## Purpose               ← optional
-
-## Requirements          ← required
+## Requirements
 
 ### Requirement: <name>
-<body text — must contain SHALL or MUST>
+Body must contain SHALL or MUST.
 
 #### Scenario: <short name>
 - **WHEN** <condition>
-- **THEN** <expected outcome>
+- **THEN** <outcome>
 ```
 
-- `## Purpose` is optional prose before requirements. If present, `SerializeSpec` emits it.
-- `## Requirements` is required — all `### Requirement:` blocks must appear inside it.
-- No other H2 sections are permitted between H1 and `## Requirements`.
+ADDED/MODIFIED not needed — edit the file directly. Small fix edits it, greenfield creates it.
 
-### Scenarios
+## Decisions
 
-Each requirement has named scenarios (`#### Scenario: <name>`) with WHEN/THEN format. Scenarios describe expected behavior — the format is opaque text, not parsed structurally.
+File: `specs/decisions/NNNN-slug.md`
 
-Rules:
-- ADDED and MODIFIED requirements must have at least one scenario
-- ADDED and MODIFIED requirement body text must contain `SHALL` or `MUST`
-- REMOVED requirements are name-only — no body or scenarios
-- RENAMED requirements preserve content and scenarios under the new name
+```markdown
+# Title
 
+## Status
+proposed | accepted | superseded
 
-
-## Artifact Dependency Graph
-
-```
-proposal ──────► specs ──┐
-     │                   ├──► tasks
-     └──► design ────────┘
+## Context
+## Decision
+## Consequences
 ```
 
-States:
-- **BLOCKED** — dependencies not yet satisfied
-- **READY** — all dependencies exist, artifact does not
-- **DONE** — artifact file exists on disk
+Optional frontmatter: `spine: true` for load-bearing. `validate` checks sections, `view` stars spine.
 
-## Tool Integration
+No `litespec decide` command. `touch` + `validate` is enough.
 
-- **Canonical location:** `.agents/skills/` — SKILL.md with YAML frontmatter
-- **Thin adapter layer:** Optional generation of tool-specific commands via `litespec init --tools claude,cursor,...`
-- Skills are lean — minimal token usage, no boilerplate
+### When to write one
 
-## Configuration
+The bar is high, on purpose. A decision closes off a road someone will reasonably propose again — the signal is explaining *why not* rather than *how*. Both must hold:
 
-Convention over configuration. No config file. All defaults baked in. If a need arises later, add it then.
+1. **Real contention.** Someone argued for the other road, or demonstrably will — it's the obvious default. A road closed by argument during grilling counts by construction.
+2. **No better home.** Reasoning that fits at the line that would change is a comment there, not a decision. Decisions hold reasoning that spans files, or argues against a road with no single line to attach to.
 
-Tool adapters are auto-detected by scanning for symlinks in adapter skill directories (e.g., `.claude/skills/`) that point into `.agents/skills/`.
+When in doubt, don't — a decisions directory that reads like a changelog has stopped being useful. `Context` records what was actually measured; `Consequences` state what would justify revisiting.
 
-## CLI Commands
+### Layering
 
-| Command | Purpose |
-|---------|---------|
-| `litespec init [--tools ...]` | Scaffold `specs/` dir + generate skills (+ optional tool-specific commands) |
-| `litespec new <name>` | Create a new change directory with `.litespec.yaml` metadata |
-| `litespec patch <name> <capability>` | Create a patch-mode change (delta-only) |
-| `litespec decide <slug>` | Create architectural decision record |
-| `litespec validate [<name>] [--all|--changes|--specs|--decisions] [--type change|spec|decision] [--strict]` | Validate artifact structure, delta syntax, dangling deltas, dependency cycles/overlaps, and decision records |
-| `litespec status [<name>]` | Show artifact graph state (BLOCKED/READY/DONE), review mode, and suggested next step. JSON output includes `reviewMode` (artifact/implementation/pre-archive), `suggestedNextStep` (plan/build/review), and `isNewProject` (for all-changes view). |
-| `litespec instructions <artifact>` | Return artifact-specific instructions for AI to create an artifact |
-| `litespec list [--specs|--changes|--decisions|--backlog] [--sort name|recent|deps|number] [--status <state>]` | List specs, changes, decisions, or backlog items (deps sort uses topological order, number sort is for decisions) |
-| `litespec view` | Display dashboard overview with progress bars, specs, changes (draft/active/ready-to-archive), and dependency graph |
-| `litespec update [--tools ...]` | Regenerate skills and adapter symlinks. Stale `litespec-*` skill directories (from previous versions) are removed automatically. Non-litespec directories (e.g., `skill-creator`, `the-drill`, `research-*`) are preserved. |
-| `litespec archive <change> [--allow-incomplete]` | Apply deltas to canon + move to archive (marks change as implemented; errors if unarchived dependencies exist) |
-| `litespec preview <change> [--json]` | Preview what archive would do to canonical specs without making changes |
-| `litespec completion <shell>` | Print shell completion script (bash, zsh, fish) |
-| `litespec __complete <words...>` | Hidden backend for dynamic shell completions |
-| `litespec upgrade` | Check for latest version and upgrade via `go install` |
-| `litespec import --source <dir> [--dry-run] [--force]` | Import an OpenSpec project to litespec format |
-
-## Archive Behavior
-
-Archiving a change **promotes it to implemented**: deltas are merged into canonical specs (the source of truth), and the change directory is moved to the archive. Until a change is archived, its deltas are tentative — not part of the canonical spec.
-
-`litespec archive <change>` performs these steps in order:
-
-1. **Validate** — run `ValidateChange` (artifacts exist, delta syntax valid, no dangling deltas)
-2. **Check dependencies** — error if the change has unarchived dependencies; warn with `--allow-incomplete`
-3. **Check tasks** — all checkboxes must be checked, unless `--allow-incomplete`
-4. **Merge deltas** — apply RENAMED→REMOVED→MODIFIED→ADDED into `specs/canon/<capability>/spec.md`
-5. **Move** — relocate the change directory to `specs/changes/archive/<YYYY-MM-DD>-<name>/`
-
-The archive operation is transactional: the change is moved to the archive first, then canonical specs are written atomically. If the write fails, the change is restored from archive.
-
-## Change Metadata
-
-Each change directory contains `.litespec.yaml`:
-
-```yaml
-schema: spec-driven
-created: "2026-03-31T10:30:00Z"
-dependsOn:          # optional — list of change names this change depends on
-  - parent-change
-```
-
-Minimal. No phase tracking — derived from `tasks.md`. The `dependsOn` field is optional and establishes prerequisite relationships between changes.
-
-## Change Dependencies
-
-Changes can declare optional `dependsOn` relationships in `.litespec.yaml`. This enables:
-
-- **Cycle detection** — `validate --changes` and `validate --all` detect circular dependencies
-- **Overlap detection** — validates that changes sharing a dependency don't modify the same capability requirements
-- **Topological sorting** — `list --changes --sort deps` orders changes by dependency (level-by-level BFS, alphabetical within each level); falls back to alphabetical on cycles
-- **Archive guard** — `archive` errors when the change being archived has unarchived dependencies; warns with `--allow-incomplete`
-- **Dependency graph** — `view` renders a tree-style DAG with box-drawing characters when any active change has `dependsOn`
-
-Resolution checks active changes first, then archived changes. Active takes priority on name collision. Archived change names are extracted by stripping the date prefix.
+`AGENTS.md` carries the compressed rule; the decision file carries the full reasoning, once. Neither restates the other — the split is the design, not duplication to clean up.
 
 ## Glossary
 
-The project's ubiquitous language lives in `specs/glossary.md` — a single, version-controlled markdown file containing term definitions. Curated by humans (with AI proposals), not auto-generated.
+`specs/glossary.md`, optional but highly recommended. Curated. Skill nudges when a new core term appears. No gate.
 
-Skills that read the glossary:
-- **think** — read at session start, nudge when undefined terms surface
-- **plan** — checks for new terms after writing specs, offers to update; manages the glossary file
-- **build** — passive reference, no enforcement
-- **review** — supplementary context during cross-change review, no enforcement
 
-If the glossary doesn't exist, all skills degrade gracefully. The think skill may suggest creating one when stable terms emerge.
+## Skills
 
-## Backlog
+3 generated skills, lean, directive, progressive disclosure. `think+plan` merged — fuzzy vs clear are modes of `plan`.
 
-The project's parking lot lives in `specs/backlog.md` — a single file with sections for deferred items, open questions, and future ideas. Items graduate from backlog to changes via the plan skill. Surfaced by `list --backlog` and visible in `view` output. Optional; graceful degradation if absent.
+| Skill | When |
+|-------|------|
+| plan | turn intent into bounded GH issue (+ spec). Fuzzy vs clear are references |
+| build | implement one unit, satisfy Verify |
+| review | adversarial check, triage findings into lanes |
+
+`litespec-plan` references (load only when branch applies, distilled from AgenticWiki — no links, no theory):
+- `references/fuzzy.md` — half-baked idea; grill by default with `references/grilling.md`, research/spike, no files yet
+- `references/clear.md` — sharp idea: write GH issue body (proposal+design+queue) + `specs/<feature>/spec.md` if load-bearing (owns the Verify rule)
+- `references/grilling.md` — default fuzzy process; also `grill-me` or unresolved branches
+- `references/codebase-design.md` — thin vertical slice, reuse existing path, smallest coherent change (distilled from tracer bullets / vertical slices / infrastructure blindness / over-engineering)
+- `references/domain-modeling.md` — new ubiquitous term -> glossary
+
+`litespec-build` references:
+- `references/build/review-fixing.md` — rebuilding a unit that review routed back to build. Scope expands: fix the pattern, not just the cited line
+
+`litespec-review` references:
+- `references/review/adversarial-review.md` — constructing adversarial scenarios for interaction bugs, state transitions, wiring gaps
+
+No alias for `think`. Add if dogfooding shows we miss it. Detail lives in `references/` only when that branch applies — borrow grill/domain ideas from mattpocock/skills on our terms.
+
+Generated via `litespec update` from `internal/skill/templates/` (embed.FS). `.agents/skills/` is canonical.
+
+## CLI (minimal)
+
+| Command | Purpose |
+|---------|---------|
+| `litespec init [--tools <ids>]` | scaffold `specs/` + skills |
+| `litespec validate [--all\|--specs\|--decisions\|--issue <N>\|--queue <path>] [--type T]` | lint structural contracts and report `structure ok; implementation semantics not verified` on success |
+| `litespec view` | product + features + open `litespec` GH issues (via `gh` if present) + decisions (spine starred) |
+| `litespec update [--tools <ids>]` | regenerate skills and adapters |
+| `litespec upgrade` | check for and install the latest version via `go install` |
+| `litespec digest --issue <N> \| --queue <path>` | print expected unit contract digests, one tab-separated line per queue unit |
+| `litespec receipt --issue <N> \| --queue <path> --heading "<text>" [flags]` | resolve one queue unit and assemble its validator-clean evidence receipt into numbered comment files (exact `gh issue comment` commands in issue mode, files only in queue mode); emit-only by default — opt-in `--post` runs the printed commands in posting order and stops visibly on the first gh failure; `--out <dir>` selects the emission directory (default: current directory), emitted paths are absolute so posting works from any directory, and a mid-sequence write failure removes the already-written files so no partial set is left; it never ticks checkboxes |
+| `litespec issue check --issue <N> --heading "<text>" [--occurrence <K>]` | managed single-checkbox tick: resolves the queue unit by digest identity semantics, flips exactly one `- [ ]` to `- [x]`, and writes back only when the result differs from the fetched body by that single flip with the `Base:`/`Branch:` ownership lines byte-unchanged; any other body delta, ambiguous or unknown heading, already-checked target, or gh failure is a refusal that issues no write — hand-edited issue bodies are retired |
+| `litespec completion <shell>` | generate shell completion script (bash, zsh, fish) |
+
+## GH issues as the change
+
+GH issue is the queue — the GH issue body is proposal + design + queue (64k limit, no overflow design needed).
+
+- GH issue body is proposal + design + queue. 64k limit — no overflow design needed.
+- The `litespec` label marks queue issues. `validate` scans open issues with this label; `view` filters to it.
+- `plan[clear]` creates the labeled GH issue; when `gh` is unavailable it writes `specs/queues/<name>.md`.
+- `view` auto-detects `gh` + GitHub remote. No config flag.
+
+## Resolved for v2 lean
+
+- Local queue fallback at `specs/queues/<name>.md` when `gh` unavailable — mirrors the GH issue 1:1, handles multi-feature changes
+- Product flows: list explicitly in `product.md` (models + flows as lists).

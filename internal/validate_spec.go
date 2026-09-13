@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func ValidateSpec(root, name string) (*ValidationResult, error) {
 	result := &ValidationResult{Valid: true}
-	specPath := filepath.Join(CanonPath(root), name, "spec.md")
+	specPath := FeatureSpecPath(root, name)
 
 	data, err := os.ReadFile(specPath)
 	if err != nil {
@@ -38,12 +39,28 @@ func ValidateSpec(root, name string) (*ValidationResult, error) {
 	}
 
 	for _, req := range spec.Requirements {
+		if !containsKeyword(req.Content) {
+			result.Errors = append(result.Errors, ValidationIssue{
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("requirement %q in capability %q must contain SHALL or MUST", req.Name, name),
+				File:     specPath,
+			})
+		}
 		if len(req.Scenarios) == 0 {
-			result.Warnings = append(result.Warnings, ValidationIssue{
-				Severity: SeverityWarning,
+			result.Errors = append(result.Errors, ValidationIssue{
+				Severity: SeverityError,
 				Message:  fmt.Sprintf("requirement %q in capability %q has no scenarios", req.Name, name),
 				File:     specPath,
 			})
+		}
+		for _, sc := range req.Scenarios {
+			if !strings.Contains(sc.Content, "WHEN") || !strings.Contains(sc.Content, "THEN") {
+				result.Errors = append(result.Errors, ValidationIssue{
+					Severity: SeverityError,
+					Message:  fmt.Sprintf("scenario %q in requirement %q must contain WHEN and THEN", sc.Name, req.Name),
+					File:     specPath,
+				})
+			}
 		}
 		result.ScenariosCount += len(req.Scenarios)
 	}
@@ -56,17 +73,11 @@ func ValidateSpec(root, name string) (*ValidationResult, error) {
 
 func ValidateSpecs(root string) (*ValidationResult, error) {
 	result := &ValidationResult{Valid: true}
-	specsDir := CanonPath(root)
 
-	entries, err := os.ReadDir(specsDir)
+	projectSpecsDir := filepath.Join(root, ProjectDirName)
+	entries, err := os.ReadDir(projectSpecsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			result.Valid = false
-			result.Errors = append(result.Errors, ValidationIssue{
-				Severity: SeverityError,
-				Message:  "specs directory does not exist",
-				File:     specsDir,
-			})
 			return result, nil
 		}
 		return nil, fmt.Errorf("read specs directory: %w", err)
@@ -76,12 +87,20 @@ func ValidateSpecs(root string) (*ValidationResult, error) {
 		if !entry.IsDir() {
 			continue
 		}
-		specPath := filepath.Join(specsDir, entry.Name(), "spec.md")
+		name := entry.Name()
+		if name == ChangesDirName || name == "decisions" {
+			continue
+		}
+		specPath := filepath.Join(projectSpecsDir, name, "spec.md")
+		if _, statErr := os.Stat(specPath); statErr != nil {
+			continue
+		}
+
 		data, err := os.ReadFile(specPath)
 		if err != nil {
 			result.Errors = append(result.Errors, ValidationIssue{
 				Severity: SeverityError,
-				Message:  fmt.Sprintf("spec file for capability %q not found", entry.Name()),
+				Message:  fmt.Sprintf("spec file for capability %q not found", name),
 				File:     specPath,
 			})
 			continue
@@ -103,18 +122,34 @@ func ValidateSpecs(root string) (*ValidationResult, error) {
 		if len(spec.Requirements) == 0 {
 			result.Warnings = append(result.Warnings, ValidationIssue{
 				Severity: SeverityWarning,
-				Message:  fmt.Sprintf("capability %q has no requirements", entry.Name()),
+				Message:  fmt.Sprintf("capability %q has no requirements", name),
 				File:     specPath,
 			})
 		}
 
 		for _, req := range spec.Requirements {
-			if len(req.Scenarios) == 0 {
-				result.Warnings = append(result.Warnings, ValidationIssue{
-					Severity: SeverityWarning,
-					Message:  fmt.Sprintf("requirement %q in capability %q has no scenarios", req.Name, entry.Name()),
+			if !containsKeyword(req.Content) {
+				result.Errors = append(result.Errors, ValidationIssue{
+					Severity: SeverityError,
+					Message:  fmt.Sprintf("requirement %q in capability %q must contain SHALL or MUST", req.Name, name),
 					File:     specPath,
 				})
+			}
+			if len(req.Scenarios) == 0 {
+				result.Errors = append(result.Errors, ValidationIssue{
+					Severity: SeverityError,
+					Message:  fmt.Sprintf("requirement %q in capability %q has no scenarios", req.Name, name),
+					File:     specPath,
+				})
+			}
+			for _, sc := range req.Scenarios {
+				if !strings.Contains(sc.Content, "WHEN") || !strings.Contains(sc.Content, "THEN") {
+					result.Errors = append(result.Errors, ValidationIssue{
+						Severity: SeverityError,
+						Message:  fmt.Sprintf("scenario %q in requirement %q must contain WHEN and THEN", sc.Name, req.Name),
+						File:     specPath,
+					})
+				}
 			}
 			result.ScenariosCount += len(req.Scenarios)
 		}
