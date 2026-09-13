@@ -1,37 +1,35 @@
 # Project Structure
 
-litespec v2 keeps the durable spec surface small and links it to a GitHub issue queue. The tree below is everything that lives on disk permanently; the issue is the queue, not a folder.
+Everything durable lives under `specs/`; the queue and conversation live in the GitHub issue. Nothing else is permanent.
 
 ```
 project/
 ├── specs/
 │   ├── product.md          # mental models + flows
-│   ├── glossary.md         # ubiquitous language (optional)
+│   ├── glossary.md         # ubiquitous language (optional, recommended)
 │   ├── decisions/          # NNNN-<slug>.md decision records
+│   ├── queues/             # <name>.md local fallback, only when gh is unavailable
 │   └── <feature>/
 │       └── spec.md         # load-bearing contract
 ├── .agents/skills/         # generated skills (canonical)
-├── .claude/skills/         # symlinks for Claude Code
-└── mkdocs.yml              # docs site config
+└── .claude/skills/         # symlinks for Claude Code (only with --tools claude)
 ```
 
-Everything under `specs/` is durable. GitHub issues and their comments are disposable.
+## `specs/product.md` — what we are
 
-## `specs/` — durable contracts
+Mental models, what the project is and isn't, 2–3 representative flows. Human + agent maintained. Every plan/build/review session reads it first.
 
-The `specs/` directory holds the long-lived source of truth. It is small by design: only things that would mislead a future reader if they were stale.
+## `specs/glossary.md` — shared words
 
-### `specs/product.md` — mental models + flows
+Curated ubiquitous language — only terms that are shared, stable, and ambiguous enough to matter. `litespec-plan` reads it and nudges when a new term appears; other skills consult it without enforcement. Missing file degrades gracefully. See [Glossary](glossary.md). One line per term:
 
-What the project is, what it is not, how to think about it, and 2–3 representative flows. Human + agent maintained. Read it at the start of every plan/build/review session.
+```markdown
+- **Widget**: a customer-visible unit of work in the dashboard. Not a database row. Not a UI component.
+```
 
-### `specs/glossary.md` — ubiquitous language
+## `specs/decisions/NNNN-<slug>.md` — durable rulings
 
-Curated, optional but recommended. Defines the shared terms used in specs, code, and decisions. `litespec-plan` reads it and nudges when a new term appears. See the [Glossary](glossary.md) page for the concept and maintenance workflow.
-
-### `specs/decisions/NNNN-<slug>.md` — durable rulings
-
-Long-lived architectural decisions. File name is a zero-padded number and a slug, e.g. `0001-use-json-logger.md`.
+Standing architectural reasoning that spans files — *why not* the obvious road. Created with `touch` + `validate`; no CLI. Never deleted after a feature ships; supersede instead.
 
 ```markdown
 ---
@@ -48,11 +46,11 @@ proposed | accepted | superseded
 ## Consequences
 ```
 
-`spine: true` frontmatter marks a load-bearing decision that `litespec view` highlights. Decisions are created by `touch` + `validate`, not by a CLI. They are durable; only supersede or amend, do not delete after a feature ships.
+`spine: true` marks load-bearing decisions that `view` stars. The bar is high: real contention (someone argued the other road, or observably will) plus no better home (a line comment fits a one-line change; decisions hold reasoning with no single line to attach to). `Context` records what was measured; `Consequences` state what would justify revisiting.
 
-### `specs/<feature>/spec.md` — load-bearing contracts
+## `specs/<feature>/spec.md` — load-bearing contracts
 
-One spec per load-bearing feature or capability. Edited in place; there is only one spec file per feature, with no separate approved layer or lifecycle markers. The format is:
+One file per load-bearing feature. Edited in place — no staging, no approved layer, no lifecycle markers. Only promises that break things when wrong earn a spec.
 
 ```markdown
 # <feature>
@@ -67,58 +65,26 @@ Body must contain SHALL or MUST.
 - **THEN** <outcome>
 ```
 
-Small fixes may edit the spec in place. New features may draft the spec during `litespec-plan` clear mode. Only load-bearing capabilities get a spec; if a feature is not a durable contract, it does not need one.
+Small fixes edit it directly; `litespec-plan` drafts it in clear mode for new features.
+
+## `specs/queues/<name>.md` — offline fallback only
+
+A 1:1 mirror of the GH issue body (`Base:`/`Branch:` + proposal + design + queue), written only when `gh` is unavailable. `<name>` is the change name from `plan[clear]`. When `gh` works, the issue is the queue and this directory stays empty. Local receipts append as `Evidence:` blocks under their unit; routing metadata appends after all units in separate commits.
 
 ## `.agents/skills/` and `.claude/skills/`
 
-Generated agent skills live in `.agents/skills/`. This is the canonical location; nearly every AI coding agent discovers it natively.
+Canonical generated skills — one `SKILL.md` plus `references/` per skill, regenerated by `litespec update` from `internal/skill/templates/`:
 
 ```
 .agents/skills/
-├── litespec-plan/
-│   └── SKILL.md
-├── litespec-build/
-│   └── SKILL.md
-└── litespec-review/
-    └── SKILL.md
+├── litespec-plan/      # fuzzy/clear + grilling, codebase-design, domain-modeling
+├── litespec-build/     # one unit + review-fixing
+└── litespec-review/    # adversarial review
 ```
 
-Each skill is a single `SKILL.md` with YAML frontmatter and focused instructions. Run `litespec update` to regenerate them from the templates in `internal/skill/templates/`.
+`--tools claude` symlinks these into `.claude/skills/` because Claude Code doesn't read `.agents/`. Project-specific skills (like `the-drill`) live beside them as tracked files — never generated, never overwritten, ignored by stale-skill detection.
 
-`litespec init --tools claude` (or `litespec update --tools claude`) creates symlinks in `.claude/skills/` because Claude Code does not read `.agents/`. Those symlinks point back into `.agents/skills/` and are auto-detected on later `update` runs.
+## The two lanes on this structure
 
-Project-specific skills such as `the-drill` live directly in `.agents/skills/` as tracked git files. They are not generated by `litespec update`.
-
-## `mkdocs.yml`
-
-If the project publishes a docs site, `mkdocs.yml` is the MkDocs Material configuration. `litespec init` does not create this file; add or copy it when you want a generated site.
-
-A minimal `mkdocs.yml` looks like:
-
-```yaml
-site_name: your-project
-site_description: A lean, AI-native spec-driven project
-
-theme:
-  name: material
-
-nav:
-  - Home: index.md
-```
-
-This layout is intentionally minimal. The durable surface lives under `specs/`; the queue and conversation normally live in the GitHub issue. `specs/queues/<name>.md` is the local fallback when `gh` is unavailable.
-
-## Two lanes
-
-The same structure supports both speeds:
-
-- **Small fix — zero ceremony:**
-  No GH issue. Read `specs/product.md` + the relevant `specs/<feature>/spec.md` + `specs/decisions/` and `specs/glossary.md`, edit code and spec in place, stop.
-
-- **New feature — plan fuzzy → clear:**
-  ```
-  plan[fuzzy] → plan[clear]
-  ```
-  `litespec-plan` starts from a clean tree, creates `litespec/<change-name>`, and records `Base:` + `Branch:` with proposal, design, and units in the labeled GH issue body (or local queue). `litespec-build` implements one unit at a time on that branch. After its trusted auto-loaded instruction bootstrap, `litespec-review` screens every additional local queue, contract, implementation, and reference path before reading it. The issue closes only when every unit checkbox is checked, every rebuild request is resolved, review returns `PASS`, and the issue's `Branch:` is merged (decision 0008) — merge first, then close.
-
-The queue lives in the GitHub issue in the normal workflow; local queue files are the offline fallback.
+- **Small fix:** read product + relevant spec + decisions/glossary, edit code and spec in place, stop. No issue, no branch.
+- **New feature:** `plan[clear]` records `Base:` + `Branch:` and creates `litespec/<change-name>` — all branch work belongs to the issue. `build` implements one unit at a time there; `review` screens every local path before reading it. Merge the branch first, then close the issue.

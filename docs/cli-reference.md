@@ -1,6 +1,6 @@
 # CLI Reference
 
-Complete command-line reference for litespec v2.
+Every command in `litespec --help`, with usage, flags, and examples.
 
 ```
 Usage: litespec <command> [options]
@@ -14,6 +14,9 @@ Commands:
   validate [--all|--specs|--decisions|--issue <N>|--queue <path>] [--type T]   Validate specs, decisions, and queues
   view                              Dashboard overview
   update [--tools <ids>]            Regenerate skills and adapters
+  digest --issue <N> | --queue <p>  Print expected unit contract digests for a queue
+  receipt --issue <N> | --queue <p> --heading "<h>"  Assemble evidence receipt comment files
+  issue check --issue <N> --heading "<h>"  Tick exactly one unit checkbox (managed)
   upgrade                           Check for and install the latest version
   completion <shell>                Generate shell completion script (bash, zsh, fish)
 
@@ -33,116 +36,55 @@ Flags:
    --type       Disambiguate name type: spec|decision (validate)
 ```
 
-The flags above are the top-level defaults. Each command also supports its own flags and aliases, shown below.
-
-## Global Flags
-
-| Flag | Description |
-|------|-------------|
-| `--version` | Print version information |
-| `--help` | Print help message |
-| `--json` | Output structured JSON where supported |
-| `--strict` | Treat warnings as errors (`validate` only) |
-| `--all` | Validate all specs, decisions, and queues (`validate` only) |
-| `--specs` | Validate all specs only (`validate` only) |
-| `--decisions` | Validate all decisions only (`validate` only) |
-| `--issue <N>` | Fetch and validate one GH queue issue (`validate` only) |
-| `--queue <path>` | Validate one local queue file (`validate` only) |
-| `--type <T>` | Disambiguate name type: `spec` or `decision` (`validate` only) |
+`--json` and `--minimal` are supported where each command's help says so. Success from `validate` always reads `structure ok; implementation semantics not verified` — structure only, never a claim the code is correct. Exit `0` on success, `1` on error, validation failure, or bad arguments. No removed commands (`new`, `list`, `status`, `instructions`, `import`, `preview`, `archive`, `patch`) exist.
 
 ## `init`
-
-Usage:
 
 ```bash
 litespec init [--tools <ids>] [--json] [--minimal]
 ```
 
-Description:
-
-Initialize a new litespec project in the current directory.
-
-Creates:
-
-- `specs/product.md`
-- `specs/glossary.md`
-- `specs/decisions/`
-- `.agents/skills/` (`litespec-plan`, `litespec-build`, `litespec-review`)
-
-Flags:
+Scaffold a project: `specs/product.md`, `specs/glossary.md` (if missing), `specs/decisions/`, and the three generated skills in `.agents/skills/`.
 
 | Flag | Description |
 |------|-------------|
-| `--tools <ids>` | Comma-separated tool IDs (e.g., `claude`) |
+| `--tools <ids>` | Comma-separated tool IDs (today only `claude`: symlinks skills into `.claude/skills/`) |
 | `--json` | Output as JSON |
 | `--minimal` | Minimal output |
-
-Examples:
 
 ```bash
 litespec init
 litespec init --tools claude
-litespec init --json
 ```
 
 ## `validate`
-
-Usage:
 
 ```bash
 litespec validate [<name>|--all|--specs|--decisions|--issue <N>|--queue <path>] [--type T] [--strict] [--json] [--minimal]
 ```
 
-Description:
+Lint structure of specs, decisions, and queues. No arguments means `--all`.
 
-Validate the structure of specs, decisions, and queue issues/files.
-
-Spec checks:
-
-- Requirement body text contains `SHALL` or `MUST`.
-- Each requirement has at least one `#### Scenario:` with `WHEN` and `THEN`.
-- Specs are valid Markdown and parseable.
-
-Decision checks:
-
-- Required sections: Context, Decision, Consequences.
-- Valid status: `proposed`, `accepted`, or `superseded`.
-- No duplicate numbers or slugs.
-- Supersede pointers resolve and point to `superseded` decisions.
-- No supersede cycles.
-
-Queue checks:
-
-- Exactly one `Base:` and `Branch:` ownership line before the first `##` heading.
-- `Base:` is a full commit ID and `Branch:` matches `litespec/<change-name>`.
-- Every unit has `Done means:`, an executable `Verify:`, and a checkbox.
-- A checked unit has a complete red-green evidence receipt: the verbatim command; distinct full pre/post SHAs; non-zero pre and zero post statuses; two nonempty fenced outputs; and matching scope lines. A nonempty `Evidence:` label is not enough.
-- `Depends:` references resolve to units in the same queue.
-
-Flags:
+Spec checks: requirement bodies contain `SHALL`/`MUST`; every requirement has a `#### Scenario:` with `WHEN`/`THEN`; specs parse. Decision checks: `NNNN-<slug>.md` naming; Status (`proposed`/`accepted`/`superseded`), Context, Decision, Consequences; supersede pointers resolve (superseded decisions point forward); no duplicate numbers/slugs or cycles. Queue checks: exactly one `Base:` (full SHA) and one `Branch:` (`litespec/<name>`) before the first `##`; every unit has identified `Done means:` clauses fully mapped through `Scenarios:`, one executable `Verify:` (fenced block linted with `bash -n`; inline backtick command accepted; vacuous commands rejected), a checkbox, optional unique-nonempty `Read first:`/`Constraints:`/`Depends:` (depends must resolve), `Boundary:` from the closed `filesystem`/`process`/`network` vocabulary with a complete five-risk `Risk cases:` block when present; checked units carry a complete red-green receipt with matching `unit digest:` (see [Workflow](workflow.md)); rebuild requests, re-plan markers, and amendment chains resolve.
 
 | Flag | Description |
 |------|-------------|
-| `<name>` | Validate a specific spec or decision by name |
-| `--all` | Validate all specs, decisions, and queues |
-| `--specs` | Validate all specs only |
-| `--decisions` | Validate all decisions only |
+| `<name>` | One spec or decision by name |
+| `--all` | Everything: specs, decisions, queues (the default) |
+| `--specs` | Specs only |
+| `--decisions` | Decisions only |
 | `--issue <N>` | Fetch and validate one GH queue issue |
 | `--queue <path>` | Validate one local queue file |
-| `--type <T>` | Disambiguate name: `spec` or `decision` |
-| `--strict` | Treat warnings as errors |
+| `--type <T>` | Disambiguate: `spec` or `decision` |
+| `--strict` | Warnings become errors |
 | `--json` | Output as JSON |
 | `--minimal` | Minimal output |
-
-Default behavior with no arguments is equivalent to `--all`.
-
-Examples:
 
 ```bash
 litespec validate
 litespec validate my-spec
-litespec validate --all --strict
 litespec validate shared --type spec
+litespec validate --all --strict
 litespec validate --decisions
 litespec validate --issue 42
 litespec validate --queue specs/queues/add-auth.md
@@ -150,26 +92,16 @@ litespec validate --queue specs/queues/add-auth.md
 
 ## `view`
 
-Usage:
-
 ```bash
 litespec view [--json] [--minimal]
 ```
 
-Description:
-
-Display a dashboard overview of product, specs, decisions, and open `litespec` GH issues.
-
-If `gh` is installed and the project is a Git repository with a GitHub remote, `view` calls `gh issue list --label litespec` and shows open queue issues. Otherwise it shows only local specs and decisions.
-
-Flags:
+Dashboard: product, spec/requirement counts, active/total decisions (spine starred), and open `litespec`-labeled GH issues. Runs `gh issue list --label litespec --json number,title,state,url --state open --limit 10000`; when `gh` or the work tree is missing it silently shows local content only.
 
 | Flag | Description |
 |------|-------------|
-| `--json` | Output as JSON |
-| `--minimal` | Minimal output |
-
-Examples:
+| `--json` | Full JSON (`summary`, `specs`, `decisions`, `product`, `ghIssues`); with `--minimal`, `summary` only |
+| `--minimal` | One tab-separated line: `<N> specs  <M> reqs  <K> decisions  <L> issues` |
 
 ```bash
 litespec view
@@ -178,116 +110,134 @@ litespec view --json
 
 ## `update`
 
-Usage:
-
 ```bash
 litespec update [--tools <ids>] [--json] [--minimal]
 ```
 
-Description:
-
-Regenerate skills and adapter symlinks from the built-in templates.
-
-- Writes `.agents/skills/<skill>/SKILL.md` for each generated skill.
-- Writes reference files from `internal/skill/templates/references/`.
-- Cleans stale skill directories and symlinks.
-- Auto-detects active adapters (e.g., existing `.claude/skills/` symlinks).
-- Does not modify `specs/` content.
-
-Flags:
+Regenerate `.agents/skills/<name>/SKILL.md` plus `references/` from the built-in templates. Removes stale `litespec-*` directories, refuses to write through symlinks, leaves project-specific skills (like `the-drill`) alone. Without `--tools`, auto-detects active adapters from existing symlinks.
 
 | Flag | Description |
 |------|-------------|
-| `--tools <ids>` | Comma-separated tool IDs (e.g., `claude`) |
+| `--tools <ids>` | Comma-separated tool IDs (today only `claude`) |
 | `--json` | Output as JSON |
 | `--minimal` | Minimal output |
-
-Examples:
 
 ```bash
 litespec update
 litespec update --tools claude
 ```
 
-## `upgrade`
+## `digest`
 
-Usage:
+```bash
+litespec digest --issue <N> | --queue <path> [--heading <text>]
+```
+
+Print each queue unit's identity and expected contract digest — one tab-separated `occurrence  heading  digest` line per unit. Build pastes this digest into the receipt verbatim; `validate` recomputes it from the unit's contract fields, so any post-evidence edit to heading, `Done means:`, `Scenarios:`, risks, or `Verify:` fails validation until plan witnesses an amendment.
+
+| Flag | Description |
+|------|-------------|
+| `--issue <N>` | GH issue number (requires `gh`) |
+| `--queue <path>` | Local queue file |
+| `--heading <text>` | Only lines whose heading equals this exactly (every duplicate occurrence listed; no match exits non-zero) |
+
+```bash
+litespec digest --issue 42
+litespec digest --queue specs/queues/add-auth.md --heading "Enforce per-IP cap"
+```
+
+## `receipt`
+
+```bash
+litespec receipt --issue <N> | --queue <path> --heading "<text>" [--occurrence <K>]
+  --pre-sha <sha> --pre-status <n> --pre-out <file>
+  --post-sha <sha> --post-status <n> --post-out <file>
+  [--rebuild] [--recovered-from <id>] [--post] [--out <dir>]
+```
+
+Assemble one validator-clean evidence receipt for the resolved unit (exact heading + positive same-heading occurrence, same identity as `digest`) and emit numbered `receipt-0001.md`, `receipt-0002.md`, … comment files. Issue mode also prints the exact `gh issue comment` commands in posting order; queue mode emits files only. Emit-only by default — nothing posts, nothing ticks boxes. The receipt self-parses through the evidence grammar before anything is written; ambiguous/unknown/out-of-range headings, unreadable outputs, equal SHAs, zero pre status, non-zero post status, and non-ancestor pre all refuse before any write. Over-long receipts split across comments (never truncated); a mid-sequence write failure removes already-written files so no partial set remains. Emitted paths and printed commands are absolute, so posting works from any directory.
+
+| Flag | Description |
+|------|-------------|
+| `--issue <N>` | GH issue number (requires `gh`) |
+| `--queue <path>` | Local queue file |
+| `--heading <text>` | Exact unit heading (required) |
+| `--occurrence <K>` | Which duplicate heading (default: must be unambiguous) |
+| `--pre-sha <sha>` | Full pre commit SHA |
+| `--pre-status <n>` | Pre exit status (must be non-zero) |
+| `--pre-out <file>` | File holding raw pre output |
+| `--post-sha <sha>` | Full post commit SHA |
+| `--post-status <n>` | Post exit status (default 0) |
+| `--post-out <file>` | File holding raw post output |
+| `--rebuild` | Include the rebuild routing identity (rebuilding a reviewed unit) |
+| `--recovered-from <id>` | Append-only recovery provenance: earlier complete receipt ID |
+| `--post` | Opt-in: run the printed `gh issue comment` commands in order; first `gh` failure stops the chain with posted/unposted named, no retry |
+| `--out <dir>` | Emission directory (default: current directory; created when missing) |
+
+```bash
+go test ./internal/ratelimit -run TestCounterWindow > /tmp/pre.out; echo "exit=$?"
+# ... implement, commit ...
+go test ./internal/ratelimit -run TestCounterWindow > /tmp/post.out
+litespec receipt --issue 42 --heading "Sliding window counter" \
+  --pre-sha <pre> --pre-status 1 --pre-out /tmp/pre.out \
+  --post-sha <post> --post-out /tmp/post.out
+```
+
+Build normally runs this for you; reach for it directly when assembling a receipt by hand.
+
+## `issue check`
+
+```bash
+litespec issue check --issue <N> --heading "<text>" [--occurrence <K>]
+```
+
+Tick exactly one unit checkbox. Resolves by the same heading + occurrence identity as `digest`, then writes back only when the result differs from the fetched body by that single `- [ ]` → `- [x]` flip with `Base:`/`Branch:` byte-unchanged. Anything else — ambiguous or unknown heading, out-of-range occurrence, already-checked target, any other body delta, `gh` failure — refuses with no write. No offline lane, no broader body management: hand-editing issue bodies is retired.
+
+```bash
+litespec issue check --issue 42 --heading "Sliding window counter"
+```
+
+## `upgrade`
 
 ```bash
 litespec upgrade [--json] [--minimal]
 ```
 
-Description:
-
-Check for the latest release and upgrade via `go install github.com/bermudi/litespec/v2/cmd/litespec@latest`.
-
-Only works for binaries installed with `go install`. Exits with no change if already up to date.
-
-Flags:
-
-| Flag | Description |
-|------|-------------|
-| `--json` | Output as JSON |
-| `--minimal` | Minimal output |
-
-Examples:
+Check the GitHub tags for the channel's latest (stable ignores prereleases; prereleases follow both) and `go install` it when newer. `go install` placements only — elsewhere it errors. After a successful upgrade it reminds you to run `litespec update` in your projects. A silent background check runs at most weekly without output or blocking.
 
 ```bash
 litespec upgrade
-litespec upgrade --json
 ```
 
 ## `completion`
-
-Usage:
 
 ```bash
 litespec completion <shell>
 ```
 
-Description:
-
-Generate a shell completion script.
-
-Supported shells: `bash`, `zsh`, `fish`.
-
-Examples:
+Print a completion script derived from the `CommandSpecs` registry. `bash`, `zsh`, or `fish`; no flags, exactly one argument.
 
 ```bash
-# Bash
+# Persist
 litespec completion bash > ~/.local/share/bash-completion/completions/litespec
-eval "$(litespec completion bash)"
-
-# Zsh
-litespec completion zsh > ~/.zsh/completion/_litespec
-fpath=(~/.zsh/completion $fpath)
-autoload -U compinit && compinit
-
-# Fish
+litespec completion zsh > ~/.zfunc/_litespec        # ~/.zfunc in fpath, then compinit
 litespec completion fish > ~/.config/fish/completions/litespec.fish
+# Or try for one session
+eval "$(litespec completion bash)"
 ```
 
-`completion` has no flags and accepts exactly one shell argument.
+## Tool adapters
 
-## Tool Adapters
+`--tools` on `init`/`update` creates adapter symlinks pointing at canonical `.agents/skills/`.
 
-The `--tools` flag for `init` and `update` creates tool-specific adapter symlinks that point to the canonical `.agents/skills/` directory.
-
-| Tool ID | Name | Skills Directory |
+| Tool ID | Name | Skills directory |
 |---------|------|------------------|
 | `claude` | Claude Code | `.claude/skills/` |
 
-Run `litespec init --tools claude` once. Subsequent `litespec update` calls auto-detect and refresh the symlinks.
+Pass `--tools claude` once; later `update` runs auto-detect and refresh. Adding a CLI command or flag means updating the `CommandSpecs` registry in `internal/commandspec.go` — completions derive from it.
 
-## Exit Codes
+## See also
 
-| Code | Meaning |
-|------|---------|
-| `0` | Success |
-| `1` | Error, validation failed, or invalid arguments |
-
-## See Also
-
-- [Workflow](workflow.md)
-- [Concepts](concepts.md)
-- [Getting Started](getting-started.md)
+- [Workflow](workflow.md) — unit shape, evidence, routing, closure
+- [Concepts](concepts.md) — durable vs disposable
+- [Getting Started](getting-started.md) — install and first commands

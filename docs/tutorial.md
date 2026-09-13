@@ -1,257 +1,160 @@
 # Tutorial: Your First Feature
 
-This tutorial walks through a complete v2 feature cycle. We'll add rate limiting to an API: plan a fuzzy idea, write a clear GH issue, draft a durable spec, build one unit at a time, review, and close the issue.
+A complete feature cycle: fuzzy idea → clear GH issue → durable spec → one unit at a time → review → merged branch → closed issue. We'll add rate limiting to an API.
 
-## Setting up
+## Setup
 
-You already have litespec installed. Initialize the project:
-
-```bash
-$ litespec init --tools claude
-Created specs/ directory structure
-Generated .agents/skills/
-Generated adapter commands for: claude
-Project initialized.
-```
-
-Start the queue issue from a clean tree and dedicated branch:
+Install litespec ([Getting Started](getting-started.md)), then initialize:
 
 ```bash
+litespec init
 git status --porcelain  # must print nothing
-git rev-parse HEAD      # record this as Base:
+git rev-parse HEAD      # this becomes Base:
 git switch -c litespec/add-rate-limiting
 ```
 
-`litespec-plan` in `clear` mode performs those checks, records `Base:` and `Branch:`, and creates the labeled issue. If `gh` is unavailable, it writes the same body to `specs/queues/add-rate-limiting.md`.
+`litespec-plan` in clear mode performs those checks itself — clean tree, `Base:`, dedicated branch, `Branch:` — and creates the labeled issue. If `gh` is unavailable it writes the same body to `specs/queues/add-rate-limiting.md` instead.
 
-## Two lanes, one workflow
+This tutorial follows the new-feature lane. Small fixes skip all of this: read the spec, edit, update the spec if the contract changed, done.
 
-v2 has two lanes:
+## Plan fuzzy
 
-- **Small fix** — zero ceremony. Read `specs/product.md`, the relevant `specs/<feature>/spec.md`, and decisions/glossary; edit code; update the spec if the contract changed. No GH issue required.
-- **New feature** — `plan[fuzzy]` → `plan[clear]` (GH issue) → `grill-me` → `build` one unit at a time → `review` → close the issue.
+Invoke `litespec-plan` and describe the idea.
 
-This tutorial follows the new-feature lane.
-
-## Plan (fuzzy)
-
-Invoke the `litespec-plan` skill and describe the idea.
-
-> **You:** I want to add rate limiting to the API. We should limit each IP to 100 requests per minute and return 429 with a `Retry-After` header.
+> **You:** Limit each IP to 100 requests per minute, return 429 with a `Retry-After` header.
 >
-> **litespec-plan (fuzzy mode):** Reads the code, `specs/product.md`, and the glossary. Asks 2–3 clarifying questions. Writes no files.
+> **Plan (fuzzy):** Reads the code, product, glossary. Asks two or three questions, one at a time. Writes no files.
 >
-> Example questions:
-> - Should the limit be configurable?
-> - In-memory only, or do we need a shared store?
-> - Per-user or IP-based?
+> - Configurable limit, or fixed at 100?
+> - In-memory only, or a shared store?
+> - Per-IP or per-user?
 
-Fuzzy mode is ephemeral. When the scope is clear, move to `clear` mode.
+Fuzzy is ephemeral. When you can answer "what demo proves this?" and "what Verify fails without it?", say ready and move to clear.
 
-## Plan (clear)
+## Plan clear
 
-`litespec-plan` (clear mode) writes ownership metadata followed by the proposal, design, and queue. Each unit is an `## <outcome>` with `Done means:` and a `Verify:` that must fail without the outcome.
+Clear mode writes the issue body: ownership lines first, then proposal, design, and queue. Each unit is one boundary or failure policy with identified clauses, scenario mappings, risk accounting, and one `Verify:` — dry-run on the base tree before filing, so every Verify is known to fail without its outcome.
 
 ````markdown
-Base: <full commit ID printed before branch creation>
+Base: <full commit SHA printed before branch creation>
 Branch: litespec/add-rate-limiting
 
 ## Proposal
 
-Add rate limiting to the API to prevent abuse and ensure fair usage.
+Add rate limiting to prevent abuse and keep usage fair. Out of scope: distributed stores, per-user quotas.
 
 ## Design
 
-Use an in-memory sliding window counter per IP. A middleware extracts the IP, increments the counter, and rejects requests over the limit with HTTP 429 and a `Retry-After` header. The limit is configurable via `RATE_LIMIT_PER_MINUTE` and defaults to 100.
+In-memory sliding-window counter per IP behind a middleware. The middleware extracts the IP, increments the counter, rejects over-limit requests with 429 and `Retry-After`. Limit comes from `RATE_LIMIT_PER_MINUTE`, default 100.
 
-## Unit 1: Sliding window counter
-Done means: `internal/ratelimit/counter.go` exists and counts requests in the last 60 seconds.
-
-Verify:
-```bash
-go test ./internal/ratelimit -run TestCounterWindow
-```
-
+## Sliding window counter
+Boundary: process
+Done means:
+- [window] The counter counts requests in the last 60 seconds
+Scenarios:
+- [window] TestCounterWindow
+Risk cases:
+- timeout: N/A — in-memory count, no deadline
+- cleanup: N/A — no temp state per request
+- non-ENOENT errors: N/A — no filesystem lookup
+- concurrency: [window]
+- optional configured dependencies: N/A — counter has no optional services
+Verify: `go test ./internal/ratelimit -run TestCounterWindow`
 - [ ] pending
 
-## Unit 2: Limiter enforces per-IP cap
-Done means: `internal/ratelimit/limiter.go` exists, allows 100 requests per minute per IP, and rejects the 101st with 429.
-
-Verify:
-```bash
-go test ./internal/ratelimit -run TestLimiterEnforcement
-```
-
-- [ ] pending
-
-## Unit 3: Middleware integration
-Done means: `cmd/api/middleware.go` applies the limiter and sets `Retry-After`.
-
-Verify:
-```bash
-go test ./cmd/api -run TestMiddleware
-```
-
+## Limiter enforces per-IP cap
+Depends: Sliding window counter
+Done means:
+- [cap] 100 requests per minute per IP pass; the 101st returns 429 with `Retry-After`
+Scenarios:
+- [cap] TestLimiterEnforcement
+Verify: `go test ./internal/ratelimit -run TestLimiterEnforcement`
 - [ ] pending
 ````
 
-Create or update the issue with `gh issue create` or `gh issue edit 42 --body-file issue.md`.
+Create it with `gh issue create --label litespec --body-file issue.md`. Prose-only units are banned — explanation rides with the unit whose behavior it describes.
 
 ## Draft the spec
 
-For load-bearing features, `litespec-plan` also drafts a durable spec at `specs/<feature>/spec.md`. It is a contract, not a proposal, so it uses `SHALL`/`MUST` and `WHEN`/`THEN`.
-
-`specs/rate-limit/spec.md`:
+Rate limiting outlives the issue, so it's load-bearing: plan drafts `specs/rate-limit/spec.md` alongside the issue. Contracts, not proposals — `SHALL`/`MUST`, `WHEN`/`THEN`:
 
 ```markdown
 # rate-limit
 
-## Purpose
-
-Rate limiting protects the API from abuse and ensures fair usage by limiting the number of requests per IP address over a time window.
-
 ## Requirements
 
 ### Requirement: Enforce per-IP request limit
-The rate limiter MUST enforce a maximum of 100 requests per minute per IP address. Requests exceeding the limit SHALL return HTTP 429 with a `Retry-After` header.
+The rate limiter MUST enforce 100 requests per minute per IP. Requests over the limit SHALL return HTTP 429 with a `Retry-After` header.
 
 #### Scenario: Request under limit
-- **WHEN** an IP address makes 50 requests within one minute
+- **WHEN** an IP makes 50 requests within one minute
 - **THEN** all requests succeed with HTTP 200
 
 #### Scenario: Request exceeds limit
-- **WHEN** an IP address makes 101 requests within one minute
-- **THEN** the 101st request returns HTTP 429 with a `Retry-After: 60` header
+- **WHEN** an IP makes 101 requests within one minute
+- **THEN** the 101st returns HTTP 429 with `Retry-After: 60`
 
 ### Requirement: Configurable limit
-The rate limit MUST be configurable via the `RATE_LIMIT_PER_MINUTE` environment variable. The default value SHALL be 100 when the variable is unset.
+The limit MUST be configurable via `RATE_LIMIT_PER_MINUTE`. It SHALL default to 100 when unset.
 
 #### Scenario: Default limit
 - **WHEN** `RATE_LIMIT_PER_MINUTE` is unset
-- **THEN** the limit defaults to 100 requests per minute
+- **THEN** the limit is 100 requests per minute
 ```
 
-Every requirement body contains `SHALL` or `MUST`. Each load-bearing requirement has at least one named scenario with `WHEN` and `THEN`.
+Run `litespec validate` — it reports the file and line for a missing `SHALL`/`MUST` or a scenario without `WHEN`/`THEN`.
 
 ## Grill me (optional)
 
-Before building, ask `litespec-plan` to stress-test the plan.
+Before building:
 
 > **You:** grill-me
 >
-> **litespec-plan:** Questions the design. What if the counter map grows unbounded? What if `X-Forwarded-For` contains multiple IPs? What if the service restarts? It may add a durable decision to `specs/decisions/` or tighten the spec.
+> **Plan:** What if the counter map grows unbounded? What if `X-Forwarded-For` holds multiple IPs? What if the service restarts?
 
-This is optional, but it catches gaps before code.
+Grilling may tighten the spec or record a durable decision. Cheap now, expensive later.
 
 ## Build one unit at a time
 
-Invoke `litespec-build` for **Unit 1**.
-
 > **You:** build unit 1
 >
-> **litespec-build:** Reads the GH issue, `specs/rate-limit/spec.md`, `specs/product.md`, and `specs/glossary.md`. Because the unit introduces its test, it first adds that test in one verifier-only commit. It runs the exact Verify at that clean pre commit and confirms the test fails because the counter is absent:
->
-> ```bash
-> go test ./internal/ratelimit -run TestCounterWindow
-> ```
->
-> It then creates `internal/ratelimit/counter.go` and implements the sliding window in one or more implementation/fix commits. It never amends those commits:
->
-> ```bash
-> git commit -m "ratelimit: add sliding window counter"
-> ```
->
-> Post is the final clean commit where `Verify:` passes with exit status 0. It posts one receipt containing the exact command, both SHAs and statuses, both raw outputs, and matching scope lines; then it checks the unit and stops. The pre and implementation/fix commits are never amended.
+> **Build:** Reads the issue, the spec, product, glossary. On the issue's branch, from a clean tree, runs the exact Verify — it fails because the counter is absent. That clean commit is pre. (If the unit introduces its own test, build commits just the verifier first and uses that as pre.) Then implements the sliding window, commits without amending, and re-runs the same Verify at the final clean commit — green. That commit is post.
 
-Repeat for Unit 2 and Unit 3. Each unit is demo-able and has a Verify that fails without it.
+Then the receipt. Build runs `litespec digest` for the unit's contract digest and `litespec receipt` to assemble the evidence — exact command, digest, pre/post SHAs and statuses, both raw outputs unedited, scope lines — into numbered comment files, posts them, and ticks the box with `litespec issue check` (exactly one flip, ownership lines untouched). Then it stops. Re-invoke for unit 2.
 
-## Validate
-
-Run `litespec validate` as you go:
-
-```bash
-$ litespec validate
-ok: 1 capability, 2 requirements, 3 scenarios
-```
-
-If a requirement is missing `SHALL`/`MUST` or a scenario is missing `WHEN`/`THEN`, `validate` reports the file and line.
-
-## View the dashboard
-
-`litespec view` shows the spec and the open issue:
-
-```text
-
-Litespec Dashboard
-
-════════════════════════════════════════════════════════════
-Product:
-  specs/product.md — # Product
-  product: mental models + flows
-
-Summary:
-  ● Specifications: 1 specs, 2 requirements
-  ● GH Issues: 1 open
-
-Specifications
-────────────────────────────────────────────────────────────
-  ▪ rate-limit                     2 requirements  (specs/rate-limit/spec.md)
-
-GH Issues (open)
-────────────────────────────────────────────────────────────
-  #42     Add rate limiting                        https://github.com/your-org/your-project/issues/42
-
-════════════════════════════════════════════════════════════
-
-```
+Never amend pre or any implementation commit; fixes go in new commits.
 
 ## Review
 
-When all units are done, invoke `litespec-review`. Harness/system instructions and auto-loaded repository instructions are its trusted bootstrap. After activation it reads only the remote issue first, then screens every additional local queue, contract, implementation, and reference path before reading it. Unsafe paths or parent components stop review.
-
 > **You:** review
 >
-> **litespec-review:** Adversarial review of the GH issue + `specs/rate-limit/spec.md` vs the implementation. It checks:
-> - Does the exact Verify fail for the absent outcome at pre, pass with it at post, and still pass at `HEAD`? All three runs use detached temporary worktrees with guaranteed cleanup, never the current worktree.
-> - Does the code enforce 100 requests per minute per IP?
-> - Does the 101st request return 429 with `Retry-After`?
-> - Does `RATE_LIMIT_PER_MINUTE` default to 100?
-> - Are edge cases (empty header, window reset, concurrent access) tested?
+> **Review:** Reads the issue body first, screens every local path before touching it, then fetches comments. Replays the exact Verify in detached throwaway worktrees at pre, post, and `HEAD` — removing each even on failure, never checking out evidence SHAs in your tree. Then the adversarial pass: does the 101st request really return 429? Does the window reset? Concurrent access? Empty headers?
 
-Red-green evidence distinguishes the recorded trees; it does not prove that Verify targets the correct behavior. That remains part of the adversarial review.
+A passing Verify proves only its scope, so review probes beyond the receipt. Findings route in order: suggestions ride the small-fix lane; unit violations rebuild the unit via build (at most twice per contract — the third routes to plan to reshape it); in-scope findings outside units become a direct fix or a new unit on this issue; out-of-scope findings route without blocking.
 
-Routing is ordered:
+## Merge, then close
 
-1. Suggestions are non-blocking.
-2. Unit violations, including WARNINGs, route that unit to `litespec-build`. GitHub review posts one append-only rebuild request carrying the exact heading and its same-heading occurrence; local review unchecks only the affected unit in a clean metadata commit.
-3. CRITICAL/WARNING findings inside issue scope but outside units block as a direct fix or a new unit on this issue.
-4. Findings outside issue scope route without blocking; non-trivial work gets its own later `plan[clear]` and branch.
-
-## Close the issue
-
-When every unit is checked, every rebuild request has later complete evidence for the same identity, and review returns `PASS`, close the GH issue:
+When every box is ticked, every rebuild request and amendment resolved, and review returns `PASS`:
 
 ```bash
+gh pr create --head litespec/add-rate-limiting
+# after merge:
 gh issue close 42
 ```
 
-The queue is closed. The durable spec remains in `specs/rate-limit/spec.md`.
+Merge first, then close — a closed issue leaves no work stranded on a branch. The queue is gone; `specs/rate-limit/spec.md` remains as the durable truth.
 
-## Summary
+## What you did
 
-You completed a v2 feature cycle:
-
-1. `litespec-plan` clarified the idea, started from a clean tree, created the isolated branch, and wrote `Base:`/`Branch:` into the queue issue.
-2. `litespec-plan` drafted `specs/rate-limit/spec.md` with `SHALL`/`MUST` and `WHEN`/`THEN`.
-3. `litespec-build` implemented one unit at a time, satisfying `Done means:` and `Verify` for each.
-4. `litespec validate` confirmed the spec format.
-5. `litespec-review` checked the implementation against the issue and spec.
-6. `gh issue close 42` closed the queue.
-
-The spec is the durable source of truth. The issue is disposable.
+1. `litespec-plan` grilled the idea, then wrote `Base:`/`Branch:` plus proposal, design, and queue into the issue.
+2. `litespec-plan` drafted the load-bearing spec with `SHALL`/`MUST` and `WHEN`/`THEN`.
+3. `litespec-build` implemented one unit at a time — red at pre, green at post, receipt, tick, stop.
+4. `litespec validate` confirmed structure (it never claims the code is correct).
+5. `litespec-review` replayed the evidence and probed the behavior.
+6. You merged the branch, then closed the issue.
 
 ## What's next
 
-- [Workflow](workflow.md) — the two lanes in detail
+- [Workflow](workflow.md) — unit shape, evidence protocol, and routing in full
 - [Concepts](concepts.md) — what makes a good spec
-- [CLI Reference](cli-reference.md) — command reference
+- [CLI Reference](cli-reference.md) — every command and flag

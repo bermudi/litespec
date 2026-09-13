@@ -1,113 +1,117 @@
 # Workflow
 
-litespec is unidirectional and has two lanes. GH issue is the queue — proposal + design + queue live in the GH issue body. Durable contracts live in `specs/<feature>/spec.md` and `specs/decisions/`. Disposable work lives in a closed GH issue.
+The full rules of the two lanes: unit shape, evidence protocol, review routing, closure. [Concepts](concepts.md) is the why; this is the how.
 
-## Two Lanes
+## Small fix — zero ceremony
 
-### Small fix — zero ceremony
-
-For typos, bugs, one-offs, and trivial refactors.
+Typos, bugs, one-offs, trivial refactors.
 
 1. Tell the agent the fix.
-2. The agent reads `specs/product.md`, the relevant `specs/<feature>/spec.md`, `specs/decisions/`, and `specs/glossary.md`.
-3. The agent edits the code.
-4. If the fix changed a load-bearing contract, the agent edits the one `specs/<feature>/spec.md` directly. Preserve `SHALL`/`MUST` and `WHEN`/`THEN`.
-5. Done.
+2. It reads `specs/product.md`, the relevant spec, decisions, and glossary.
+3. It edits the code.
+4. If a load-bearing contract changed, it edits the one `specs/<feature>/spec.md` directly, preserving `SHALL`/`MUST` and `WHEN`/`THEN`.
+5. Done. No issue, no queue.
 
-No GH issue. No folder.
+## New feature — plan, build, review
 
-### New feature — plan fuzzy to clear
+Greenfield, API shape, CLI behavior, anything that outlasts the issue. Unidirectional: if the plan shifts, rewrite the issue (disposable), not the spec.
 
-For greenfield, API shape, CLI behavior, or anything that will outlast the issue.
-
-1. `litespec-plan` in **fuzzy** mode: read code, ask 2–3 questions, maybe spike, write no files. Use `references/fuzzy.md`.
-2. `litespec-plan` in **clear** mode: require a clean tree, capture `Base:`, create `litespec/<change-name>`, and record `Branch:` in the labeled GH issue body before its proposal, design, and units. If `gh` is unavailable, write the same body to `specs/queues/<name>.md`. Draft a spec if load-bearing.
-3. **grill-me** (optional): adversarial shaping. Use `references/grilling.md`. Pull in `codebase-design` or `domain-modeling` when needed.
-4. `litespec-build`: establish a meaningful red Verify at a clean pre commit, implement one unit through one or more implementation/fix commits, require green at the final clean commit where `Verify:` passes, then post the complete receipt before checking the box.
-5. `litespec-review`: replay Verify at pre, post, and `HEAD`, verify the recorded branch, review tracked and untracked issue-owned work, then route findings.
-6. Close the GH issue only when all units are checked and review returns `PASS`.
-
-Unidirectional. If the plan shifts, rewrite the GH issue (disposable), not the durable spec.
+1. **`litespec-plan` fuzzy** — read code, grill with two or three questions, maybe spike. No files. (`references/fuzzy.md`, grilling by default.)
+2. **`litespec-plan` clear** — clean tree required. Capture `Base:`, create `litespec/<change-name>`, record `Branch:`, write the labeled GH issue (proposal + design + queue), draft the spec if load-bearing. (`references/clear.md` owns the Verify rule.) Offline: same body in `specs/queues/<name>.md`.
+3. **Grill-me (optional)** — adversarial shaping via `references/grilling.md`, plus codebase-design or domain-modeling when the branch applies.
+4. **`litespec-build`** — one unit per session: meaningful red at a clean pre commit, immutable implementation commits, green at the final clean post commit, receipt posted, box ticked, stop.
+5. **`litespec-review`** — replay Verify at pre, post, and `HEAD` in detached worktrees; adversarial probe; route findings.
+6. **Merge the `Branch:`, then close the issue** — only when every box is ticked, every rebuild request / re-plan marker / amendment resolved, and review returns `PASS`.
 
 ## Units
 
-A unit is one demo-able outcome with a `Verify:` that must fail without the outcome.
-
-In the GH issue body:
+One unit is one boundary or one failure policy — never just one broad demo. A demo crossing independent boundaries splits.
 
 ```markdown
-Base: <full commit ID>
+Base: <full commit SHA>
 Branch: litespec/show-dependency-graph
 
-## Queue
+## Proposal
+...
+
+## Design
+...
 
 ## Show dependency graph in `view`
-Done means: `litespec view` displays arrows between dependent changes
-Verify: `go test ./...` and `litespec view | grep "->"` returns a non-empty line
-- [ ] pending
-
-## Validate specs from `view`
-Done means: the dashboard lists each `specs/<feature>/spec.md` with its requirement count
-Verify: `litespec view | grep "Specifications"` shows the spec name and count
+Boundary: process
+Done means:
+- [graph] `litespec view` shows arrows between dependent changes
+Scenarios:
+- [graph] TestViewShowsDependencyArrows
+Risk cases:
+- timeout: N/A — view is a local read with no deadline
+- cleanup: N/A — view creates no temp state
+- non-ENOENT errors: N/A — no filesystem lookup beyond specs/
+- concurrency: N/A — single read-only invocation
+- optional configured dependencies: N/A — view requires no optional services
+Verify: `go test ./internal -run TestViewShowsDependencyArrows`
 - [ ] pending
 ```
 
-- Build one unit per session.
-- `Verify:` must be a concrete command or assertion. If it would pass without the outcome, the unit is too big.
-- Before implementation, run the exact Verify on a clean pre commit. It must fail because the outcome is absent. If the verifier is introduced by the unit, create at most one verifier-only commit first.
-- Create one or more implementation/fix commits without amending them, then run the same Verify. Post is the final clean commit where `Verify:` passes with exit status 0.
-- For initial work, tick the checkbox only after posting one receipt with the exact command plus full pre/post SHAs, statuses, fenced raw outputs, and matching scope lines. A checked GitHub unit with an unresolved rebuild request is also selectable; its later receipt carries the same exact heading and same-heading occurrence, resolves all earlier requests for that identity, and leaves the body unchanged. Never amend either evidence commit. A nonempty `Evidence:` label is not enough.
-- After a plan-authored amendment changes a unit, validation checks an older receipt against the command and digest it declares, including exact repeated identity on raw-output chunks. It accepts that historical receipt only when amendment edges chain its digest to the current contract; a receipt declaring the current digest must still use the current Verify command exactly.
-- Put unrelated work on another branch or worktree.
+Field rules:
 
-Review checks pre→post→`HEAD` ancestry and replays the exact Verify using a detached temporary worktree at pre, another at post, and a detached temporary worktree at `HEAD`. All are removed even when Verify fails, and the current worktree is never checked out to evidence commits. Red-green evidence does not prove that Verify targets the correct behavior, so review still probes it adversarially. Findings then route in order: suggestions are non-blocking; unit violations rebuild the unit; CRITICAL/WARNING inside issue scope blocks as a direct fix or new parent unit; findings outside issue scope route without blocking. GitHub rebuild routing posts one structured append-only comment per affected unit identity and never edits the issue body. Local routing unchecks only affected units in a clean metadata commit. Auto-loaded instructions are trusted bootstrap inputs. After skill activation, only the remote issue is read initially; every additional local queue, contract, implementation, or reference path is screened before content access.
+- **`Done means:`** — one bullet per clause, each with a unique bracketed ID. The clause is the observable outcome.
+- **`Scenarios:`** — every clause ID maps to at least one named test. Unknown IDs and unmapped clauses both fail validation. IDs and mappings are contract: build treats them as fixed, review judges whether the named tests actually exercise them.
+- **`Verify:`** — exactly one command, and it must fail without the outcome. Fenced block preferred; an inline backtick command on the `Verify:` line also validates. Vacuous commands (`true`, `:`, `exit 0`, comment-only) fail. `bash -n` lints fenced blocks.
+- **`Boundary:` / `Risk cases:`** — required when the unit touches filesystem, process, or network. `Boundary:` takes exactly one of `filesystem`, `process`, `network` (closed, case-sensitive vocabulary). `Risk cases:` accounts for all five — `timeout`, `cleanup`, `non-ENOENT errors`, `concurrency`, `optional configured dependencies` — each mapping to a scenario ID or `N/A — <concrete reason>`. No boundary, no risk block.
+- **`Read first:` / `Constraints:` / `Depends:`** — optional, at most one each, nonempty when present. `Read first:` is context (areas and rulings, not a file list). `Constraints:` states what must stay true or is out of bounds — never an edit list. `Depends:` names `##` headings in the same queue; a unit is unblocked when its dependencies are checked with no unresolved requests.
+- **Prose sections** (`Proposal`, `Design`, drafts) are skipped by validation — only `##` sections containing `Done means:` or `Verify:` are units. But prose is still scope: before filing, every preservation sentence in it must map onto a unit's `Done means:`/`Constraints:`, become its own regression-pin unit, or be deleted. A sentence no unit enforces is a promise nothing can test.
 
-## When to Write a Spec
+Before filing, plan dry-runs each Verify on the base tree: honest results are non-zero (outcome or verifier missing) or green only when every named test file actually executed — runners silently skip misnamed files and stay green. An outcome an earlier unit already delivers (or is constrained to preserve) becomes a regression pin, never a re-delivery: the named tests are the outcome, and the Verify fails while the pin is absent.
 
-A spec is a durable, load-bearing contract in `specs/<feature>/spec.md`.
+## Evidence protocol
 
-Write one when:
+Build proves the unit twice with one exact command, then review replays both runs plus the present.
 
-- You are defining a CLI command, API shape, file format, or public interface.
-- Being wrong six months from now would break downstream work.
-- The contract needs `SHALL`/`MUST` and `WHEN`/`THEN` scenarios.
+**Build, per unit:**
 
-Skip one when:
+1. Clean tree. Run the exact `Verify:` — it must exit non-zero *because the outcome is absent*. Unrelated failures (typo, missing dependency, broken environment) stop the unit.
+2. If the verifier doesn't exist yet, commit just the verifier first (at most one verifier-only commit; loud not-implemented stubs keep gates green while pre stays red) and use that as pre. Otherwise the starting commit is pre.
+3. Implement in one or more commits. Never amend pre or any implementation commit.
+4. Clean tree. Run the same `Verify:` — exit 0 with the outcome present. That final clean commit is post.
+5. Assemble the receipt with `litespec receipt` (see [CLI Reference](cli-reference.md)): exact command, `unit digest:` from `litespec digest`, labeled pre/post SHAs and statuses, both raw outputs in unedited fences (`<no output>` if empty), matching scope lines, opening with `Protocol: evidence/v1`, `Digest algorithm: unit-contract-sha256-v1`, and a content-derived `Receipt ID:`. Pre must ancestor post.
+6. Post it — GitHub comment, or `Evidence:` block under the unit for local queues — then tick the box with `litespec issue check` (GitHub) or a separate metadata commit (local). A prose `Evidence:` label is not a receipt. Then stop; one unit per session.
 
-- It is a one-off, trivial refactor, prototype, or internal-only detail.
-- It will not outlast the GH issue.
-- The change is purely cosmetic or a bug fix with no contract change.
+Oversized receipts split, never truncate: field-boundary splits after a scope line, or identity-bearing `Raw output chunk:` records for a single giant output — every non-final comment ending with the literal continuation marker. `validate` joins only the literal next comment; anything else is an incomplete-receipt error.
 
-For small fixes, edit the existing spec in place. For new features, `litespec-plan` drafts the spec during `clear` mode.
+**Review, per checked unit:** detached throwaway worktrees at pre (must fail for the absent outcome), post (must pass), and `HEAD` (must still pass) — each removed even on failure, evidence SHAs never checked out in the working tree. Red-green proves Verify distinguishes the trees; the adversarial probe decides whether it tests the right behavior. Superseded receipts validate against their own declared protocol, command, and digest; current-digest receipts must match current Verify exactly.
 
-## Durable vs Disposable
+**Rebuilds:** a checked unit with an unresolved rebuild request is selectable again; its fresh receipt carries the same heading + occurrence and resolves all earlier requests for that identity. After two completed rebuild cycles against one digest, the next unit-breaking finding records `Re-plan required:` instead — build refuses the marked contract until plan reshapes it through an `Amendment:` (old digest → new digest, witnessed append-only), which resets the count and stays unresolved until fresh evidence lands on the new digest. Only plan authors or alters contracts; silent edits followed by fresh receipts fail the digest chain.
 
-| Durable (keep) | Disposable (close/delete) |
-|---|---|
-| `specs/product.md` | GH issue body and comments |
-| `specs/<feature>/spec.md` | |
-| `specs/decisions/NNNN-<slug>.md` (`spine: true` for load-bearing) | |
-| `specs/glossary.md` | |
+## Review routing
 
-Rule of thumb: if being stale would mislead the next reader, keep it. Otherwise delete it after merge.
+Every finding carries Severity (`CRITICAL` / `WARNING` / `SUGGESTION`), Location, Evidence, and one unambiguous Fix direction. Severity is confidence it's wrong; scope decides whether this issue owns it. First matching rule wins — and `DISPUTED` (an adversarial candidate that cited authority explicitly rejects) is terminal: never blocks, never routes.
 
-## Skills and Adapters
+1. **SUGGESTION** → small-fix lane, non-blocking, user's discretion.
+2. **CRITICAL/WARNING breaking a unit contract** → blocking. Fewer than two rebuild cycles against the current digest: rebuild request → `litespec-build`. Two cycles done: re-plan marker → `litespec-plan`. WARNINGs follow the same threshold.
+3. **CRITICAL/WARNING in scope, outside units** → blocking. Trivial: direct fix on the issue branch. Non-trivial and well-shaped: append an unchecked unit to this issue, build it here. Wrong shape: `litespec-plan`.
+4. **CRITICAL/WARNING outside scope and units** → non-blocking. Trivial: small-fix lane. Non-trivial: draft for a later `plan[clear]` with its own queue and branch. Wrong shape: `litespec-plan`.
 
-litespec generates three skills into `.agents/skills/`:
+A finding needing a durable ruling reports `needs decision: <question>` first — it doesn't change blocking status. Review never writes code, ticks boxes, edits issue bodies for routing, or removes evidence; rebuild requests, re-plan markers, coverage records, and parent-unit appends are the only permitted routing mutations. Review also posts a HEAD-keyed coverage record per review — advisory only, never proof; each reviewer drafts risks independently first, then uses prior records to hunt gaps.
+
+## Closure
+
+The issue closes only when **all** hold: every box ticked, every rebuild request / re-plan marker / amendment resolved (every observed digest chains to the current contract), review returns `PASS`, and the issue's `Branch:` is merged. Merge first, then close. Non-blocking routed findings never prevent closure — they already have their own lane.
+
+## Skills and adapters
+
+Three skills, generated into `.agents/skills/` by `litespec update`:
 
 | Skill | Purpose |
 |---|---|
-| `litespec-plan` | Fuzzy/clear planning, grilling, codebase-design, domain-modeling |
-| `litespec-build` | Implement one unit at a time, satisfy `Done means:` and `Verify:` |
-| `litespec-review` | Adversarial review of GH issue + spec vs implementation |
+| `litespec-plan` | Fuzzy grilling, clear issue writing, codebase design, domain modeling, glossary |
+| `litespec-build` | One unit: red, green, receipt, tick, stop |
+| `litespec-review` | Replay, adversarial probe, route |
 
-- `.agents/skills/` is canonical. Nearly every AI coding agent discovers it natively.
-- `litespec init --tools claude` or `litespec update --tools claude` creates symlinks in `.claude/skills/` for Claude Code.
-- Run `litespec update` after changing templates or pulling a new version.
-- Project-specific skills are tracked in git directly, not generated.
+`.agents/skills/` is canonical. `litespec init --tools claude` symlinks into `.claude/skills/` for Claude Code; later `update` runs auto-detect. Project-specific skills live in `.agents/skills/` as tracked files — never generated, never overwritten.
 
-## See Also
+## See also
 
-- [Concepts](concepts.md)
-- [CLI Reference](cli-reference.md)
-- [Getting Started](getting-started.md)
+- [Concepts](concepts.md) — the why behind all of this
+- [Tutorial](tutorial.md) — the cycle end to end
+- [CLI Reference](cli-reference.md) — the exact commands

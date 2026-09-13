@@ -1,69 +1,79 @@
 # Concepts
 
-litespec is built for AI-native, spec-driven development. These concepts are the foundation. For the full design rationale, see [`DESIGN.md`](https://github.com/bermudi/litespec/blob/main/DESIGN.md).
+Why litespec exists, what its pieces are, and how they fit together. For the full design rationale, see [`DESIGN.md`](https://github.com/bermudi/litespec/blob/main/DESIGN.md).
 
-## Why spec-driven development for AI agents
+## Why specs survive the chat window
 
-AI coding agents are great at implementation, but context is lost between sessions. A spec is a durable contract that survives the chat window. It states **what** the system must do (requirements with `SHALL` or `MUST`) and **when** it matters (named `WHEN`/`THEN` scenarios), so the next agent can verify the same thing the first agent built.
+AI coding agents are good at implementation and bad at memory. Context evaporates between sessions: the first agent knew *why* the rate limit is per-IP, the next one guesses. A spec is a durable contract that outlives the conversation — it states **what** the system must do (requirements with `SHALL` or `MUST`) and **when** it matters (named `WHEN`/`THEN` scenarios), so the next agent verifies the same thing the first one built.
 
-Specs are not roadmaps, design documents, or hand-wavy intentions. They are small, load-bearing contracts for the parts of the system that break if they are wrong: CLI shapes, API surfaces, file formats, and core workflows.
+Specs are not roadmaps, design documents, or intentions. They are small, load-bearing promises about the parts that break when wrong: CLI shapes, API surfaces, file formats, core workflows. If being stale would mislead the next reader, it belongs in a spec. Otherwise it lives in the issue and disappears when the issue closes.
 
-## The two-lane workflow
+## The two lanes
 
 Work is either a small fix or a new feature. The lanes differ in ceremony, not rigor.
 
-### Small fix — zero ceremony
+**Small fix — zero ceremony.** "Fix the typo." The agent reads `specs/product.md`, the relevant spec, decisions, and glossary; edits the code; updates the spec in place if the contract changed. No issue, no queue.
 
-"Fix the typo" or "rename this function." The agent reads `specs/product.md`, the relevant `specs/<feature>/spec.md`, and `specs/decisions/` / `specs/glossary.md`; edits the code; and updates the spec in place if the contract changed. No GitHub issue, no queue.
+**New feature — plan, build, review.** A fuzzy idea becomes a clear issue, then one verifiable unit at a time:
 
-### New feature — plan, then build
+1. **Plan fuzzy** — `litespec-plan` reads the codebase, grills you with two or three questions, maybe runs a tiny spike. Writes nothing. Ephemeral.
+2. **Plan clear** — `litespec-plan` writes the GitHub issue: `Base:` + `Branch:` ownership, proposal, design, queue of units. Drafts `specs/<feature>/spec.md` if the feature is load-bearing.
+3. **Build one unit** — `litespec-build` records the exact `Verify:` failing at a clean pre commit, implements the unit in immutable commits, records the same command passing at the final clean post commit, posts the receipt, ticks the box, stops. One unit per session.
+4. **Review** — `litespec-review` replays Verify at pre, post, and `HEAD` in detached worktrees, then adversarially checks issue + spec against implementation. Red-green evidence proves Verify distinguishes the two trees — it never proves Verify targets the right behavior. That judgment is the review.
+5. **Close** — merge the issue's `Branch:` first, then close the issue. The spec stays; the issue is disposable.
 
-A fuzzy idea becomes a clear issue, then a demo-able unit at a time:
+One direction only. If the plan shifts, rewrite the issue, not the durable spec.
 
-1. **Plan fuzzy** — `litespec-plan` reads the codebase, asks two or three questions, does a quick spike, and writes nothing. Ephemeral.
-2. **Plan clear** — `litespec-plan` writes the GitHub issue body: proposal, design, and queue of units. It also drafts `specs/<feature>/spec.md` if the feature is load-bearing.
-3. **Grill-me** — stress-test the plan with `litespec-plan`, pulling in codebase-design and domain-modeling references when needed.
-4. **Build one unit** — `litespec-build` records the exact `Verify:` failing for the absent outcome at a clean pre commit, implements one `## <outcome>` in one or more implementation/fix commits without amendments, records the same command passing at the final clean commit where `Verify:` passes, posts the receipt, ticks the checkbox, and stops.
-5. **Review** — `litespec-review` replays Verify at pre, post, and `HEAD` in detached temporary worktrees with guaranteed cleanup, then adversarially checks the issue + spec against the implementation. Red-green evidence does not prove the command targets the right behavior.
-6. **Close the issue** — the issue is disposable. Durable specs, decisions, and glossary stay.
+## The issue is the queue
 
-Unidirectional. One unit per session.
-
-## GitHub issue as the queue
-
-The GitHub issue body is the change: proposal, design, and queue. Each queue item is a unit:
+The GitHub issue body is the change: proposal, design, and queue, headed by immutable ownership lines:
 
 ```markdown
-## Show graph for 2 changes
-Done means: `litespec view` shows arrows between deps
-Verify: `go test ./...` and view output contains "->"
+Base: <full commit SHA at plan time>
+Branch: litespec/show-dependency-graph
+
+## Proposal
+...
+
+## Design
+...
+
+## Show dependency graph in `view`
+Boundary: process
+Done means:
+- [graph] `litespec view` shows arrows between dependent changes
+Scenarios:
+- [graph] TestViewShowsDependencyArrows
+Risk cases:
+- timeout: N/A — view is a local read with no deadline
+- cleanup: N/A — view creates no temp state
+- non-ENOENT errors: N/A — no filesystem lookup beyond specs/
+- concurrency: N/A — single read-only invocation
+- optional configured dependencies: N/A — view requires no optional services
+Verify: `go test ./internal -run TestViewShowsDependencyArrows`
 - [ ] pending
 ```
 
-`plan[clear]` requires a clean tree, records `Base:`, creates `litespec/<change-name>`, and records `Branch:` in the labeled GH issue. If `gh` is unavailable, it writes the same body to `specs/queues/<name>.md`. All work on that branch belongs to the issue.
+One unit is one boundary or one failure policy — not one demo. Every bracketed `Done means:` clause maps to a named test scenario; filesystem, process, and network units account for the five standard risks per scenario or reasoned N/A. One exact `Verify:` gates the unit, and it must fail without the outcome. `plan[clear]` creates the labeled issue from a clean tree on a dedicated `litespec/<change-name>` branch; all work on that branch belongs to the issue. When `gh` is unavailable, `specs/queues/<name>.md` is the same body as a local file.
 
-The 64 KiB issue limit is enough because the queue contains only units, not full designs. Durable design and reasoning live in `specs/product.md`, `specs/<feature>/spec.md`, and `specs/decisions/`.
+## Evidence, not prose
 
-## Durable specs vs. ephemeral issues
+A checked unit carries a receipt, not a claim. The receipt quotes the exact `Verify:`, the unit's contract digest (from `litespec digest`), labeled pre/post SHAs and exit statuses, both raw outputs in unedited fences, and scope lines that say what the runs show and nothing more. New receipts open with `Protocol: evidence/v1`, `Digest algorithm: unit-contract-sha256-v1`, and a content-derived `Receipt ID:`. The CLI assembles them (`litespec receipt`), the validator structural-checks them, build posts them, review replays them — and review still asks whether the command tests the right thing. `litespec issue check` ticks the box afterward, exactly one flip, ownership lines byte-unchanged; hand-editing issue bodies is retired.
 
-**Durable (curated, small):**
+Digest transitions are witnessed, not silent. Only `litespec-plan` may change a unit contract, and it does so with an append-only `Amendment:` record chaining the old digest to the new one. After two review-requested rebuilds against one digest, the next unit-breaking finding stops routing to build and requires plan to reshape the contract. See [Workflow](workflow.md) for the full protocol.
 
-- `specs/product.md` — mental models, flows, and what the project is and isn't.
-- `specs/<feature>/spec.md` — load-bearing contracts. Edited directly.
-- `specs/decisions/NNNN-<slug>.md` — durable rulings. `spine: true` marks load-bearing ones.
-- `specs/glossary.md` — ubiquitous language.
+## Durable vs disposable
 
-**Disposable (closed after the work ships):**
+| Keep (curated, small) | Close (disposable) |
+|---|---|
+| `specs/product.md` — mental models + 2–3 flows | GH issue body and comments |
+| `specs/<feature>/spec.md` — load-bearing contracts, edited directly | |
+| `specs/decisions/NNNN-<slug>.md` — durable rulings (`spine: true` when load-bearing) | |
+| `specs/glossary.md` — shared words, curated | |
 
-- GitHub issues and their comments.
+## What a good spec looks like
 
-Rule of thumb from `DESIGN.md`: if being stale would mislead a new person or agent, keep it. Otherwise it goes in the issue and is closed when done.
-
-## Direct spec edits
-
-There is no staging file for spec changes. Small fixes and new features edit `specs/<feature>/spec.md` directly. If a requirement changes, change the file. If a feature is load-bearing, create the file.
-
-A spec uses this format:
+One spec per load-bearing feature, edited in place — no staging, no delta flow:
 
 ```markdown
 # <feature>
@@ -78,9 +88,7 @@ Body must contain SHALL or MUST.
 - **THEN** <outcome>
 ```
 
-Each load-bearing requirement has a `SHALL` or `MUST` body and at least one named `WHEN`/`THEN` scenario.
-
-Good specs make an observable promise; bad specs leave the implementation to guess:
+Good specs make an observable promise; bad ones leave the implementation guessing:
 
 ```markdown
 Bad: The dashboard should be fast and intuitive.
@@ -94,30 +102,20 @@ Good:
 - **THEN** `litespec view` does not list it
 ```
 
+Decisions close off a road someone will reasonably propose again — the signal is *why not*, not *how*. The bar is high on purpose: real contention plus no better home (a comment at the line that would change beats a decision file). `touch` + `validate` is enough; there is no decide command.
+
 ## Convention over configuration
 
-litespec has no config file. Conventions are enough:
-
-- `specs/` is where durable docs live.
-- `.agents/skills/` is the canonical skill directory.
-- `.claude/skills/` is a symlink for Claude Code.
-- `litespec view` auto-detects `gh` and the GitHub remote.
-- Tool adapters are discovered by scanning symlinked skill directories.
-
-Adapters are added only when a concrete need appears.
+No config file. `specs/` holds durable docs, `.agents/skills/` is the canonical skill directory (`.claude/skills/` symlinks exist only because Claude Code doesn't read `.agents/`), the `litespec` label marks queue issues, `view` auto-detects `gh`. Adapters are discovered by scanning for symlinks — added only when a concrete tool needs one.
 
 ## Three lean skills
 
-AI skills are generated by `litespec update` into `.agents/skills/`. They are short, directive, and progressive: details live in `references/` and are loaded only when the branch applies.
+Generated by `litespec update` into `.agents/skills/`. Short and directive; detail lives in `references/` and loads only when the branch applies.
 
 | Skill | What it does |
 |-------|--------------|
-| `litespec-plan` | Fuzzy exploration, clear issue writing, grilling, codebase design, and domain modeling. |
-| `litespec-build` | One unit at a time. Record red at pre and green at post, post the receipt, tick the box, stop. |
-| `litespec-review` | Replay pre/post/HEAD evidence, then adversarially review the issue + spec against the implementation. |
+| `litespec-plan` | Fuzzy grilling, clear issue writing, codebase design, domain modeling, glossary |
+| `litespec-build` | One unit: red at pre, green at post, receipt, tick, stop |
+| `litespec-review` | Replay pre/post/HEAD, adversarial probe, route findings |
 
-These are the only generated skills. Project-specific skills are tracked directly in `.agents/skills/` and are not generated by the CLI.
-
-## The bottom line
-
-litespec gives AI agents a durable, verifiable contract to work against and a lean workflow that keeps the contract aligned with the code. The GitHub issue carries the temporary plan; the `specs/` directory carries the durable truth.
+Project-specific skills (like `the-drill`) live directly in `.agents/skills/` as tracked files — never generated, never overwritten.

@@ -18,7 +18,7 @@ The project SHALL use MkDocs with the Material theme as its documentation engine
 
 ### Requirement: Documentation Pages
 
-The `docs/` directory SHALL contain the following markdown pages: `index.md` (landing page), `concepts.md` (philosophy and why spec-driven dev matters), `getting-started.md` (installation, init), `tutorial.md` (worked feature walkthrough from plan to review), `workflow.md` (the two-lane flow: small fix vs new feature), `cli-reference.md` (every command and flag for the 6 v2 commands), `project-structure.md` (directory layout explained), and `glossary.md` (explains what the ubiquitous language is, how litespec uses it, how to maintain it, and links to `specs/glossary.md` as the living source of truth — does not duplicate or inline terms).
+The `docs/` directory SHALL contain the following markdown pages: `index.md` (landing page), `concepts.md` (philosophy and why spec-driven dev matters), `getting-started.md` (installation, init), `tutorial.md` (worked feature walkthrough from plan to review), `workflow.md` (the two-lane flow: small fix vs new feature), `cli-reference.md` (every command and flag), `project-structure.md` (directory layout explained), and `glossary.md` (explains what the ubiquitous language is, how litespec uses it, how to maintain it, and links to `specs/glossary.md` as the living source of truth — does not duplicate or inline terms).
 
 #### Scenario: Complete page set
 
@@ -50,12 +50,17 @@ The `concepts.md` page SHALL explain what a spec IS vs ISN'T, what makes a good 
 
 ### Requirement: CLI Reference Completeness
 
-The `cli-reference.md` page SHALL document all 6 v2 commands (`init`, `validate`, `view`, `update`, `upgrade`, `completion`) with usage, flags, and examples. It SHALL NOT reference removed commands (`new`, `list`, `status`, `instructions`, `import`, `preview`, `archive`, `patch`).
+The `cli-reference.md` page SHALL document every command in `litespec --help` output (`init`, `validate`, `view`, `update`, `digest`, `receipt`, `issue check`, `upgrade`, `completion`) with usage, flags, and examples. It SHALL NOT reference removed commands (`new`, `list`, `status`, `instructions`, `import`, `preview`, `archive`, `patch`).
 
 #### Scenario: CLI reference matches binary
 
 - **WHEN** a user runs `litespec --help` and compares to the CLI reference page
 - **THEN** every command and flag listed in the help output is documented on the page
+
+#### Scenario: Evidence commands documented
+
+- **WHEN** a user needs to assemble an evidence receipt or tick a unit checkbox
+- **THEN** the CLI reference page explains `digest`, `receipt`, and `issue check` with usage and examples
 
 ### Requirement: Tool Compatibility
 
