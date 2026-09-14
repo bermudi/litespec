@@ -1,13 +1,17 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -202,6 +206,219 @@ func receiptUnitDigest(t *testing.T, queuePath, heading string, occurrence int) 
 	}
 	t.Fatalf("fixture has no unit %q occurrence %d", heading, occurrence)
 	return ""
+}
+
+func TestReceiptCommandEmitsBoundedV2Comments(t *testing.T) {
+	receiptSHA256 := func(s string) string {
+		sum := sha256.Sum256([]byte(s))
+		return hex.EncodeToString(sum[:])
+	}
+	// boundedFencePayload extracts the fenced payload that follows the given
+	// anchor line, where the fence delimiter is a run of backticks.
+	boundedFencePayload := func(t *testing.T, text, anchor string) string {
+		t.Helper()
+		i := strings.Index(text, anchor)
+		if i < 0 {
+			t.Fatalf("anchor %q not found in receipt:\n%s", anchor, text)
+		}
+		rest := text[i+len(anchor):]
+		nl := strings.Index(rest, "\n")
+		if nl < 0 || strings.Trim(rest[:nl], "`") != "" {
+			t.Fatalf("no opening fence delimiter after anchor %q:\n%s", anchor, text)
+		}
+		delim := rest[:nl]
+		body := rest[nl+1:]
+		closeIdx := strings.Index(body, "\n"+delim+"\n")
+		if closeIdx < 0 {
+			if strings.HasSuffix(body, "\n"+delim) {
+				closeIdx = len(body) - len(delim) - 1
+			} else {
+				t.Fatalf("no closing fence delimiter:\n%s", text)
+			}
+		}
+		return body[:closeIdx]
+	}
+	assertBoundedV2Fields := func(t *testing.T, content, queuePath, pre, post, preOut, postOut string) {
+		t.Helper()
+		for _, want := range []string{
+			"Protocol: evidence/v2",
+			"Digest algorithm: unit-contract-sha256-v1",
+			"unit digest: " + receiptUnitDigest(t, queuePath, "Only unit", 1),
+			"pre sha: " + pre,
+			"pre exit status: 1",
+			"post sha: " + post,
+			"post exit status: 0",
+			"pre bytes: " + strconv.Itoa(len(preOut)),
+			"pre output sha256: " + receiptSHA256(preOut),
+			"post bytes: " + strconv.Itoa(len(postOut)),
+			"post output sha256: " + receiptSHA256(postOut),
+			"Pre-evidence scope: this command exited 1 at " + pre + "; nothing else is inferred.",
+			"Post-evidence scope: this command exited 0 at " + post + "; nothing else is inferred.",
+		} {
+			if !strings.Contains(content, want) {
+				t.Errorf("v2 receipt missing %q:\n%s", want, content)
+			}
+		}
+		if !regexp.MustCompile(`(?m)^Receipt ID: receipt-sha256-v2:[0-9a-f]{64}$`).MatchString(content) {
+			t.Errorf("v2 receipt missing a receipt-sha256-v2 Receipt ID:\n%s", content)
+		}
+		if strings.Contains(content, "Raw output chunk:") || strings.Contains(content, "Receipt continues in next comment") {
+			t.Errorf("v2 receipt must not chunk or continue:\n%s", content)
+		}
+		if len(content) > 8192 {
+			t.Errorf("v2 receipt is %d bytes, over the 8192-byte budget", len(content))
+		}
+	}
+
+	t.Run("receipt command emits one bounded v2 comment file", func(t *testing.T) {
+		preOut := "missing outcome\n"
+		postOut := "outcome present\n"
+
+		// Issue lane: exactly one gh comment command for exactly one file.
+		bin, root := setupCLITest(t)
+		queuePath := writeReceiptQueueFixture(t, root, receiptFixtureBody)
+		fakePath := receiptFakeGH(t, 42, receiptFixtureBody)
+		pre, post := receiptGitCommits(t, root)
+		writeReceiptRunOutput(t, root, "pre.txt", preOut)
+		writeReceiptRunOutput(t, root, "post.txt", postOut)
+
+		cmd := exec.Command(bin, "receipt", "--issue", "42", "--heading", "Only unit",
+			"--pre-sha", pre, "--pre-status", "1", "--pre-out", "pre.txt",
+			"--post-sha", post, "--post-out", "post.txt")
+		cmd.Dir = root
+		cmd.Env = append(append(os.Environ(), "HOME="+root), "PATH="+fakePath)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("receipt failed: %v\n%s", err, out)
+		}
+		wantCommand := "gh issue comment 42 --body-file " + filepath.Join(root, "receipt-0001.md") + "\n"
+		if string(out) != wantCommand {
+			t.Fatalf("stdout = %q, want exactly one gh command %q", string(out), wantCommand)
+		}
+		files := receiptCommentFiles(t, root)
+		if len(files) != 1 {
+			t.Fatalf("want exactly one comment file, got %v", files)
+		}
+		content, err := os.ReadFile(files[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertBoundedV2Fields(t, string(content), queuePath, pre, post, preOut, postOut)
+		if !strings.Contains(string(content), preOut) || !strings.Contains(string(content), postOut) {
+			t.Errorf("outputs within the excerpt budget must appear verbatim:\n%s", content)
+		}
+
+		// Queue lane: the same single bounded file, no gh commands.
+		bin, root = setupCLITest(t)
+		queuePath = writeReceiptQueueFixture(t, root, receiptFixtureBody)
+		pre, post = receiptGitCommits(t, root)
+		writeReceiptRunOutput(t, root, "pre.txt", preOut)
+		writeReceiptRunOutput(t, root, "post.txt", postOut)
+		queueOut, code := runCLI(t, bin, root, "receipt", "--queue", queuePath, "--heading", "Only unit",
+			"--pre-sha", pre, "--pre-status", "1", "--pre-out", "pre.txt",
+			"--post-sha", post, "--post-out", "post.txt")
+		if code != 0 {
+			t.Fatalf("queue-lane receipt failed: %s", queueOut)
+		}
+		if strings.Contains(queueOut, "gh issue comment") {
+			t.Errorf("queue lane must not print gh commands: %s", queueOut)
+		}
+		files = receiptCommentFiles(t, root)
+		if len(files) != 1 {
+			t.Fatalf("queue lane want exactly one comment file, got %v", files)
+		}
+		content, err = os.ReadFile(files[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertBoundedV2Fields(t, string(content), queuePath, pre, post, preOut, postOut)
+	})
+
+	t.Run("oversized output no longer chunks into multiple files", func(t *testing.T) {
+		bin, root := setupCLITest(t)
+		writeReceiptQueueFixture(t, root, receiptFixtureBody)
+		fakePath := receiptFakeGH(t, 42, receiptFixtureBody)
+		pre, post := receiptGitCommits(t, root)
+		preOut := strings.Repeat("0123456789", 7000) + "\n"
+		postOut := "outcome present\n"
+		writeReceiptRunOutput(t, root, "pre.txt", preOut)
+		writeReceiptRunOutput(t, root, "post.txt", postOut)
+
+		cmd := exec.Command(bin, "receipt", "--issue", "42", "--heading", "Only unit",
+			"--pre-sha", pre, "--pre-status", "1", "--pre-out", "pre.txt",
+			"--post-sha", post, "--post-out", "post.txt")
+		cmd.Dir = root
+		cmd.Env = append(append(os.Environ(), "HOME="+root), "PATH="+fakePath)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("receipt failed: %v\n%s", err, out)
+		}
+		wantCommand := "gh issue comment 42 --body-file " + filepath.Join(root, "receipt-0001.md") + "\n"
+		if string(out) != wantCommand {
+			t.Fatalf("stdout = %q, want exactly one gh command for the single bounded file", string(out))
+		}
+		files := receiptCommentFiles(t, root)
+		if len(files) != 1 {
+			t.Fatalf("oversized output must emit exactly one comment file, got %v", files)
+		}
+		content, err := os.ReadFile(files[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(content)
+		if len(text) > 8192 {
+			t.Fatalf("bounded receipt is %d bytes, over the 8192-byte budget", len(text))
+		}
+		if !strings.Contains(text, "pre bytes: "+strconv.Itoa(len(preOut))) {
+			t.Errorf("receipt must declare the full pre byte count %d:\n%s", len(preOut), text)
+		}
+		if !strings.Contains(text, "pre output sha256: "+receiptSHA256(preOut)) {
+			t.Errorf("receipt must declare the full pre output SHA-256:\n%s", text)
+		}
+		markerRe := regexp.MustCompile(`(?m)^\.\.\. ([1-9][0-9]*) bytes elided \.\.\.$`)
+		markers := markerRe.FindAllStringSubmatch(text, -1)
+		if len(markers) != 1 {
+			t.Fatalf("want exactly one elision marker, got %d:\n%s", len(markers), text)
+		}
+		elided, err := strconv.Atoi(markers[0][1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		payload := boundedFencePayload(t, text, "pre exit status: 1\n")
+		markerIdx := strings.Index(payload, markers[0][0])
+		headLen := markerIdx
+		rest := payload[markerIdx+len(markers[0][0]):]
+		tailLen := 0
+		if rest != "" {
+			tailLen = len(rest) - 1 // the newline separating marker and tail
+		}
+		if headLen+elided+tailLen != len(preOut) {
+			t.Errorf("reconstruction arithmetic broken: head %d + elided %d + tail %d != declared %d", headLen, elided, tailLen, len(preOut))
+		}
+	})
+
+	t.Run("metadata over budget refuses before writing files", func(t *testing.T) {
+		bin, root := setupCLITest(t)
+		hugeHeading := "Big " + strings.Repeat("H", 8500)
+		body := "Base: 0000000000000000000000000000000000000004\nBranch: litespec/receipt-fixture\n\n## " + hugeHeading + "\n\nDone means: it works\n\nVerify:\n```bash\necho over-budget\n```\n\n- [ ] pending\n"
+		queuePath := writeReceiptQueueFixture(t, root, body)
+		pre, post := receiptGitCommits(t, root)
+		writeReceiptRunOutput(t, root, "pre.txt", "missing outcome\n")
+		writeReceiptRunOutput(t, root, "post.txt", "outcome present\n")
+
+		out, code := runCLI(t, bin, root, "receipt", "--queue", queuePath, "--heading", hugeHeading,
+			"--pre-sha", pre, "--pre-status", "1", "--pre-out", "pre.txt",
+			"--post-sha", post, "--post-out", "post.txt")
+		if code == 0 {
+			t.Fatalf("oversized identity fields must be refused, got exit 0: %s", out)
+		}
+		if !strings.Contains(out, "8192") || !strings.Contains(out, "Unit heading") {
+			t.Errorf("refusal must name the byte budget and the oversized field: %s", out)
+		}
+		if files := receiptCommentFiles(t, root); len(files) != 0 {
+			t.Fatalf("refusal wrote comment files: %v", files)
+		}
+	})
 }
 
 func TestReceiptCommandEmitsCommentFiles(t *testing.T) {
