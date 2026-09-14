@@ -60,6 +60,38 @@ func TestGeneratedSkillTemplatesDocumentOperations(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("generated build skill documents the bounded v2 receipt shape", func(t *testing.T) {
+		data := readGeneratedSkillFile(t, root, "litespec-build", "SKILL.md")
+		for _, want := range []string{
+			"Protocol: evidence/v2",
+			"Receipt ID: receipt-sha256-v2:<64 lowercase hex>",
+			"pre bytes: <decimal byte length of the full pre output>",
+			"pre output sha256: <SHA-256 of the full pre output>",
+			"... <N> bytes elided ...",
+			"head 2048 + tail 3072 bytes",
+			"never continues across comments and never uses the chunk form",
+			"Prefer `litespec receipt`",
+		} {
+			if !strings.Contains(data, want) {
+				t.Errorf("generated litespec-build SKILL.md missing %q", want)
+			}
+		}
+	})
+
+	t.Run("generated review skill cross-checks v2 replays by byte count and sha256", func(t *testing.T) {
+		data := readGeneratedSkillFile(t, root, "litespec-review", "SKILL.md")
+		for _, want := range []string{
+			"Protocol: evidence/v2",
+			"receipt-sha256-v2:",
+			"comparing its byte count and SHA-256 against the declared",
+			"instead of byte-diffing the full posted log",
+		} {
+			if !strings.Contains(data, want) {
+				t.Errorf("generated litespec-review SKILL.md missing %q", want)
+			}
+		}
+	})
 }
 
 func readGeneratedSkillFile(t *testing.T, root, skillName, relPath string) string {
