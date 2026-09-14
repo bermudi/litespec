@@ -569,9 +569,9 @@ func TestReceiptCommandEmitsCommentFiles(t *testing.T) {
 		for _, want := range []string{
 			"## Only unit",
 			"Evidence:",
-			"Protocol: evidence/v1",
+			"Protocol: evidence/v2",
 			"Digest algorithm: unit-contract-sha256-v1",
-			"Receipt ID: receipt-sha256-v1:",
+			"Receipt ID: receipt-sha256-v2:",
 			"echo receipt-fixture",
 			"unit digest: " + receiptUnitDigest(t, queuePath, "Only unit", 1),
 			"pre sha: " + pre,
@@ -586,8 +586,8 @@ func TestReceiptCommandEmitsCommentFiles(t *testing.T) {
 			}
 		}
 
-		// Oversized output splits into numbered files with gh commands in
-		// posting order.
+		// Oversized output emits exactly one bounded comment file with one gh
+		// command instead of chunking across multiple comments.
 		bin, root = setupCLITest(t)
 		writeReceiptQueueFixture(t, root, receiptFixtureBody)
 		fakePath = receiptFakeGH(t, 42, receiptFixtureBody)
@@ -605,24 +605,22 @@ func TestReceiptCommandEmitsCommentFiles(t *testing.T) {
 			t.Fatalf("oversized receipt failed: %v\n%s", err, out)
 		}
 		files := receiptCommentFiles(t, root)
-		if len(files) < 2 {
-			t.Fatalf("expected oversized output to split across files, got %v", files)
+		if len(files) != 1 {
+			t.Fatalf("oversized output must emit exactly one bounded comment file, got %v", files)
 		}
-		var wantCommands []string
-		for i := range files {
-			wantCommands = append(wantCommands, "gh issue comment 42 --body-file "+files[i])
+		wantCommand := "gh issue comment 42 --body-file " + files[0] + "\n"
+		if string(out) != wantCommand {
+			t.Fatalf("stdout = %q, want the single exact gh command %q", string(out), wantCommand)
 		}
-		if string(out) != strings.Join(wantCommands, "\n")+"\n" {
-			t.Fatalf("stdout = %q, want gh commands in posting order %v", string(out), wantCommands)
+		oversized, err := os.ReadFile(files[0])
+		if err != nil {
+			t.Fatal(err)
 		}
-		for _, name := range files {
-			info, err := os.Stat(name)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if info.Size() > 65536 {
-				t.Errorf("comment file %s is %d bytes, over the comment cap", name, info.Size())
-			}
+		if len(oversized) > 8192 {
+			t.Errorf("bounded comment file %s is %d bytes, over the 8192-byte receipt budget", files[0], len(oversized))
+		}
+		if !strings.Contains(string(oversized), " bytes elided ...") {
+			t.Errorf("bounded receipt must elide the oversized output:\n%s", oversized)
 		}
 
 		// Queue mode stays emit-only: files without gh commands.
@@ -667,44 +665,34 @@ func TestReceiptCommandEmitsCommentFiles(t *testing.T) {
 		if err != nil {
 			t.Fatalf("receipt with --out failed: %v\n%s", err, stdout)
 		}
-		files, err := filepath.Glob(filepath.Join(root, "out", "receipt-*.md"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		sort.Strings(files)
-		if len(files) < 2 {
-			t.Fatalf("expected the oversized output to split across files in out/, got %v", files)
-		}
-		wantCommands := make([]string, len(files))
-		for i := range files {
-			wantCommands[i] = fmt.Sprintf("gh issue comment 42 --body-file %s", filepath.Join(root, "out", fmt.Sprintf("receipt-%04d.md", i+1)))
-		}
-		if stdout != strings.Join(wantCommands, "\n")+"\n" {
-			t.Fatalf("stdout = %q, want gh commands referencing out/: %v", stdout, wantCommands)
+		wantCommand := fmt.Sprintf("gh issue comment 42 --body-file %s\n", filepath.Join(root, "out", "receipt-0001.md"))
+		if stdout != wantCommand {
+			t.Fatalf("stdout = %q, want the single gh command %q even for the oversized output", stdout, wantCommand)
 		}
 		if stray := receiptCommentFiles(t, root); len(stray) != 0 {
 			t.Fatalf("--out must keep the working directory clean, found %v", stray)
 		}
 
-		// A mid-sequence write failure removes the already-written files.
+		// A failed comment-file write exits non-zero naming the file and
+		// leaves no partial receipt set.
 		bin, root = setupCLITest(t)
 		writeReceiptQueueFixture(t, root, receiptFixtureBody)
 		fakePath = receiptFakeGH(t, 42, receiptFixtureBody)
 		pre, post = receiptGitCommits(t, root)
 		writeReceiptRunOutput(t, root, "pre.txt", strings.Repeat("0123456789", 14000)+"\n")
 		writeReceiptRunOutput(t, root, "post.txt", "outcome present\n")
-		if err := os.MkdirAll(filepath.Join(root, "out", "receipt-0002.md"), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(root, "out", "receipt-0001.md"), 0o755); err != nil {
 			t.Fatal(err)
 		}
 		stdout, err = runReceipt()
 		if err == nil {
-			t.Fatalf("mid-sequence write failure must exit non-zero: %s", stdout)
+			t.Fatalf("failed comment-file write must exit non-zero: %s", stdout)
 		}
-		if !strings.Contains(stdout, "receipt-0002.md") || !strings.Contains(stdout, "removed") {
-			t.Fatalf("failure must name the failing file and the cleanup: %s", stdout)
+		if !strings.Contains(stdout, "receipt-0001.md") {
+			t.Fatalf("failure must name the failing file: %s", stdout)
 		}
-		if _, statErr := os.Stat(filepath.Join(root, "out", "receipt-0001.md")); !os.IsNotExist(statErr) {
-			t.Fatalf("partial set must be removed; receipt-0001.md stat err=%v", statErr)
+		if _, statErr := os.Stat(filepath.Join(root, "out", "receipt-0002.md")); !os.IsNotExist(statErr) {
+			t.Fatalf("no partial set may remain beyond the failing name; receipt-0002.md stat err=%v", statErr)
 		}
 	})
 
@@ -782,7 +770,7 @@ func TestReceiptPostsCommentsWhenAsked(t *testing.T) {
 		return string(out), code
 	}
 
-	t.Run("opt-in flag posts the numbered comments in order", func(t *testing.T) {
+	t.Run("opt-in flag posts the single bounded comment", func(t *testing.T) {
 		bin, root, fakePath, logPath, pre, post := newScenario(t)
 
 		out, code := runReceipt(t, bin, root, fakePath, emitArgs(pre, post, "--post")...)
@@ -790,17 +778,12 @@ func TestReceiptPostsCommentsWhenAsked(t *testing.T) {
 			t.Fatalf("posting receipt failed: exit %d\n%s", code, out)
 		}
 		files := receiptCommentFiles(t, root)
-		if len(files) < 3 {
-			t.Fatalf("expected the oversized output to split into at least three files, got %v", files)
+		if len(files) != 1 {
+			t.Fatalf("expected exactly one bounded comment file even for the oversized output, got %v", files)
 		}
-		var wantReport []string
-		var wantCalls []string
-		for _, name := range files {
-			wantReport = append(wantReport, fmt.Sprintf("posted %s (gh issue comment 42 --body-file %s)", name, name))
-			wantCalls = append(wantCalls, "gh issue comment 42 --body-file "+name)
-		}
-		if !strings.Contains(out, strings.Join(wantReport, "\n")) {
-			t.Fatalf("stdout must report each posted comment in posting order:\n%s", out)
+		wantReport := fmt.Sprintf("posted %s (gh issue comment 42 --body-file %s)", files[0], files[0])
+		if !strings.Contains(out, wantReport) {
+			t.Fatalf("stdout must report the posted comment:\n%s", out)
 		}
 		if strings.Contains(out, "\ngh issue comment ") {
 			t.Errorf("post mode must report posted comments, not print bare commands:\n%s", out)
@@ -809,8 +792,9 @@ func TestReceiptPostsCommentsWhenAsked(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if strings.TrimSpace(string(logged)) != strings.Join(wantCalls, "\n") {
-			t.Fatalf("gh calls = %q, want exactly %q in posting order", string(logged), strings.Join(wantCalls, "\n"))
+		wantCall := "gh issue comment 42 --body-file " + files[0]
+		if strings.TrimSpace(string(logged)) != wantCall {
+			t.Fatalf("gh calls = %q, want exactly %q", string(logged), wantCall)
 		}
 	})
 
@@ -842,32 +826,22 @@ func TestReceiptPostsCommentsWhenAsked(t *testing.T) {
 		}
 	})
 
-	t.Run("mid-chain gh failure stops visibly with posted and unposted parts named", func(t *testing.T) {
-		bin, root, fakePath, _, pre, post := newScenario(t)
-		out, code := runReceipt(t, bin, root, fakePath, emitArgs(pre, post)...)
-		if code != 0 {
-			t.Fatalf("emit run failed: exit %d\n%s", code, out)
-		}
-		files := receiptCommentFiles(t, root)
-		if len(files) < 2 {
-			t.Fatalf("expected at least two comment files, got %v", files)
-		}
-
+	t.Run("failing gh invocation stops visibly naming the command and the unposted file", func(t *testing.T) {
 		bin, root, fakePath, logPath, pre, post := newScenario(t)
-		failing := filepath.Join(root, "receipt-0002.md")
+		failing := filepath.Join(root, "receipt-0001.md")
 		cmd := exec.Command(bin, emitArgs(pre, post, "--post")...)
 		cmd.Dir = root
 		cmd.Env = append(append(os.Environ(), "HOME="+root), "PATH="+fakePath, "FAIL_MARKER="+failing)
 		raw, err := cmd.CombinedOutput()
 		var exitErr *exec.ExitError
 		if !errors.As(err, &exitErr) || exitErr.ExitCode() == 0 {
-			t.Fatalf("mid-chain failure must exit non-zero, got %v\n%s", err, raw)
+			t.Fatalf("gh failure must exit non-zero, got %v\n%s", err, raw)
 		}
-		out = string(raw)
+		out := string(raw)
 		for _, want := range []string{
 			"gh issue comment 42 --body-file " + failing,
-			"posted: receipt-0001.md",
-			"not posted: " + filepath.Base(failing),
+			"posted: (none)",
+			"not posted: receipt-0001.md",
 		} {
 			if !strings.Contains(out, want) {
 				t.Errorf("failure output must name %q:\n%s", want, out)
@@ -877,11 +851,9 @@ func TestReceiptPostsCommentsWhenAsked(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		lines := strings.Split(strings.TrimSpace(string(logged)), "\n")
-		if len(lines) != 2 ||
-			lines[0] != "gh issue comment 42 --body-file "+filepath.Join(root, "receipt-0001.md") ||
-			lines[1] != "gh issue comment 42 --body-file "+failing {
-			t.Fatalf("gh calls = %q, want exactly two: post receipt-0001.md then fail on %s with no retry", string(logged), failing)
+		wantCall := "gh issue comment 42 --body-file " + failing
+		if strings.TrimSpace(string(logged)) != wantCall {
+			t.Fatalf("gh calls = %q, want exactly one failing call %q with no retry", string(logged), wantCall)
 		}
 	})
 
@@ -908,8 +880,8 @@ func TestReceiptPostsCommentsWhenAsked(t *testing.T) {
 			t.Fatal(err)
 		}
 		sort.Strings(files)
-		if len(files) < 2 {
-			t.Fatalf("files must land in the invoking directory, got %v", files)
+		if len(files) != 1 {
+			t.Fatalf("the oversized output must land as exactly one file in the invoking directory, got %v", files)
 		}
 		if stray := receiptCommentFiles(t, root); len(stray) != 0 {
 			t.Fatalf("project root must stay clean when invoked from a subdirectory, found %v", stray)
@@ -918,12 +890,9 @@ func TestReceiptPostsCommentsWhenAsked(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var wantCalls []string
-		for _, name := range files {
-			wantCalls = append(wantCalls, "gh issue comment 42 --body-file "+name)
-		}
-		if strings.TrimSpace(string(logged)) != strings.Join(wantCalls, "\n") {
-			t.Fatalf("gh calls = %q, want absolute body-file paths %v", string(logged), wantCalls)
+		wantCall := "gh issue comment 42 --body-file " + files[0]
+		if strings.TrimSpace(string(logged)) != wantCall {
+			t.Fatalf("gh calls = %q, want the absolute body-file path %q", string(logged), wantCall)
 		}
 	})
 }
