@@ -189,6 +189,9 @@ func (c *evidenceCursor) consumeContinuationReceiptHeader(expectedIdentity *queu
 	if part < 1 || part-1 >= len(c.partContinued) || !c.partContinued[part-1] {
 		return nil
 	}
+	if c.receiptHeader.protocol == evidenceProtocolV2 {
+		return fmt.Errorf("evidence/v2 receipts must not continue across comments")
+	}
 	c.skipBlanks()
 	if c.at >= len(c.lines) || !strings.HasPrefix(c.lines[c.at], "Protocol:") {
 		return fmt.Errorf("continuation receipt must repeat its version metadata")
@@ -332,6 +335,13 @@ func parseEvidenceReceiptDocument(
 	}
 	receipt.header = header
 
+	if header.protocol == evidenceProtocolV2 {
+		if reason := receiptV2DocumentBoundsIssue(document); reason != "" {
+			fail(reason)
+			return receipt, issues
+		}
+	}
+
 	cursor := newEvidenceCursorFromDocument(document)
 	cursor.at = headerEnd
 	if header.versioned {
@@ -404,6 +414,7 @@ func parseEvidenceReceiptDocument(
 			return receipt, issues
 		}
 		receipt.preOutputSHA = preOutputSHA
+		receiptV2EnforceOutputBounds("pre", receipt.preOutput, receipt.preBytes, receipt.preOutputSHA, fail)
 	}
 
 	cursor.skipBlanks()
@@ -479,6 +490,7 @@ func parseEvidenceReceiptDocument(
 			return receipt, issues
 		}
 		receipt.postOutputSHA = postOutputSHA
+		receiptV2EnforceOutputBounds("post", receipt.postOutput, receipt.postBytes, receipt.postOutputSHA, fail)
 	}
 
 	cursor.skipBlanks()

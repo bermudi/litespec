@@ -29,13 +29,26 @@ func v2TestLargeOutput(prefix string) string {
 	return strings.Join(lines, "\n")
 }
 
+func v2TestMediumOutput(prefix string) string {
+	lines := make([]string, 0, 50)
+	for i := 0; i < 50; i++ {
+		lines = append(lines, fmt.Sprintf("%s line %03d of medium bounded-receipt output that still splits for chunking", prefix, i))
+	}
+	return strings.Join(lines, "\n")
+}
+
 func v2TestIssues(t *testing.T, comments []string) []ValidationIssue {
 	t.Helper()
-	merged := mergeContinuedCommentRecords(comments)
-	if len(merged) != 1 {
-		t.Fatalf("expected one merged receipt comment, got %d", len(merged))
+	var records []continuedComment
+	for _, record := range mergeContinuedCommentRecords(comments) {
+		if strings.TrimSpace(record.text) != "" {
+			records = append(records, record)
+		}
 	}
-	document := evidencePayloadDocument(newEvidenceDocumentFromComment(merged[0]))
+	if len(records) != 1 {
+		t.Fatalf("expected one merged receipt comment, got %d", len(records))
+	}
+	document := evidencePayloadDocument(newEvidenceDocumentFromComment(records[0]))
 	identity := queueUnitIdentity{Occurrence: 1, Heading: "My outcome"}
 	issues, _ := evidenceReceiptIssuesForDocument(
 		document,
@@ -202,11 +215,14 @@ func TestValidateEvidenceV2Receipts(t *testing.T) {
 	})
 
 	t.Run("v2 receipt must not continue or chunk across comments", func(t *testing.T) {
-		large := v2TestRequest(v2TestLargeOutput("pre"), v2TestLargeOutput("post"))
-		large.CommentLimit = 4096
-		v1Chain, err := AssembleEvidenceReceiptComments(large)
+		chunkSource := v2TestRequest(v2TestMediumOutput("pre"), "outcome present\n")
+		chunkSource.CommentLimit = 4096
+		v1Chain, err := AssembleEvidenceReceiptComments(chunkSource)
 		if err != nil {
 			t.Fatalf("v1 assembly refused: %v", err)
+		}
+		if len(v1Chain) < 2 {
+			t.Fatalf("expected the chunked source to split across comments, got %d comments", len(v1Chain))
 		}
 
 		v2Chunked := make([]string, len(v1Chain))

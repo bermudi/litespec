@@ -751,6 +751,9 @@ func (c *evidenceCursor) consumeRawOutput(phase, declaredDigest, expectedHeading
 	if c.at >= len(c.lines) {
 		return "", false, fmt.Sprintf("must include %s raw command output in a fenced block", phase)
 	}
+	if c.receiptHeader != nil && c.receiptHeader.protocol == evidenceProtocolV2 && c.lines[c.at] == "Raw output chunk:" {
+		return "", false, "must not use the raw output chunk form: evidence/v2 is a single-comment protocol"
+	}
 	if c.lines[c.at] != "Raw output chunk:" {
 		output, ok := c.consumeFence()
 		if !ok || strings.TrimSpace(output) == "" {
