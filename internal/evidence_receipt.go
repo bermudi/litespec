@@ -27,19 +27,23 @@ type evidenceReceiptHeader struct {
 }
 
 type parsedEvidenceReceipt struct {
-	header     evidenceReceiptHeader
-	identity   *queueUnitIdentity
-	heading    string
-	verify     string
-	digest     string
-	preSHA     string
-	preStatus  string
-	preOutput  string
-	preScope   string
-	postSHA    string
-	postStatus string
-	postOutput string
-	postScope  string
+	header        evidenceReceiptHeader
+	identity      *queueUnitIdentity
+	heading       string
+	verify        string
+	digest        string
+	preSHA        string
+	preStatus     string
+	preOutput     string
+	preBytes      string
+	preOutputSHA  string
+	preScope      string
+	postSHA       string
+	postStatus    string
+	postOutput    string
+	postBytes     string
+	postOutputSHA string
+	postScope     string
 }
 
 func receiptVersionField(line string) bool {
