@@ -306,6 +306,7 @@ func parseEvidenceReceiptDocument(
 	heading string,
 	expectedIdentity *queueUnitIdentity,
 ) (parsedEvidenceReceipt, []ValidationIssue) {
+	payloadBytes := len(strings.Join(document.lines, "\n"))
 	document = document.trimSpace()
 	receipt := parsedEvidenceReceipt{
 		heading:  heading,
@@ -336,7 +337,7 @@ func parseEvidenceReceiptDocument(
 	receipt.header = header
 
 	if header.protocol == evidenceProtocolV2 {
-		if reason := receiptV2DocumentBoundsIssue(document); reason != "" {
+		if reason := receiptV2DocumentBoundsIssue(document, payloadBytes); reason != "" {
 			fail(reason)
 			return receipt, issues
 		}

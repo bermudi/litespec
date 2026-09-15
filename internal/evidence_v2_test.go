@@ -185,10 +185,17 @@ func TestValidateEvidenceV2Receipts(t *testing.T) {
 		})
 		v2TestRequireIssue(t, []string{inconsistent}, "reconstruction arithmetic does not hold")
 
-		zeroMarker := v2TestMutateFencePayload(t, elided, "pre", func(payload string) string {
-			return regexp.MustCompile(`\.\.\. \d+ bytes elided \.\.\.`).ReplaceAllLiteralString(payload, "... 0 bytes elided ...")
+		leadingZeroMarker := v2TestMutateFencePayload(t, elided, "pre", func(payload string) string {
+			return regexp.MustCompile(`\.\.\. \d+ bytes elided \.\.\.`).ReplaceAllStringFunc(
+				payload,
+				func(marker string) string {
+					var n int
+					fmt.Sscanf(marker, "... %d bytes elided ...", &n)
+					return fmt.Sprintf("... 0%d bytes elided ...", n)
+				},
+			)
 		})
-		v2TestRequireIssue(t, []string{zeroMarker}, "zero elided")
+		v2TestRequireIssue(t, []string{leadingZeroMarker}, "neither holds the full output nor carries an elision marker")
 
 		missingMarker := v2TestMutateFencePayload(t, elided, "pre", func(payload string) string {
 			return regexp.MustCompile(`(?m)^\.\.\. \d+ bytes elided \.\.\.\n`).ReplaceAllLiteralString(payload, "")
@@ -255,6 +262,24 @@ func TestValidateEvidenceV2Receipts(t *testing.T) {
 			return payload + "\n" + strings.Repeat("x", receiptV2TotalBudget)
 		})
 		v2TestRequireIssue(t, []string{padded}, "byte evidence/v2 receipt budget")
+
+		wideHeading := strings.Replace(small, "## My outcome", "## "+strings.Repeat("h", receiptV2TotalBudget), 1)
+		if !strings.HasPrefix(wideHeading, "## "+strings.Repeat("h", 100)) {
+			t.Fatal("heading replacement did not apply")
+		}
+		v2TestRequireIssue(t, []string{wideHeading}, "byte evidence/v2 receipt budget")
+
+		atBoundary := strings.Replace(small, "## My outcome", "## "+strings.Repeat("z", receiptV2TotalBudget-len(small)+len("My outcome")), 1)
+		if len(atBoundary) != receiptV2TotalBudget {
+			t.Fatalf("expected a %d-byte comment, got %d", receiptV2TotalBudget, len(atBoundary))
+		}
+		v2TestRequireNoIssues(t, []string{atBoundary})
+
+		overBoundary := strings.Replace(atBoundary, "## ", "## y", 1)
+		if len(overBoundary) != receiptV2TotalBudget+1 {
+			t.Fatalf("expected a %d-byte comment, got %d", receiptV2TotalBudget+1, len(overBoundary))
+		}
+		v2TestRequireIssue(t, []string{overBoundary}, "byte evidence/v2 receipt budget")
 	})
 
 	t.Run("v1 and legacy receipts still validate verbatim", func(t *testing.T) {

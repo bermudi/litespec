@@ -538,6 +538,12 @@ type evidenceDocument struct {
 	partIndexes            []int
 	partContinued          []bool
 	trackCommentBoundaries bool
+
+	// prefixBytes counts the wrapper bytes dropped ahead of the payload
+	// (heading or identity lines plus the Evidence: label, newline
+	// included); budget checks add it back so they measure the span a
+	// producer would have posted, not the payload alone.
+	prefixBytes int
 }
 
 func newEvidenceDocument(text string) evidenceDocument {
@@ -579,18 +585,28 @@ func (d evidenceDocument) trimSpace() evidenceDocument {
 		partIndexes:            d.partIndexes[start:end],
 		partContinued:          d.partContinued,
 		trackCommentBoundaries: d.trackCommentBoundaries,
+		prefixBytes:            d.prefixBytes,
 	}
 }
 
 func (d evidenceDocument) afterLine(index int) evidenceDocument {
+	dropped := index
+	if dropped > len(d.lines) {
+		dropped = len(d.lines)
+	}
+	prefixBytes := d.prefixBytes
+	for _, line := range d.lines[:dropped] {
+		prefixBytes += len(line) + 1
+	}
 	if index >= len(d.lines) {
-		return evidenceDocument{partContinued: d.partContinued, trackCommentBoundaries: d.trackCommentBoundaries}
+		return evidenceDocument{partContinued: d.partContinued, trackCommentBoundaries: d.trackCommentBoundaries, prefixBytes: prefixBytes}
 	}
 	return evidenceDocument{
 		lines:                  d.lines[index:],
 		partIndexes:            d.partIndexes[index:],
 		partContinued:          d.partContinued,
 		trackCommentBoundaries: d.trackCommentBoundaries,
+		prefixBytes:            prefixBytes,
 	}
 }
 

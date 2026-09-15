@@ -9,16 +9,19 @@ import (
 	"strings"
 )
 
-var evidenceV2ElisionMarkerPattern = regexp.MustCompile(`^\.\.\. ([0-9]+) bytes elided \.\.\.$`)
+var evidenceV2ElisionMarkerPattern = regexp.MustCompile(`^\.\.\. ([1-9][0-9]*) bytes elided \.\.\.$`)
 var evidenceV2OutputSHAPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 // receiptV2DocumentBoundsIssue reports the first document-level v2 bound the
-// receipt violates: the fixed byte budget, or the single-comment rule — a v2
-// receipt never ends with the continuation marker.
-func receiptV2DocumentBoundsIssue(document evidenceDocument) string {
-	size := len(strings.Join(document.lines, "\n"))
+// receipt violates: the fixed byte budget, measured over the same span
+// assembly budgets — the wrapper lines dropped ahead of the payload
+// (heading or identity lines plus the Evidence: label) together with the
+// payload — or the single-comment rule: a v2 receipt never ends with the
+// continuation marker.
+func receiptV2DocumentBoundsIssue(document evidenceDocument, payloadBytes int) string {
+	size := document.prefixBytes + payloadBytes
 	if size > receiptV2TotalBudget {
-		return fmt.Sprintf("exceeds the %d-byte evidence/v2 receipt budget (%d bytes)", receiptV2TotalBudget, size)
+		return fmt.Sprintf("exceeds the %d-byte evidence/v2 receipt budget (%d bytes including the heading wrapper)", receiptV2TotalBudget, size)
 	}
 	for i := len(document.lines) - 1; i >= 0; i-- {
 		if strings.TrimSpace(document.lines[i]) == "" {
@@ -63,10 +66,12 @@ func receiptV2EnforceOutputBounds(phase, payload, declaredBytes, declaredSHA str
 }
 
 // receiptV2EnforceElisionArithmetic checks an elided fence: exactly one
-// elision marker with a positive count, and fence bytes minus the marker
-// plus the elided count must equal the declared byte count. A spurious
-// marker-shaped line inside head or tail inflates the fence bytes, breaks
-// the arithmetic, and surfaces here as a visible error.
+// canonical elision marker — a positive count without leading zeros, the
+// only form assembly emits — and fence bytes minus the marker plus the
+// elided count must equal the declared byte count. Marker-shaped lines
+// that deviate from the canonical form count as output content; a
+// spurious canonical marker inside head or tail inflates the fence bytes,
+// breaks the arithmetic, and surfaces here as a visible error.
 func receiptV2EnforceElisionArithmetic(phase, payload string, declared int, fail func(string)) {
 	lines := strings.Split(payload, "\n")
 	var markers []int
@@ -83,10 +88,6 @@ func receiptV2EnforceElisionArithmetic(phase, payload string, declared int, fail
 	default:
 		index := markers[0]
 		elided, _ := strconv.Atoi(evidenceV2ElisionMarkerPattern.FindStringSubmatch(lines[index])[1])
-		if elided == 0 {
-			fail(fmt.Sprintf("carries an elision marker declaring zero elided %s bytes", phase))
-			return
-		}
 		separator := 0
 		if index != len(lines)-1 {
 			separator = 1
