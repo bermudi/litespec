@@ -8,7 +8,7 @@ Byte-exact evidence assembly and queue-body bookkeeping are CLI responsibilities
 
 ### Requirement: Receipt Emission
 
-`litespec receipt` SHALL assemble one red-green evidence receipt for a resolved queue unit from labeled run evidence and emit numbered comment files plus the exact gh commands that post them, without invoking any gh write unless posting is explicitly requested. Resolution from a local queue file emits the numbered files without gh commands, since no issue is addressed. The command SHALL resolve the unit by exact heading and positive same-heading occurrence from the live issue body or a local queue file and SHALL refuse ambiguous, unknown, or out-of-range resolution. It SHALL refuse equal pre and post SHAs, a zero pre exit status, a nonzero post exit status, and a pre commit that is not an ancestor of the post commit, before writing any file. The assembled receipt SHALL carry the versioned evidence header with a Receipt ID identical to the validator's derivation for the same logical receipt, SHALL split oversized content only at legal boundaries using the exact continuation marker or the explicit chunk form, and SHALL parse clean through the existing evidence grammar before any file is written.
+`litespec receipt` SHALL assemble one red-green evidence receipt for a resolved queue unit from labeled run evidence and emit numbered comment files plus the exact gh commands that post them, without invoking any gh write unless posting is explicitly requested. Resolution from a local queue file emits the numbered files without gh commands, since no issue is addressed. The command SHALL resolve the unit by exact heading and positive same-heading occurrence from the live issue body or a local queue file and SHALL refuse ambiguous, unknown, or out-of-range resolution. It SHALL refuse equal pre and post SHAs, a zero pre exit status, a nonzero post exit status, and a pre commit that is not an ancestor of the post commit, before writing any file. The assembled receipt SHALL carry the versioned evidence header with a Receipt ID identical to the validator's derivation for the same logical receipt and SHALL parse clean through the existing evidence grammar before any file is written. Newly assembled receipts SHALL declare `Protocol: evidence/v2` and conform to the Bounded Output Excerpts requirement; the exact continuation marker and explicit chunk form remain valid only for receipts declaring earlier protocols.
 
 #### Scenario: Ambiguous heading refused
 
@@ -27,8 +27,32 @@ Byte-exact evidence assembly and queue-body bookkeeping are CLI responsibilities
 
 #### Scenario: Oversized output splits legally
 
-- **WHEN** a raw output block exceeds the GitHub comment cap
+- **WHEN** a raw output block exceeds the GitHub comment cap in a receipt declaring an earlier protocol
 - **THEN** the split uses the explicit chunk form with repeated receipt identity and consecutive chunk numbering, or falls after a scope line, and every non-final comment ends with the exact continuation marker
+
+### Requirement: Bounded Output Excerpts
+
+Newly assembled receipts SHALL declare `Protocol: evidence/v2` and carry bounded output excerpts: each run position records the full output's byte length and SHA-256 beside one fence holding either the verbatim complete output, when it fits the excerpt budget, or a deterministic head excerpt, one literal elision marker naming the exact elided byte count, and a deterministic tail excerpt. One v2 receipt SHALL fit one comment within the fixed byte budget; it SHALL NOT continue across comments or use the chunk form, and assembly SHALL refuse visibly when identity and status fields alone exceed the budget. Excerpt budgets SHALL be fixed constants, never configuration. Validation SHALL dispatch on the declared protocol: v2 receipts must be arithmetically consistent (head plus elided plus tail equals the declared byte count), unelided fences must hash to the declared SHA-256, and v2 receipts that continue, chunk, or exceed the budget SHALL error visibly. Receipts declaring `evidence/v1` or the legacy unversioned shape SHALL continue to validate under their retained parsers, including continuation and chunk forms.
+
+#### Scenario: Oversized output emits one bounded comment
+
+- **WHEN** a raw output exceeds the excerpt budget
+- **THEN** the emitted v2 receipt is a single comment whose fence carries the head excerpt, the elision marker with the exact elided byte count, and the tail excerpt, beside the full output's byte count and SHA-256
+
+#### Scenario: Small output stays verbatim
+
+- **WHEN** a raw output fits the excerpt budget
+- **THEN** the fence holds the complete output with no elision marker, and the declared byte count and SHA-256 match the fenced bytes
+
+#### Scenario: v2 never continues
+
+- **WHEN** a receipt declaring evidence/v2 ends with the continuation marker, uses the chunk form, or exceeds the byte budget
+- **THEN** validation errors visibly instead of joining chunks or reconstructing output
+
+#### Scenario: Earlier-protocol receipts keep their parser
+
+- **WHEN** a checked unit's receipt declares evidence/v1 or the legacy unversioned shape and is valid under its own grammar
+- **THEN** it validates exactly as before, including continuation and chunk forms
 
 ### Requirement: Opt-in Comment Posting
 

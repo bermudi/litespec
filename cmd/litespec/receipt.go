@@ -123,7 +123,7 @@ func cmdReceipt(args []string) error {
 		return err
 	}
 
-	comments, err := internal.AssembleEvidenceReceiptComments(internal.ReceiptAssemblyRequest{
+	comments, err := internal.AssembleEvidenceV2ReceiptComments(internal.ReceiptAssemblyRequest{
 		Occurrence:    resolved.Occurrence,
 		Heading:       resolved.Heading,
 		Verify:        resolved.Verify,
@@ -216,25 +216,29 @@ func printReceiptHelp() {
 	fmt.Print(`Usage: litespec receipt --issue <N> | --queue <path> --heading "<heading>" [flags]
 
 Assemble one validator-clean evidence receipt for a resolved queue unit and
-emit numbered comment files (receipt-0001.md, receipt-0002.md, ...). Issue
-mode also prints the exact gh issue comment commands in posting order; queue
-mode emits files only. By default the command never posts and never ticks
-checkboxes. Opt-in --post runs the printed gh issue comment commands itself,
-strictly in posting order, reporting each posted comment; a failing gh
-invocation stops the chain naming the posted and unposted parts, with no
-retry or reordering. Posting never ticks checkboxes.
+emit a single bounded evidence/v2 comment file (receipt-0001.md). Outputs
+are excerpted head/marker/tail beside the full output's byte count and
+SHA-256 so one receipt always fits one comment; oversized output never
+chunks and the receipt never continues. Issue mode also prints the exact
+gh issue comment command; queue mode emits the file only. By default the
+command never posts and never ticks checkboxes. Opt-in --post runs the
+printed gh issue comment command itself, reporting the posted comment; a
+failing gh invocation stops with a visible error naming the failing
+command and the unposted file, with no retry. Posting never ticks
+checkboxes.
 
 The unit is resolved by exact heading and positive same-heading occurrence,
 with the same identity semantics as litespec digest. Ambiguous, unknown, or
-out-of-range headings, unreadable output files, and ancestry violations are
-refused before any file is written; the assembled receipt self-parses
-through the existing evidence grammar. Posted receipts are independently
+out-of-range headings, unreadable output files, ancestry violations, and
+identity/status fields that exceed the fixed receipt budget are refused
+before any file is written; the assembled receipt self-parses through the
+existing evidence grammar. Posted receipts are independently
 re-verified by ` + "`litespec validate --issue <N>`" + ` (and the default
 labeled-issue scan): every versioned Receipt ID is recomputed from the
 posted comment's own fields, and a mismatch fails validation. Emitted file paths and printed
 commands are absolute, so posting and pasted commands work from any
-directory. A mid-sequence write failure removes the already-written files
-so no partial set is left behind.
+directory. A failed comment-file write removes any already-written file so
+no partial set is left behind.
 
 Flags:
   --issue <N>            Fetch the GH issue by number (requires gh)

@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"regexp"
 	"strconv"
 	"strings"
@@ -378,6 +380,199 @@ func TestReceiptAssemblyEngine(t *testing.T) {
 		}
 		if identity != (queueUnitIdentity{Occurrence: 1, Heading: "My outcome"}) {
 			t.Fatalf("assembled rebuild receipt resolves to the wrong identity: %+v", identity)
+		}
+	})
+}
+
+var boundedElisionMarker = regexp.MustCompile(`^\.\.\. ([1-9][0-9]*) bytes elided \.\.\.$`)
+
+func testOutputSHA256(output string) string {
+	sum := sha256.Sum256([]byte(output))
+	return hex.EncodeToString(sum[:])
+}
+
+func v2TestFences(t *testing.T, comment string) [][]string {
+	t.Helper()
+	var fences [][]string
+	var current []string
+	open := false
+	for _, line := range strings.Split(comment, "\n") {
+		if line == "```" {
+			if open {
+				fences = append(fences, current)
+				current = nil
+			}
+			open = !open
+			continue
+		}
+		if open {
+			current = append(current, line)
+		}
+	}
+	if open || len(fences) != 2 {
+		t.Fatalf("v2 receipt must hold exactly two closed fences, got %d", len(fences))
+	}
+	return fences
+}
+
+func v2TestMarkerLines(comment string) []string {
+	var markers []string
+	for _, line := range strings.Split(comment, "\n") {
+		if boundedElisionMarker.MatchString(line) {
+			markers = append(markers, line)
+		}
+	}
+	return markers
+}
+
+func TestBoundedReceiptAssembly(t *testing.T) {
+	t.Run("bounded excerpt fits one comment with elision marker", func(t *testing.T) {
+		request := assemblyTestRequest()
+		request.Pre.Output = strings.Repeat("pre line\n", 1200)
+		comments, err := AssembleEvidenceV2ReceiptComments(request)
+		if err != nil {
+			t.Fatalf("assembly refused elidable run evidence: %v", err)
+		}
+		if len(comments) != 1 {
+			t.Fatalf("v2 receipt must be a single comment, got %d", len(comments))
+		}
+		if len(comments[0]) > 8192 {
+			t.Fatalf("v2 receipt is %d bytes, over the 8192-byte budget", len(comments[0]))
+		}
+		if !strings.Contains(comments[0], "Protocol: evidence/v2") {
+			t.Fatal("v2 receipt must declare Protocol: evidence/v2")
+		}
+		assemblyAssertFenceDelimiters(t, comments)
+		fences := v2TestFences(t, comments[0])
+		markerAt := -1
+		for i, line := range fences[0] {
+			if boundedElisionMarker.MatchString(line) {
+				if markerAt >= 0 {
+					t.Fatal("elided pre output must carry exactly one elision marker")
+				}
+				markerAt = i
+			}
+		}
+		if markerAt < 0 {
+			t.Fatal("oversized pre output must carry an elision marker")
+		}
+		head := ""
+		if markerAt > 0 {
+			head = strings.Join(fences[0][:markerAt], "\n") + "\n"
+		}
+		tail := strings.Join(fences[0][markerAt+1:], "\n")
+		if !strings.HasPrefix(request.Pre.Output, head) {
+			t.Fatal("head excerpt is not an exact byte prefix of the output")
+		}
+		if !strings.HasSuffix(request.Pre.Output, tail) {
+			t.Fatal("tail excerpt is not an exact byte suffix of the output")
+		}
+		elided, err := strconv.Atoi(boundedElisionMarker.FindStringSubmatch(fences[0][markerAt])[1])
+		if err != nil {
+			t.Fatalf("elision marker carries a non-numeric count: %v", err)
+		}
+		if len(head)+elided+len(tail) != len(request.Pre.Output) {
+			t.Fatalf("elision arithmetic is off: head %d + elided %d + tail %d != %d",
+				len(head), elided, len(tail), len(request.Pre.Output))
+		}
+		post := strings.Join(fences[1], "\n")
+		if post != request.Post.Output {
+			t.Fatalf("output within budget must appear verbatim, got %q", post)
+		}
+		if markers := v2TestMarkerLines(comments[0]); len(markers) != 1 {
+			t.Fatalf("expected exactly one elision marker in the receipt, got %d", len(markers))
+		}
+	})
+
+	t.Run("full output metadata carries bytes and sha256", func(t *testing.T) {
+		request := assemblyTestRequest()
+		comments, err := AssembleEvidenceV2ReceiptComments(request)
+		if err != nil {
+			t.Fatalf("assembly refused small run evidence: %v", err)
+		}
+		receipt := assemblySelfParse(t, comments)
+		if receipt.preBytes != strconv.Itoa(len(request.Pre.Output)) {
+			t.Fatalf("pre bytes must record the full output length, got %q", receipt.preBytes)
+		}
+		if receipt.preOutputSHA != testOutputSHA256(request.Pre.Output) {
+			t.Fatal("pre output sha256 must record the full output hash")
+		}
+		if receipt.postBytes != strconv.Itoa(len(request.Post.Output)) {
+			t.Fatalf("post bytes must record the full output length, got %q", receipt.postBytes)
+		}
+		if receipt.postOutputSHA != testOutputSHA256(request.Post.Output) {
+			t.Fatal("post output sha256 must record the full output hash")
+		}
+		fences := v2TestFences(t, comments[0])
+		if len(strings.Join(fences[0], "\n")) != len(request.Pre.Output) {
+			t.Fatal("unelided fence must hold the full output verbatim")
+		}
+		empty := assemblyTestRequest()
+		empty.Pre.Output = ""
+		emptyComments, err := AssembleEvidenceV2ReceiptComments(empty)
+		if err != nil {
+			t.Fatalf("assembly refused empty pre output: %v", err)
+		}
+		emptyReceipt := assemblySelfParse(t, emptyComments)
+		if emptyReceipt.preBytes != "0" {
+			t.Fatalf("empty output must declare zero bytes, got %q", emptyReceipt.preBytes)
+		}
+		if emptyReceipt.preOutputSHA != testOutputSHA256("") {
+			t.Fatal("empty output must declare the empty-string sha256")
+		}
+	})
+
+	t.Run("receipt ID v2 derives from bounded canonical fields", func(t *testing.T) {
+		request := assemblyTestRequest()
+		comments, err := AssembleEvidenceV2ReceiptComments(request)
+		if err != nil {
+			t.Fatalf("assembly refused run evidence: %v", err)
+		}
+		v2IDPattern := regexp.MustCompile(`receipt-sha256-v2:[0-9a-f]{64}`)
+		embedded := v2IDPattern.FindString(comments[0])
+		if embedded == "" {
+			t.Fatal("v2 receipt must carry a receipt-sha256-v2: Receipt ID")
+		}
+		receipt := assemblySelfParse(t, comments)
+		if derived := receiptIDForCanonicalReceipt(receipt); derived != embedded {
+			t.Fatalf("Receipt ID mismatch: engine emitted %s, validator derives %s", embedded, derived)
+		}
+		repeated, err := AssembleEvidenceV2ReceiptComments(request)
+		if err != nil {
+			t.Fatalf("assembly refused identical run evidence: %v", err)
+		}
+		if v2IDPattern.FindString(repeated[0]) != embedded {
+			t.Fatal("identical runs must yield identical receipt IDs")
+		}
+		changed := assemblyTestRequest()
+		changed.Post.Output = "changed outcome\n"
+		changedComments, err := AssembleEvidenceV2ReceiptComments(changed)
+		if err != nil {
+			t.Fatalf("assembly refused changed run evidence: %v", err)
+		}
+		if v2IDPattern.FindString(changedComments[0]) == embedded {
+			t.Fatal("changed output must yield a changed receipt ID")
+		}
+	})
+
+	t.Run("oversized metadata refused without excerpts", func(t *testing.T) {
+		request := assemblyTestRequest()
+		request.Verify = "echo " + strings.Repeat("x", 9000)
+		request.UnitDigest = fixtureUnitDigest(request.Verify)
+		request.Pre.Output = strings.Repeat("pre line\n", 1200)
+		request.Post.Output = strings.Repeat("post line\n", 1200)
+		comments, err := AssembleEvidenceV2ReceiptComments(request)
+		if err == nil {
+			t.Fatal("expected a visible refusal when fixed fields alone exceed the budget")
+		}
+		if comments != nil {
+			t.Fatalf("refusal produced partial output: %d comments", len(comments))
+		}
+		if !strings.Contains(err.Error(), "8192") {
+			t.Fatalf("refusal does not name the byte budget: %v", err)
+		}
+		if !strings.Contains(err.Error(), "Verify") {
+			t.Fatalf("refusal does not name the oversized field: %v", err)
 		}
 	})
 }

@@ -12,11 +12,13 @@ import (
 const (
 	evidenceProtocolLegacy = "evidence/legacy-v0"
 	evidenceProtocolV1     = "evidence/v1"
+	evidenceProtocolV2     = "evidence/v2"
 	receiptIDPrefix        = "receipt-sha256-v1:"
+	receiptIDV2Prefix      = "receipt-sha256-v2:"
 	legacyReceiptIDPrefix  = "legacy-receipt-sha256-v1:"
 )
 
-var receiptIDPattern = regexp.MustCompile(`^(?:receipt-sha256-v1|legacy-receipt-sha256-v1):[0-9a-f]{64}$`)
+var receiptIDPattern = regexp.MustCompile(`^(?:receipt-sha256-v2|receipt-sha256-v1|legacy-receipt-sha256-v1):[0-9a-f]{64}$`)
 
 type evidenceReceiptHeader struct {
 	protocol        string
@@ -27,19 +29,23 @@ type evidenceReceiptHeader struct {
 }
 
 type parsedEvidenceReceipt struct {
-	header     evidenceReceiptHeader
-	identity   *queueUnitIdentity
-	heading    string
-	verify     string
-	digest     string
-	preSHA     string
-	preStatus  string
-	preOutput  string
-	preScope   string
-	postSHA    string
-	postStatus string
-	postOutput string
-	postScope  string
+	header        evidenceReceiptHeader
+	identity      *queueUnitIdentity
+	heading       string
+	verify        string
+	digest        string
+	preSHA        string
+	preStatus     string
+	preOutput     string
+	preBytes      string
+	preOutputSHA  string
+	preScope      string
+	postSHA       string
+	postStatus    string
+	postOutput    string
+	postBytes     string
+	postOutputSHA string
+	postScope     string
 }
 
 func receiptVersionField(line string) bool {
@@ -75,7 +81,12 @@ func consumeVersionedReceiptHeader(cursor *evidenceCursor) (evidenceReceiptHeade
 	if err != nil {
 		return evidenceReceiptHeader{}, err
 	}
-	if protocol != evidenceProtocolV1 {
+	idPrefix := receiptIDPrefix
+	switch protocol {
+	case evidenceProtocolV1:
+	case evidenceProtocolV2:
+		idPrefix = receiptIDV2Prefix
+	default:
 		return evidenceReceiptHeader{}, fmt.Errorf("unknown evidence protocol %q", protocol)
 	}
 
@@ -91,8 +102,8 @@ func consumeVersionedReceiptHeader(cursor *evidenceCursor) (evidenceReceiptHeade
 	if err != nil {
 		return evidenceReceiptHeader{}, err
 	}
-	if !strings.HasPrefix(receiptID, receiptIDPrefix) || !unitDigestPattern.MatchString(strings.TrimPrefix(receiptID, receiptIDPrefix)) {
-		return evidenceReceiptHeader{}, fmt.Errorf("Receipt ID must be %s followed by 64 lowercase hexadecimal characters", receiptIDPrefix)
+	if !strings.HasPrefix(receiptID, idPrefix) || !unitDigestPattern.MatchString(strings.TrimPrefix(receiptID, idPrefix)) {
+		return evidenceReceiptHeader{}, fmt.Errorf("Receipt ID must be %s followed by 64 lowercase hexadecimal characters", idPrefix)
 	}
 
 	header := evidenceReceiptHeader{
@@ -178,6 +189,9 @@ func (c *evidenceCursor) consumeContinuationReceiptHeader(expectedIdentity *queu
 	if part < 1 || part-1 >= len(c.partContinued) || !c.partContinued[part-1] {
 		return nil
 	}
+	if c.receiptHeader.protocol == evidenceProtocolV2 {
+		return fmt.Errorf("evidence/v2 receipts must not continue across comments")
+	}
 	c.skipBlanks()
 	if c.at >= len(c.lines) || !strings.HasPrefix(c.lines[c.at], "Protocol:") {
 		return fmt.Errorf("continuation receipt must repeat its version metadata")
@@ -229,19 +243,59 @@ func receiptCanonicalFields(receipt parsedEvidenceReceipt) []string {
 	}
 }
 
-func receiptIDForCanonicalReceipt(receipt parsedEvidenceReceipt) string {
+// receiptV2CanonicalFields bounds the ID inputs: the excerpt text stands in
+// for the full output, which participates only through its byte count and
+// SHA-256.
+func receiptV2CanonicalFields(receipt parsedEvidenceReceipt) []string {
+	occurrence := ""
+	heading := receipt.heading
+	if receipt.identity != nil {
+		occurrence = strconv.Itoa(receipt.identity.Occurrence)
+		heading = receipt.identity.Heading
+	}
+	return []string{
+		receipt.header.protocol,
+		receipt.header.digestAlgorithm,
+		receipt.header.recoveredFrom,
+		occurrence,
+		heading,
+		receipt.verify,
+		receipt.digest,
+		receipt.preSHA,
+		receipt.preStatus,
+		receipt.preBytes,
+		receipt.preOutputSHA,
+		receipt.preOutput,
+		receipt.preScope,
+		receipt.postSHA,
+		receipt.postStatus,
+		receipt.postBytes,
+		receipt.postOutputSHA,
+		receipt.postOutput,
+		receipt.postScope,
+	}
+}
+
+func receiptIDFromFields(prefix string, fields []string) string {
 	var canonical strings.Builder
-	for _, field := range receiptCanonicalFields(receipt) {
+	for _, field := range fields {
 		canonical.WriteString(strconv.Itoa(len([]byte(field))))
 		canonical.WriteByte(':')
 		canonical.WriteString(field)
 	}
 	sum := sha256.Sum256([]byte(canonical.String()))
+	return prefix + hex.EncodeToString(sum[:])
+}
+
+func receiptIDForCanonicalReceipt(receipt parsedEvidenceReceipt) string {
+	if receipt.header.protocol == evidenceProtocolV2 {
+		return receiptIDFromFields(receiptIDV2Prefix, receiptV2CanonicalFields(receipt))
+	}
 	prefix := receiptIDPrefix
 	if !receipt.header.versioned {
 		prefix = legacyReceiptIDPrefix
 	}
-	return prefix + hex.EncodeToString(sum[:])
+	return receiptIDFromFields(prefix, receiptCanonicalFields(receipt))
 }
 
 func parseEvidenceReceiptDocument(
@@ -252,6 +306,7 @@ func parseEvidenceReceiptDocument(
 	heading string,
 	expectedIdentity *queueUnitIdentity,
 ) (parsedEvidenceReceipt, []ValidationIssue) {
+	payloadBytes := len(strings.Join(document.lines, "\n"))
 	document = document.trimSpace()
 	receipt := parsedEvidenceReceipt{
 		heading:  heading,
@@ -280,6 +335,13 @@ func parseEvidenceReceiptDocument(
 		return receipt, issues
 	}
 	receipt.header = header
+
+	if header.protocol == evidenceProtocolV2 {
+		if reason := receiptV2DocumentBoundsIssue(document, payloadBytes); reason != "" {
+			fail(reason)
+			return receipt, issues
+		}
+	}
 
 	cursor := newEvidenceCursorFromDocument(document)
 	cursor.at = headerEnd
@@ -338,6 +400,24 @@ func parseEvidenceReceiptDocument(
 	}
 	receipt.preOutput = preOutput
 
+	if header.protocol == evidenceProtocolV2 {
+		cursor.skipBlanks()
+		preBytes, ok := cursor.consumeField("pre bytes")
+		if !ok {
+			fail("must include a `pre bytes:` field between the pre output fence and the pre scope line")
+			return receipt, issues
+		}
+		receipt.preBytes = preBytes
+		cursor.skipBlanks()
+		preOutputSHA, ok := cursor.consumeField("pre output sha256")
+		if !ok {
+			fail("must include a `pre output sha256:` field between pre bytes and the pre scope line")
+			return receipt, issues
+		}
+		receipt.preOutputSHA = preOutputSHA
+		receiptV2EnforceOutputBounds("pre", receipt.preOutput, receipt.preBytes, receipt.preOutputSHA, fail)
+	}
+
 	cursor.skipBlanks()
 	if cursor.at >= len(cursor.lines) {
 		fail("must include a matching Pre-evidence scope line")
@@ -395,6 +475,24 @@ func parseEvidenceReceiptDocument(
 		return receipt, issues
 	}
 	receipt.postOutput = postOutput
+
+	if header.protocol == evidenceProtocolV2 {
+		cursor.skipBlanks()
+		postBytes, ok := cursor.consumeField("post bytes")
+		if !ok {
+			fail("must include a `post bytes:` field between the post output fence and the post scope line")
+			return receipt, issues
+		}
+		receipt.postBytes = postBytes
+		cursor.skipBlanks()
+		postOutputSHA, ok := cursor.consumeField("post output sha256")
+		if !ok {
+			fail("must include a `post output sha256:` field between post bytes and the post scope line")
+			return receipt, issues
+		}
+		receipt.postOutputSHA = postOutputSHA
+		receiptV2EnforceOutputBounds("post", receipt.postOutput, receipt.postBytes, receipt.postOutputSHA, fail)
+	}
 
 	cursor.skipBlanks()
 	if cursor.at >= len(cursor.lines) {
